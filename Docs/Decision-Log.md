@@ -11,3 +11,11 @@ Consequence: M1 is implemented as a native Win32/GDI prototype. Runtime verifica
 ## 2026-07-21 — First implementation gate
 
 Implemented M1 source and static verification gate. `python Scripts/verify_milestone1.py` passes. Native configure/build/runtime tests remain pending on the toolchain blocker. Next queued task is M2 only after M1 runtime evidence.
+
+## 2026-07-21 — M2-1 debug scene foundation
+
+M2-1 implemented the smallest coherent scene/rendering slice: a transform parent-child contract, orthographic camera mapping, disk-loaded text static mesh, and GDI debug grid/triangle rendering. It deliberately does not introduce DirectX/Vulkan, gameplay, physics, ECS, or production asset dependencies.
+
+Evidence: Debug and Release native builds passed; CTest passed 2/2 in both configurations; static verification passed; live Win32 probe found a 1264x681 window, sampled the expected clear color `RGB(12,18,36)` and triangle color `RGB(168,92,255)`, and closed the process with exit code 0. QA details are in `Docs/QA/MILESTONE-2.md`.
+
+Next queued task: M3 third-person controller, pending branch review and Lucas merge approval.

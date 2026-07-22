@@ -39,7 +39,11 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
 
     ShowWindow(window_, showCommand);
     UpdateWindow(window_);
-    g_logger.Info("Window created; press Escape or close the window to exit");
+    if (!debugMesh_.LoadFromFile("Game/Assets/debug_triangle.mesh")) {
+        g_logger.Info("Failed to load Game/Assets/debug_triangle.mesh");
+        return false;
+    }
+    g_logger.Info("Window created; debug scene mesh loaded; press Escape or close the window to exit");
     return true;
 }
 
@@ -73,6 +77,7 @@ int Win32Application::Run() {
         RECT viewport{};
         GetClientRect(window_, &viewport);
         g_renderer.Clear(deviceContext, viewport);
+        g_renderer.RenderDebugScene(deviceContext, viewport, camera_, debugMesh_, debugTransform_);
         ReleaseDC(window_, deviceContext);
         Sleep(1);
     }
