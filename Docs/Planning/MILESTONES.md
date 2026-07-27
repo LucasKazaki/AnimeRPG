@@ -27,4 +27,4 @@ Source: Product Requirements Document v0.2, extracted 2026-07-21.
 M1 is the first gate. The first playable combat slice begins only after M1–M3 are verified: move a placeholder character in a windowed test scene. Combat and art are intentionally not started in parallel until those contracts exist.
 
 ## Next queued packet
-M2 renderer/scene foundation, contingent on a verified native C++ toolchain and M1 runtime evidence.
+M3 third-person controller, beginning with a placeholder entity, camera follow, WASD movement, and bounded collision contract. M2-1 completed the first debug-scene subset of the renderer/scene foundation; DirectX/Vulkan, production asset formats, and full scene/ECS work remain future packets.
