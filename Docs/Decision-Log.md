@@ -19,3 +19,13 @@ M2-1 implemented the smallest coherent scene/rendering slice: a transform parent
 Evidence: Debug and Release native builds passed; CTest passed 2/2 in both configurations; static verification passed; live Win32 probe found a 1264x681 window, sampled the expected clear color `RGB(12,18,36)` and triangle color `RGB(168,92,255)`, and closed the process with exit code 0. QA details are in `Docs/QA/MILESTONE-2.md`.
 
 Next queued task: M3 third-person controller, pending branch review and Lucas merge approval.
+
+## 2026-07-28 — M2-1 merge decision resolved
+
+Decision: Lucas explicitly approved continuing past the M2-1 merge gate. The already-recorded merge commit `43310cc` is accepted as the current `main` baseline for the next bounded task.
+
+Evidence: `main` points to `43310cc` (`Merge branch 'task/m2-planning'`); Debug and Release builds pass; CTest passes 2/2 in both configurations; Milestone 1 and Milestone 2 static gates pass.
+
+Consequence: M3 third-person controller is authorized to begin in a dedicated worktree. This approval does not authorize destructive cleanup, external downloads, plugin installation, public deployment, history rewriting, or automatic future merges. Each subsequent packet retains its own review, QA, and merge gate.
+
+Next queued task: implement M3 from `Tasks/M3-third-person-controller.md` in `C:/AI/worktrees/AnimeRPG/m3-controller-implementation`, followed by independent review and QA evidence.
