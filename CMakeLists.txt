@@ -12,6 +12,7 @@ add_executable(AstralGame WIN32
     Engine/Platform/Win32Application.cpp
     Engine/Renderer/Renderer.cpp
     Engine/Scene/Camera.cpp
+    Engine/Scene/PlayerController.cpp
     Engine/Scene/Transform.cpp
     Game/Main.cpp
 )
@@ -29,6 +30,7 @@ if(BUILD_TESTING)
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp
         Engine/Scene/Camera.cpp
+        Engine/Scene/PlayerController.cpp
         Engine/Scene/Transform.cpp
         Tests/SceneTests.cpp
     )

@@ -27,4 +27,8 @@ Source: Product Requirements Document v0.2, extracted 2026-07-21.
 M1 is the first gate. The first playable combat slice begins only after M1–M3 are verified: move a placeholder character in a windowed test scene. Combat and art are intentionally not started in parallel until those contracts exist.
 
 ## Next queued packet
-M3 third-person controller, beginning with a placeholder entity, camera follow, WASD movement, and bounded collision contract. M2-1 completed the first debug-scene subset of the renderer/scene foundation; DirectX/Vulkan, production asset formats, and full scene/ECS work remain future packets.
+M4 combat sandbox in a fresh isolated worktree, beginning only after verified M3 is merged. The M4 packet remains bounded to light/heavy attacks, hit detection, damage, and dummy death; unrelated renderer, physics, AI, asset, or networking expansion is not implied.
+
+## M3 implementation evidence
+
+The bounded controller/camera contract is implemented and verified on `task/m3-third-person-controller` in the dedicated M3 worktree. Debug and Release builds, both CTest runs, static verification, and the Lucas-accepted automated native runtime substitute are passing; see `Docs/QA/MILESTONE-3.md`.

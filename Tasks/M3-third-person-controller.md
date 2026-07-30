@@ -4,7 +4,7 @@ task_id: M3-third-person-controller
 title: Add a bounded placeholder controller and camera-follow contract
 owner: Engine Coding Agent (coordinated by Unreal Specialist)
 priority: P0
-status: authorized; implementation may begin in the dedicated worktree after the M2-1 merge decision was recorded
+status: verified; Lucas accepted the automated native runtime substitute and authorized merge
 dependencies: M2-1 commit 9ff0b75 merged into main; existing Clock, Transform, OrthographicCamera, and Win32Application loop
 
 ## Context
@@ -28,6 +28,7 @@ The approved product path is the custom C++ Astral Engine, not Unreal. `Docs/Pla
 - `Docs/QA/MILESTONE-3.md`
 - `Docs/Decision-Log.md`
 - `Docs/Planning/MILESTONES.md`
+- `Scripts/verify_milestone3.py`
 
 ## Forbidden actions
 
@@ -60,7 +61,7 @@ Move a placeholder entity through a deterministic test scene using bounded keybo
 5. Movement remains within the declared bounded collision region.
 6. M2 debug mesh/grid rendering and clean close behavior remain intact.
 7. Static verification covers the new controller source and test markers.
-8. Manual runtime evidence records window dimensions, movement input, camera response, boundary behavior, and clean exit; source checks alone are insufficient.
+8. Runtime evidence records window dimensions, movement input, camera response, boundary behavior, and clean exit; source checks alone are insufficient. Lucas explicitly accepts the 2026-07-30 automated native runtime smoke documented in `Docs/QA/MILESTONE-3.md` as the substitute for manual runtime QA.
 
 ## Test instructions
 
@@ -80,4 +81,4 @@ A dedicated worktree and branch, source diff limited to this packet, failing-the
 
 ## Next gate
 
-The M2-1 merge decision was resolved on 2026-07-28 and recorded in `Docs/Decision-Log.md`. The implementation agent may now work in the dedicated M3 worktree. M3 itself still requires independent review, QA evidence, and Lucas merge approval before it is merged.
+The M2-1 merge decision was resolved on 2026-07-28 and recorded in `Docs/Decision-Log.md`. On 2026-07-30 Lucas explicitly authorized autonomous M3 unblocking and accepted a genuine automated native runtime smoke in place of manual runtime QA. With all release gates green, M3 is authorized for merge and M4 may begin in a fresh isolated worktree.
