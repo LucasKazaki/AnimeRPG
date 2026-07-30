@@ -59,3 +59,12 @@ Lucas explicitly delegates local commits and merges once the listed tests, scope
 - Existing M4 and M5 runtime smokes — PASS in Debug and Release.
 - `python Scripts/verify_milestone3.py` — PASS; `git diff --check` — PASS; allowlist scope audit — PASS.
 - Full evidence and capability limits: `Docs/QA/MILESTONE-7.md`.
+
+## Integration blocker — 2026-07-30
+
+M7 is committed on `task/m7-shadowblade` as `838cf01` and all M7 acceptance gates pass, but integration is blocked because the `main` worktree is not clean. Reproduce from `C:/AI/projects/AnimeRPG` with `git status --short --branch`; it reports:
+
+- `?? Docs/Blockers/BLOCKER-0002-visual-studio-update.md`
+- `?? Tasks/PRODUCTION-KICKOFF-2026-07-27.md`
+
+These unrelated untracked files were preserved. Per the packet's clean-main integration policy, M7 was not merged and the M8 packet/worktree was not created.
