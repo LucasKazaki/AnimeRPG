@@ -27,8 +27,12 @@ Source: Product Requirements Document v0.2, extracted 2026-07-21.
 M1 is the first gate. The first playable combat slice begins only after M1–M3 are verified: move a placeholder character in a windowed test scene. Combat and art are intentionally not started in parallel until those contracts exist.
 
 ## Next queued packet
-M4 combat sandbox in a fresh isolated worktree, beginning only after verified M3 is merged. The M4 packet remains bounded to light/heavy attacks, hit detection, damage, and dummy death; unrelated renderer, physics, AI, asset, or networking expansion is not implied.
+M5 National Mall blockout in a fresh isolated worktree after verified M4 is merged. Its packet should bound the traversal blockout to the Lincoln Memorial, Reflecting Pool, and Washington Monument landmarks without implying an art pass, asset pipeline, renderer rewrite, or open-world system.
 
 ## M3 implementation evidence
 
 The bounded controller/camera contract is implemented and verified on `task/m3-third-person-controller` in the dedicated M3 worktree. Debug and Release builds, both CTest runs, static verification, and the Lucas-accepted automated native runtime substitute are passing; see `Docs/QA/MILESTONE-3.md`.
+
+## M4 implementation evidence
+
+The bounded deterministic combat sandbox is implemented and verified on `task/m4-combat-sandbox`: light/heavy attacks, range and cooldown rejection, dummy damage/defeat, live J/K input, GDI state feedback, focused tests, and an automated native runtime path pass in Debug and Release. See `Docs/QA/MILESTONE-4.md`.

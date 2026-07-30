@@ -12,6 +12,7 @@ add_executable(AstralGame WIN32
     Engine/Platform/Win32Application.cpp
     Engine/Renderer/Renderer.cpp
     Engine/Scene/Camera.cpp
+    Engine/Scene/CombatSandbox.cpp
     Engine/Scene/PlayerController.cpp
     Engine/Scene/Transform.cpp
     Game/Main.cpp
@@ -36,4 +37,19 @@ if(BUILD_TESTING)
     )
     target_include_directories(AstralSceneTests PRIVATE .)
     add_test(NAME AstralSceneTests COMMAND AstralSceneTests)
+
+    add_executable(CombatSandboxTests
+        Engine/Scene/CombatSandbox.cpp
+        Tests/CombatSandboxTests.cpp
+    )
+    target_include_directories(CombatSandboxTests PRIVATE .)
+    add_test(NAME CombatSandboxTests COMMAND CombatSandboxTests)
+
+    add_executable(M4RuntimeSmoke Tests/CombatSandboxTests.cpp)
+    target_include_directories(M4RuntimeSmoke PRIVATE .)
+    target_compile_definitions(M4RuntimeSmoke PRIVATE
+        ASTRAL_RUNTIME_SMOKE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(M4RuntimeSmoke PRIVATE user32)
+    add_test(NAME M4RuntimeSmoke COMMAND M4RuntimeSmoke
+        $<TARGET_FILE:AstralGame> ${CMAKE_SOURCE_DIR})
 endif()

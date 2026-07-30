@@ -45,3 +45,11 @@ Decision: Lucas explicitly authorized autonomous M3 unblocking and accepted a ge
 Evidence: an external CMake build tree produced passing Debug and Release builds and 2/2 CTest results in both configurations; the M3 static verifier passed. The automated Win32 smoke found the process-owned `Astral Engine | M3: WASD Move` window at `1264x681`, used `SendInput` through the real `GetAsyncKeyState` path, observed title position changes from `(0,0)` to bounded `(9,5)`, observed the rendered purple mesh remain effectively screen-stationary under camera follow, and exited through controlled Escape with code 0. See `Docs/QA/MILESTONE-3.md`.
 
 Consequence: the M3 runtime blocker is resolved without claiming manual evidence. M3 may merge after the final scope, build, test, static, and diff gates pass. M4 combat sandbox is the next approved milestone and must begin in a fresh isolated worktree.
+
+## 2026-07-30 — M4 bounded combat sandbox verified
+
+Decision: accept the packet-bounded deterministic combat domain and native runtime evidence for M4. `CombatSandbox` owns one fixed training dummy, range/damage/cooldown rules, and terminal defeat state independently of Win32. The existing application loop maps edge-triggered `J`/`K` input to that domain, while the existing GDI renderer and title expose dummy and attack state.
+
+Evidence: out-of-source Debug and Release builds passed; CTest passed 4/4 in both configurations. Focused domain tests cover light/heavy damage, out-of-range and cooldown rejection, defeat, and post-defeat immunity. The automated native runtime smoke launched each configuration of `AstralGame`, observed title transitions for light hit, cooldown rejection, heavy hit, defeat, and post-defeat rejection through real `SendInput`/`GetAsyncKeyState`, then exited through Escape with code 0. The M3 verifier, scope audit, and `git diff --check` also passed. See `Docs/QA/MILESTONE-4.md`.
+
+Consequence: M4 satisfies its autonomous merge gate. No evidence requires reprioritization away from the staged P0 sequence; M5 National Mall blockout remains the highest-value next bounded task and should begin in a fresh isolated worktree.

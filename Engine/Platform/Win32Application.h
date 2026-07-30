@@ -2,6 +2,7 @@
 
 #include "Engine/Assets/StaticMesh.h"
 #include "Engine/Scene/Camera.h"
+#include "Engine/Scene/CombatSandbox.h"
 #include "Engine/Scene/PlayerController.h"
 
 #include <windows.h>
@@ -20,6 +21,9 @@ private:
     Assets::StaticMesh debugMesh_;
     Scene::OrthographicCamera camera_;
     Scene::PlayerController playerController_;
+    Scene::CombatSandbox combatSandbox_;
+    bool lightAttackPressed_{};
+    bool heavyAttackPressed_{};
 };
 
 } // namespace Astral::Platform

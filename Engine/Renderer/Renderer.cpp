@@ -12,7 +12,7 @@ void Renderer::Clear(HDC deviceContext, RECT viewport) const {
 
 void Renderer::RenderDebugScene(HDC deviceContext, RECT viewport,
     const Scene::OrthographicCamera& camera, const Assets::StaticMesh& mesh,
-    const Scene::Transform& transform) const {
+    const Scene::Transform& transform, const Scene::CombatSandbox& combatSandbox) const {
     const int width = viewport.right - viewport.left;
     const int height = viewport.bottom - viewport.top;
     const auto toPoint = [&](const Math::Vec3& position) {
@@ -46,9 +46,34 @@ void Renderer::RenderDebugScene(HDC deviceContext, RECT viewport,
         LineTo(deviceContext, screenEnd.x, screenEnd.y);
     }
 
+    const Scene::TrainingDummy& dummy = combatSandbox.Dummy();
+    const POINT dummyCenter = toPoint(dummy.position);
+    const COLORREF dummyColor = dummy.IsDefeated() ? RGB(90, 90, 100) : RGB(255, 105, 80);
+    const HPEN dummyPen = CreatePen(PS_SOLID, 3, dummyColor);
+    const HBRUSH dummyBrush = CreateSolidBrush(dummy.IsDefeated() ? RGB(45, 45, 55) : RGB(110, 40, 45));
+    SelectObject(deviceContext, dummyPen);
+    const HGDIOBJ previousBrush = SelectObject(deviceContext, dummyBrush);
+    Ellipse(deviceContext, dummyCenter.x - 18, dummyCenter.y - 30,
+        dummyCenter.x + 18, dummyCenter.y + 30);
+
+    const int healthWidth = dummy.maximumHealth > 0 ? (60 * dummy.health / dummy.maximumHealth) : 0;
+    RECT healthBackground{dummyCenter.x - 30, dummyCenter.y - 42, dummyCenter.x + 30,
+        dummyCenter.y - 36};
+    RECT health{healthBackground.left, healthBackground.top,
+        healthBackground.left + healthWidth, healthBackground.bottom};
+    const HBRUSH healthBackgroundBrush = CreateSolidBrush(RGB(55, 25, 30));
+    const HBRUSH healthBrush = CreateSolidBrush(RGB(90, 230, 120));
+    FillRect(deviceContext, &healthBackground, healthBackgroundBrush);
+    FillRect(deviceContext, &health, healthBrush);
+
+    SelectObject(deviceContext, previousBrush);
     SelectObject(deviceContext, previousPen);
     DeleteObject(gridPen);
     DeleteObject(meshPen);
+    DeleteObject(dummyPen);
+    DeleteObject(dummyBrush);
+    DeleteObject(healthBackgroundBrush);
+    DeleteObject(healthBrush);
 }
 
 } // namespace Astral::Renderer
