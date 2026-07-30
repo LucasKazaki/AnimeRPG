@@ -113,7 +113,8 @@ void Renderer::Clear(HDC deviceContext, RECT viewport) const {
 void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     const Scene::PerspectiveCamera& camera, const Scene::WorldBlockout& world,
     const Scene::Transform& playerTransform, const Scene::CombatSandbox& combatSandbox,
-    const Scene::ShadowbladeActions& shadowbladeActions) const {
+    const Scene::ShadowbladeActions& shadowbladeActions,
+    const Scene::ThoughtCommands& thoughtCommands) const {
     const int width = viewport.right - viewport.left;
     const int height = viewport.bottom - viewport.top;
     const HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(35, 52, 78));
@@ -190,7 +191,8 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     }
 
     const HBRUSH shadowBackgroundBrush = CreateSolidBrush(RGB(25, 30, 52));
-    const HBRUSH shadowResourceBrush = CreateSolidBrush(RGB(70, 220, 235));
+    const HBRUSH shadowResourceBrush = CreateSolidBrush(thoughtCommands.IsFocusActive()
+        ? RGB(120, 90, 255) : RGB(70, 220, 235));
     const int shadowWidth = static_cast<int>(180.0f * shadowbladeActions.Resource()
         / Scene::ShadowbladeActions::MaximumResource);
     RECT shadowBackground{20, 20, 200, 34};
@@ -203,6 +205,19 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     const wchar_t* shadowLabel = shadowbladeActions.IsGuarding()
         ? L"SHADOWBLADE  GUARD ACTIVE" : L"SHADOWBLADE  Q DASH  L FATAL  SHIFT GUARD";
     TextOutW(deviceContext, 20, 39, shadowLabel, static_cast<int>(wcslen(shadowLabel)));
+
+    if (thoughtCommands.IsFocusActive()) {
+        const HBRUSH focusBrush = CreateSolidBrush(RGB(120, 90, 255));
+        RECT focusBanner{20, 65, 300, 82};
+        FillRect(deviceContext, &focusBanner, focusBrush);
+        DeleteObject(focusBrush);
+    }
+    SetTextColor(deviceContext, thoughtCommands.IsFocusActive()
+        ? RGB(210, 200, 255) : RGB(165, 180, 205));
+    const wchar_t* commandLabel = thoughtCommands.IsFocusActive()
+        ? L"THOUGHT FOCUS ACTIVE  LOCAL TIME x0.35"
+        : L"THOUGHT COMMANDS  1 DASH 2 FATAL 3/4 GUARD 5 FOCUS";
+    TextOutW(deviceContext, 20, 86, commandLabel, static_cast<int>(wcslen(commandLabel)));
 
     SelectObject(deviceContext, previousPen);
     DeleteObject(gridPen);
