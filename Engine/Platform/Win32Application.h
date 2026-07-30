@@ -2,7 +2,7 @@
 
 #include "Engine/Assets/StaticMesh.h"
 #include "Engine/Scene/Camera.h"
-#include "Engine/Scene/Transform.h"
+#include "Engine/Scene/PlayerController.h"
 
 #include <windows.h>
 
@@ -15,10 +15,11 @@ public:
 
 private:
     static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
+
     HWND window_{};
     Assets::StaticMesh debugMesh_;
     Scene::OrthographicCamera camera_;
-    Scene::Transform debugTransform_;
+    Scene::PlayerController playerController_;
 };
 
 } // namespace Astral::Platform

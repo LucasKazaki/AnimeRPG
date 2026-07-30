@@ -11,8 +11,13 @@ constexpr wchar_t kWindowClass[] = L"AstralEngineWindow";
 Astral::Renderer::Renderer g_renderer;
 Astral::Core::Logger g_logger("astral.log");
 
-void UpdateTitle(HWND window, float fps) {
-    const std::wstring title = L"Astral Engine | Milestone 1 | FPS: " + std::to_wstring(static_cast<int>(fps));
+void UpdateTitle(HWND window, float fps, const Astral::Scene::Transform& state) {
+    const Astral::Math::Vec3 position = state.WorldPosition();
+    const std::wstring title = L"Astral Engine | M3: WASD Move | FPS: "
+        + std::to_wstring(static_cast<int>(fps)) + L" | Pos: ("
+        + std::to_wstring(position.x) + L", "
+        + std::to_wstring(position.y) + L", "
+        + std::to_wstring(position.z) + L")";
     SetWindowTextW(window, title.c_str());
 }
 } // namespace
@@ -43,7 +48,8 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
         g_logger.Info("Failed to load Game/Assets/debug_triangle.mesh");
         return false;
     }
-    g_logger.Info("Window created; debug scene mesh loaded; press Escape or close the window to exit");
+    camera_.Follow(playerController_.TransformState());
+    g_logger.Info("Window created; M3 controller active; press Escape or close the window to exit");
     return true;
 }
 
@@ -63,7 +69,7 @@ int Win32Application::Run() {
         fpsAccumulator += deltaSeconds;
         ++frameCount;
         if (fpsAccumulator >= 1.0) {
-            UpdateTitle(window_, static_cast<float>(frameCount / fpsAccumulator));
+            UpdateTitle(window_, static_cast<float>(frameCount / fpsAccumulator), playerController_.TransformState());
             g_logger.Info("Frame timing active");
             fpsAccumulator = 0.0;
             frameCount = 0;
@@ -73,11 +79,21 @@ int Win32Application::Run() {
             PostMessageW(window_, WM_CLOSE, 0, 0);
         }
 
+        const Scene::MovementInput input{
+            (GetAsyncKeyState('W') & 0x8000) != 0,
+            (GetAsyncKeyState('S') & 0x8000) != 0,
+            (GetAsyncKeyState('A') & 0x8000) != 0,
+            (GetAsyncKeyState('D') & 0x8000) != 0,
+        };
+        playerController_.Update(input, deltaSeconds);
+        camera_.Follow(playerController_.TransformState());
+
         HDC deviceContext = GetDC(window_);
         RECT viewport{};
         GetClientRect(window_, &viewport);
         g_renderer.Clear(deviceContext, viewport);
-        g_renderer.RenderDebugScene(deviceContext, viewport, camera_, debugMesh_, debugTransform_);
+        g_renderer.RenderDebugScene(deviceContext, viewport, camera_, debugMesh_,
+            playerController_.TransformState());
         ReleaseDC(window_, deviceContext);
         Sleep(1);
     }
@@ -85,7 +101,8 @@ int Win32Application::Run() {
     return static_cast<int>(message.wParam);
 }
 
-LRESULT CALLBACK Win32Application::WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK Win32Application::WindowProc(HWND window, UINT message, WPARAM wParam,
+    LPARAM lParam) {
     switch (message) {
     case WM_PAINT: {
         PAINTSTRUCT paint{};
