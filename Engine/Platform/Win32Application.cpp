@@ -50,14 +50,44 @@ const wchar_t* ShadowResultName(Astral::Scene::ShadowActionResult result) {
     return L"Unknown";
 }
 
+const wchar_t* CommandReasonName(Astral::Scene::ThoughtCommandReason reason) {
+    switch (reason) {
+    case Astral::Scene::ThoughtCommandReason::None: return L"None";
+    case Astral::Scene::ThoughtCommandReason::Empty: return L"Empty";
+    case Astral::Scene::ThoughtCommandReason::Ambiguous: return L"Ambiguous";
+    case Astral::Scene::ThoughtCommandReason::Unsupported: return L"Unsupported";
+    case Astral::Scene::ThoughtCommandReason::NoOp: return L"No Op";
+    case Astral::Scene::ThoughtCommandReason::GuardedConflict: return L"Blocked by Guard";
+    case Astral::Scene::ThoughtCommandReason::Cooldown: return L"Cooldown";
+    case Astral::Scene::ThoughtCommandReason::InsufficientResource: return L"No Resource";
+    case Astral::Scene::ThoughtCommandReason::OutOfRange: return L"Out of Range";
+    case Astral::Scene::ThoughtCommandReason::TargetDefeated: return L"Target Defeated";
+    }
+    return L"Unknown";
+}
+
+std::wstring WidenAscii(const std::string& text) {
+    return std::wstring(text.begin(), text.end());
+}
+
 void UpdateTitle(HWND window, float fps, const Astral::Scene::Transform& state,
     const Astral::Scene::CombatSandbox& combatSandbox,
-    const Astral::Scene::ShadowbladeActions& shadowbladeActions) {
+    const Astral::Scene::ShadowbladeActions& shadowbladeActions,
+    const Astral::Scene::ThoughtCommands& thoughtCommands) {
     const Astral::Math::Vec3 position = state.WorldPosition();
     const Astral::Scene::TrainingDummy& dummy = combatSandbox.Dummy();
     const Astral::Scene::AttackReport& attack = combatSandbox.LastAttack();
     const Astral::Scene::ShadowActionReport& shadow = shadowbladeActions.LastAction();
-    const std::wstring title = L"Astral Engine | M7 Shadowblade | Q Dash L Fatal Shift Guard | Shadow: "
+    const Astral::Scene::ThoughtCommandReport& command = thoughtCommands.LastReport();
+    const std::wstring submitted = command.submitted.empty()
+        ? L"none" : WidenAscii(command.submitted);
+    const std::wstring commandOutcome = command.status
+            == Astral::Scene::ThoughtCommandStatus::Accepted
+        ? L"ACCEPTED" : L"REJECTED: " + std::wstring(CommandReasonName(command.reason));
+    const std::wstring title = L"Astral Engine | M8 Thought Commands | 1 Dash 2 Fatal 3/4 Guard 5 Focus | Command: "
+        + submitted + L" | " + commandOutcome
+        + L" | Focus: " + (thoughtCommands.IsFocusActive() ? L"ON x0.35" : L"OFF x1.00")
+        + L" | M7 Shadowblade | Q Dash L Fatal Shift Guard | Shadow: "
         + std::to_wstring(static_cast<int>(shadowbladeActions.Resource())) + L"/100 | Guard: "
         + (shadowbladeActions.IsGuarding() ? L"ON" : L"OFF")
         + L" | DashCD: " + std::to_wstring(static_cast<int>(shadowbladeActions.DashCooldownRemaining() * 10.0f))
@@ -101,8 +131,8 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
     playerController_.SetPosition({0.0f, 0.0f, 0.0f});
     camera_.Follow(playerController_.TransformState());
     UpdateTitle(window_, 0.0f, playerController_.TransformState(), combatSandbox_,
-        shadowbladeActions_);
-    g_logger.Info("Window created; M7 Shadowblade active; Q dash, L fatal, Shift guard, Escape exits");
+        shadowbladeActions_, thoughtCommands_);
+    g_logger.Info("Window created; M8 Thought Commands active; number commands and Escape exits");
     return true;
 }
 
@@ -123,7 +153,8 @@ int Win32Application::Run() {
         ++frameCount;
         if (fpsAccumulator >= 1.0) {
             UpdateTitle(window_, static_cast<float>(frameCount / fpsAccumulator),
-                playerController_.TransformState(), combatSandbox_, shadowbladeActions_);
+                playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
+                thoughtCommands_);
             g_logger.Info("Frame timing active");
             fpsAccumulator = 0.0;
             frameCount = 0;
@@ -133,27 +164,36 @@ int Win32Application::Run() {
             PostMessageW(window_, WM_CLOSE, 0, 0);
         }
 
+        const float simulationDelta = thoughtCommands_.ScaleDelta(deltaSeconds);
         const Scene::MovementInput input{
             (GetAsyncKeyState('W') & 0x8000) != 0,
             (GetAsyncKeyState('S') & 0x8000) != 0,
             (GetAsyncKeyState('A') & 0x8000) != 0,
             (GetAsyncKeyState('D') & 0x8000) != 0,
         };
-        playerController_.Update(input, deltaSeconds);
+        playerController_.Update(input, simulationDelta);
         camera_.Follow(playerController_.TransformState());
-        combatSandbox_.AdvanceTime(deltaSeconds);
-        shadowbladeActions_.AdvanceTime(deltaSeconds);
+        combatSandbox_.AdvanceTime(simulationDelta);
+        shadowbladeActions_.AdvanceTime(simulationDelta);
 
-        const bool guarding = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
-        const bool guardChanged = guarding != shadowbladeActions_.IsGuarding();
-        shadowbladeActions_.SetGuarding(guarding);
+        const bool physicalGuarding = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
+        const bool effectiveGuarding = physicalGuarding
+            || thoughtCommands_.IsCommandGuardActive();
+        const bool guardChanged = effectiveGuarding != shadowbladeActions_.IsGuarding();
+        thoughtCommands_.ApplyGuardState(physicalGuarding, shadowbladeActions_);
+        const bool guarding = shadowbladeActions_.IsGuarding();
 
         const bool lightAttackDown = (GetAsyncKeyState('J') & 0x8000) != 0;
         const bool heavyAttackDown = (GetAsyncKeyState('K') & 0x8000) != 0;
         const bool dashDown = (GetAsyncKeyState('Q') & 0x8000) != 0;
         const bool fatalStrikeDown = (GetAsyncKeyState('L') & 0x8000) != 0;
+        bool commandDown[6]{};
+        for (int index = 0; index < 6; ++index) {
+            commandDown[index] = (GetAsyncKeyState('0' + index) & 0x8000) != 0;
+        }
         bool attacked = false;
         bool shadowAction = false;
+        bool thoughtCommand = false;
         if (!guarding && lightAttackDown && !lightAttackPressed_) {
             combatSandbox_.TryAttack(Scene::AttackType::Light,
                 playerController_.TransformState().WorldPosition());
@@ -176,15 +216,34 @@ int Win32Application::Run() {
                 playerController_.TransformState().WorldPosition(), combatSandbox_);
             shadowAction = true;
         }
+        const char* commandInputs[6]{"unsupported", "dash", "fatal", "guard on",
+            "guard off", "focus"};
+        for (int index = 0; index < 6; ++index) {
+            if (commandDown[index] && !commandPressed_[index]) {
+                const Scene::ThoughtCommandReport report = thoughtCommands_.Submit(
+                    commandInputs[index], playerController_.TransformState().WorldPosition(),
+                    shadowbladeActions_, combatSandbox_);
+                if (report.type == Scene::ThoughtCommandType::Dash
+                    && report.status == Scene::ThoughtCommandStatus::Accepted) {
+                    playerController_.SetPosition(report.shadowAction.dashDestination);
+                    camera_.Follow(playerController_.TransformState());
+                }
+                thoughtCommands_.ApplyGuardState(physicalGuarding, shadowbladeActions_);
+                thoughtCommand = true;
+                break;
+            }
+        }
         lightAttackPressed_ = lightAttackDown;
         heavyAttackPressed_ = heavyAttackDown;
         dashPressed_ = dashDown;
         fatalStrikePressed_ = fatalStrikeDown;
-        if (attacked || shadowAction || guardChanged || input.forward || input.backward
+        for (int index = 0; index < 6; ++index) commandPressed_[index] = commandDown[index];
+        if (attacked || shadowAction || thoughtCommand || guardChanged || input.forward || input.backward
             || input.left || input.right) {
             UpdateTitle(window_, frameCount > 0 && fpsAccumulator > 0.0
                     ? static_cast<float>(frameCount / fpsAccumulator) : 0.0f,
-                playerController_.TransformState(), combatSandbox_, shadowbladeActions_);
+                playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
+                thoughtCommands_);
         }
 
         HDC deviceContext = GetDC(window_);
@@ -192,7 +251,8 @@ int Win32Application::Run() {
         GetClientRect(window_, &viewport);
         g_renderer.Clear(deviceContext, viewport);
         g_renderer.RenderWorld(deviceContext, viewport, camera_, world_,
-            playerController_.TransformState(), combatSandbox_, shadowbladeActions_);
+            playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
+            thoughtCommands_);
         ReleaseDC(window_, deviceContext);
         Sleep(1);
     }

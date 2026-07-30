@@ -15,6 +15,7 @@ add_executable(AstralGame WIN32
     Engine/Scene/CombatSandbox.cpp
     Engine/Scene/PlayerController.cpp
     Engine/Scene/ShadowbladeActions.cpp
+    Engine/Scene/ThoughtCommands.cpp
     Engine/Scene/Transform.cpp
     Engine/Scene/WorldBlockout.cpp
     Game/Main.cpp
@@ -62,6 +63,15 @@ if(BUILD_TESTING)
     target_include_directories(ShadowbladeActionsTests PRIVATE .)
     add_test(NAME ShadowbladeActionsTests COMMAND ShadowbladeActionsTests)
 
+    add_executable(ThoughtCommandsTests
+        Engine/Scene/CombatSandbox.cpp
+        Engine/Scene/ShadowbladeActions.cpp
+        Engine/Scene/ThoughtCommands.cpp
+        Tests/ThoughtCommandsTests.cpp
+    )
+    target_include_directories(ThoughtCommandsTests PRIVATE .)
+    add_test(NAME ThoughtCommandsTests COMMAND ThoughtCommandsTests)
+
     add_executable(M4RuntimeSmoke Tests/CombatSandboxTests.cpp)
     target_include_directories(M4RuntimeSmoke PRIVATE .)
     target_compile_definitions(M4RuntimeSmoke PRIVATE
@@ -82,5 +92,12 @@ if(BUILD_TESTING)
     target_compile_definitions(M7RuntimeSmoke PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_link_libraries(M7RuntimeSmoke PRIVATE user32 gdi32)
     add_test(NAME M7RuntimeSmoke COMMAND M7RuntimeSmoke
+        $<TARGET_FILE:AstralGame> ${CMAKE_SOURCE_DIR})
+
+    add_executable(M8RuntimeSmoke Tests/M8RuntimeSmoke.cpp)
+    target_include_directories(M8RuntimeSmoke PRIVATE .)
+    target_compile_definitions(M8RuntimeSmoke PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(M8RuntimeSmoke PRIVATE user32 gdi32)
+    add_test(NAME M8RuntimeSmoke COMMAND M8RuntimeSmoke
         $<TARGET_FILE:AstralGame> ${CMAKE_SOURCE_DIR})
 endif()

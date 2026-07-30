@@ -4,6 +4,7 @@
 #include "Engine/Scene/CombatSandbox.h"
 #include "Engine/Scene/PlayerController.h"
 #include "Engine/Scene/ShadowbladeActions.h"
+#include "Engine/Scene/ThoughtCommands.h"
 #include "Engine/Scene/WorldBlockout.h"
 
 #include <windows.h>
@@ -24,10 +25,12 @@ private:
     Scene::PlayerController playerController_{6.0f, {-18.0f, 18.0f, -4.0f, 72.0f}};
     Scene::CombatSandbox combatSandbox_;
     Scene::ShadowbladeActions shadowbladeActions_;
+    Scene::ThoughtCommands thoughtCommands_;
     bool lightAttackPressed_{};
     bool heavyAttackPressed_{};
     bool dashPressed_{};
     bool fatalStrikePressed_{};
+    bool commandPressed_[6]{};
 };
 
 } // namespace Astral::Platform
