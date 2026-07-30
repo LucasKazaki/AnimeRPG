@@ -31,15 +31,14 @@ void UpdateTitle(HWND window, float fps, const Astral::Scene::Transform& state,
     const Astral::Math::Vec3 position = state.WorldPosition();
     const Astral::Scene::TrainingDummy& dummy = combatSandbox.Dummy();
     const Astral::Scene::AttackReport& attack = combatSandbox.LastAttack();
-    const std::wstring title = L"Astral Engine | M4 Combat | J Light K Heavy | Dummy: "
+    const std::wstring title = L"Astral Engine | M5 Perspective Mall | WASD Traverse | J Light K Heavy | Dummy: "
         + std::wstring(dummy.IsDefeated() ? L"Defeated" : L"Alive") + L" HP: "
         + std::to_wstring(dummy.health) + L"/" + std::to_wstring(dummy.maximumHealth)
         + L" | Last: " + AttackName(attack.type) + L" " + ResultName(attack.result)
         + (attack.damageApplied > 0 ? L" -" + std::to_wstring(attack.damageApplied) : L"")
         + L" | FPS: " + std::to_wstring(static_cast<int>(fps)) + L" | Pos: ("
         + std::to_wstring(position.x) + L", "
-        + std::to_wstring(position.y) + L", "
-        + std::to_wstring(position.z) + L")";
+        + std::to_wstring(position.y) + L")";
     SetWindowTextW(window, title.c_str());
 }
 } // namespace
@@ -66,13 +65,10 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
 
     ShowWindow(window_, showCommand);
     UpdateWindow(window_);
-    if (!debugMesh_.LoadFromFile("Game/Assets/debug_triangle.mesh")) {
-        g_logger.Info("Failed to load Game/Assets/debug_triangle.mesh");
-        return false;
-    }
+    playerController_.SetPosition({0.0f, 0.0f, 0.0f});
     camera_.Follow(playerController_.TransformState());
     UpdateTitle(window_, 0.0f, playerController_.TransformState(), combatSandbox_);
-    g_logger.Info("Window created; M4 combat active; J light, K heavy; press Escape or close to exit");
+    g_logger.Info("Window created; M5 perspective mall active; WASD traverse, J/K combat, Escape exits");
     return true;
 }
 
@@ -127,7 +123,7 @@ int Win32Application::Run() {
         }
         lightAttackPressed_ = lightAttackDown;
         heavyAttackPressed_ = heavyAttackDown;
-        if (attacked) {
+        if (attacked || input.forward || input.backward || input.left || input.right) {
             UpdateTitle(window_, frameCount > 0 && fpsAccumulator > 0.0
                     ? static_cast<float>(frameCount / fpsAccumulator) : 0.0f,
                 playerController_.TransformState(), combatSandbox_);
@@ -137,7 +133,7 @@ int Win32Application::Run() {
         RECT viewport{};
         GetClientRect(window_, &viewport);
         g_renderer.Clear(deviceContext, viewport);
-        g_renderer.RenderDebugScene(deviceContext, viewport, camera_, debugMesh_,
+        g_renderer.RenderWorld(deviceContext, viewport, camera_, world_,
             playerController_.TransformState(), combatSandbox_);
         ReleaseDC(window_, deviceContext);
         Sleep(1);

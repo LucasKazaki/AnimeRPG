@@ -5,12 +5,17 @@
 
 #include <cassert>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 
 namespace {
 bool NearlyEqual(float left, float right) {
     return std::fabs(left - right) < 0.001f;
+}
+
+void Check(bool condition) {
+    if (!condition) std::abort();
 }
 }
 
@@ -62,6 +67,41 @@ int main() {
         {3.0f, 0.0f, 0.0f}, 100, 80);
     assert(NearlyEqual(followed.x, 50.0f));
     assert(NearlyEqual(followed.y, 40.0f));
+
+    Astral::Scene::PerspectiveCamera perspective;
+    Astral::Math::Vec2 projected{};
+    const Astral::Math::Vec3 cameraPosition = perspective.Position();
+    constexpr float forwardY = -0.514495755f;
+    constexpr float forwardZ = 0.857492926f;
+    const auto atDepth = [&](float x, float up, float depth) {
+        return Astral::Math::Vec3{x,
+            cameraPosition.y + forwardY * depth + forwardZ * up,
+            cameraPosition.z + forwardZ * depth - forwardY * up};
+    };
+
+    Check(perspective.WorldToScreen(atDepth(0.0f, 0.0f, 10.0f), 800, 600, projected));
+    Check(NearlyEqual(projected.x, 400.0f));
+    Check(NearlyEqual(projected.y, 300.0f));
+
+    Astral::Math::Vec2 nearOffset{};
+    Astral::Math::Vec2 farOffset{};
+    Check(perspective.WorldToScreen(atDepth(1.0f, 0.0f, 5.0f), 800, 600, nearOffset));
+    Check(perspective.WorldToScreen(atDepth(1.0f, 0.0f, 10.0f), 800, 600, farOffset));
+    Check((nearOffset.x - 400.0f) > (farOffset.x - 400.0f));
+    Check(NearlyEqual(nearOffset.x - 400.0f, 2.0f * (farOffset.x - 400.0f)));
+
+    Astral::Math::Vec2 above{};
+    Check(perspective.WorldToScreen(atDepth(0.0f, 1.0f, 10.0f), 800, 600, above));
+    Check(above.y < projected.y);
+    Check(!perspective.WorldToScreen(atDepth(0.0f, 0.0f, perspective.NearPlane()),
+        800, 600, projected));
+    Check(!perspective.WorldToScreen(atDepth(0.0f, 0.0f, -1.0f), 800, 600, projected));
+
+    Astral::Scene::Transform perspectiveTarget;
+    perspectiveTarget.localPosition = {4.0f, 7.0f, 0.0f};
+    perspective.Follow(perspectiveTarget);
+    Check(NearlyEqual(perspective.Position().x, 4.0f));
+    Check(NearlyEqual(perspective.Position().z, -3.0f));
 
     const std::filesystem::path meshPath =
         std::filesystem::temp_directory_path() / "astral_m2_scene_test.mesh";

@@ -15,6 +15,7 @@ add_executable(AstralGame WIN32
     Engine/Scene/CombatSandbox.cpp
     Engine/Scene/PlayerController.cpp
     Engine/Scene/Transform.cpp
+    Engine/Scene/WorldBlockout.cpp
     Game/Main.cpp
 )
 
@@ -38,6 +39,13 @@ if(BUILD_TESTING)
     target_include_directories(AstralSceneTests PRIVATE .)
     add_test(NAME AstralSceneTests COMMAND AstralSceneTests)
 
+    add_executable(WorldBlockoutTests
+        Engine/Scene/WorldBlockout.cpp
+        Tests/WorldBlockoutTests.cpp
+    )
+    target_include_directories(WorldBlockoutTests PRIVATE .)
+    add_test(NAME WorldBlockoutTests COMMAND WorldBlockoutTests)
+
     add_executable(CombatSandboxTests
         Engine/Scene/CombatSandbox.cpp
         Tests/CombatSandboxTests.cpp
@@ -51,5 +59,12 @@ if(BUILD_TESTING)
         ASTRAL_RUNTIME_SMOKE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_link_libraries(M4RuntimeSmoke PRIVATE user32)
     add_test(NAME M4RuntimeSmoke COMMAND M4RuntimeSmoke
+        $<TARGET_FILE:AstralGame> ${CMAKE_SOURCE_DIR})
+
+    add_executable(M5RuntimeSmoke Tests/M5RuntimeSmoke.cpp)
+    target_include_directories(M5RuntimeSmoke PRIVATE .)
+    target_compile_definitions(M5RuntimeSmoke PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(M5RuntimeSmoke PRIVATE user32 gdi32)
+    add_test(NAME M5RuntimeSmoke COMMAND M5RuntimeSmoke
         $<TARGET_FILE:AstralGame> ${CMAKE_SOURCE_DIR})
 endif()

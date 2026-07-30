@@ -1,6 +1,105 @@
 #include "Engine/Renderer/Renderer.h"
 
+#include <array>
 #include <cmath>
+
+namespace {
+using Astral::Math::Vec2;
+using Astral::Math::Vec3;
+using Astral::Scene::PerspectiveCamera;
+
+bool DrawSegment(HDC deviceContext, const PerspectiveCamera& camera, int width, int height,
+    Vec3 start, Vec3 end) {
+    float startDepth = camera.Depth(start);
+    float endDepth = camera.Depth(end);
+    const float clippedDepth = camera.NearPlane() + 0.01f;
+    if (startDepth <= camera.NearPlane() && endDepth <= camera.NearPlane()) return false;
+    if (startDepth <= camera.NearPlane()) {
+        const float amount = (clippedDepth - startDepth) / (endDepth - startDepth);
+        start = {start.x + (end.x - start.x) * amount,
+            start.y + (end.y - start.y) * amount,
+            start.z + (end.z - start.z) * amount};
+    } else if (endDepth <= camera.NearPlane()) {
+        const float amount = (clippedDepth - endDepth) / (startDepth - endDepth);
+        end = {end.x + (start.x - end.x) * amount,
+            end.y + (start.y - end.y) * amount,
+            end.z + (start.z - end.z) * amount};
+    }
+
+    Vec2 screenStart{};
+    Vec2 screenEnd{};
+    if (!camera.WorldToScreen(start, width, height, screenStart)
+        || !camera.WorldToScreen(end, width, height, screenEnd)) return false;
+    MoveToEx(deviceContext, static_cast<int>(std::lround(screenStart.x)),
+        static_cast<int>(std::lround(screenStart.y)), nullptr);
+    LineTo(deviceContext, static_cast<int>(std::lround(screenEnd.x)),
+        static_cast<int>(std::lround(screenEnd.y)));
+    return true;
+}
+
+void DrawBox(HDC deviceContext, const PerspectiveCamera& camera, int width, int height,
+    const Vec3& groundCenter, const Vec3& dimensions, float heightScale = 1.0f) {
+    const float halfX = dimensions.x * 0.5f;
+    const float halfZ = dimensions.z * 0.5f;
+    const float top = groundCenter.y + dimensions.y * heightScale;
+    const std::array<Vec3, 8> vertices{{
+        {groundCenter.x - halfX, groundCenter.y, groundCenter.z - halfZ},
+        {groundCenter.x + halfX, groundCenter.y, groundCenter.z - halfZ},
+        {groundCenter.x + halfX, groundCenter.y, groundCenter.z + halfZ},
+        {groundCenter.x - halfX, groundCenter.y, groundCenter.z + halfZ},
+        {groundCenter.x - halfX, top, groundCenter.z - halfZ},
+        {groundCenter.x + halfX, top, groundCenter.z - halfZ},
+        {groundCenter.x + halfX, top, groundCenter.z + halfZ},
+        {groundCenter.x - halfX, top, groundCenter.z + halfZ},
+    }};
+    constexpr std::array<std::array<int, 2>, 12> edges{{
+        {{0, 1}}, {{1, 2}}, {{2, 3}}, {{3, 0}}, {{4, 5}}, {{5, 6}},
+        {{6, 7}}, {{7, 4}}, {{0, 4}}, {{1, 5}}, {{2, 6}}, {{3, 7}},
+    }};
+    for (const auto& edge : edges) {
+        DrawSegment(deviceContext, camera, width, height, vertices[edge[0]], vertices[edge[1]]);
+    }
+}
+
+void DrawLandmark(HDC deviceContext, const PerspectiveCamera& camera, int width, int height,
+    const Astral::Scene::LandmarkProxy& landmark) {
+    DrawBox(deviceContext, camera, width, height, landmark.position, landmark.dimensions,
+        landmark.kind == Astral::Scene::LandmarkKind::WashingtonMonument ? 0.82f : 1.0f);
+
+    if (landmark.kind == Astral::Scene::LandmarkKind::LincolnMemorial) {
+        const float halfX = landmark.dimensions.x * 0.5f;
+        const float halfZ = landmark.dimensions.z * 0.5f;
+        const float roofY = landmark.position.y + landmark.dimensions.y + 1.5f;
+        const Vec3 roofFront{landmark.position.x, roofY, landmark.position.z - halfZ};
+        const Vec3 roofBack{landmark.position.x, roofY, landmark.position.z + halfZ};
+        DrawSegment(deviceContext, camera, width, height, roofFront, roofBack);
+        DrawSegment(deviceContext, camera, width, height, roofFront,
+            {landmark.position.x - halfX, landmark.position.y + landmark.dimensions.y,
+                landmark.position.z - halfZ});
+        DrawSegment(deviceContext, camera, width, height, roofFront,
+            {landmark.position.x + halfX, landmark.position.y + landmark.dimensions.y,
+                landmark.position.z - halfZ});
+        DrawSegment(deviceContext, camera, width, height, roofBack,
+            {landmark.position.x - halfX, landmark.position.y + landmark.dimensions.y,
+                landmark.position.z + halfZ});
+        DrawSegment(deviceContext, camera, width, height, roofBack,
+            {landmark.position.x + halfX, landmark.position.y + landmark.dimensions.y,
+                landmark.position.z + halfZ});
+    } else if (landmark.kind == Astral::Scene::LandmarkKind::WashingtonMonument) {
+        const float halfX = landmark.dimensions.x * 0.5f;
+        const float halfZ = landmark.dimensions.z * 0.5f;
+        const float shoulderY = landmark.position.y + landmark.dimensions.y * 0.82f;
+        const Vec3 apex{landmark.position.x, landmark.position.y + landmark.dimensions.y,
+            landmark.position.z};
+        for (float x : {-halfX, halfX}) {
+            for (float z : {-halfZ, halfZ}) {
+                DrawSegment(deviceContext, camera, width, height,
+                    {landmark.position.x + x, shoulderY, landmark.position.z + z}, apex);
+            }
+        }
+    }
+}
+}
 
 namespace Astral::Renderer {
 
@@ -10,68 +109,73 @@ void Renderer::Clear(HDC deviceContext, RECT viewport) const {
     DeleteObject(background);
 }
 
-void Renderer::RenderDebugScene(HDC deviceContext, RECT viewport,
-    const Scene::OrthographicCamera& camera, const Assets::StaticMesh& mesh,
-    const Scene::Transform& transform, const Scene::CombatSandbox& combatSandbox) const {
+void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
+    const Scene::PerspectiveCamera& camera, const Scene::WorldBlockout& world,
+    const Scene::Transform& playerTransform, const Scene::CombatSandbox& combatSandbox) const {
     const int width = viewport.right - viewport.left;
     const int height = viewport.bottom - viewport.top;
-    const auto toPoint = [&](const Math::Vec3& position) {
-        const Math::Vec2 screen = camera.WorldToScreen(position, width, height);
-        return POINT{static_cast<LONG>(std::lround(screen.x)), static_cast<LONG>(std::lround(screen.y))};
-    };
-
     const HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(35, 52, 78));
-    const HPEN meshPen = CreatePen(PS_SOLID, 3, RGB(168, 92, 255));
     const HGDIOBJ previousPen = SelectObject(deviceContext, gridPen);
-    for (int grid = -10; grid <= 10; ++grid) {
-        const POINT verticalStart = toPoint({static_cast<float>(grid), -6.0f, 0.0f});
-        const POINT verticalEnd = toPoint({static_cast<float>(grid), 6.0f, 0.0f});
-        MoveToEx(deviceContext, verticalStart.x, verticalStart.y, nullptr);
-        LineTo(deviceContext, verticalEnd.x, verticalEnd.y);
-
-        const POINT horizontalStart = toPoint({-10.0f, static_cast<float>(grid), 0.0f});
-        const POINT horizontalEnd = toPoint({10.0f, static_cast<float>(grid), 0.0f});
-        MoveToEx(deviceContext, horizontalStart.x, horizontalStart.y, nullptr);
-        LineTo(deviceContext, horizontalEnd.x, horizontalEnd.y);
+    const Scene::GroundGrid& grid = world.Grid();
+    for (float x = grid.minimumX; x <= grid.maximumX; x += grid.spacing) {
+        DrawSegment(deviceContext, camera, width, height, {x, 0.0f, grid.minimumZ},
+            {x, 0.0f, grid.maximumZ});
+    }
+    for (float z = grid.minimumZ; z <= grid.maximumZ; z += grid.spacing) {
+        DrawSegment(deviceContext, camera, width, height, {grid.minimumX, 0.0f, z},
+            {grid.maximumX, 0.0f, z});
     }
 
-    SelectObject(deviceContext, meshPen);
-    const Math::Vec3 worldPosition = transform.WorldPosition();
-    for (const Assets::MeshEdge& edge : mesh.Edges()) {
-        const Math::Vec3 start = mesh.Vertices()[edge.start];
-        const Math::Vec3 end = mesh.Vertices()[edge.end];
-        const POINT screenStart = toPoint({start.x + worldPosition.x, start.y + worldPosition.y, 0.0f});
-        const POINT screenEnd = toPoint({end.x + worldPosition.x, end.y + worldPosition.y, 0.0f});
-        MoveToEx(deviceContext, screenStart.x, screenStart.y, nullptr);
-        LineTo(deviceContext, screenEnd.x, screenEnd.y);
+    constexpr std::array<COLORREF, 3> landmarkColors{{
+        RGB(235, 205, 120), RGB(70, 190, 235), RGB(225, 225, 235)}};
+    for (std::size_t index = 0; index < world.Landmarks().size(); ++index) {
+        const HPEN landmarkPen = CreatePen(PS_SOLID, 2, landmarkColors[index]);
+        SelectObject(deviceContext, landmarkPen);
+        DrawLandmark(deviceContext, camera, width, height, world.Landmarks()[index]);
+        SelectObject(deviceContext, gridPen);
+        DeleteObject(landmarkPen);
+    }
+
+    const Math::Vec3 player = world.GroundPosition(playerTransform.WorldPosition());
+    const HPEN playerPen = CreatePen(PS_SOLID, 3, RGB(168, 92, 255));
+    SelectObject(deviceContext, playerPen);
+    const std::array<Math::Vec3, 4> playerBase{{
+        {player.x - 0.65f, 0.0f, player.z - 0.65f}, {player.x + 0.65f, 0.0f, player.z - 0.65f},
+        {player.x + 0.65f, 0.0f, player.z + 0.65f}, {player.x - 0.65f, 0.0f, player.z + 0.65f}}};
+    const Math::Vec3 playerApex{player.x, 2.2f, player.z};
+    for (std::size_t index = 0; index < playerBase.size(); ++index) {
+        DrawSegment(deviceContext, camera, width, height, playerBase[index],
+            playerBase[(index + 1) % playerBase.size()]);
+        DrawSegment(deviceContext, camera, width, height, playerBase[index], playerApex);
     }
 
     const Scene::TrainingDummy& dummy = combatSandbox.Dummy();
-    const POINT dummyCenter = toPoint(dummy.position);
+    const Math::Vec3 dummyGround = world.GroundPosition(dummy.position);
     const COLORREF dummyColor = dummy.IsDefeated() ? RGB(90, 90, 100) : RGB(255, 105, 80);
     const HPEN dummyPen = CreatePen(PS_SOLID, 3, dummyColor);
-    const HBRUSH dummyBrush = CreateSolidBrush(dummy.IsDefeated() ? RGB(45, 45, 55) : RGB(110, 40, 45));
     SelectObject(deviceContext, dummyPen);
-    const HGDIOBJ previousBrush = SelectObject(deviceContext, dummyBrush);
-    Ellipse(deviceContext, dummyCenter.x - 18, dummyCenter.y - 30,
-        dummyCenter.x + 18, dummyCenter.y + 30);
+    DrawBox(deviceContext, camera, width, height, dummyGround, {1.2f, 2.5f, 1.2f});
 
     const int healthWidth = dummy.maximumHealth > 0 ? (60 * dummy.health / dummy.maximumHealth) : 0;
-    RECT healthBackground{dummyCenter.x - 30, dummyCenter.y - 42, dummyCenter.x + 30,
-        dummyCenter.y - 36};
-    RECT health{healthBackground.left, healthBackground.top,
-        healthBackground.left + healthWidth, healthBackground.bottom};
+    Math::Vec2 dummyTop{};
+    const bool dummyVisible = camera.WorldToScreen(
+        {dummyGround.x, 3.0f, dummyGround.z}, width, height, dummyTop);
     const HBRUSH healthBackgroundBrush = CreateSolidBrush(RGB(55, 25, 30));
     const HBRUSH healthBrush = CreateSolidBrush(RGB(90, 230, 120));
-    FillRect(deviceContext, &healthBackground, healthBackgroundBrush);
-    FillRect(deviceContext, &health, healthBrush);
+    if (dummyVisible) {
+        const LONG centerX = static_cast<LONG>(std::lround(dummyTop.x));
+        const LONG top = static_cast<LONG>(std::lround(dummyTop.y)) - 8;
+        RECT healthBackground{centerX - 30, top, centerX + 30, top + 6};
+        RECT health{healthBackground.left, healthBackground.top,
+            healthBackground.left + healthWidth, healthBackground.bottom};
+        FillRect(deviceContext, &healthBackground, healthBackgroundBrush);
+        FillRect(deviceContext, &health, healthBrush);
+    }
 
-    SelectObject(deviceContext, previousBrush);
     SelectObject(deviceContext, previousPen);
     DeleteObject(gridPen);
-    DeleteObject(meshPen);
+    DeleteObject(playerPen);
     DeleteObject(dummyPen);
-    DeleteObject(dummyBrush);
     DeleteObject(healthBackgroundBrush);
     DeleteObject(healthBrush);
 }

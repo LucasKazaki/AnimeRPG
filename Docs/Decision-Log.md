@@ -53,3 +53,11 @@ Decision: accept the packet-bounded deterministic combat domain and native runti
 Evidence: out-of-source Debug and Release builds passed; CTest passed 4/4 in both configurations. Focused domain tests cover light/heavy damage, out-of-range and cooldown rejection, defeat, and post-defeat immunity. The automated native runtime smoke launched each configuration of `AstralGame`, observed title transitions for light hit, cooldown rejection, heavy hit, defeat, and post-defeat rejection through real `SendInput`/`GetAsyncKeyState`, then exited through Escape with code 0. The M3 verifier, scope audit, and `git diff --check` also passed. See `Docs/QA/MILESTONE-4.md`.
 
 Consequence: M4 satisfies its autonomous merge gate. No evidence requires reprioritization away from the staged P0 sequence; M5 National Mall blockout remains the highest-value next bounded task and should begin in a fresh isolated worktree.
+
+## 2026-07-30 — M5 perspective wireframe world verified
+
+Decision: accept M5's bounded C++17/GDI perspective world capability. `PerspectiveCamera` supplies deterministic positive-near-plane projection and player follow; `WorldBlockout` supplies a traversable X/Z grid and deterministic Lincoln Memorial, Reflecting Pool, and Washington Monument wire proxies at distinct depths. The live renderer uses those objects rather than translating the old debug triangle and preserves the player marker, dummy, J/K combat, title state, and clean exit.
+
+Evidence: out-of-source Debug and Release builds passed and CTest passed 6/6 in both configurations. Release-active focused tests cover projection center, depth scaling, vertical orientation, near rejection, camera follow, deterministic landmark data, valid dimensions, distinct depth, and ground mapping. The native M5 smoke launched the actual game, observed M5/title position state, verified a real light hit, moved through the real W input path, captured exact GDI colors for the grid, all three landmarks, player, and dummy, observed the rendered frame hash change, and exited through Escape with code 0. See `Docs/QA/MILESTONE-5.md`.
+
+Consequence: M5 satisfies its autonomous merge gate. Dynamic selection from the updated backlog favors M7 Shadowblade (P0) over M6 destruction (P1); create a clean isolated M7 worktree after the M5 merge, but do not implement it without a bounded task packet.
