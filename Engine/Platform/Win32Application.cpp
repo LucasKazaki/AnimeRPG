@@ -11,10 +11,32 @@ constexpr wchar_t kWindowClass[] = L"AstralEngineWindow";
 Astral::Renderer::Renderer g_renderer;
 Astral::Core::Logger g_logger("astral.log");
 
-void UpdateTitle(HWND window, float fps, const Astral::Scene::Transform& state) {
+const wchar_t* AttackName(Astral::Scene::AttackType type) {
+    return type == Astral::Scene::AttackType::Light ? L"Light" : L"Heavy";
+}
+
+const wchar_t* ResultName(Astral::Scene::AttackResult result) {
+    switch (result) {
+    case Astral::Scene::AttackResult::Ready: return L"Ready";
+    case Astral::Scene::AttackResult::Hit: return L"Hit";
+    case Astral::Scene::AttackResult::Cooldown: return L"Cooldown";
+    case Astral::Scene::AttackResult::OutOfRange: return L"Out of Range";
+    case Astral::Scene::AttackResult::TargetDefeated: return L"Already Defeated";
+    }
+    return L"Unknown";
+}
+
+void UpdateTitle(HWND window, float fps, const Astral::Scene::Transform& state,
+    const Astral::Scene::CombatSandbox& combatSandbox) {
     const Astral::Math::Vec3 position = state.WorldPosition();
-    const std::wstring title = L"Astral Engine | M3: WASD Move | FPS: "
-        + std::to_wstring(static_cast<int>(fps)) + L" | Pos: ("
+    const Astral::Scene::TrainingDummy& dummy = combatSandbox.Dummy();
+    const Astral::Scene::AttackReport& attack = combatSandbox.LastAttack();
+    const std::wstring title = L"Astral Engine | M4 Combat | J Light K Heavy | Dummy: "
+        + std::wstring(dummy.IsDefeated() ? L"Defeated" : L"Alive") + L" HP: "
+        + std::to_wstring(dummy.health) + L"/" + std::to_wstring(dummy.maximumHealth)
+        + L" | Last: " + AttackName(attack.type) + L" " + ResultName(attack.result)
+        + (attack.damageApplied > 0 ? L" -" + std::to_wstring(attack.damageApplied) : L"")
+        + L" | FPS: " + std::to_wstring(static_cast<int>(fps)) + L" | Pos: ("
         + std::to_wstring(position.x) + L", "
         + std::to_wstring(position.y) + L", "
         + std::to_wstring(position.z) + L")";
@@ -49,7 +71,8 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
         return false;
     }
     camera_.Follow(playerController_.TransformState());
-    g_logger.Info("Window created; M3 controller active; press Escape or close the window to exit");
+    UpdateTitle(window_, 0.0f, playerController_.TransformState(), combatSandbox_);
+    g_logger.Info("Window created; M4 combat active; J light, K heavy; press Escape or close to exit");
     return true;
 }
 
@@ -69,7 +92,8 @@ int Win32Application::Run() {
         fpsAccumulator += deltaSeconds;
         ++frameCount;
         if (fpsAccumulator >= 1.0) {
-            UpdateTitle(window_, static_cast<float>(frameCount / fpsAccumulator), playerController_.TransformState());
+            UpdateTitle(window_, static_cast<float>(frameCount / fpsAccumulator),
+                playerController_.TransformState(), combatSandbox_);
             g_logger.Info("Frame timing active");
             fpsAccumulator = 0.0;
             frameCount = 0;
@@ -87,13 +111,34 @@ int Win32Application::Run() {
         };
         playerController_.Update(input, deltaSeconds);
         camera_.Follow(playerController_.TransformState());
+        combatSandbox_.AdvanceTime(deltaSeconds);
+
+        const bool lightAttackDown = (GetAsyncKeyState('J') & 0x8000) != 0;
+        const bool heavyAttackDown = (GetAsyncKeyState('K') & 0x8000) != 0;
+        bool attacked = false;
+        if (lightAttackDown && !lightAttackPressed_) {
+            combatSandbox_.TryAttack(Scene::AttackType::Light,
+                playerController_.TransformState().WorldPosition());
+            attacked = true;
+        } else if (heavyAttackDown && !heavyAttackPressed_) {
+            combatSandbox_.TryAttack(Scene::AttackType::Heavy,
+                playerController_.TransformState().WorldPosition());
+            attacked = true;
+        }
+        lightAttackPressed_ = lightAttackDown;
+        heavyAttackPressed_ = heavyAttackDown;
+        if (attacked) {
+            UpdateTitle(window_, frameCount > 0 && fpsAccumulator > 0.0
+                    ? static_cast<float>(frameCount / fpsAccumulator) : 0.0f,
+                playerController_.TransformState(), combatSandbox_);
+        }
 
         HDC deviceContext = GetDC(window_);
         RECT viewport{};
         GetClientRect(window_, &viewport);
         g_renderer.Clear(deviceContext, viewport);
         g_renderer.RenderDebugScene(deviceContext, viewport, camera_, debugMesh_,
-            playerController_.TransformState());
+            playerController_.TransformState(), combatSandbox_);
         ReleaseDC(window_, deviceContext);
         Sleep(1);
     }
