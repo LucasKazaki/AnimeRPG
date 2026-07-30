@@ -61,3 +61,11 @@ Decision: accept M5's bounded C++17/GDI perspective world capability. `Perspecti
 Evidence: out-of-source Debug and Release builds passed and CTest passed 6/6 in both configurations. Release-active focused tests cover projection center, depth scaling, vertical orientation, near rejection, camera follow, deterministic landmark data, valid dimensions, distinct depth, and ground mapping. The native M5 smoke launched the actual game, observed M5/title position state, verified a real light hit, moved through the real W input path, captured exact GDI colors for the grid, all three landmarks, player, and dummy, observed the rendered frame hash change, and exited through Escape with code 0. See `Docs/QA/MILESTONE-5.md`.
 
 Consequence: M5 satisfies its autonomous merge gate. Dynamic selection from the updated backlog favors M7 Shadowblade (P0) over M6 destruction (P1); create a clean isolated M7 worktree after the M5 merge, but do not implement it without a bounded task packet.
+
+## 2026-07-30 — M7 Shadowblade action kit verified
+
+Decision: accept M7's bounded C++17 Shadowblade gameplay layer. `ShadowbladeActions` owns deterministic resource, cooldown, guard, dash, and fatal-strike outcomes; the live application routes dash through the bounded controller and fatal damage through the existing combat domain while preserving the M5 perspective world.
+
+Evidence: canonical external Debug and Release builds passed and CTest passed 8/8 in both configurations. Focused tests cover resource cap/cost/rejection, positive-finite delta handling, dash and fatal cooldowns, fatal range/damage/defeat, and guard conflicts. The native M7 smoke launched the actual game, observed held guard and rendered guard pixels, verified guard-blocked Q, applied an 80-damage L fatal strike, moved from Z 0 to Z 6 with Q, observed repeated-Q cooldown rejection, captured the resource bar, and exited through Escape with code 0. Existing M4/M5 runtime smokes remained green. See `Docs/QA/MILESTONE-7.md`.
+
+Consequence: M7 satisfies its delegated merge gate. Dynamic selection favors the next P0 player capability, M8 Thought Commands, over P1 M6 destruction; create a fresh bounded M8 packet and isolated worktree after integration.

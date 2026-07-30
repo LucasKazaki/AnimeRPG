@@ -31,10 +31,16 @@ AttackReport CombatSandbox::TryAttack(AttackType type, const Math::Vec3& attacke
     }
 
     lastAttack_.result = AttackResult::Hit;
-    lastAttack_.damageApplied = std::min(attack.damage, dummy_.health);
-    dummy_.health -= lastAttack_.damageApplied;
+    lastAttack_.damageApplied = ApplyDamage(attack.damage);
     nextAttackTime_ = elapsedSeconds_ + attack.cooldownSeconds;
     return lastAttack_;
+}
+
+int CombatSandbox::ApplyDamage(int damage) {
+    if (damage <= 0 || dummy_.IsDefeated()) return 0;
+    const int applied = std::min(damage, dummy_.health);
+    dummy_.health -= applied;
+    return applied;
 }
 
 float CombatSandbox::CooldownRemaining() const {

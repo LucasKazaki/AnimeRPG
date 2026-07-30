@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <cwchar>
 
 namespace {
 using Astral::Math::Vec2;
@@ -111,7 +112,8 @@ void Renderer::Clear(HDC deviceContext, RECT viewport) const {
 
 void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     const Scene::PerspectiveCamera& camera, const Scene::WorldBlockout& world,
-    const Scene::Transform& playerTransform, const Scene::CombatSandbox& combatSandbox) const {
+    const Scene::Transform& playerTransform, const Scene::CombatSandbox& combatSandbox,
+    const Scene::ShadowbladeActions& shadowbladeActions) const {
     const int width = viewport.right - viewport.left;
     const int height = viewport.bottom - viewport.top;
     const HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(35, 52, 78));
@@ -149,6 +151,21 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
         DrawSegment(deviceContext, camera, width, height, playerBase[index], playerApex);
     }
 
+    if (shadowbladeActions.IsGuarding()) {
+        Math::Vec2 playerScreen{};
+        if (camera.WorldToScreen({player.x, 1.0f, player.z}, width, height, playerScreen)) {
+            const HPEN guardPen = CreatePen(PS_SOLID, 4, RGB(255, 220, 70));
+            const HGDIOBJ priorGuardPen = SelectObject(deviceContext, guardPen);
+            const HGDIOBJ priorBrush = SelectObject(deviceContext, GetStockObject(HOLLOW_BRUSH));
+            const int centerX = static_cast<int>(std::lround(playerScreen.x));
+            const int centerY = static_cast<int>(std::lround(playerScreen.y));
+            Ellipse(deviceContext, centerX - 28, centerY - 38, centerX + 28, centerY + 38);
+            SelectObject(deviceContext, priorBrush);
+            SelectObject(deviceContext, priorGuardPen);
+            DeleteObject(guardPen);
+        }
+    }
+
     const Scene::TrainingDummy& dummy = combatSandbox.Dummy();
     const Math::Vec3 dummyGround = world.GroundPosition(dummy.position);
     const COLORREF dummyColor = dummy.IsDefeated() ? RGB(90, 90, 100) : RGB(255, 105, 80);
@@ -172,12 +189,29 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
         FillRect(deviceContext, &health, healthBrush);
     }
 
+    const HBRUSH shadowBackgroundBrush = CreateSolidBrush(RGB(25, 30, 52));
+    const HBRUSH shadowResourceBrush = CreateSolidBrush(RGB(70, 220, 235));
+    const int shadowWidth = static_cast<int>(180.0f * shadowbladeActions.Resource()
+        / Scene::ShadowbladeActions::MaximumResource);
+    RECT shadowBackground{20, 20, 200, 34};
+    RECT shadowResource{20, 20, 20 + shadowWidth, 34};
+    FillRect(deviceContext, &shadowBackground, shadowBackgroundBrush);
+    FillRect(deviceContext, &shadowResource, shadowResourceBrush);
+    SetBkMode(deviceContext, TRANSPARENT);
+    SetTextColor(deviceContext, shadowbladeActions.IsGuarding()
+        ? RGB(255, 220, 70) : RGB(210, 230, 255));
+    const wchar_t* shadowLabel = shadowbladeActions.IsGuarding()
+        ? L"SHADOWBLADE  GUARD ACTIVE" : L"SHADOWBLADE  Q DASH  L FATAL  SHIFT GUARD";
+    TextOutW(deviceContext, 20, 39, shadowLabel, static_cast<int>(wcslen(shadowLabel)));
+
     SelectObject(deviceContext, previousPen);
     DeleteObject(gridPen);
     DeleteObject(playerPen);
     DeleteObject(dummyPen);
     DeleteObject(healthBackgroundBrush);
     DeleteObject(healthBrush);
+    DeleteObject(shadowBackgroundBrush);
+    DeleteObject(shadowResourceBrush);
 }
 
 } // namespace Astral::Renderer

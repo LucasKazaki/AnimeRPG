@@ -3,6 +3,7 @@
 #include "Engine/Scene/Camera.h"
 #include "Engine/Scene/CombatSandbox.h"
 #include "Engine/Scene/PlayerController.h"
+#include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/WorldBlockout.h"
 
 #include <windows.h>
@@ -22,8 +23,11 @@ private:
     Scene::WorldBlockout world_;
     Scene::PlayerController playerController_{6.0f, {-18.0f, 18.0f, -4.0f, 72.0f}};
     Scene::CombatSandbox combatSandbox_;
+    Scene::ShadowbladeActions shadowbladeActions_;
     bool lightAttackPressed_{};
     bool heavyAttackPressed_{};
+    bool dashPressed_{};
+    bool fatalStrikePressed_{};
 };
 
 } // namespace Astral::Platform

@@ -43,6 +43,7 @@ public:
 
     void AdvanceTime(float deltaSeconds);
     AttackReport TryAttack(AttackType type, const Math::Vec3& attackerPosition);
+    int ApplyDamage(int damage);
 
     const TrainingDummy& Dummy() const { return dummy_; }
     const AttackReport& LastAttack() const { return lastAttack_; }

@@ -27,7 +27,7 @@ Source: Product Requirements Document v0.2, extracted 2026-07-21.
 M1 is the first gate. The first playable combat slice begins only after M1–M3 are verified: move a placeholder character in a windowed test scene. Combat and art are intentionally not started in parallel until those contracts exist.
 
 ## Next queued packet
-M7 Shadowblade in a fresh isolated worktree after verified M5 is merged. Dynamic selection favors this P0 core-player capability over the P1 M6 destruction prototype. A new packet must bound abilities, resources, cooldowns, live controls, focused tests, and native runtime evidence before implementation begins.
+M8 Thought Commands in a fresh isolated worktree after verified M7 is merged. Dynamic selection favors this P0 player-command capability over the P1 M6 destruction prototype. A new packet must bound slow-time semantics, parser grammar, ability/summon/environment routing contracts, live controls, focused tests, and native runtime evidence before implementation begins.
 
 ## M3 implementation evidence
 
@@ -40,3 +40,7 @@ The bounded deterministic combat sandbox is implemented and verified on `task/m4
 ## M5 implementation evidence
 
 The bounded perspective wireframe world is implemented and verified on `task/m5-national-mall-blockout`: deterministic perspective projection, positive near-plane rejection, player-follow traversal on an X/Z grid, three deterministic landmark proxies at distinct depths, retained player/dummy combat state, and captured native GDI frame evidence pass in Debug and Release. See `Docs/QA/MILESTONE-5.md`.
+
+## M7 implementation evidence
+
+The bounded deterministic Shadowblade action kit is implemented and verified on `task/m7-shadowblade`: Q dash through the bounded controller path, L fatal strike through the combat domain, held left-Shift guard/conflict state, capped resource and cooldown rules, visible GDI/title feedback, and actual-game runtime input evidence pass in Debug and Release. Existing M4/M5 runtime smokes remain green. See `Docs/QA/MILESTONE-7.md`.
