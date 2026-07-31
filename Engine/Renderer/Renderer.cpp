@@ -115,7 +115,8 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     const Scene::Transform& playerTransform, const Scene::CombatSandbox& combatSandbox,
     const Scene::ShadowbladeActions& shadowbladeActions,
     const Scene::ThoughtCommands& thoughtCommands,
-    const Scene::LandmarkInteraction& landmarkInteraction) const {
+    const Scene::LandmarkInteraction& landmarkInteraction,
+    const Scene::LandmarkEncounter& landmarkEncounter) const {
     const int width = viewport.right - viewport.left;
     const int height = viewport.bottom - viewport.top;
     const HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(35, 52, 78));
@@ -241,6 +242,22 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     TextOutW(deviceContext, 20, 111, interactionLabel,
         static_cast<int>(wcslen(interactionLabel)));
 
+    const bool encounterActive = landmarkEncounter.State()
+        == Scene::LandmarkEncounterState::Active;
+    const bool encounterCompleted = landmarkEncounter.State()
+        == Scene::LandmarkEncounterState::Completed;
+    const HBRUSH encounterBrush = CreateSolidBrush(encounterCompleted
+        ? RGB(80, 235, 125) : (encounterActive ? RGB(255, 155, 60) : RGB(65, 75, 100)));
+    RECT encounterBanner{20, 132, 300, 150};
+    FillRect(deviceContext, &encounterBanner, encounterBrush);
+    SetTextColor(deviceContext, RGB(245, 245, 255));
+    const wchar_t* encounterLabel = encounterCompleted
+        ? L"TRAINING ENCOUNTER COMPLETED  REWARD GRANTED"
+        : (encounterActive ? L"TRAINING ENCOUNTER ACTIVE  DEFEAT DUMMY"
+            : L"TRAINING ENCOUNTER LOCKED  DISCOVER LINCOLN");
+    TextOutW(deviceContext, 20, 135, encounterLabel,
+        static_cast<int>(wcslen(encounterLabel)));
+
     SelectObject(deviceContext, previousPen);
     DeleteObject(gridPen);
     DeleteObject(playerPen);
@@ -250,6 +267,7 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     DeleteObject(shadowBackgroundBrush);
     DeleteObject(shadowResourceBrush);
     if (interactionBrush) DeleteObject(interactionBrush);
+    DeleteObject(encounterBrush);
 }
 
 } // namespace Astral::Renderer
