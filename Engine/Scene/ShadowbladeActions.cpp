@@ -15,6 +15,13 @@ void ShadowbladeActions::AdvanceTime(float deltaSeconds) {
         fatalStrikeCooldownRemaining_ - deltaSeconds);
 }
 
+float ShadowbladeActions::RestoreResource(float amount) {
+    if (amount <= 0.0f || !std::isfinite(amount)) return 0.0f;
+    const float previous = resource_;
+    resource_ = std::min(MaximumResource, resource_ + amount);
+    return resource_ - previous;
+}
+
 void ShadowbladeActions::SetGuarding(bool guarding) {
     if (guarding_ == guarding) return;
     guarding_ = guarding;

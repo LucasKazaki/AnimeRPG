@@ -66,6 +66,25 @@ const wchar_t* CommandReasonName(Astral::Scene::ThoughtCommandReason reason) {
     return L"Unknown";
 }
 
+const wchar_t* LandmarkName(Astral::Scene::LandmarkKind kind) {
+    switch (kind) {
+    case Astral::Scene::LandmarkKind::LincolnMemorial: return L"Lincoln";
+    case Astral::Scene::LandmarkKind::ReflectingPool: return L"Pool";
+    case Astral::Scene::LandmarkKind::WashingtonMonument: return L"Monument";
+    }
+    return L"None";
+}
+
+const wchar_t* InteractionResultName(Astral::Scene::LandmarkInteractionResult result) {
+    switch (result) {
+    case Astral::Scene::LandmarkInteractionResult::None: return L"None";
+    case Astral::Scene::LandmarkInteractionResult::OutOfRange: return L"Out of Range";
+    case Astral::Scene::LandmarkInteractionResult::Discovered: return L"Discovered";
+    case Astral::Scene::LandmarkInteractionResult::AlreadyVisited: return L"Already Visited";
+    }
+    return L"Unknown";
+}
+
 std::wstring WidenAscii(const std::string& text) {
     return std::wstring(text.begin(), text.end());
 }
@@ -73,7 +92,8 @@ std::wstring WidenAscii(const std::string& text) {
 void UpdateTitle(HWND window, float fps, const Astral::Scene::Transform& state,
     const Astral::Scene::CombatSandbox& combatSandbox,
     const Astral::Scene::ShadowbladeActions& shadowbladeActions,
-    const Astral::Scene::ThoughtCommands& thoughtCommands) {
+    const Astral::Scene::ThoughtCommands& thoughtCommands,
+    const Astral::Scene::LandmarkInteraction& landmarkInteraction) {
     const Astral::Math::Vec3 position = state.WorldPosition();
     const Astral::Scene::TrainingDummy& dummy = combatSandbox.Dummy();
     const Astral::Scene::AttackReport& attack = combatSandbox.LastAttack();
@@ -84,7 +104,15 @@ void UpdateTitle(HWND window, float fps, const Astral::Scene::Transform& state,
     const std::wstring commandOutcome = command.status
             == Astral::Scene::ThoughtCommandStatus::Accepted
         ? L"ACCEPTED" : L"REJECTED: " + std::wstring(CommandReasonName(command.reason));
-    const std::wstring title = L"Astral Engine | M8 Thought Commands | 1 Dash 2 Fatal 3/4 Guard 5 Focus | Command: "
+    const Astral::Scene::LandmarkInteractionReport& interaction = landmarkInteraction.LastReport();
+    const std::wstring selected = landmarkInteraction.HasSelection()
+        ? LandmarkName(landmarkInteraction.SelectedKind()) : L"None";
+    const std::wstring reward = interaction.rewardApplied > 0.0f
+        ? L" Reward Shadow Restored" : L"";
+    const std::wstring title = L"Astral Engine | M9 Landmark Interaction | E Interact | Selected: "
+        + selected + L" | Visited: " + std::to_wstring(landmarkInteraction.VisitedCount())
+        + L"/3 | Interaction Last: " + InteractionResultName(interaction.result) + reward
+        + L" | M8 Thought Commands | 1 Dash 2 Fatal 3/4 Guard 5 Focus | Command: "
         + submitted + L" | " + commandOutcome
         + L" | Focus: " + (thoughtCommands.IsFocusActive() ? L"ON x0.35" : L"OFF x1.00")
         + L" | M7 Shadowblade | Q Dash L Fatal Shift Guard | Shadow: "
@@ -129,10 +157,11 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
     ShowWindow(window_, showCommand);
     UpdateWindow(window_);
     playerController_.SetPosition({0.0f, 0.0f, 0.0f});
+    landmarkInteraction_.UpdateSelection(playerController_.TransformState().WorldPosition(), world_);
     camera_.Follow(playerController_.TransformState());
     UpdateTitle(window_, 0.0f, playerController_.TransformState(), combatSandbox_,
-        shadowbladeActions_, thoughtCommands_);
-    g_logger.Info("Window created; M8 Thought Commands active; number commands and Escape exits");
+        shadowbladeActions_, thoughtCommands_, landmarkInteraction_);
+    g_logger.Info("Window created; M9 landmark interaction active; E interacts and Escape exits");
     return true;
 }
 
@@ -154,7 +183,7 @@ int Win32Application::Run() {
         if (fpsAccumulator >= 1.0) {
             UpdateTitle(window_, static_cast<float>(frameCount / fpsAccumulator),
                 playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
-                thoughtCommands_);
+                thoughtCommands_, landmarkInteraction_);
             g_logger.Info("Frame timing active");
             fpsAccumulator = 0.0;
             frameCount = 0;
@@ -187,6 +216,7 @@ int Win32Application::Run() {
         const bool heavyAttackDown = (GetAsyncKeyState('K') & 0x8000) != 0;
         const bool dashDown = (GetAsyncKeyState('Q') & 0x8000) != 0;
         const bool fatalStrikeDown = (GetAsyncKeyState('L') & 0x8000) != 0;
+        const bool interactDown = (GetAsyncKeyState('E') & 0x8000) != 0;
         bool commandDown[6]{};
         for (int index = 0; index < 6; ++index) {
             commandDown[index] = (GetAsyncKeyState('0' + index) & 0x8000) != 0;
@@ -194,6 +224,7 @@ int Win32Application::Run() {
         bool attacked = false;
         bool shadowAction = false;
         bool thoughtCommand = false;
+        bool interacted = false;
         if (!guarding && lightAttackDown && !lightAttackPressed_) {
             combatSandbox_.TryAttack(Scene::AttackType::Light,
                 playerController_.TransformState().WorldPosition());
@@ -233,17 +264,25 @@ int Win32Application::Run() {
                 break;
             }
         }
+        const bool selectionChanged = landmarkInteraction_.UpdateSelection(
+            playerController_.TransformState().WorldPosition(), world_);
+        if (interactDown && !interactPressed_) {
+            landmarkInteraction_.TryInteract(playerController_.TransformState().WorldPosition(),
+                world_, shadowbladeActions_);
+            interacted = true;
+        }
         lightAttackPressed_ = lightAttackDown;
         heavyAttackPressed_ = heavyAttackDown;
         dashPressed_ = dashDown;
         fatalStrikePressed_ = fatalStrikeDown;
+        interactPressed_ = interactDown;
         for (int index = 0; index < 6; ++index) commandPressed_[index] = commandDown[index];
-        if (attacked || shadowAction || thoughtCommand || guardChanged || input.forward || input.backward
-            || input.left || input.right) {
+        if (attacked || shadowAction || thoughtCommand || interacted || selectionChanged
+            || guardChanged || input.forward || input.backward || input.left || input.right) {
             UpdateTitle(window_, frameCount > 0 && fpsAccumulator > 0.0
                     ? static_cast<float>(frameCount / fpsAccumulator) : 0.0f,
                 playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
-                thoughtCommands_);
+                thoughtCommands_, landmarkInteraction_);
         }
 
         HDC deviceContext = GetDC(window_);
@@ -252,7 +291,7 @@ int Win32Application::Run() {
         g_renderer.Clear(deviceContext, viewport);
         g_renderer.RenderWorld(deviceContext, viewport, camera_, world_,
             playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
-            thoughtCommands_);
+            thoughtCommands_, landmarkInteraction_);
         ReleaseDC(window_, deviceContext);
         Sleep(1);
     }
