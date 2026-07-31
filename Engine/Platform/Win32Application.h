@@ -2,6 +2,7 @@
 
 #include "Engine/Scene/Camera.h"
 #include "Engine/Scene/CombatSandbox.h"
+#include "Engine/Scene/LandmarkEncounter.h"
 #include "Engine/Scene/LandmarkInteraction.h"
 #include "Engine/Scene/PlayerController.h"
 #include "Engine/Scene/ShadowbladeActions.h"
@@ -25,6 +26,7 @@ private:
     Scene::WorldBlockout world_;
     Scene::PlayerController playerController_{6.0f, {-18.0f, 18.0f, -4.0f, 72.0f}};
     Scene::CombatSandbox combatSandbox_;
+    Scene::LandmarkEncounter landmarkEncounter_;
     Scene::LandmarkInteraction landmarkInteraction_;
     Scene::ShadowbladeActions shadowbladeActions_;
     Scene::ThoughtCommands thoughtCommands_;

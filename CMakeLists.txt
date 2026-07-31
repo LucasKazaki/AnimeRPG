@@ -13,6 +13,7 @@ add_executable(AstralGame WIN32
     Engine/Renderer/Renderer.cpp
     Engine/Scene/Camera.cpp
     Engine/Scene/CombatSandbox.cpp
+    Engine/Scene/LandmarkEncounter.cpp
     Engine/Scene/LandmarkInteraction.cpp
     Engine/Scene/PlayerController.cpp
     Engine/Scene/ShadowbladeActions.cpp
@@ -83,6 +84,17 @@ if(BUILD_TESTING)
     target_include_directories(LandmarkInteractionTests PRIVATE .)
     add_test(NAME LandmarkInteractionTests COMMAND LandmarkInteractionTests)
 
+    add_executable(LandmarkEncounterTests
+        Engine/Scene/CombatSandbox.cpp
+        Engine/Scene/LandmarkEncounter.cpp
+        Engine/Scene/LandmarkInteraction.cpp
+        Engine/Scene/ShadowbladeActions.cpp
+        Engine/Scene/WorldBlockout.cpp
+        Tests/LandmarkEncounterTests.cpp
+    )
+    target_include_directories(LandmarkEncounterTests PRIVATE .)
+    add_test(NAME LandmarkEncounterTests COMMAND LandmarkEncounterTests)
+
     add_executable(M4RuntimeSmoke Tests/CombatSandboxTests.cpp)
     target_include_directories(M4RuntimeSmoke PRIVATE .)
     target_compile_definitions(M4RuntimeSmoke PRIVATE
@@ -117,5 +129,12 @@ if(BUILD_TESTING)
     target_compile_definitions(M9RuntimeSmoke PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_link_libraries(M9RuntimeSmoke PRIVATE user32 gdi32)
     add_test(NAME M9RuntimeSmoke COMMAND M9RuntimeSmoke
+        $<TARGET_FILE:AstralGame> ${CMAKE_SOURCE_DIR})
+
+    add_executable(M10RuntimeSmoke Tests/M10RuntimeSmoke.cpp)
+    target_include_directories(M10RuntimeSmoke PRIVATE .)
+    target_compile_definitions(M10RuntimeSmoke PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(M10RuntimeSmoke PRIVATE user32 gdi32)
+    add_test(NAME M10RuntimeSmoke COMMAND M10RuntimeSmoke
         $<TARGET_FILE:AstralGame> ${CMAKE_SOURCE_DIR})
 endif()

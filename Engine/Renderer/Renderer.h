@@ -2,6 +2,7 @@
 
 #include "Engine/Scene/Camera.h"
 #include "Engine/Scene/CombatSandbox.h"
+#include "Engine/Scene/LandmarkEncounter.h"
 #include "Engine/Scene/LandmarkInteraction.h"
 #include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/ThoughtCommands.h"
@@ -20,7 +21,8 @@ public:
         const Scene::CombatSandbox& combatSandbox,
         const Scene::ShadowbladeActions& shadowbladeActions,
         const Scene::ThoughtCommands& thoughtCommands,
-        const Scene::LandmarkInteraction& landmarkInteraction) const;
+        const Scene::LandmarkInteraction& landmarkInteraction,
+        const Scene::LandmarkEncounter& landmarkEncounter) const;
 };
 
 } // namespace Astral::Renderer
