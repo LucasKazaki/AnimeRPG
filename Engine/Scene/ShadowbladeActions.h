@@ -43,6 +43,7 @@ public:
     static constexpr int FatalStrikeDamage = 80;
 
     void AdvanceTime(float deltaSeconds);
+    float RestoreResource(float amount);
     void SetGuarding(bool guarding);
     ShadowActionReport TryDash(const Math::Vec3& position);
     ShadowActionReport TryFatalStrike(const Math::Vec3& position, CombatSandbox& combatSandbox);

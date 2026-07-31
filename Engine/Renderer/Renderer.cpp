@@ -114,7 +114,8 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     const Scene::PerspectiveCamera& camera, const Scene::WorldBlockout& world,
     const Scene::Transform& playerTransform, const Scene::CombatSandbox& combatSandbox,
     const Scene::ShadowbladeActions& shadowbladeActions,
-    const Scene::ThoughtCommands& thoughtCommands) const {
+    const Scene::ThoughtCommands& thoughtCommands,
+    const Scene::LandmarkInteraction& landmarkInteraction) const {
     const int width = viewport.right - viewport.left;
     const int height = viewport.bottom - viewport.top;
     const HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(35, 52, 78));
@@ -132,7 +133,12 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     constexpr std::array<COLORREF, 3> landmarkColors{{
         RGB(235, 205, 120), RGB(70, 190, 235), RGB(225, 225, 235)}};
     for (std::size_t index = 0; index < world.Landmarks().size(); ++index) {
-        const HPEN landmarkPen = CreatePen(PS_SOLID, 2, landmarkColors[index]);
+        const bool selected = landmarkInteraction.HasSelection()
+            && landmarkInteraction.SelectedIndex() == index;
+        const bool visited = landmarkInteraction.IsVisited(world.Landmarks()[index].kind);
+        const COLORREF color = visited ? RGB(80, 235, 125)
+            : (selected ? RGB(255, 90, 220) : landmarkColors[index]);
+        const HPEN landmarkPen = CreatePen(PS_SOLID, selected ? 5 : (visited ? 3 : 2), color);
         SelectObject(deviceContext, landmarkPen);
         DrawLandmark(deviceContext, camera, width, height, world.Landmarks()[index]);
         SelectObject(deviceContext, gridPen);
@@ -219,6 +225,22 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
         : L"THOUGHT COMMANDS  1 DASH 2 FATAL 3/4 GUARD 5 FOCUS";
     TextOutW(deviceContext, 20, 86, commandLabel, static_cast<int>(wcslen(commandLabel)));
 
+    HBRUSH interactionBrush = nullptr;
+    if (landmarkInteraction.HasSelection()) {
+        const bool selectedVisited = landmarkInteraction.IsVisited(
+            landmarkInteraction.SelectedKind());
+        interactionBrush = CreateSolidBrush(selectedVisited
+            ? RGB(80, 235, 125) : RGB(255, 90, 220));
+        RECT interactionBanner{20, 108, 300, 126};
+        FillRect(deviceContext, &interactionBanner, interactionBrush);
+    }
+    SetTextColor(deviceContext, landmarkInteraction.HasSelection()
+        ? RGB(245, 245, 255) : RGB(150, 165, 190));
+    const wchar_t* interactionLabel = landmarkInteraction.HasSelection()
+        ? L"LANDMARK IN RANGE  E INTERACT" : L"LANDMARK DISCOVERY  EXPLORE TO INTERACT";
+    TextOutW(deviceContext, 20, 111, interactionLabel,
+        static_cast<int>(wcslen(interactionLabel)));
+
     SelectObject(deviceContext, previousPen);
     DeleteObject(gridPen);
     DeleteObject(playerPen);
@@ -227,6 +249,7 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     DeleteObject(healthBrush);
     DeleteObject(shadowBackgroundBrush);
     DeleteObject(shadowResourceBrush);
+    if (interactionBrush) DeleteObject(interactionBrush);
 }
 
 } // namespace Astral::Renderer
