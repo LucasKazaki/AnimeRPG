@@ -1,89 +1,74 @@
 # AnimeRPG Loop Status — 2026-08-11
 
-Assessment: **paused, recovery required**
+Assessment: **repository gate restored; local Agent Studio execution still unverified**
 
-Scope note: this assessment is based on repository-visible state. It does not claim that a local Windows process is alive. A live Agent Studio loop must prove liveness by updating the heartbeat artifact defined below.
+Scope note: this status distinguishes repository-visible verification from a live process on Lucas's Windows host. A green hosted build is not proof that the local loop, interactive RuntimeSmoke tests, or packaging process is running.
 
-## Current verified baseline
+## Current verified state
 
-`main` points to `181298f69b42899db83040d2d5b6c3e67804e242`, `merge M10 landmark encounter loop`, dated 2026-07-31.
+The accepted implementation baseline remains the custom C++17 Win32/GDI prototype through implementation task M10. It includes:
 
-The repository currently contains a custom C++17 Win32/GDI prototype with:
-
-- native window, game loop, timing, input, and logging;
+- native window, timing, input, rendering, and logging;
 - static scene, camera, player movement, and National Mall wireframe blockout;
 - bounded combat sandbox and Shadowblade actions;
 - Thought Commands;
 - landmark selection and discovery;
 - one Lincoln Memorial training encounter with a capped resource reward;
-- focused domain tests and native runtime-smoke executables through implementation task M10.
+- focused domain tests and native runtime-smoke executables through M10.
 
-The M10 task record states that Visual Studio 2022 x64 configure, Debug and Release builds, and 14/14 CTest runs passed on 2026-07-30. That historical evidence is useful, but it is not a fresh August 11 health check.
+Recovery controls and CI fixes are merged on `main`. The product source head `453782d2b5989a30de19360a4c676ee4dbf49e78` passed the hosted Windows Server 2022 gate on 2026-08-11:
 
-## Why the loop is not considered operational
+- Visual Studio 2022 x64 configure;
+- Debug build;
+- deterministic Debug tests;
+- Release build;
+- deterministic Release tests;
+- static milestone verifiers;
+- clean tracked-tree validation.
 
-- No repository commit has landed since 2026-07-31.
-- Before this recovery branch, only `main` existed remotely.
-- There was no open pull request, open issue, commit status, or CI workflow acting as a heartbeat.
-- `AGENTS.md` incorrectly described the repository as an Unreal Engine 5 project even though the accepted architecture and implementation are custom C++.
-- `Docs/Blockers/BLOCKER-0001-native-toolchain.md` still described the toolchain as blocking even though later milestones built and ran.
-- `Docs/Decision-Log.md` stops at M7, while implementation tasks M8, M9, and M10 are merged.
-- `Docs/Planning/MILESTONES.md` still says M8 is next and its original M9/M10 product definitions do not match the later implementation-task labels. This numbering drift must be reconciled before selecting another feature.
-- There are no standalone QA reports for implementation tasks M8, M9, and M10.
+The recovery work did not modify `Engine/`, `Game/`, `Tests/`, or `CMakeLists.txt`.
 
-The code should not be rolled back solely because the audit trail is incomplete. The correct response is a bounded recovery and fresh verification pass.
+## Cleared orchestration defects
 
-## Delivery target for this week
+- `AGENTS.md` now identifies the project as a custom C++17 engine rather than Unreal Engine 5.
+- The historical July 21 native-toolchain blocker is marked resolved, with a fresh-probe rule for new machines or shells.
+- The repository now has an explicit machine-readable loop heartbeat.
+- `Tasks/R0-loop-recovery-release-candidate.md` defines a bounded recovery and delivery gate.
+- Windows CI is pinned to the Visual Studio 2022 runner instead of the incompatible `windows-latest` Visual Studio 2026 image.
+- CI uses one deterministic Debug and Release job and intentionally leaves interactive Win32 runtime smokes to the local Windows-host gate.
 
-By **Friday, August 14, 2026**, the game loop should deliver a release-candidate package of the current M10 playable prototype, not an unverified feature expansion. The package must include:
+## Remaining blocker
 
-- the freshly built `AstralGame.exe` and required runtime assets;
-- fresh Debug and Release build logs;
-- complete local CTest evidence, including native runtime smokes;
-- QA reports for implementation tasks M8, M9, and M10 or one clearly indexed recovery QA report that covers them;
-- a concise controls and known-limitations README;
-- a reconciled milestone map and one bounded next-feature packet;
-- a commit, branch, or pull request that makes the result externally visible.
+The connected interface cannot inspect the local Agent Studio process table or `C:/AI` worktrees. Therefore the loop must remain `blocked`, not `running`, until the local coordinator proves all of the following:
 
-A new gameplay feature may begin only after the release-candidate gate passes and the milestone numbering conflict is resolved.
+- a dedicated R0 worktree exists at the packet's expected path;
+- the repository heartbeat contains the actual worktree, branch, head, command, and current state;
+- full local Debug and Release CTest runs pass, including native interactive RuntimeSmoke tests;
+- M8, M9, and M10 QA and decision records are reconciled;
+- the M10 release-candidate package launches from its delivery directory;
+- package manifest, controls README, known limitations, and independent review are complete.
 
-## Recovery topology
+The local coordinator should pull `main`, read `Tasks/R0-loop-recovery-release-candidate.md`, update the heartbeat to `running`, and execute Phase 1. Do not begin a new gameplay feature before this gate passes.
 
-Use the smallest useful team:
+## Delivery target
 
-1. **Coordinator:** owns the packet, worktree, heartbeat, stop conditions, and final decision.
-2. **Build/release worker:** runs the exact Windows configure, build, CTest, packaging, and artifact checks. It does not redesign the game.
-3. **Independent reviewer/QA:** checks scope, logs, package contents, and claims without editing.
+By **Friday, August 14, 2026**, deliver the current M10 playable prototype as a verified release-candidate package, not an unverified feature expansion. The package must contain:
 
-Do not run multiple implementation agents in parallel during recovery. When a deterministic test failure appears, stop the release pass and create one narrow fix packet for that failure.
+- `AstralGame.exe` and demonstrably required runtime files;
+- fresh local Debug and Release build and test evidence;
+- native interactive runtime-smoke evidence;
+- a SHA-256 manifest;
+- launch instructions, controls, and known limitations;
+- reconciled M8 through M10 QA records;
+- an independent review;
+- one bounded next-feature packet that does not start during recovery.
 
-## Required heartbeat
+## Low-waste topology
 
-The local coordinator must maintain `Docs/Agents/LOOP_HEARTBEAT.json` in its active branch or worktree with these fields:
+Use only:
 
-```json
-{
-  "loop": "game-dev",
-  "task": "R0-loop-recovery-release-candidate",
-  "status": "running | blocked | review | complete",
-  "updated_at": "ISO-8601 timestamp with offset",
-  "worktree": "absolute local worktree path",
-  "branch": "branch name",
-  "head": "git commit SHA",
-  "current_command": "exact command or null",
-  "last_result": "concise factual result",
-  "blocker": "exact blocker or null",
-  "next_action": "one concrete next action"
-}
-```
+1. one coordinator for git state, heartbeat, stop conditions, and acceptance;
+2. one build/release worker for deterministic commands and packaging;
+3. one independent reviewer/QA worker.
 
-Liveness rule: a `running` heartbeat older than 30 minutes is stale unless the current command is a known long build or test and the tracked process still exists. A stale loop must be marked `blocked` or restarted from the last clean gate. Never repeatedly call a model merely to refresh the timestamp.
-
-## Token and time policy
-
-- Supply workers only the active packet, relevant contracts, and failing log excerpt.
-- Use local utility models for extraction and classification, not repeated architecture deliberation.
-- Do not retry an identical failed command more than once without a material change.
-- Cache summaries and command outputs in files so agents do not reread full transcripts.
-- Prefer deterministic scripts, tests, and git state over model judgment.
-- Stop after the release-candidate acceptance gate. Do not spend remaining budget inventing additional scope.
+Do not run parallel coding agents during recovery. Give workers only the active packet, relevant contracts, and the smallest useful log excerpt. Do not retry an identical failed command more than once without a material change. Cache evidence in files and stop after the release-candidate gate passes.
