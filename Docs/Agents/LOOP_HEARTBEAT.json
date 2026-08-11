@@ -1,0 +1,13 @@
+{
+  "loop": "game-dev",
+  "task": "R0-loop-recovery-release-candidate",
+  "status": "blocked",
+  "updated_at": "2026-08-11T03:34:20-04:00",
+  "worktree": null,
+  "branch": "agent/loop-recovery-2026-08-11",
+  "head": null,
+  "current_command": null,
+  "last_result": "Repository recovery branch and pull request created; conflicting engine guidance and stale historical blocker corrected; R0 packet queued.",
+  "blocker": "The local Windows Agent Studio process and C:/AI worktrees are not reachable from the connected repository interface, so no live process or fresh native build can be asserted here.",
+  "next_action": "On the Windows host, create the R0 worktree from the reviewed recovery baseline, set head to git rev-parse HEAD, update this heartbeat to running, and execute Phase 1 of Tasks/R0-loop-recovery-release-candidate.md."
+}

@@ -1,0 +1,75 @@
+name: Windows build and deterministic tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "CMakeLists.txt"
+      - "Engine/**"
+      - "Game/**"
+      - "Tests/**"
+      - "Scripts/**"
+      - ".github/workflows/windows-ci.yml"
+  pull_request:
+    paths:
+      - "CMakeLists.txt"
+      - "Engine/**"
+      - "Game/**"
+      - "Tests/**"
+      - "Scripts/**"
+      - ".github/workflows/windows-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: MSVC Debug and Release
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure Visual Studio 2022 x64
+        run: cmake -S . -B build-ci -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Debug
+        run: cmake --build build-ci --config Debug --parallel
+
+      - name: Run deterministic Debug tests
+        run: ctest --test-dir build-ci -C Debug --output-on-failure -E "RuntimeSmoke"
+
+      - name: Build Release
+        run: cmake --build build-ci --config Release --parallel
+
+      - name: Run deterministic Release tests
+        run: ctest --test-dir build-ci -C Release --output-on-failure -E "RuntimeSmoke"
+
+      - name: Run static milestone verifiers
+        shell: pwsh
+        run: |
+          python Scripts/verify_milestone1.py
+          python Scripts/verify_milestone2.py
+          python Scripts/verify_milestone3.py
+
+      - name: Confirm clean tracked tree
+        shell: pwsh
+        run: |
+          git diff --check
+          if (git status --porcelain --untracked-files=no) {
+            Write-Error "Tracked files changed during CI."
+            git status --short
+            exit 1
+          }
+
+# Native Win32 RuntimeSmoke tests intentionally remain a local Windows-host gate.
+# Hosted runners can compile those executables, but they are not treated as a
+# trustworthy interactive desktop for SendInput, window discovery, and GDI capture.
