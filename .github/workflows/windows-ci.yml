@@ -2,6 +2,16 @@ name: Windows build and deterministic tests
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - "main"
+    paths:
+      - "CMakeLists.txt"
+      - "Engine/**"
+      - "Game/**"
+      - "Tests/**"
+      - "Scripts/**"
+      - ".github/workflows/windows-ci.yml"
   pull_request:
     paths:
       - "CMakeLists.txt"
