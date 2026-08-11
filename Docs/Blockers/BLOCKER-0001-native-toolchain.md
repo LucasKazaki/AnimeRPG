@@ -1,27 +1,27 @@
 # BLOCKER-0001 — Native C++ Build Toolchain
 
-Status: blocking runtime verification of M1
-Date: 2026-07-21
+Status: resolved
+Opened: 2026-07-21
+Resolved: 2026-07-22
+Last reconciled: 2026-08-11
 
-## Exact evidence
+## Original evidence
 
-- `cmake -S . -B build -G "Visual Studio 17 2022"` returned `/usr/bin/bash: line 3: cmake: command not found` (exit 127).
-- `where cl.exe`, `where clang++.exe`, and `where g++.exe` returned no compiler path.
-- `C:/Program Files/Windows Kits/10` exists, but a Windows SDK alone does not provide the C++ compiler/linker environment needed by this CMake project.
+- The first environment used for M1 verification did not have `cmake` or a discoverable C++ compiler.
+- The Windows SDK was present, but the compiler/linker environment required by the CMake project was not available in that shell.
 
-## Impact
+## Resolution evidence
 
-The M1 source and static gate are present, but the native executable, CTest binary, and runtime window/input/logging evidence cannot honestly be claimed yet. M2 and gameplay implementation should not start until M1 has real build/runtime evidence.
+The blocker was superseded by later native verification recorded in `Docs/Decision-Log.md` and the milestone QA reports:
 
-## Recommended next action
+- M2 completed Visual Studio 2022 Debug and Release builds, CTest, and a live Win32 rendering probe.
+- M3 through M7 completed native builds and automated runtime-smoke evidence.
+- The M10 task record states that Visual Studio 2022 x64 configure, Debug and Release builds, and the complete 14/14 CTest suite passed, including M4, M5, M7, M8, M9, and M10 runtime smokes.
 
-Lucas should approve one ordinary local toolchain installation path, with its license/terms handled explicitly by Lucas. Recommended options:
+This file must no longer stop new work merely because the original July 21 shell lacked a toolchain.
 
-1. Install Visual Studio Build Tools with Desktop C++ workload and CMake support.
-2. Install LLVM/clang-cl plus CMake from a trusted local package source.
+## Current handling rule
 
-After approval and installation, run the README configure/build/CTest commands, then execute the manual M1-04 through M1-08 playtest. Do not install both toolchains unless a build failure demonstrates the need.
+Before a new implementation packet begins, run a fresh toolchain probe in its dedicated worktree. When the current machine cannot configure or build, create a new dated blocker containing the exact shell, command, exit code, and missing executable. Do not reopen this historical blocker without new evidence.
 
-## Safe work continuing now
-
-No installation, license acceptance, firewall change, credential entry, external API call, or public deployment was performed. The source, task packet, acceptance matrix, and loop artifacts are ready for the approved toolchain verification pass.
+No agent may install or modify a toolchain, accept a license, or change system configuration without Lucas's explicit approval.
