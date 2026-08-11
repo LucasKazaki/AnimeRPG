@@ -2,12 +2,12 @@
   "loop": "game-dev",
   "task": "R0-loop-recovery-release-candidate",
   "status": "blocked",
-  "updated_at": "2026-08-11T03:34:20-04:00",
+  "updated_at": "2026-08-11T03:42:58-04:00",
   "worktree": null,
-  "branch": "agent/loop-recovery-2026-08-11",
-  "head": null,
+  "branch": "main",
+  "head": "453782d2b5989a30de19360a4c676ee4dbf49e78",
   "current_command": null,
-  "last_result": "Repository recovery branch and pull request created; conflicting engine guidance and stale historical blocker corrected; R0 packet queued.",
-  "blocker": "The local Windows Agent Studio process and C:/AI worktrees are not reachable from the connected repository interface, so no live process or fresh native build can be asserted here.",
-  "next_action": "On the Windows host, create the R0 worktree from the reviewed recovery baseline, set head to git rev-parse HEAD, update this heartbeat to running, and execute Phase 1 of Tasks/R0-loop-recovery-release-candidate.md."
+  "last_result": "Repository recovery controls are merged. Hosted Windows Server 2022 CI passed Visual Studio 2022 configure, Debug and Release builds, deterministic tests, static verifiers, and clean-tree validation on main.",
+  "blocker": "The local Windows Agent Studio process and C:/AI worktrees are not reachable from the connected interface, so the R0 worktree, native interactive RuntimeSmoke tests, packaging pass, and live loop process have not been verified or started here.",
+  "next_action": "The local Agent Studio coordinator must pull main at this head, create the R0 worktree, set this heartbeat to running with the actual process command and worktree path, and execute Phase 1 of Tasks/R0-loop-recovery-release-candidate.md."
 }
