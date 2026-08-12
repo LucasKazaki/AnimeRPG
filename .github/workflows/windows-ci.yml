@@ -38,6 +38,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Parse R0 recovery runner
+        run: python -m py_compile Scripts/invoke_r0_release_candidate.py
+
       - name: Configure Visual Studio 2022 x64
         run: cmake -S . -B build-ci -G "Visual Studio 17 2022" -A x64
 
