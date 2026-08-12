@@ -1,13 +1,16 @@
 {
   "loop": "game-dev",
   "task": "R0-loop-recovery-release-candidate",
+  "deadline": "2026-08-14T23:59:59-04:00",
   "status": "blocked",
-  "updated_at": "2026-08-11T03:42:58-04:00",
+  "updated_at": "2026-08-11T22:11:59-04:00",
   "worktree": null,
   "branch": "main",
-  "head": "453782d2b5989a30de19360a4c676ee4dbf49e78",
+  "head": "1e8c67420b7eb3d6e73eed1343cc3b9177e7fcb3",
+  "pid": null,
   "current_command": null,
-  "last_result": "Repository recovery controls are merged. Hosted Windows Server 2022 CI passed Visual Studio 2022 configure, Debug and Release builds, deterministic tests, static verifiers, and clean-tree validation on main.",
-  "blocker": "The local Windows Agent Studio process and C:/AI worktrees are not reachable from the connected interface, so the R0 worktree, native interactive RuntimeSmoke tests, packaging pass, and live loop process have not been verified or started here.",
-  "next_action": "The local Agent Studio coordinator must pull main at this head, create the R0 worktree, set this heartbeat to running with the actual process command and worktree path, and execute Phase 1 of Tasks/R0-loop-recovery-release-candidate.md."
+  "last_artifact": null,
+  "last_result": "The one-command R0 recovery runner is merged on main. Hosted Windows CI passed on both the pull request and merged main commit, including runner syntax, Visual Studio 2022 Debug and Release builds, deterministic tests, static verifiers, and clean-tree validation.",
+  "blocker": "The connected interface cannot access the local Windows Agent Studio process table or C:/AI workspace, so the dedicated R0 worktree, complete native RuntimeSmoke suite, delivery package, manifest, and independent review have not been executed or verified locally.",
+  "next_action": "On the Windows Agent Studio host, pull main and run: python Scripts/invoke_r0_release_candidate.py. The runner will establish the dedicated worktree, stop at the first deterministic blocker, or leave a verified package at the independent-review gate."
 }
