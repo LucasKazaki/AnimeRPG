@@ -15,8 +15,9 @@ markers = {
     ROOT / "Engine/Assets/StaticMesh.cpp": ["LoadFromFile", "ASTRAL_MESH", "vertices_.clear"],
     ROOT / "Engine/Scene/Transform.cpp": ["WorldPosition", "parent->WorldPosition"],
     ROOT / "Engine/Scene/Camera.cpp": ["WorldToScreen", "worldWidth", "worldHeight"],
-    ROOT / "Engine/Renderer/Renderer.cpp": ["RenderDebugScene", "CreatePen", "LineTo"],
-    ROOT / "Engine/Platform/Win32Application.cpp": ["debug_triangle.mesh", "RenderDebugScene"],
+    # M5 evolved the original RenderDebugScene entry point into RenderWorld.
+    ROOT / "Engine/Renderer/Renderer.cpp": ["RenderWorld", "CreatePen", "LineTo"],
+    ROOT / "Engine/Platform/Win32Application.cpp": ["g_renderer.RenderWorld", "WM_PAINT"],
 }
 
 missing = [str(path.relative_to(ROOT)) for path in required if not path.is_file()]

@@ -1,10 +1,46 @@
-build/
-.vs/
-__pycache__/
-*.user
-*.suo
+# CMake and Visual Studio output
+[Bb]uild/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.recipe
+*.tlog
+*.lastbuildstate
+
+# Compiled binaries and symbols
+*.dll
+*.exe
+*.exp
+*.idb
+*.ilk
+*.lib
 *.obj
 *.pdb
-*.ilk
-*.exe
+
+# Runtime and generated state
+Intermediate/
+Saved/
 *.log
+/NUL
+
+# Python tooling
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Editors and operating systems
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+.DS_Store
+Thumbs.db
