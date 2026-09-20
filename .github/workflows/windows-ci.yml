@@ -48,6 +48,9 @@ jobs:
       - name: Parse R0 recovery runner
         run: python -m py_compile Scripts/invoke_r0_release_candidate.py
 
+      - name: Verify R0 runner safety contracts
+        run: python Scripts/test_r0_runner_safety.py
+
       - name: Verify Release assertion and CTest safety contracts
         run: python Scripts/test_test_safety.py
 
