@@ -12,6 +12,8 @@ on:
       - "Scripts/test_release_manifest.py"
       - "Scripts/run_package_runtime_smoke.py"
       - "Scripts/test_package_runtime_smoke.py"
+      - "Scripts/run_package_restart_stress.py"
+      - "Scripts/test_package_restart_stress.py"
       - ".github/workflows/release-manifest-validation.yml"
 
 permissions:
@@ -33,6 +35,9 @@ jobs:
 
       - name: Verify package runtime receipt contracts
         run: python Scripts/test_package_runtime_smoke.py
+
+      - name: Verify package restart-stress receipt contracts
+        run: python Scripts/test_package_restart_stress.py
 
       - name: Configure and build Release executable
         shell: pwsh
