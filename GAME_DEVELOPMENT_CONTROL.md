@@ -21,7 +21,9 @@ a 24-hour soak, and independent QA before game-content work resumes.
 
 ## Immediate control objective
 
-Reconcile the completed R0 release-candidate evidence with the present engine
-scope, then admit exactly one dependency-ordered engine readiness, repair, or
-verification task. Do not replay historical game-content tasks merely because
-they are present in the repository.
+Reconcile any claimed completed R0 release-candidate evidence with the present
+engine scope, then admit exactly one dependency-ordered engine readiness, repair,
+or verification task. A historical completion statement is not a verified receipt.
+Do not replay historical game-content tasks merely because they are present in
+the repository. See `Docs/Project-Status.md` for the September 19 repository audit;
+it does not establish the live state of a local Windows host.

@@ -1,5 +1,11 @@
 # Milestone Backlog and Vertical Slice
 
+> Historical product roadmap, not the active task queue. Read
+> `../../GAME_DEVELOPMENT_CONTROL.md` and `../Project-Status.md` first.
+> The September 17 director scope pauses game-content work until engine acceptance.
+> Implementation M8/M9/M10 mean Thought Commands / Landmark Interaction / Landmark
+> Encounter. They do not mark the original M9 summon or M10 enemy set complete.
+
 Source: Product Requirements Document v0.2, extracted 2026-07-21.
 
 ## Staged backlog
@@ -26,7 +32,10 @@ Source: Product Requirements Document v0.2, extracted 2026-07-21.
 ## Smallest executable vertical slice
 M1 is the first gate. The first playable combat slice begins only after M1–M3 are verified: move a placeholder character in a windowed test scene. Combat and art are intentionally not started in parallel until those contracts exist.
 
-## Next queued packet
+## Historical next queued packet (before implementation M8)
+
+The following paragraph is retained as history, not a current work assignment:
+
 M8 Thought Commands in a fresh isolated worktree after verified M7 is merged. Dynamic selection favors this P0 player-command capability over the P1 M6 destruction prototype. A new packet must bound slow-time semantics, parser grammar, ability/summon/environment routing contracts, live controls, focused tests, and native runtime evidence before implementation begins.
 
 ## M3 implementation evidence
