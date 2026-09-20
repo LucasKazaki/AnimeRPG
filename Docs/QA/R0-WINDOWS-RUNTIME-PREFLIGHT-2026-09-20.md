@@ -1,12 +1,13 @@
 # R0 Windows central-runtime preflight evidence, 2026-09-20
 
-Status: portable preflight tests passed before publication. Hosted Windows verification
-for the exact GitHub candidate remains required after commit. This is not clean-machine
-or package-launch evidence.
+Status: portable preflight tests and hosted Windows verification passed for the
+published candidate. This is not clean-machine or package-launch evidence.
 
 ## Baseline and scope
 
-Baseline draft PR #9 head: `5241384e5fe8f063abe1a68106d1d40cc7c3c0e2`.
+Implementation baseline was draft PR #9 head
+`5241384e5fe8f063abe1a68106d1d40cc7c3c0e2`. The runtime-preflight implementation
+was published as `cc8c1e829e82710883c421793fa0c512130cab82`.
 The preceding hosted package evidence established an AMD64 Release importing
 `MSVCP140.dll`, `VCRUNTIME140.dll`, and `VCRUNTIME140_1.dll` and a reviewed
 `central_vc_redist` policy. This pass adds no dependency and does not change engine,
@@ -50,15 +51,52 @@ binding, hashes/version records, missing DLL failure, metadata failure, changed 
 stale/import-mismatched plan, unsafe DLL name, unreviewed strategy, rejected/false-clean
 plan, and x86/x64/ARM64 central-directory selection.
 
-## Hosted contract added
+## Hosted Windows receipt
 
-Windows CI now runs the portable contract tests. After building the real Release image,
-it reuses the exact PE dependency report and prerequisite plan, probes the hosted
-Windows central runtime files, and requires a successful preflight while still asserting
-that runtime-version compatibility, package launch, clean-machine compatibility, and
-independent acceptance remain false.
+GitHub Actions run https://github.com/LucasKazaki/AnimeRPG/actions/runs/35525799852,
+job `106117606175`, completed **SUCCESS** on `windows-2022` for candidate
+`cc8c1e829e82710883c421793fa0c512130cab82`.
 
-Hosted Windows results are pending for the published candidate. Even a green hosted run
-will demonstrate tool behavior and real central-runtime file inventory only. It cannot
-satisfy clean-machine package launch, registered local RuntimeSmoke, independent review,
-or the required soak.
+Verified steps included:
+
+- R0 runner-safety contracts: pass.
+- PE dependency inspector contracts: pass.
+- Windows prerequisite planner contracts: pass.
+- Windows runtime-environment probe contract tests: pass.
+- Release assertion/CTest safety contracts: pass.
+- Visual Studio 2022 x64 configure: pass.
+- full Debug build and deterministic non-GUI tests: pass.
+- full Release build: pass.
+- real Release dependency inspection and prerequisite planning: pass.
+- current x64 `central_vc_redist` policy assertions: pass.
+- central VC runtime preflight against the freshly built Release image and hosted
+  Windows environment: pass.
+- hosted claim guard requiring required runtime files to be present and versioned while
+  version compatibility, package launch, clean-machine compatibility, and independent
+  acceptance remain false: pass.
+- deterministic Release tests, static milestone verifiers, and tracked-tree cleanliness:
+  pass.
+
+The hosted preflight demonstrates that the candidate tool can chain the freshly built
+package to its dependency report and prerequisite plan and can inventory every required
+central VC runtime file on that GitHub-hosted Windows image with SHA-256, size, and
+fixed file-version metadata. GitHub Actions is not a supported clean end-user machine,
+and the workflow deliberately does not treat this result as package-launch evidence.
+
+## Research basis and remaining acceptance
+
+Primary Microsoft references read September 20, 2026:
+
+- https://learn.microsoft.com/en-us/lifecycle/faq/visual-c-faq
+- https://learn.microsoft.com/en-us/cpp/windows/redist-version-auditing?view=msvc-170
+
+The Visual C++ v14 Redistributable is cumulative, and Microsoft requires the installed
+Redistributable to be equal to or newer than the Build Tools version used to build the
+application. This pass records DLL file versions but does not derive or assert that
+minimum-version comparison. That remains the next prerequisite-evidence step.
+
+Unresolved acceptance remains: bind the exact build-tool/runtime compatibility policy,
+use an approved central Redistributable delivery/bootstrap method, launch the finished
+package on a supported clean Windows machine, run the registered interactive
+RuntimeSmoke checks, obtain independent review, and complete the required long soak.
+Do not invoke R0, merge, or claim E15 completion from this hosted preflight alone.
