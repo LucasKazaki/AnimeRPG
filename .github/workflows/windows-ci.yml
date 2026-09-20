@@ -54,6 +54,9 @@ jobs:
       - name: Verify PE dependency inspector contracts
         run: python Scripts/test_pe_dependencies.py
 
+      - name: Verify Windows prerequisite plan contracts
+        run: python Scripts/test_windows_prerequisite_plan.py
+
       - name: Verify Release assertion and CTest safety contracts
         run: python Scripts/test_test_safety.py
 
@@ -71,6 +74,30 @@ jobs:
 
       - name: Inspect Release runtime dependencies
         run: python Scripts/inspect_pe_dependencies.py "$env:BUILD_ROOT/Release/AstralGame.exe" --json "$env:RUNNER_TEMP/AstralGame-runtime-dependencies.json" --fail-on-debug-runtime
+
+      - name: Plan Release Windows prerequisites
+        run: python Scripts/plan_windows_prerequisites.py "$env:RUNNER_TEMP/AstralGame-runtime-dependencies.json" --json "$env:RUNNER_TEMP/AstralGame-windows-prerequisites.json" --fail-on-debug-runtime
+
+      - name: Verify current Release prerequisite policy
+        shell: pwsh
+        run: |
+          $plan = Get-Content "$env:RUNNER_TEMP/AstralGame-windows-prerequisites.json" -Raw | ConvertFrom-Json
+          if ($plan.vc_runtime.strategy -ne "central_vc_redist") {
+            Write-Error "Current Release build no longer resolves to the reviewed central VC Redistributable policy."
+            exit 1
+          }
+          if ($plan.vc_runtime.architecture -ne "x64") {
+            Write-Error "Current Release prerequisite plan is not x64."
+            exit 1
+          }
+          if ($plan.vc_runtime.installer_bundled -ne $false -or $plan.vc_runtime.installer_executed -ne $false) {
+            Write-Error "Hosted CI must not claim that a redistributable installer was bundled or executed."
+            exit 1
+          }
+          if ($plan.release_policy.clean_machine_compatibility_verified -ne $false) {
+            Write-Error "Hosted import inspection cannot establish clean-machine compatibility."
+            exit 1
+          }
 
       - name: Run deterministic Release tests
         run: ctest --test-dir "$env:BUILD_ROOT" -C Release --output-on-failure -E "RuntimeSmoke" --no-tests=error
