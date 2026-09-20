@@ -63,6 +63,9 @@ jobs:
       - name: Verify Windows runtime compatibility audit contracts
         run: python Scripts/test_windows_runtime_compatibility.py
 
+      - name: Verify Windows Redistributable bootstrap contracts
+        run: python Scripts/test_windows_redist_bootstrap.py
+
       - name: Verify Release assertion and CTest safety contracts
         run: python Scripts/test_test_safety.py
 
@@ -137,7 +140,10 @@ jobs:
       - name: Audit hosted runtime version compatibility
         run: python Scripts/audit_windows_runtime_compatibility.py "$env:RUNNER_TEMP/AstralGame-windows-runtime-preflight.json" --vc-tools-version "$env:VC_TOOLS_VERSION" --json "$env:RUNNER_TEMP/AstralGame-windows-runtime-compatibility.json" --fail-on-incompatible
 
-      - name: Verify hosted runtime preflight and compatibility claims
+      - name: Plan hosted central VC Redistributable bootstrap
+        run: python Scripts/plan_windows_redist_bootstrap.py "$env:RUNNER_TEMP/AstralGame-windows-prerequisites.json" "$env:RUNNER_TEMP/AstralGame-windows-runtime-compatibility.json" --json "$env:RUNNER_TEMP/AstralGame-windows-redist-bootstrap.json"
+
+      - name: Verify hosted runtime and bootstrap claim boundaries
         shell: pwsh
         run: |
           $probe = Get-Content "$env:RUNNER_TEMP/AstralGame-windows-runtime-preflight.json" -Raw | ConvertFrom-Json
@@ -174,6 +180,30 @@ jobs:
           if ($audit.compatibility.supported_redist_installation_verified -ne $false -or $audit.acceptance.package_launch_verified -ne $false -or $audit.acceptance.clean_machine_compatibility_verified -ne $false -or $audit.acceptance.independent_acceptance -ne $false) {
             Write-Error "Hosted runtime version evidence must not claim installer provenance, package launch, clean-machine, or independent acceptance."
             exit 1
+          }
+
+          $bootstrap = Get-Content "$env:RUNNER_TEMP/AstralGame-windows-redist-bootstrap.json" -Raw | ConvertFrom-Json
+          if ($bootstrap.package_sha256 -ne $audit.package_sha256 -or $bootstrap.architecture -ne "x64" -or $bootstrap.bootstrap.strategy -ne "central_vc_redist") {
+            Write-Error "Redistributable bootstrap decision is not bound to the reviewed x64 package evidence."
+            exit 1
+          }
+          if ($bootstrap.bootstrap.action -notin @("skip_install", "install_latest_supported")) {
+            Write-Error "Redistributable bootstrap decision has an unsupported action."
+            exit 1
+          }
+          if ($bootstrap.bootstrap.installer_downloaded -ne $false -or $bootstrap.bootstrap.installer_executed -ne $false -or $bootstrap.bootstrap.installation_receipt_verified -ne $false) {
+            Write-Error "Hosted CI must not download, execute, or claim an installer receipt."
+            exit 1
+          }
+          if ($bootstrap.acceptance.bootstrap_decision_verified -ne $true -or $bootstrap.acceptance.supported_redist_installation_verified -ne $false -or $bootstrap.acceptance.package_launch_verified -ne $false -or $bootstrap.acceptance.clean_machine_compatibility_verified -ne $false -or $bootstrap.acceptance.independent_acceptance -ne $false) {
+            Write-Error "Bootstrap planning must retain installer, launch, clean-machine, and independent acceptance gates."
+            exit 1
+          }
+          if ($bootstrap.bootstrap.action -eq "skip_install") {
+            if ($null -eq $bootstrap.registered_v14_redist -or $bootstrap.registered_v14_redist.version_floor_satisfied -ne $true) {
+              Write-Error "skip_install requires same-or-newer registered v14 Redistributable evidence."
+              exit 1
+            }
           }
 
       - name: Run deterministic Release tests
