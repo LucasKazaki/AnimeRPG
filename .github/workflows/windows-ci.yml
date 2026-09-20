@@ -60,11 +60,40 @@ jobs:
       - name: Verify Windows runtime environment probe contracts
         run: python Scripts/test_windows_runtime_environment.py
 
+      - name: Verify Windows runtime compatibility audit contracts
+        run: python Scripts/test_windows_runtime_compatibility.py
+
       - name: Verify Release assertion and CTest safety contracts
         run: python Scripts/test_test_safety.py
 
       - name: Configure Visual Studio 2022 x64
         run: cmake -S . -B "$env:BUILD_ROOT" -G "Visual Studio 17 2022" -A x64
+
+      - name: Record Visual C++ Build Tools version
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) {
+            Write-Error "vswhere.exe is unavailable; cannot bind the package to an exact Visual Studio 2022 toolset."
+            exit 1
+          }
+          $installation = (& $vswhere -latest -version "[17.0,18.0)" -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
+          if (-not $installation) {
+            Write-Error "No Visual Studio 2022 C++ tool installation was discovered."
+            exit 1
+          }
+          $versionFile = Join-Path $installation.Trim() "VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
+          if (-not (Test-Path $versionFile)) {
+            Write-Error "Visual C++ default toolset version file is missing: $versionFile"
+            exit 1
+          }
+          $vcToolsVersion = (Get-Content $versionFile -Raw).Trim()
+          if ($vcToolsVersion -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') {
+            Write-Error "Unexpected Visual C++ toolset version: $vcToolsVersion"
+            exit 1
+          }
+          Write-Host "Visual C++ Build Tools version: $vcToolsVersion"
+          "VC_TOOLS_VERSION=$vcToolsVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build Debug
         run: cmake --build "$env:BUILD_ROOT" --config Debug --parallel
@@ -105,7 +134,10 @@ jobs:
       - name: Probe hosted central VC runtime environment
         run: python Scripts/probe_windows_runtime_environment.py "$env:RUNNER_TEMP/AstralGame-runtime-dependencies.json" "$env:RUNNER_TEMP/AstralGame-windows-prerequisites.json" "$env:BUILD_ROOT/Release/AstralGame.exe" --json "$env:RUNNER_TEMP/AstralGame-windows-runtime-preflight.json" --fail-on-missing
 
-      - name: Verify hosted runtime preflight claims
+      - name: Audit hosted runtime version compatibility
+        run: python Scripts/audit_windows_runtime_compatibility.py "$env:RUNNER_TEMP/AstralGame-windows-runtime-preflight.json" --vc-tools-version "$env:VC_TOOLS_VERSION" --json "$env:RUNNER_TEMP/AstralGame-windows-runtime-compatibility.json" --fail-on-incompatible
+
+      - name: Verify hosted runtime preflight and compatibility claims
         shell: pwsh
         run: |
           $probe = Get-Content "$env:RUNNER_TEMP/AstralGame-windows-runtime-preflight.json" -Raw | ConvertFrom-Json
@@ -118,7 +150,7 @@ jobs:
             exit 1
           }
           if ($probe.vc_runtime.runtime_version_compatibility_verified -ne $false -or $probe.acceptance.package_launch_verified -ne $false -or $probe.acceptance.clean_machine_compatibility_verified -ne $false -or $probe.acceptance.independent_acceptance -ne $false) {
-            Write-Error "Hosted runtime preflight must not claim compatibility, package launch, clean-machine, or independent acceptance."
+            Write-Error "The preflight layer must not pre-claim compatibility, package launch, clean-machine, or independent acceptance."
             exit 1
           }
           foreach ($file in $probe.vc_runtime.files) {
@@ -126,6 +158,22 @@ jobs:
               Write-Error "Hosted runtime evidence is incomplete for $($file.name)."
               exit 1
             }
+          }
+
+          $audit = Get-Content "$env:RUNNER_TEMP/AstralGame-windows-runtime-compatibility.json" -Raw | ConvertFrom-Json
+          $expectedToolsVersion = $env:VC_TOOLS_VERSION
+          if (($expectedToolsVersion -split '\.').Count -eq 3) { $expectedToolsVersion += ".0" }
+          if ($audit.build_toolchain.vc_tools_version -ne $expectedToolsVersion) {
+            Write-Error "Runtime compatibility evidence is not bound to the recorded Visual C++ Build Tools version."
+            exit 1
+          }
+          if ($audit.compatibility.runtime_file_version_floor_satisfied -ne $true -or $audit.compatibility.runtime_version_compatibility_verified -ne $true) {
+            Write-Error "Observed central VC runtime file versions are older than the build toolset used for AstralGame."
+            exit 1
+          }
+          if ($audit.compatibility.supported_redist_installation_verified -ne $false -or $audit.acceptance.package_launch_verified -ne $false -or $audit.acceptance.clean_machine_compatibility_verified -ne $false -or $audit.acceptance.independent_acceptance -ne $false) {
+            Write-Error "Hosted runtime version evidence must not claim installer provenance, package launch, clean-machine, or independent acceptance."
+            exit 1
           }
 
       - name: Run deterministic Release tests
