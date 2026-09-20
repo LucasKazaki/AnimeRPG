@@ -1,11 +1,12 @@
 # R0 Windows prerequisite policy evidence, 2026-09-20
 
-Status: portable policy tests passed before publication. Hosted Windows verification
-for the exact GitHub candidate remains required after commit.
+Status: portable policy tests and hosted Windows verification passed for the published
+candidate. Clean-machine package execution and independent review remain separate gates.
 
 ## Baseline and observed dependency evidence
 
-Baseline PR #9 head: `3a27de91e2cfecf40b19639134a39e93ac807bb1`.
+Implementation baseline was PR #9 head `3a27de91e2cfecf40b19639134a39e93ac807bb1`.
+Policy implementation was published as `adaccc7b402756ef0cb13068eb6fb1d08a2917ff`.
 The immediately preceding hosted Release inventory recorded AMD64 `AstralGame.exe`
 SHA-256 `6b808fc5145d7d420c46c6660c94c8cad042074f0e541cd5356c5a9e1b5a1969` importing
 `MSVCP140.dll`, `VCRUNTIME140.dll`, and `VCRUNTIME140_1.dll`, with no Debug CRT imports.
@@ -45,13 +46,33 @@ verification and installer execution/bundling all false.
 These are policy/parser checks, not Windows launch evidence and not a test of the
 Microsoft installer itself.
 
-## Hosted contract added
+## Hosted Windows receipt
 
-Windows CI now runs the eight planner tests. After building Release it reuses the real
-`inspect_pe_dependencies.py` output from `AstralGame.exe`, creates a prerequisite plan,
-and checks that the current dynamically linked build resolves to central VC v14
-redistributable deployment while preserving the unverified/bundled/executed flags.
-A change in runtime linkage therefore requires an explicit packaging-policy update.
+GitHub Actions run https://github.com/LucasKazaki/AnimeRPG/actions/runs/35522471810,
+job `106108814814`, completed **SUCCESS** for candidate
+`adaccc7b402756ef0cb13068eb6fb1d08a2917ff` on `windows-2022`.
+
+Verified steps included:
+
+- R0 safety contracts: pass.
+- PE dependency inspector contracts: pass.
+- Windows prerequisite planner contracts: pass, **8/8** portable planner tests inside
+  the published test file.
+- Release assertion/CTest safety contracts: pass.
+- Visual Studio 2022 x64 configure: pass.
+- full Debug build and deterministic non-GUI tests: pass.
+- full Release build and deterministic non-GUI tests: pass.
+- real Release `AstralGame.exe` dependency inspection: pass.
+- real Release prerequisite planning: pass.
+- explicit current-policy checks: `central_vc_redist`, `x64`, no installer bundled or
+  executed, and clean-machine compatibility still false: pass.
+- static milestone verifiers and tracked-tree cleanliness check: pass.
+
+The hosted run proves that the planner accepts the freshly compiled Release dependency
+report and that the reviewed current policy remains central v14 redistributable
+deployment. It does not prove that a redistributable installer is available, licensed
+for a particular delivery mechanism, installed on a target, or sufficient for a clean
+machine launch.
 
 ## Remaining acceptance
 
