@@ -1,0 +1,77 @@
+name: Release manifest integrity
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "Engine/**"
+      - "Game/**"
+      - "Scripts/release_manifest.py"
+      - "Scripts/test_release_manifest.py"
+      - ".github/workflows/release-manifest-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-manifest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-package-manifest:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify manifest contracts
+        run: python Scripts/test_release_manifest.py
+
+      - name: Configure and build Release executable
+        shell: pwsh
+        run: |
+          $build = Join-Path $env:RUNNER_TEMP "Astral-manifest-build"
+          "ASTRAL_MANIFEST_BUILD=$build" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          cmake -S . -B $build -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build $build --config Release --target AstralGame --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Stage, manifest, and verify exact hosted package bytes
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP "Astral-manifest-package"
+          New-Item -ItemType Directory -Path $package -Force | Out-Null
+          Copy-Item (Join-Path $env:ASTRAL_MANIFEST_BUILD "Release/AstralGame.exe") (Join-Path $package "AstralGame.exe")
+          "Hosted manifest fixture only. Not a clean-machine package acceptance result." | Set-Content (Join-Path $package "README.txt") -Encoding utf8
+          $commit = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { Write-Error "Cannot resolve exact build commit"; exit 1 }
+          $manifest = Join-Path $package "MANIFEST.json"
+          python Scripts/release_manifest.py create $package $manifest --commit $commit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exeHash = (Get-FileHash (Join-Path $package "AstralGame.exe") -Algorithm SHA256).Hash.ToLowerInvariant()
+          $report = Join-Path $env:RUNNER_TEMP "Astral-manifest-verification.json"
+          python Scripts/release_manifest.py verify $manifest $package --expected-commit $commit --expected-executable-sha256 $exeHash --json $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $verified = Get-Content $report -Raw | ConvertFrom-Json
+          if ($verified.manifest_integrity_verified -ne $true -or $verified.acceptance.package_manifest_verified -ne $true) {
+            Write-Error "Hosted package manifest verification did not pass"
+            exit 1
+          }
+          if ($verified.acceptance.package_launch_verified -ne $false -or $verified.acceptance.clean_machine_compatibility_verified -ne $false -or $verified.acceptance.independent_acceptance -ne $false) {
+            Write-Error "Manifest verification must not claim launch, clean-machine, or independent acceptance"
+            exit 1
+          }
+          Write-Host "Hosted manifest commit: $commit"
+          Write-Host "Hosted AstralGame.exe SHA-256: $exeHash"
+
+      - name: Confirm clean tracked tree
+        shell: pwsh
+        run: |
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $changes = git status --porcelain --untracked-files=no
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($changes) { Write-Error "Tracked files changed during manifest verification"; exit 1 }
