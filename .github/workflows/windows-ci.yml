@@ -51,6 +51,9 @@ jobs:
       - name: Verify R0 runner safety contracts
         run: python Scripts/test_r0_runner_safety.py
 
+      - name: Verify PE dependency inspector contracts
+        run: python Scripts/test_pe_dependencies.py
+
       - name: Verify Release assertion and CTest safety contracts
         run: python Scripts/test_test_safety.py
 
@@ -65,6 +68,9 @@ jobs:
 
       - name: Build Release
         run: cmake --build "$env:BUILD_ROOT" --config Release --parallel
+
+      - name: Inspect Release runtime dependencies
+        run: python Scripts/inspect_pe_dependencies.py "$env:BUILD_ROOT/Release/AstralGame.exe" --json "$env:RUNNER_TEMP/AstralGame-runtime-dependencies.json" --fail-on-debug-runtime
 
       - name: Run deterministic Release tests
         run: ctest --test-dir "$env:BUILD_ROOT" -C Release --output-on-failure -E "RuntimeSmoke" --no-tests=error
