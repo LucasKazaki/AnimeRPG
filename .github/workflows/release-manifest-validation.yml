@@ -10,6 +10,8 @@ on:
       - "Game/**"
       - "Scripts/release_manifest.py"
       - "Scripts/test_release_manifest.py"
+      - "Scripts/run_package_runtime_smoke.py"
+      - "Scripts/test_package_runtime_smoke.py"
       - ".github/workflows/release-manifest-validation.yml"
 
 permissions:
@@ -28,6 +30,9 @@ jobs:
 
       - name: Verify manifest contracts
         run: python Scripts/test_release_manifest.py
+
+      - name: Verify package runtime receipt contracts
+        run: python Scripts/test_package_runtime_smoke.py
 
       - name: Configure and build Release executable
         shell: pwsh
