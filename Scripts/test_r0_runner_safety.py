@@ -193,15 +193,21 @@ class R0RunnerSafetyTests(unittest.TestCase):
                     runner.establish_worktree()
             self.assertEqual((args.worktree / "tracked.txt").read_text(encoding="utf-8"), "evidence changed\n")
 
-    def _tree_sleep_command(self, sentinel: Path) -> list[str]:
+    def _tree_sleep_command(self, sentinel: Path, ready: Path | None = None) -> list[str]:
         child_code = (
             "import pathlib,time; time.sleep(2.0); "
             f"pathlib.Path({str(sentinel)!r}).write_text('escaped', encoding='utf-8')"
         )
+        ready_code = ""
+        if ready is not None:
+            ready_code = (
+                f"pathlib.Path({str(ready)!r}).write_text('descendant-started', encoding='utf-8'); "
+            )
         parent_code = (
-            "import subprocess,sys,time; "
+            "import pathlib,subprocess,sys,time; "
             f"subprocess.Popen([sys.executable, '-c', {child_code!r}]); "
-            "print('partial-output-marker', flush=True); time.sleep(30)"
+            + ready_code
+            + "print('partial-output-marker', flush=True); time.sleep(30)"
         )
         return [sys.executable, "-c", parent_code]
 
@@ -245,10 +251,23 @@ class R0RunnerSafetyTests(unittest.TestCase):
             args.worktree.mkdir()
             runner = r0.R0Runner(args)
             sentinel = root / "interrupt-escaped.txt"
-            with mock.patch.object(runner, "_wait_process", side_effect=KeyboardInterrupt):
+            ready = root / "interrupt-descendant-started.txt"
+
+            def interrupt_after_descendant_started(process: subprocess.Popen[str], timeout: float) -> int:
+                deadline = time.monotonic() + min(timeout, 5.0)
+                while not ready.exists() and time.monotonic() < deadline:
+                    if process.poll() is not None:
+                        self.fail("interrupt fixture parent exited before descendant startup was confirmed")
+                    time.sleep(0.01)
+                self.assertTrue(ready.exists(), "interrupt fixture did not confirm descendant startup")
+                raise KeyboardInterrupt
+
+            with mock.patch.object(
+                runner, "_wait_process", side_effect=interrupt_after_descendant_started
+            ):
                 with self.assertRaises(KeyboardInterrupt):
                     runner.run_command(
-                        "interrupt-fixture", self._tree_sleep_command(sentinel),
+                        "interrupt-fixture", self._tree_sleep_command(sentinel, ready),
                         cwd=args.worktree, timeout_seconds=10.0,
                     )
             log = (args.evidence_root / "01-interrupt-fixture.log").read_text(encoding="utf-8")
