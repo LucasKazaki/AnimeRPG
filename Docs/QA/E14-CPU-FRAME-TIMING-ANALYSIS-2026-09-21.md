@@ -12,6 +12,7 @@ review.
 - Branch: `repair/2026-09-20-r0-runner-safety`
 - Pre-packet head: `77721fd0947072052d890f27c7a96a00fb7c7c23`
 - Implementation commit: `2a44ba88cb8541717327e175021a1ba2bc5c2e9b`
+- First QA checkpoint commit: `d3dc2c828e0ed20581f6c30c7ad6d19acc58903f`
 - Dependency/base revision retained by the stacked PR: `e12e6c559bf776ffc9c715c809a517f8e02ce5d5`
 
 Implementation commit changed only the packet-authorized paths:
@@ -34,8 +35,8 @@ Published Git blob identities verified after the write:
 
 The analyzer blob and workflow/task blobs were re-read from GitHub after publication.
 The analyzer blob exactly matches the source exercised in the disposable sandbox.
-The GitHub test blob is the source of truth for the repository test; hosted execution
-of that exact blob remains required below.
+The GitHub test blob is the repository source of truth and was subsequently executed
+by hosted CI through the PR synthetic merge described below.
 
 ## What was implemented
 
@@ -129,53 +130,101 @@ verify_benchmark_manifest = verify_manifest
 ```
 
 and `release_manifest.py` exposes `write_release_manifest(...)`, so the integration
-test targets the actual documented repository call surface rather than a mock.
-This inspection is not a substitute for executing the three integration tests.
+test targets the actual repository call surface rather than a mock.
 
-### Hosted CI status for this candidate
+### Hosted frame-timing portability
 
-At the checkpoint query, GitHub reported no workflow run associated with
-implementation head `2a44ba88cb8541717327e175021a1ba2bc5c2e9b`. The latest visible
-pull-request runs were successful runs for the prior head
-`77721fd0947072052d890f27c7a96a00fb7c7c23`. Therefore this record does **not**
-reuse those older green runs and does not claim hosted integration for the new
-analyzer.
+GitHub Actions run `35564646701`, job `106223963453`, completed successfully for
+source head `2a44ba88cb8541717327e175021a1ba2bc5c2e9b`. As expected for a pull-request
+workflow, `actions/checkout` executed synthetic merge revision
+`e39b21782ba0a4d1ae8e876181d39f9b0181cafb`, which GitHub recorded as merging that
+implementation head into base `e12e6c559bf776ffc9c715c809a517f8e02ce5d5`.
 
-Required hosted follow-up, without weakening any existing gate:
+Runner evidence: Ubuntu 24.04.5 LTS, `ubuntu-24.04` image version
+`20260907.300.1`, Azure `centralus`.
+
+The exact hosted command:
 
 ```text
 python Scripts/test_frame_timing_analysis.py
 ```
 
-must pass all 12 tests against the complete repository checkout, followed by the
-existing C++17 Debug and optimized Release frame-timing contracts and the existing
-Clang ASan+UBSan/leak lane. If a new CI run appears later, record its run/job IDs,
-exact commit or PR merge revision, commands and conclusions before treating hosted
-integration as satisfied.
+ran all 12 tests, including the three production-manifest integration cases, and
+reported `Ran 12 tests ... OK`. The production binding, exact expected-candidate
+identity and tampered-evidence rejection cases all passed.
+
+The same job then configured the production-linked frame-timing fixture and passed:
+
+- GNU 13.3.0 Debug: `FRAME TIMING CAPTURE TESTS: PASS (11 groups)`;
+- GNU 13.3.0 optimized Release: `FRAME TIMING CAPTURE TESTS: PASS (11 groups)`;
+- Clang 18.1.3 Debug with AddressSanitizer + UndefinedBehaviorSanitizer and
+  `ASAN_OPTIONS=detect_leaks=1:halt_on_error=1`: `PASS (11 groups)`.
+
+All three CTest executions reported 100% passed and zero failed.
+
+### Hosted Windows and package regressions
+
+GitHub Actions run `35564646707`, job `106223963508`, also completed successfully
+for source head `2a44ba88cb8541717327e175021a1ba2bc5c2e9b` and the same synthetic PR merge
+revision. Runner: Windows Server 2022 build 20348, `windows-2022` image version
+`20260913.307.1`, Azure `eastus`. Toolchain: MSVC `19.44.35228.0`, Visual C++ tools
+`14.44.35207`, Windows SDK `10.0.26100.0`.
+
+Observed regression results included:
+
+- R0 runner safety: 13/13 pass. These are parser/safety contracts only; R0 itself was
+  not invoked.
+- PE dependency inspection: 5/5 pass.
+- Windows prerequisite plan: 8/8 pass.
+- Windows runtime-environment probe: 8/8 pass.
+- Windows runtime-compatibility audit: 7/7 pass.
+- VC Redistributable bootstrap: 8 pass, 1 expected platform-specific skip.
+- assertion/CTest safety: 3/3 pass.
+- native non-GUI Debug CTest: 9/9 pass, including `FrameTimingCaptureTests`.
+- native non-GUI Release CTest: 9/9 pass, including `FrameTimingCaptureTests`.
+- static milestone verifiers and clean tracked-tree check: pass.
+
+The resulting hosted Release `AstralGame.exe` was 91,136 bytes, SHA-256
+`89dd35915c4ea4c30e9050e8d70052521421e9f9708aa425ca1084b6b3d54de5`. The
+hosted prerequisite evidence explicitly retained `package_launch_verified=false`,
+`clean_machine_compatibility_verified=false`, and `independent_acceptance=false`.
+
+GitHub Actions release-manifest run `35564646662`, job `106223963409`, also completed
+successfully for the same implementation source head. Its manifest, package-smoke,
+restart-stress, continuous-soak contract, soak-analysis, benchmark-manifest, PE
+reproducibility, repeated Release build, exact package-verification and clean-tree
+steps all concluded successfully. Runtime-smoke/soak contract tests in hosted CI are
+not a substitute for the deferred native GUI launch, continuous 86,400-second local
+soak, or independent acceptance.
 
 ## Claim boundaries and remaining gates
 
-Attempted/passed in this packet:
+Passed in this packet:
 
-- exact analyzer syntax and parser/analysis contracts: PASS in disposable sandbox;
-- 250 seeded malformed-input mutations: PASS in disposable sandbox;
-- published analyzer blob identity: VERIFIED against GitHub;
-- production manifest API surface: READ and compatible by direct source inspection.
+- exact analyzer syntax and parser/analysis contracts in the disposable sandbox;
+- 250 seeded malformed-input mutations in the disposable sandbox;
+- published analyzer blob identity against GitHub;
+- all 12 analyzer tests against the complete repository and production manifests in
+  hosted Ubuntu CI;
+- production-linked C++ Debug, optimized Release and Clang ASan+UBSan/leak capture
+  contract suites in hosted Ubuntu CI;
+- full hosted Windows build/deterministic regression lane for the exact
+  implementation source head;
+- hosted release-manifest/package contract regression lane for the exact
+  implementation source head.
 
 Deferred/not established:
 
-- complete-repository execution of the three production-binding integration tests;
-- hosted C++ Debug/Release and sanitizer execution for this exact implementation;
-- native Windows GUI timing capture and capture-off control;
-- instrumentation overhead, GPU timestamps and CPU thread attribution;
+- native Windows GUI timing capture and matched capture-off control;
+- instrumentation overhead, GPU timestamps and CPU thread/render attribution;
 - RAM/VRAM budgets and approved performance thresholds;
 - matched Astral/UE5/Unity 3D and genuine-2D workloads;
 - clean-machine package launch, load/unload and recovery stress;
 - the continuous 86,400-second soak;
 - independent QA/review.
 
-No previous green workflow, document count or descriptive percentile may be used as
-proof of those unresolved requirements.
+No green workflow, document count or descriptive percentile may be used as proof of
+those unresolved requirements.
 
 ## Registered local executor handoff
 
@@ -199,8 +248,8 @@ capture-off control separately before claiming instrumentation overhead.
 
 ## Single next useful action
 
-First obtain complete-repository execution of all 12 analyzer tests for the exact
-published candidate. If that is green, the next native packet is the existing
-3,600-sample package-bound procedural-scene capture plus a matched capture-off
-control. Do not select or claim a parity threshold until matched UE5/Unity reference
-workloads are frozen and measured.
+The complete-repository analyzer gate is now green. The next useful native packet is
+the existing 3,600-sample package-bound procedural-scene capture plus a matched
+capture-off control on the registered Windows executor. Bind the raw CSV to the
+benchmark manifest and run this analyzer. Do not select or claim a parity threshold
+until matched UE5/Unity reference workloads are frozen and measured.
