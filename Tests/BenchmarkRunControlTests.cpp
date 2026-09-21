@@ -65,7 +65,7 @@ void TestDefaultIsDisabled() {
     ClearBenchmarkEnv();
     Astral::Core::BenchmarkRunControl control;
     std::string error;
-    const auto status = control.ConfigureFromEnvironment(60, error);
+    const auto status = control.ConfigureFromEnvironment(60, 1280, 720, error);
     CHECK(status == Astral::Core::BenchmarkRunControlEnvironmentStatus::NotRequested);
     CHECK(error.empty());
     CHECK(!control.Enabled());
@@ -78,7 +78,7 @@ void TestOrphanControlsFailClosed() {
     SetEnv("ASTRAL_BENCHMARK_WARMUP_FRAMES", "120");
     Astral::Core::BenchmarkRunControl control;
     std::string error;
-    const auto status = control.ConfigureFromEnvironment(60, error);
+    const auto status = control.ConfigureFromEnvironment(60, 1280, 720, error);
     CHECK(status == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid);
     CHECK(!error.empty());
     CHECK(!control.Enabled());
@@ -94,7 +94,7 @@ void TestModeRequiresFixedSimulation() {
     SetEnv("ASTRAL_BENCHMARK_CONTROL_JSON", (dir / "control.json").string());
     Astral::Core::BenchmarkRunControl control;
     std::string error;
-    const auto status = control.ConfigureFromEnvironment(0, error);
+    const auto status = control.ConfigureFromEnvironment(0, 1280, 720, error);
     CHECK(status == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid);
     CHECK(!error.empty());
     ClearBenchmarkEnv();
@@ -113,7 +113,7 @@ void TestMalformedEnvironmentRejected() {
         SetEnv("ASTRAL_BENCHMARK_CONTROL_JSON", receipt);
         Astral::Core::BenchmarkRunControl control;
         std::string error;
-        CHECK(control.ConfigureFromEnvironment(60, error)
+        CHECK(control.ConfigureFromEnvironment(60, 1280, 720, error)
             == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid);
     }
     const char* badCounts[] = {"", "-1", "+1", " 1", "1 ", "1x", "1000001"};
@@ -125,7 +125,7 @@ void TestMalformedEnvironmentRejected() {
         SetEnv("ASTRAL_BENCHMARK_CONTROL_JSON", receipt);
         Astral::Core::BenchmarkRunControl control;
         std::string error;
-        CHECK(control.ConfigureFromEnvironment(60, error)
+        CHECK(control.ConfigureFromEnvironment(60, 1280, 720, error)
             == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid);
     }
     ClearBenchmarkEnv();
@@ -135,7 +135,16 @@ void TestMalformedEnvironmentRejected() {
     SetEnv("ASTRAL_BENCHMARK_CONTROL_JSON", receipt);
     Astral::Core::BenchmarkRunControl zeroMeasured;
     std::string error;
-    CHECK(zeroMeasured.ConfigureFromEnvironment(60, error)
+    CHECK(zeroMeasured.ConfigureFromEnvironment(60, 1280, 720, error)
+        == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid);
+
+    ClearBenchmarkEnv();
+    SetEnv("ASTRAL_BENCHMARK_MODE", "1");
+    SetEnv("ASTRAL_BENCHMARK_WARMUP_FRAMES", "0");
+    SetEnv("ASTRAL_BENCHMARK_MEASURED_FRAMES", "1");
+    SetEnv("ASTRAL_BENCHMARK_CONTROL_JSON", receipt);
+    Astral::Core::BenchmarkRunControl zeroWidth;
+    CHECK(zeroWidth.ConfigureFromEnvironment(60, 0, 720, error)
         == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid);
     ClearBenchmarkEnv();
     std::filesystem::remove_all(dir);
@@ -146,25 +155,31 @@ void TestExactFrameCompletionAndReceipt() {
     Astral::Core::BenchmarkRunControl control;
     std::string error;
     const auto receipt = dir / "control.json";
-    CHECK(control.Configure({receipt, 60, 2, 3}, error));
+    CHECK(control.Configure({receipt, 60, 2, 3, 1280, 720}, error));
     CHECK(control.Enabled());
     CHECK(control.SuppressLiveInput());
     CHECK(control.SimulationFixedHz() == 60);
     CHECK(control.WarmupFrames() == 2);
     CHECK(control.MeasuredFrames() == 3);
+    CHECK(control.ClientWidthPx() == 1280);
+    CHECK(control.ClientHeightPx() == 720);
     CHECK(control.TotalFrames() == 5);
 
     for (int i = 0; i < 4; ++i) {
+        CHECK(control.ObserveClientArea(1280, 720));
         CHECK(!control.CompleteFrame());
     }
     CHECK(control.CompletedFrames() == 4);
+    CHECK(control.ClientAreaObservations() == 4);
     CHECK(!control.FlushCompletion(error));
     CHECK(!error.empty());
     CHECK(!std::filesystem::exists(receipt));
 
     error.clear();
+    CHECK(control.ObserveClientArea(1280, 720));
     CHECK(control.CompleteFrame());
     CHECK(control.CompletedFrames() == 5);
+    CHECK(control.ClientAreaObservations() == 5);
     CHECK(control.FlushCompletion(error));
     CHECK(error.empty());
     CHECK(std::filesystem::exists(receipt));
@@ -180,11 +195,50 @@ void TestExactFrameCompletionAndReceipt() {
     CHECK(text.find("\"warmup_frames\": 2") != std::string::npos);
     CHECK(text.find("\"measured_frames\": 3") != std::string::npos);
     CHECK(text.find("\"completed_frames\": 5") != std::string::npos);
+    CHECK(text.find("\"client_width_px\": 1280") != std::string::npos);
+    CHECK(text.find("\"client_height_px\": 720") != std::string::npos);
+    CHECK(text.find("\"client_area_observations\": 5") != std::string::npos);
+    CHECK(text.find("\"client_area_stable\": true") != std::string::npos);
+    CHECK(text.find("\"window_mode\": \"windowed\"") != std::string::npos);
     CHECK(text.find("\"live_input\": \"suppressed\"") != std::string::npos);
     CHECK(text.find("\"termination\": \"exact_frame_limit\"") != std::string::npos);
     CHECK(text.find("\"comparative_parity_verified\": false") != std::string::npos);
 
     CHECK(!control.FlushCompletion(error));
+    std::filesystem::remove_all(dir);
+}
+
+void TestClientAreaObservationSafety() {
+    const auto dir = FreshDir("client-area");
+    std::string error;
+
+    Astral::Core::BenchmarkRunControl changed;
+    CHECK(changed.Configure({dir / "changed.json", 60, 0, 2, 1280, 720}, error));
+    CHECK(changed.ObserveClientArea(1280, 720));
+    CHECK(!changed.CompleteFrame());
+    CHECK(!changed.ObserveClientArea(1279, 720));
+    CHECK(!changed.CompleteFrame());
+    CHECK(!changed.FlushCompletion(error));
+    CHECK(!std::filesystem::exists(dir / "changed.json"));
+
+    Astral::Core::BenchmarkRunControl missing;
+    CHECK(missing.Configure({dir / "missing.json", 60, 0, 1, 1280, 720}, error));
+    CHECK(!missing.CompleteFrame());
+    CHECK(!missing.FlushCompletion(error));
+    CHECK(!std::filesystem::exists(dir / "missing.json"));
+
+    Astral::Core::BenchmarkRunControl duplicate;
+    CHECK(duplicate.Configure({dir / "duplicate.json", 60, 0, 1, 1280, 720}, error));
+    CHECK(duplicate.ObserveClientArea(1280, 720));
+    CHECK(!duplicate.ObserveClientArea(1280, 720));
+    CHECK(!duplicate.CompleteFrame());
+    CHECK(!duplicate.FlushCompletion(error));
+    CHECK(!std::filesystem::exists(dir / "duplicate.json"));
+
+    Astral::Core::BenchmarkRunControl invalidDimensions;
+    CHECK(!invalidDimensions.Configure({dir / "zero.json", 60, 0, 1, 0, 720}, error));
+    CHECK(!invalidDimensions.Configure({dir / "huge.json", 60, 0, 1, 16385, 720}, error));
+
     std::filesystem::remove_all(dir);
 }
 
@@ -194,7 +248,8 @@ void TestOverrunAndOutputSafety() {
 
     Astral::Core::BenchmarkRunControl overrun;
     const auto receipt = dir / "overrun.json";
-    CHECK(overrun.Configure({receipt, 120, 0, 1}, error));
+    CHECK(overrun.Configure({receipt, 120, 0, 1, 1280, 720}, error));
+    CHECK(overrun.ObserveClientArea(1280, 720));
     CHECK(overrun.CompleteFrame());
     CHECK(!overrun.CompleteFrame());
     CHECK(!overrun.FlushCompletion(error));
@@ -206,7 +261,7 @@ void TestOverrunAndOutputSafety() {
         stream << "keep";
     }
     Astral::Core::BenchmarkRunControl noOverwrite;
-    CHECK(!noOverwrite.Configure({existing, 60, 0, 1}, error));
+    CHECK(!noOverwrite.Configure({existing, 60, 0, 1, 1280, 720}, error));
 
     const auto partialFinal = dir / "partial.json";
     {
@@ -214,16 +269,17 @@ void TestOverrunAndOutputSafety() {
         stream << "keep";
     }
     Astral::Core::BenchmarkRunControl noPartialOverwrite;
-    CHECK(!noPartialOverwrite.Configure({partialFinal, 60, 0, 1}, error));
+    CHECK(!noPartialOverwrite.Configure({partialFinal, 60, 0, 1, 1280, 720}, error));
 
     Astral::Core::BenchmarkRunControl relative;
-    CHECK(!relative.Configure({std::filesystem::path("relative.json"), 60, 0, 1}, error));
+    CHECK(!relative.Configure(
+        {std::filesystem::path("relative.json"), 60, 0, 1, 1280, 720}, error));
 
     Astral::Core::BenchmarkRunControl invalidRate;
-    CHECK(!invalidRate.Configure({dir / "bad-rate.json", 1001, 0, 1}, error));
+    CHECK(!invalidRate.Configure({dir / "bad-rate.json", 1001, 0, 1, 1280, 720}, error));
 
     Astral::Core::BenchmarkRunControl invalidTotal;
-    CHECK(!invalidTotal.Configure({dir / "bad-total.json", 60, 999999, 2}, error));
+    CHECK(!invalidTotal.Configure({dir / "bad-total.json", 60, 999999, 2, 1280, 720}, error));
 
     std::filesystem::remove_all(dir);
 }
@@ -239,10 +295,12 @@ void TestEnvironmentHappyPath() {
 
     Astral::Core::BenchmarkRunControl control;
     std::string error;
-    CHECK(control.ConfigureFromEnvironment(60, error)
+    CHECK(control.ConfigureFromEnvironment(60, 1920, 1080, error)
         == Astral::Core::BenchmarkRunControlEnvironmentStatus::Enabled);
     CHECK(control.TotalFrames() == 3720);
     CHECK(control.SimulationFixedHz() == 60);
+    CHECK(control.ClientWidthPx() == 1920);
+    CHECK(control.ClientHeightPx() == 1080);
     CHECK(control.SuppressLiveInput());
 
     ClearBenchmarkEnv();
@@ -257,8 +315,9 @@ int main() {
     TestModeRequiresFixedSimulation();
     TestMalformedEnvironmentRejected();
     TestExactFrameCompletionAndReceipt();
+    TestClientAreaObservationSafety();
     TestOverrunAndOutputSafety();
     TestEnvironmentHappyPath();
-    std::cout << "BenchmarkRunControlTests: 7 groups passed\n";
+    std::cout << "BenchmarkRunControlTests: 8 groups passed\n";
     return 0;
 }
