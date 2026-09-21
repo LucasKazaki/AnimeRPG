@@ -15,7 +15,7 @@ namespace {
 void Require(bool condition, const char* expression, int line) {
     if (!condition) {
         std::cerr << "CHECK failed at line " << line << ": " << expression << "\n";
-        std::abort();
+        std::exit(EXIT_FAILURE);
     }
 }
 
@@ -23,17 +23,25 @@ void Require(bool condition, const char* expression, int line) {
 
 void SetEnv(const char* name, const std::string& value) {
 #ifdef _WIN32
-    _putenv_s(name, value.c_str());
+    // BenchmarkRunControl intentionally reads the wide CRT environment on Windows so
+    // Unicode receipt paths remain representable. Keep both CRT environment views in
+    // sync explicitly instead of relying on narrow-to-wide synchronization semantics.
+    CHECK(_putenv_s(name, value.c_str()) == 0);
+    const std::wstring wideName = std::filesystem::path(name).wstring();
+    const std::wstring wideValue = std::filesystem::path(value).wstring();
+    CHECK(_wputenv_s(wideName.c_str(), wideValue.c_str()) == 0);
 #else
-    setenv(name, value.c_str(), 1);
+    CHECK(setenv(name, value.c_str(), 1) == 0);
 #endif
 }
 
 void UnsetEnv(const char* name) {
 #ifdef _WIN32
-    _putenv_s(name, "");
+    CHECK(_putenv_s(name, "") == 0);
+    const std::wstring wideName = std::filesystem::path(name).wstring();
+    CHECK(_wputenv_s(wideName.c_str(), L"") == 0);
 #else
-    unsetenv(name);
+    CHECK(unsetenv(name) == 0);
 #endif
 }
 
