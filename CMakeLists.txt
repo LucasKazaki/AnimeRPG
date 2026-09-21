@@ -27,12 +27,27 @@ target_include_directories(AstralGame PRIVATE .)
 target_compile_definitions(AstralGame PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(AstralGame PRIVATE user32 gdi32)
 
+add_executable(AstralEditor WIN32
+    Engine/Editor/EditorLayout.cpp
+    Tools/AstralEditorMain.cpp
+)
+target_include_directories(AstralEditor PRIVATE .)
+target_compile_definitions(AstralEditor PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(AstralEditor PRIVATE user32 gdi32)
+
 include(CTest)
 if(BUILD_TESTING)
     include(cmake/AstralTestSafety.cmake)
     add_executable(AstralMathTests Tests/MathTests.cpp)
     target_include_directories(AstralMathTests PRIVATE .)
     astral_add_test(AstralMathTests)
+
+    add_executable(EditorLayoutTests
+        Engine/Editor/EditorLayout.cpp
+        Tests/EditorLayoutTests.cpp
+    )
+    target_include_directories(EditorLayoutTests PRIVATE .)
+    astral_add_test(EditorLayoutTests)
 
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp
