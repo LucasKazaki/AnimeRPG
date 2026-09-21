@@ -85,10 +85,13 @@ class Fixture:
         self.release_manifest = self.package / "MANIFEST.json"
         release_manifest.write_release_manifest(self.package, self.release_manifest, COMMIT)
         self.receipt = self.evidence / "benchmark-control.json"
-        self.receipt.write_text(json.dumps(receipt(), indent=2) + "\n", encoding="utf-8")
+        self.write_receipt(receipt())
         (self.evidence / "astral.log").write_text("fixture\n", encoding="utf-8")
         self.manifest_path = root / "benchmark.json"
         self.rebuild()
+
+    def write_receipt(self, data: dict):
+        self.receipt.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
     def rebuild(self, custom_spec: dict | None = None):
         manifest = benchmark_manifest.build_benchmark_manifest(
@@ -110,9 +113,12 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
             fx = Fixture(Path(td))
             report = fx.verify()
             self.assertTrue(report["benchmark_run_control_verified"])
+            self.assertTrue(report["benchmark_duration_protocol_coherent"])
             self.assertEqual(report["simulation_fixed_hz"], 60)
             self.assertEqual(report["warmup_frames"], 120)
             self.assertEqual(report["measured_frames"], 3600)
+            self.assertEqual(report["warmup_seconds"], 2.0)
+            self.assertEqual(report["sample_seconds"], 60.0)
             self.assertEqual(report["completed_frames"], 3720)
             self.assertEqual(report["client_width_px"], 1920)
             self.assertEqual(report["client_height_px"], 1080)
@@ -124,6 +130,50 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
             self.assertEqual(report["window_mode"], "windowed")
             self.assertEqual(report["live_input"], "suppressed")
             self.assertFalse(report["acceptance"]["comparative_parity_verified"])
+
+    def test_duration_mismatch_is_rejected_after_manifest_rehash(self):
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            wrong_warmup = spec()
+            wrong_warmup["run_protocol"]["warmup_seconds"] = 3.0
+            fx.rebuild(wrong_warmup)
+            with self.assertRaises(run_control.BenchmarkRunControlError):
+                fx.verify()
+
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            wrong_sample = spec()
+            wrong_sample["run_protocol"]["sample_seconds"] = 59.0
+            fx.rebuild(wrong_sample)
+            with self.assertRaises(run_control.BenchmarkRunControlError):
+                fx.verify()
+
+    def test_fractional_fixed_step_duration_is_rejected_not_rounded(self):
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            fractional = spec()
+            fractional["run_protocol"]["sample_seconds"] = 60.01
+            fx.rebuild(fractional)
+            with self.assertRaises(run_control.BenchmarkRunControlError):
+                fx.verify()
+
+    def test_coherent_non_sixty_hz_protocol_is_not_hardcoded(self):
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            data = receipt()
+            data["simulation_fixed_hz"] = 120
+            data["warmup_frames"] = 240
+            data["measured_frames"] = 7200
+            data["total_frames"] = 7440
+            data["completed_frames"] = 7440
+            data["client_area_observations"] = 7440
+            fx.write_receipt(data)
+            fx.rebuild()
+            report = fx.verify()
+            self.assertTrue(report["benchmark_duration_protocol_coherent"])
+            self.assertEqual(report["simulation_fixed_hz"], 120)
+            self.assertEqual(report["warmup_frames"], 240)
+            self.assertEqual(report["measured_frames"], 7200)
 
     def test_evidence_mutation_is_rejected_before_interpretation(self):
         with tempfile.TemporaryDirectory() as td:
