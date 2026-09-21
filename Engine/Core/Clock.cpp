@@ -7,17 +7,34 @@ namespace Astral::Core {
 
 Clock::Clock() : lastTick_(std::chrono::steady_clock::now()), start_(lastTick_) {
     std::string error;
-    const auto status = frameTimingCapture_.ConfigureFromEnvironment(error);
-    if (status == FrameTimingEnvironmentStatus::Invalid) {
+    const auto timingStatus = frameTimingCapture_.ConfigureFromEnvironment(error);
+    if (timingStatus == FrameTimingEnvironmentStatus::Invalid) {
         std::fprintf(stderr, "Astral frame timing capture configuration rejected: %s\n", error.c_str());
+    }
+
+    error.clear();
+    const auto memoryStatus = processMemoryCapture_.ConfigureFromEnvironment(error);
+    if (memoryStatus == ProcessMemoryEnvironmentStatus::Invalid) {
+        std::fprintf(stderr, "Astral process memory capture configuration rejected: %s\n",
+            error.c_str());
     }
 }
 
 Clock::~Clock() {
-    if (!frameTimingCapture_.Enabled()) return;
-    std::string error;
-    if (!frameTimingCapture_.Flush(error)) {
-        std::fprintf(stderr, "Astral frame timing capture was not published: %s\n", error.c_str());
+    if (frameTimingCapture_.Enabled()) {
+        std::string error;
+        if (!frameTimingCapture_.Flush(error)) {
+            std::fprintf(stderr, "Astral frame timing capture was not published: %s\n",
+                error.c_str());
+        }
+    }
+
+    if (processMemoryCapture_.Enabled()) {
+        std::string error;
+        if (!processMemoryCapture_.Flush(error)) {
+            std::fprintf(stderr, "Astral process memory capture was not published: %s\n",
+                error.c_str());
+        }
     }
 }
 
@@ -27,6 +44,13 @@ float Clock::Tick() {
     lastTick_ = now;
     if (frameTimingCapture_.Enabled()) {
         frameTimingCapture_.Record(frameIndex_, static_cast<double>(delta) * 1000.0);
+    }
+    if (processMemoryCapture_.Enabled()
+        && !processMemoryCapture_.RecordCurrentProcess(frameIndex_)
+        && !processMemoryFailureReported_) {
+        std::fprintf(stderr,
+            "Astral process memory sampler failed; final memory evidence will not be published\n");
+        processMemoryFailureReported_ = true;
     }
     ++frameIndex_;
     return delta;
