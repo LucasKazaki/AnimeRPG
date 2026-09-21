@@ -28,7 +28,7 @@ add_executable(AstralGame WIN32
 
 target_include_directories(AstralGame PRIVATE .)
 target_compile_definitions(AstralGame PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_link_libraries(AstralGame PRIVATE user32 gdi32 psapi)
+target_link_libraries(AstralGame PRIVATE user32 gdi32)
 if(MSVC)
     target_link_options(AstralGame PRIVATE "$<$<CONFIG:Release>:/Brepro>")
 endif()
@@ -47,7 +47,6 @@ if(BUILD_TESTING)
         Tests/FrameTimingCaptureTests.cpp
     )
     target_include_directories(FrameTimingCaptureTests PRIVATE .)
-    target_link_libraries(FrameTimingCaptureTests PRIVATE psapi)
     astral_add_test(FrameTimingCaptureTests)
 
     add_executable(FramePhaseTimingCaptureTests
@@ -62,7 +61,6 @@ if(BUILD_TESTING)
         Tests/ProcessMemoryCaptureTests.cpp
     )
     target_include_directories(ProcessMemoryCaptureTests PRIVATE .)
-    target_link_libraries(ProcessMemoryCaptureTests PRIVATE psapi)
     astral_add_test(ProcessMemoryCaptureTests)
 
     add_executable(AstralSceneTests
