@@ -20,6 +20,8 @@ on:
       - "Scripts/test_package_soak_telemetry_analysis.py"
       - "Scripts/benchmark_manifest.py"
       - "Scripts/test_benchmark_manifest.py"
+      - "Scripts/diagnose_pe_reproducibility.py"
+      - "Scripts/test_pe_reproducibility_diagnostic.py"
       - ".github/workflows/release-manifest-validation.yml"
 
 permissions:
@@ -53,6 +55,113 @@ jobs:
 
       - name: Verify benchmark-manifest contracts
         run: python Scripts/test_benchmark_manifest.py
+
+      - name: Verify PE reproducibility diagnostic contracts
+        run: python Scripts/test_pe_reproducibility_diagnostic.py
+
+      - name: Build same Release candidate twice and diagnose PE differences
+        id: release_repro
+        shell: pwsh
+        run: |
+          $build = Join-Path $env:RUNNER_TEMP "Astral-repro-build"
+          $evidence = Join-Path $env:RUNNER_TEMP "Astral-repro-evidence"
+          if (Test-Path $evidence) { Remove-Item $evidence -Recurse -Force }
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          $commit = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { Write-Error "Cannot resolve exact build commit"; exit 1 }
+          Write-Host "Repro diagnostic checkout: $commit"
+
+          for ($i = 1; $i -le 2; $i++) {
+            if (Test-Path $build) { Remove-Item $build -Recurse -Force }
+            cmake -S . -B $build -G "Visual Studio 17 2022" -A x64
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            cmake --build $build --config Release --target AstralGame --parallel
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+            $exe = Join-Path $build "Release/AstralGame.exe"
+            if (-not (Test-Path $exe -PathType Leaf)) { Write-Error "Missing Release AstralGame.exe"; exit 1 }
+            $exeOut = Join-Path $evidence "AstralGame-$i.exe"
+            Copy-Item $exe $exeOut
+
+            $project = Join-Path $build "AstralGame.vcxproj"
+            if (-not (Test-Path $project -PathType Leaf)) { Write-Error "Missing generated AstralGame.vcxproj"; exit 1 }
+            $projectOut = Join-Path $evidence "AstralGame-$i.vcxproj"
+            Copy-Item $project $projectOut
+
+            $exeHash = (Get-FileHash $exeOut -Algorithm SHA256).Hash.ToLowerInvariant()
+            $projectHash = (Get-FileHash $projectOut -Algorithm SHA256).Hash.ToLowerInvariant()
+            Write-Host "Build $i AstralGame.exe SHA-256: $exeHash"
+            Write-Host "Build $i AstralGame.vcxproj SHA-256: $projectHash"
+
+            $pdb = Join-Path $build "Release/AstralGame.pdb"
+            if (Test-Path $pdb -PathType Leaf) {
+              $pdbOut = Join-Path $evidence "AstralGame-$i.pdb"
+              Copy-Item $pdb $pdbOut
+              $pdbHash = (Get-FileHash $pdbOut -Algorithm SHA256).Hash.ToLowerInvariant()
+              Write-Host "Build $i AstralGame.pdb SHA-256: $pdbHash"
+            } else {
+              Write-Host "Build $i did not emit AstralGame.pdb; no PDB hash claimed."
+            }
+
+            if ($i -eq 1) { Start-Sleep -Seconds 2 }
+          }
+
+          $exeA = Join-Path $evidence "AstralGame-1.exe"
+          $exeB = Join-Path $evidence "AstralGame-2.exe"
+          $report = Join-Path $evidence "pe-reproducibility.json"
+          python Scripts/diagnose_pe_reproducibility.py $exeA $exeB --json $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $result = Get-Content $report -Raw | ConvertFrom-Json
+          $classification = [string]$result.comparison.classification
+          $fields = [string]::Join(",", @($result.comparison.changing_field_classes))
+          $marker = [bool]$result.image_a.reproducible_debug_entry_present -and [bool]$result.image_b.reproducible_debug_entry_present
+          $hashA = [string]$result.image_a.sha256
+          $hashB = [string]$result.image_b.sha256
+          Write-Host "PE reproducibility classification: $classification"
+          Write-Host "Changing recognized fields: $fields"
+          Write-Host "Both images contain IMAGE_DEBUG_TYPE_REPRO: $marker"
+          "classification=$classification" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "fields=$fields" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "repro_marker=$($marker.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "exe_a_sha256=$hashA" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "exe_b_sha256=$hashB" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: "Repro classification: byte-identical pair"
+        if: steps.release_repro.outputs.classification == 'identical'
+        shell: pwsh
+        run: Write-Host "The two fresh same-runner Release executables are byte-identical. This is pairwise evidence only."
+
+      - name: "Repro classification: recognized PE metadata only"
+        if: steps.release_repro.outputs.classification == 'recognized_pe_metadata_only'
+        shell: pwsh
+        run: Write-Host "The two fresh Release executables differ only within recognized PE metadata ranges. Root cause is not inferred."
+
+      - name: "Observed changing field: COFF timestamp"
+        if: contains(steps.release_repro.outputs.fields, 'coff_timestamp')
+        shell: pwsh
+        run: Write-Host "COFF timestamp bytes differ."
+
+      - name: "Observed changing field: optional-header checksum"
+        if: contains(steps.release_repro.outputs.fields, 'optional_header_checksum')
+        shell: pwsh
+        run: Write-Host "Optional-header checksum bytes differ."
+
+      - name: "Observed changing field: debug-directory timestamp"
+        if: contains(steps.release_repro.outputs.fields, 'debug_directory_timestamp')
+        shell: pwsh
+        run: Write-Host "Debug-directory timestamp bytes differ."
+
+      - name: "Observed changing field: CodeView data"
+        if: contains(steps.release_repro.outputs.fields, 'codeview_data')
+        shell: pwsh
+        run: Write-Host "CodeView debug-record bytes differ."
+
+      - name: Reject unclassified or layout-changing Release differences
+        if: steps.release_repro.outputs.classification != 'identical' && steps.release_repro.outputs.classification != 'recognized_pe_metadata_only'
+        shell: pwsh
+        run: |
+          Write-Error "Release reproducibility diagnostic found payload/unclassified or layout/size changes. Preserve the diagnostic log and stop before build-setting changes."
+          exit 1
 
       - name: Configure and build Release executable
         shell: pwsh
