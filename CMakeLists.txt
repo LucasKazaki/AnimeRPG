@@ -12,6 +12,7 @@ add_executable(AstralGame WIN32
     Engine/Core/FramePhaseTimingCapture.cpp
     Engine/Core/FrameTimingCapture.cpp
     Engine/Core/ProcessMemoryCapture.cpp
+    Engine/Core/ProfilingCaptureStateReceipt.cpp
     Engine/Core/SimulationTimeStep.cpp
     Engine/Core/Logger.cpp
     Engine/Platform/Win32Application.cpp
@@ -82,6 +83,14 @@ if(BUILD_TESTING)
     )
     target_include_directories(BenchmarkRunControlTests PRIVATE .)
     astral_add_test(BenchmarkRunControlTests)
+
+    add_executable(ProfilingCaptureStateReceiptTests
+        Engine/Core/BenchmarkRunControl.cpp
+        Engine/Core/ProfilingCaptureStateReceipt.cpp
+        Tests/ProfilingCaptureStateReceiptTests.cpp
+    )
+    target_include_directories(ProfilingCaptureStateReceiptTests PRIVATE .)
+    astral_add_test(ProfilingCaptureStateReceiptTests)
 
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp
