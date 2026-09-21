@@ -1,0 +1,60 @@
+#include "Engine/Editor/EditorLayout.h"
+
+#include <cstdlib>
+#include <iostream>
+
+namespace {
+using Astral::Editor::ComputeEditorLayout;
+using Astral::Editor::Contains;
+using Astral::Editor::EditorRect;
+using Astral::Editor::Overlaps;
+
+bool Expect(bool condition, const char* message) {
+    if (!condition) {
+        std::cerr << "FAIL: " << message << '\n';
+        return false;
+    }
+    return true;
+}
+
+bool CheckLayout(int width, int height) {
+    const auto layout = ComputeEditorLayout(width, height);
+    const EditorRect client{0, 0, width < 0 ? 0 : width, height < 0 ? 0 : height};
+    bool ok = true;
+    ok &= Expect(Contains(client, layout.toolbar), "toolbar outside client");
+    ok &= Expect(Contains(client, layout.outliner), "outliner outside client");
+    ok &= Expect(Contains(client, layout.viewport), "viewport outside client");
+    ok &= Expect(Contains(client, layout.inspector), "inspector outside client");
+    ok &= Expect(Contains(client, layout.assets), "assets outside client");
+    ok &= Expect(Contains(client, layout.status), "status outside client");
+    ok &= Expect(!Overlaps(layout.outliner, layout.viewport), "outliner overlaps viewport");
+    ok &= Expect(!Overlaps(layout.viewport, layout.inspector), "viewport overlaps inspector");
+    ok &= Expect(!Overlaps(layout.viewport, layout.assets), "viewport overlaps asset browser");
+    ok &= Expect(!Overlaps(layout.toolbar, layout.outliner), "toolbar overlaps content");
+    ok &= Expect(!Overlaps(layout.status, layout.assets), "status overlaps assets");
+    return ok;
+}
+}
+
+int main() {
+    bool ok = true;
+    ok &= CheckLayout(1280, 720);
+    ok &= CheckLayout(1920, 1080);
+    ok &= CheckLayout(800, 600);
+    ok &= CheckLayout(320, 200);
+    ok &= CheckLayout(0, 0);
+    ok &= CheckLayout(-1, -1);
+
+    const auto standard = ComputeEditorLayout(1280, 720);
+    ok &= Expect(standard.toolbar.height == 42, "standard toolbar height changed");
+    ok &= Expect(standard.status.height == 24, "standard status height changed");
+    ok &= Expect(standard.outliner.width == 240, "standard outliner width changed");
+    ok &= Expect(standard.inspector.width == 240, "standard inspector width changed");
+    ok &= Expect(standard.assets.height == 180, "standard asset browser height changed");
+    ok &= Expect(standard.viewport.width == 800, "standard viewport width changed");
+    ok &= Expect(standard.viewport.height == 474, "standard viewport height changed");
+
+    if (!ok) return EXIT_FAILURE;
+    std::cout << "EditorLayoutTests: PASS\n";
+    return EXIT_SUCCESS;
+}
