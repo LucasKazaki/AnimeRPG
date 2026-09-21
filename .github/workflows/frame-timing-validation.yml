@@ -1,4 +1,4 @@
-name: Frame timing capture portability
+name: Profiling capture portability
 
 on:
   workflow_dispatch:
@@ -11,6 +11,8 @@ on:
       - "Engine/Core/FramePhaseTimingCapture.h"
       - "Engine/Core/FrameTimingCapture.cpp"
       - "Engine/Core/FrameTimingCapture.h"
+      - "Engine/Core/ProcessMemoryCapture.cpp"
+      - "Engine/Core/ProcessMemoryCapture.h"
       - "Engine/Platform/Win32Application.cpp"
       - "Scripts/analyze_frame_phase_timing_capture.py"
       - "Scripts/analyze_frame_timing_capture.py"
@@ -18,6 +20,7 @@ on:
       - "Scripts/test_frame_timing_analysis.py"
       - "Tests/FramePhaseTimingCaptureTests.cpp"
       - "Tests/FrameTimingCaptureTests.cpp"
+      - "Tests/ProcessMemoryCaptureTests.cpp"
       - "Tests/FrameTiming/**"
       - ".github/workflows/frame-timing-validation.yml"
   push:
@@ -30,6 +33,8 @@ on:
       - "Engine/Core/FramePhaseTimingCapture.h"
       - "Engine/Core/FrameTimingCapture.cpp"
       - "Engine/Core/FrameTimingCapture.h"
+      - "Engine/Core/ProcessMemoryCapture.cpp"
+      - "Engine/Core/ProcessMemoryCapture.h"
       - "Engine/Platform/Win32Application.cpp"
       - "Scripts/analyze_frame_phase_timing_capture.py"
       - "Scripts/analyze_frame_timing_capture.py"
@@ -37,6 +42,7 @@ on:
       - "Scripts/test_frame_timing_analysis.py"
       - "Tests/FramePhaseTimingCaptureTests.cpp"
       - "Tests/FrameTimingCaptureTests.cpp"
+      - "Tests/ProcessMemoryCaptureTests.cpp"
       - "Tests/FrameTiming/**"
       - ".github/workflows/frame-timing-validation.yml"
 
@@ -59,7 +65,7 @@ jobs:
           python Scripts/test_frame_timing_analysis.py
           python Scripts/test_frame_phase_timing_analysis.py
 
-      - name: Debug and optimized Release capture contracts
+      - name: Debug and optimized Release profiling capture contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -70,7 +76,7 @@ jobs:
             ctest --test-dir "$build" --output-on-failure --no-tests=error -V
           done
 
-      - name: AddressSanitizer and UndefinedBehaviorSanitizer capture contracts
+      - name: AddressSanitizer and UndefinedBehaviorSanitizer profiling capture contracts
         shell: bash
         run: |
           set -euo pipefail
