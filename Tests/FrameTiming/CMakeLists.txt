@@ -14,9 +14,6 @@ add_executable(AstralFrameTimingTests
     ../FrameTimingCaptureTests.cpp
 )
 target_include_directories(AstralFrameTimingTests PRIVATE ../..)
-if(WIN32)
-    target_link_libraries(AstralFrameTimingTests PRIVATE psapi)
-endif()
 
 add_executable(AstralFramePhaseTimingTests
     ../../Engine/Core/FramePhaseTimingCapture.cpp
@@ -29,9 +26,6 @@ add_executable(AstralProcessMemoryTests
     ../ProcessMemoryCaptureTests.cpp
 )
 target_include_directories(AstralProcessMemoryTests PRIVATE ../..)
-if(WIN32)
-    target_link_libraries(AstralProcessMemoryTests PRIVATE psapi)
-endif()
 
 if(ASTRAL_FRAME_TIMING_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     foreach(target AstralFrameTimingTests AstralFramePhaseTimingTests AstralProcessMemoryTests)
