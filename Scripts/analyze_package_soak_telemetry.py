@@ -100,9 +100,19 @@ def _validate_receipt(receipt: dict[str, Any]) -> tuple[str, str, float, float, 
     if not isinstance(summary, dict):
         raise SoakAnalysisError("soak receipt telemetry_summary must be an object")
     sample_count = _nonnegative_int(summary.get("sample_count"), "telemetry_summary.sample_count")
+    passed = receipt.get("passed")
+    if not isinstance(passed, bool):
+        raise SoakAnalysisError("soak receipt passed must be boolean")
+    evidence_kind = receipt.get("evidence_kind")
+    allowed_evidence_kinds = {"synthetic_contract", "native_continuous_package_soak", "native_contract_test"}
+    if evidence_kind not in allowed_evidence_kinds:
+        raise SoakAnalysisError("soak receipt evidence_kind is unsupported")
     acceptance = receipt.get("acceptance")
     if not isinstance(acceptance, dict):
         raise SoakAnalysisError("soak receipt acceptance must be an object")
+    for key in ("continuous_package_uptime_observed", "ram_telemetry_observed", "package_unchanged_after_soak"):
+        if not isinstance(acceptance.get(key), bool):
+            raise SoakAnalysisError(f"{key} must be boolean")
     forbidden_true = (
         "required_24h_soak_verified",
         "ram_budget_verified",
@@ -119,8 +129,15 @@ def _validate_receipt(receipt: dict[str, Any]) -> tuple[str, str, float, float, 
     observed_24h = acceptance.get("required_24h_duration_observed")
     if not isinstance(observed_24h, bool):
         raise SoakAnalysisError("required_24h_duration_observed must be boolean")
-    if observed_24h and (requested < REQUIRED_SOAK_SECONDS or elapsed < REQUIRED_SOAK_SECONDS):
-        raise SoakAnalysisError("24-hour duration claim is inconsistent with requested/elapsed duration")
+    if observed_24h:
+        if requested < REQUIRED_SOAK_SECONDS or elapsed < REQUIRED_SOAK_SECONDS:
+            raise SoakAnalysisError("24-hour duration claim is inconsistent with requested/elapsed duration")
+        if not passed or evidence_kind != "native_continuous_package_soak":
+            raise SoakAnalysisError("24-hour duration claim requires a passed native continuous soak receipt")
+        if not acceptance["continuous_package_uptime_observed"] or not acceptance["ram_telemetry_observed"]:
+            raise SoakAnalysisError("24-hour duration claim requires native uptime and RAM telemetry observations")
+        if not acceptance["package_unchanged_after_soak"]:
+            raise SoakAnalysisError("24-hour duration claim requires post-soak package integrity")
     return commit.lower(), exe_hash.lower(), requested, elapsed, sample_count, telemetry_hash.lower()
 
 
@@ -278,7 +295,8 @@ def analyze(receipt_path: Path, telemetry_path: Path, *,
         "telemetry_sha256": telemetry_hash,
         "commit": commit,
         "AstralGame_sha256": exe_hash,
-        "source_soak_passed": bool(receipt.get("passed")),
+        "source_soak_passed": receipt["passed"],
+        "source_evidence_kind": receipt["evidence_kind"],
         "requested_duration_seconds": requested,
         "receipt_elapsed_seconds": elapsed,
         "first_sample_elapsed_seconds": first_elapsed,
