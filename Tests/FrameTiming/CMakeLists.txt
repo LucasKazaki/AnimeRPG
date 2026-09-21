@@ -14,10 +14,19 @@ add_executable(AstralFrameTimingTests
 )
 target_include_directories(AstralFrameTimingTests PRIVATE ../..)
 
+add_executable(AstralFramePhaseTimingTests
+    ../../Engine/Core/FramePhaseTimingCapture.cpp
+    ../FramePhaseTimingCaptureTests.cpp
+)
+target_include_directories(AstralFramePhaseTimingTests PRIVATE ../..)
+
 if(ASTRAL_FRAME_TIMING_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    target_compile_options(AstralFrameTimingTests PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
-    target_link_options(AstralFrameTimingTests PRIVATE -fsanitize=address,undefined)
+    foreach(target AstralFrameTimingTests AstralFramePhaseTimingTests)
+        target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+    endforeach()
 endif()
 
 enable_testing()
 add_test(NAME AstralFrameTimingTests COMMAND AstralFrameTimingTests)
+add_test(NAME AstralFramePhaseTimingTests COMMAND AstralFramePhaseTimingTests)

@@ -1,9 +1,12 @@
 #include "Engine/Platform/Win32Application.h"
 
 #include "Engine/Core/Clock.h"
+#include "Engine/Core/FramePhaseTimingCapture.h"
 #include "Engine/Core/Logger.h"
 #include "Engine/Renderer/Renderer.h"
 
+#include <chrono>
+#include <cstdio>
 #include <string>
 
 namespace {
@@ -177,14 +180,38 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
 
 int Win32Application::Run() {
     Astral::Core::Clock clock;
+    Astral::Core::FramePhaseTimingCapture phaseTimingCapture;
+    std::string phaseTimingError;
+    const auto phaseTimingStatus = phaseTimingCapture.ConfigureFromEnvironment(phaseTimingError);
+    if (phaseTimingStatus == Astral::Core::FramePhaseTimingEnvironmentStatus::Invalid) {
+        std::fprintf(stderr, "Astral frame phase timing capture configuration rejected: %s\n",
+            phaseTimingError.c_str());
+    }
+
     MSG message{};
     double fpsAccumulator = 0.0;
     int frameCount = 0;
+    std::uint64_t phaseFrameIndex = 0;
+    using PhaseClock = std::chrono::steady_clock;
+    const auto toMilliseconds = [](PhaseClock::duration duration) {
+        return std::chrono::duration<double, std::milli>(duration).count();
+    };
 
     while (message.message != WM_QUIT) {
+        PhaseClock::time_point phaseStart{};
+        PhaseClock::time_point afterMessages{};
+        PhaseClock::time_point afterUpdate{};
+        PhaseClock::time_point afterRender{};
+        if (phaseTimingCapture.Enabled()) {
+            phaseStart = PhaseClock::now();
+        }
+
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
             TranslateMessage(&message);
             DispatchMessageW(&message);
+        }
+        if (phaseTimingCapture.Enabled()) {
+            afterMessages = PhaseClock::now();
         }
 
         const float deltaSeconds = clock.Tick();
@@ -303,6 +330,9 @@ int Win32Application::Run() {
                 playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
                 thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
         }
+        if (phaseTimingCapture.Enabled()) {
+            afterUpdate = PhaseClock::now();
+        }
 
         HDC deviceContext = GetDC(window_);
         RECT viewport{};
@@ -312,7 +342,28 @@ int Win32Application::Run() {
             playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
             thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
         ReleaseDC(window_, deviceContext);
+        if (phaseTimingCapture.Enabled()) {
+            afterRender = PhaseClock::now();
+        }
         Sleep(1);
+
+        if (phaseTimingCapture.Enabled()) {
+            const auto afterWait = PhaseClock::now();
+            phaseTimingCapture.Record(phaseFrameIndex,
+                toMilliseconds(afterMessages - phaseStart),
+                toMilliseconds(afterUpdate - afterMessages),
+                toMilliseconds(afterRender - afterUpdate),
+                toMilliseconds(afterWait - afterRender));
+        }
+        ++phaseFrameIndex;
+    }
+
+    if (phaseTimingCapture.Enabled()) {
+        std::string error;
+        if (!phaseTimingCapture.Flush(error)) {
+            std::fprintf(stderr, "Astral frame phase timing capture was not published: %s\n",
+                error.c_str());
+        }
     }
 
     return static_cast<int>(message.wParam);
