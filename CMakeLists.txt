@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(AstralGame WIN32
     Engine/Assets/StaticMesh.cpp
+    Engine/Core/BenchmarkRunControl.cpp
     Engine/Core/Clock.cpp
     Engine/Core/FramePhaseTimingCapture.cpp
     Engine/Core/FrameTimingCapture.cpp
@@ -74,6 +75,13 @@ if(BUILD_TESTING)
     )
     target_include_directories(SimulationTimeStepTests PRIVATE .)
     astral_add_test(SimulationTimeStepTests)
+
+    add_executable(BenchmarkRunControlTests
+        Engine/Core/BenchmarkRunControl.cpp
+        Tests/BenchmarkRunControlTests.cpp
+    )
+    target_include_directories(BenchmarkRunControlTests PRIVATE .)
+    astral_add_test(BenchmarkRunControlTests)
 
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp

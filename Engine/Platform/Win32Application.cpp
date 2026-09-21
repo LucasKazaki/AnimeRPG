@@ -1,5 +1,6 @@
 #include "Engine/Platform/Win32Application.h"
 
+#include "Engine/Core/BenchmarkRunControl.h"
 #include "Engine/Core/Clock.h"
 #include "Engine/Core/FramePhaseTimingCapture.h"
 #include "Engine/Core/Logger.h"
@@ -180,6 +181,16 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
 
 int Win32Application::Run() {
     Astral::Core::Clock clock;
+    Astral::Core::BenchmarkRunControl benchmarkRunControl;
+    std::string benchmarkError;
+    const auto benchmarkStatus = benchmarkRunControl.ConfigureFromEnvironment(
+        clock.FixedSimulationHz(), benchmarkError);
+    if (benchmarkStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid) {
+        std::fprintf(stderr, "Astral benchmark run-control configuration rejected: %s\n",
+            benchmarkError.c_str());
+        return 2;
+    }
+
     Astral::Core::FramePhaseTimingCapture phaseTimingCapture;
     std::string phaseTimingError;
     const auto phaseTimingStatus = phaseTimingCapture.ConfigureFromEnvironment(phaseTimingError);
@@ -192,9 +203,14 @@ int Win32Application::Run() {
     double fpsAccumulator = 0.0;
     int frameCount = 0;
     std::uint64_t phaseFrameIndex = 0;
+    bool benchmarkFrameLimitReached = false;
     using PhaseClock = std::chrono::steady_clock;
     const auto toMilliseconds = [](PhaseClock::duration duration) {
         return std::chrono::duration<double, std::milli>(duration).count();
+    };
+    const auto keyDown = [&benchmarkRunControl](int virtualKey) {
+        return !benchmarkRunControl.SuppressLiveInput()
+            && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
     };
 
     while (message.message != WM_QUIT) {
@@ -226,37 +242,37 @@ int Win32Application::Run() {
             frameCount = 0;
         }
 
-        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
+        if (keyDown(VK_ESCAPE)) {
             PostMessageW(window_, WM_CLOSE, 0, 0);
         }
 
         const float simulationDelta = thoughtCommands_.ScaleDelta(deltaSeconds);
         const Scene::MovementInput input{
-            (GetAsyncKeyState('W') & 0x8000) != 0,
-            (GetAsyncKeyState('S') & 0x8000) != 0,
-            (GetAsyncKeyState('A') & 0x8000) != 0,
-            (GetAsyncKeyState('D') & 0x8000) != 0,
+            keyDown('W'),
+            keyDown('S'),
+            keyDown('A'),
+            keyDown('D'),
         };
         playerController_.Update(input, simulationDelta);
         camera_.Follow(playerController_.TransformState());
         combatSandbox_.AdvanceTime(simulationDelta);
         shadowbladeActions_.AdvanceTime(simulationDelta);
 
-        const bool physicalGuarding = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
+        const bool physicalGuarding = keyDown(VK_LSHIFT);
         const bool effectiveGuarding = physicalGuarding
             || thoughtCommands_.IsCommandGuardActive();
         const bool guardChanged = effectiveGuarding != shadowbladeActions_.IsGuarding();
         thoughtCommands_.ApplyGuardState(physicalGuarding, shadowbladeActions_);
         const bool guarding = shadowbladeActions_.IsGuarding();
 
-        const bool lightAttackDown = (GetAsyncKeyState('J') & 0x8000) != 0;
-        const bool heavyAttackDown = (GetAsyncKeyState('K') & 0x8000) != 0;
-        const bool dashDown = (GetAsyncKeyState('Q') & 0x8000) != 0;
-        const bool fatalStrikeDown = (GetAsyncKeyState('L') & 0x8000) != 0;
-        const bool interactDown = (GetAsyncKeyState('E') & 0x8000) != 0;
+        const bool lightAttackDown = keyDown('J');
+        const bool heavyAttackDown = keyDown('K');
+        const bool dashDown = keyDown('Q');
+        const bool fatalStrikeDown = keyDown('L');
+        const bool interactDown = keyDown('E');
         bool commandDown[6]{};
         for (int index = 0; index < 6; ++index) {
-            commandDown[index] = (GetAsyncKeyState('0' + index) & 0x8000) != 0;
+            commandDown[index] = keyDown('0' + index);
         }
         bool attacked = false;
         bool shadowAction = false;
@@ -356,14 +372,41 @@ int Win32Application::Run() {
                 toMilliseconds(afterWait - afterRender));
         }
         ++phaseFrameIndex;
+
+        if (benchmarkRunControl.Enabled() && benchmarkRunControl.CompleteFrame()) {
+            benchmarkFrameLimitReached = true;
+            break;
+        }
     }
 
+    bool phaseTimingPublished = true;
     if (phaseTimingCapture.Enabled()) {
         std::string error;
         if (!phaseTimingCapture.Flush(error)) {
             std::fprintf(stderr, "Astral frame phase timing capture was not published: %s\n",
                 error.c_str());
+            phaseTimingPublished = false;
         }
+    }
+
+    if (benchmarkRunControl.Enabled()) {
+        if (!benchmarkFrameLimitReached) {
+            std::fprintf(stderr,
+                "Astral benchmark ended before the exact warmup plus measured frame limit\n");
+            return 3;
+        }
+        if (!phaseTimingPublished) {
+            std::fprintf(stderr,
+                "Astral benchmark frame limit completed but phase timing publication failed\n");
+            return 4;
+        }
+        std::string error;
+        if (!benchmarkRunControl.FlushCompletion(error)) {
+            std::fprintf(stderr, "Astral benchmark control receipt was not published: %s\n",
+                error.c_str());
+            return 5;
+        }
+        return 0;
     }
 
     return static_cast<int>(message.wParam);

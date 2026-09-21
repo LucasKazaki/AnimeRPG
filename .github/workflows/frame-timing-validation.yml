@@ -5,6 +5,8 @@ on:
   pull_request:
     paths:
       - "CMakeLists.txt"
+      - "Engine/Core/BenchmarkRunControl.cpp"
+      - "Engine/Core/BenchmarkRunControl.h"
       - "Engine/Core/Clock.cpp"
       - "Engine/Core/Clock.h"
       - "Engine/Core/FramePhaseTimingCapture.cpp"
@@ -21,11 +23,14 @@ on:
       - "Scripts/analyze_process_memory_capture.py"
       - "Scripts/benchmark_environment.py"
       - "Scripts/test_benchmark_environment.py"
+      - "Scripts/test_benchmark_run_control.py"
       - "Scripts/test_benchmark_stream_coherence.py"
       - "Scripts/test_frame_phase_timing_analysis.py"
       - "Scripts/test_frame_timing_analysis.py"
       - "Scripts/test_process_memory_analysis.py"
+      - "Scripts/verify_benchmark_run_control.py"
       - "Scripts/verify_benchmark_stream_coherence.py"
+      - "Tests/BenchmarkRunControlTests.cpp"
       - "Tests/FramePhaseTimingCaptureTests.cpp"
       - "Tests/FrameTimingCaptureTests.cpp"
       - "Tests/ProcessMemoryCaptureTests.cpp"
@@ -36,6 +41,8 @@ on:
     branches: [main]
     paths:
       - "CMakeLists.txt"
+      - "Engine/Core/BenchmarkRunControl.cpp"
+      - "Engine/Core/BenchmarkRunControl.h"
       - "Engine/Core/Clock.cpp"
       - "Engine/Core/Clock.h"
       - "Engine/Core/FramePhaseTimingCapture.cpp"
@@ -52,11 +59,14 @@ on:
       - "Scripts/analyze_process_memory_capture.py"
       - "Scripts/benchmark_environment.py"
       - "Scripts/test_benchmark_environment.py"
+      - "Scripts/test_benchmark_run_control.py"
       - "Scripts/test_benchmark_stream_coherence.py"
       - "Scripts/test_frame_phase_timing_analysis.py"
       - "Scripts/test_frame_timing_analysis.py"
       - "Scripts/test_process_memory_analysis.py"
+      - "Scripts/verify_benchmark_run_control.py"
       - "Scripts/verify_benchmark_stream_coherence.py"
+      - "Tests/BenchmarkRunControlTests.cpp"
       - "Tests/FramePhaseTimingCaptureTests.cpp"
       - "Tests/FrameTimingCaptureTests.cpp"
       - "Tests/ProcessMemoryCaptureTests.cpp"
@@ -85,6 +95,7 @@ jobs:
           python Scripts/test_process_memory_analysis.py
           python Scripts/test_benchmark_stream_coherence.py
           python Scripts/test_benchmark_environment.py
+          python Scripts/test_benchmark_run_control.py
 
       - name: Debug and optimized Release profiling capture contracts
         shell: bash

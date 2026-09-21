@@ -15,6 +15,7 @@ public:
     ~Clock();
     float Tick();
     double ElapsedSeconds() const;
+    std::uint32_t FixedSimulationHz() const noexcept { return simulationTimeStep_.FixedHz(); }
 
 private:
     std::chrono::steady_clock::time_point lastTick_;

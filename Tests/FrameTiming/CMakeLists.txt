@@ -37,8 +37,14 @@ add_executable(AstralSimulationTimeStepTests
 )
 target_include_directories(AstralSimulationTimeStepTests PRIVATE ../..)
 
+add_executable(AstralBenchmarkRunControlTests
+    ../../Engine/Core/BenchmarkRunControl.cpp
+    ../BenchmarkRunControlTests.cpp
+)
+target_include_directories(AstralBenchmarkRunControlTests PRIVATE ../..)
+
 if(ASTRAL_FRAME_TIMING_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    foreach(target AstralFrameTimingTests AstralFramePhaseTimingTests AstralProcessMemoryTests AstralSimulationTimeStepTests)
+    foreach(target AstralFrameTimingTests AstralFramePhaseTimingTests AstralProcessMemoryTests AstralSimulationTimeStepTests AstralBenchmarkRunControlTests)
         target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
         target_link_options(${target} PRIVATE -fsanitize=address,undefined)
     endforeach()
@@ -49,3 +55,4 @@ add_test(NAME AstralFrameTimingTests COMMAND AstralFrameTimingTests)
 add_test(NAME AstralFramePhaseTimingTests COMMAND AstralFramePhaseTimingTests)
 add_test(NAME AstralProcessMemoryTests COMMAND AstralProcessMemoryTests)
 add_test(NAME AstralSimulationTimeStepTests COMMAND AstralSimulationTimeStepTests)
+add_test(NAME AstralBenchmarkRunControlTests COMMAND AstralBenchmarkRunControlTests)
