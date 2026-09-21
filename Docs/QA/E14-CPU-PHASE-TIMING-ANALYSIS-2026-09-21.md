@@ -1,18 +1,27 @@
 # E14 QA: main-thread phase timing analysis, 2026-09-21
 
-Status: implementation checkpoint for draft PR #9. No native Windows GUI benchmark, accepted performance budget, matched Unreal/Unity result, or independent acceptance is claimed by this record.
+Status: hosted implementation checkpoint for draft PR #9. No native Windows GUI benchmark, accepted performance budget, matched Unreal/Unity result, or independent acceptance is claimed by this record.
 
 ## Scope and provenance
 
 - Repository: `LucasKazaki/AnimeRPG`
 - Branch: `repair/2026-09-20-r0-runner-safety`
 - Pre-packet head: `6fe02ad75d943a048398d781091ef6c65d00379f`
+- Hosted implementation candidate: `ad338b0e12f6bfff0693b78071586ce246f96afb`
 - Stacked base: `e12e6c559bf776ffc9c715c809a517f8e02ce5d5`
 - Packet: `Tasks/E14-CPU-PHASE-TIMING-ANALYSIS-2026-09-21.md`
 
-This packet is restricted to five allowed paths: the new phase analyzer, its Python regression suite, the existing frame-timing workflow, this QA record, and the task contract. It does not edit Engine/Game/CMake source, alter the renderer or graphics API, import a dependency, change package authority, touch Company Runtime state, restart content work, merge, release, deploy, or invoke R0.
+The implementation candidate is exactly five commits ahead of the pre-packet head and changes exactly five allowed paths:
 
-PR #9 remained open/draft at packet admission and issue #7 remained open. The capability map is still on separate unmerged PR #8, where E14 profiling remains partial and E17 comparative acceptance remains unresolved.
+- `Scripts/analyze_frame_phase_timing_capture.py`
+- `Scripts/test_frame_phase_timing_analysis.py`
+- `.github/workflows/frame-timing-validation.yml`
+- `Tasks/E14-CPU-PHASE-TIMING-ANALYSIS-2026-09-21.md`
+- `Docs/QA/E14-CPU-PHASE-TIMING-ANALYSIS-2026-09-21.md`
+
+The GitHub compare from `6fe02ad75d943a048398d781091ef6c65d00379f` to `ad338b0e12f6bfff0693b78071586ce246f96afb` reports `ahead_by=5`, `behind_by=0`, with no paths outside that set. This packet does not edit Engine/Game/CMake source, alter the renderer or graphics API, import a dependency, change package authority, touch Company Runtime state, restart content work, merge, release, deploy, or invoke R0.
+
+PR #9 remained open/draft and issue #7 remained open. The capability map is still on separate unmerged PR #8, where E14 profiling remains partial and E17 comparative acceptance remains unresolved.
 
 ## Research basis
 
@@ -46,22 +55,44 @@ python -m py_compile /tmp/analyze_frame_phase_timing_capture.py /tmp/test_frame_
 cd /tmp && python test_frame_phase_timing_analysis.py
 ```
 
-Results before publication:
+Final re-run results for the published source content:
 
 - compile check: PASS, exit 0;
 - 13 tests discovered;
 - 10 parser/output/mutation tests: PASS;
 - 3 production-binding tests: intentional SKIP because repository manifest modules were absent from the partial fixture;
-- overall: `OK (skipped=3)`, exit 0, approximately 0.079 s;
+- overall: `OK (skipped=3)`, exit 0, approximately 0.071 s;
 - 250 seeded one-byte mutations either failed closed or revalidated against the complete schema/invariant set.
 
 This is tooling execution only. It is not Windows evidence, native GUI execution, GPU evidence, a package launch, or an independent review.
 
-## Hosted verification gate
+## Hosted complete-repository verification
 
-The complete repository workflow must run `Scripts/test_frame_phase_timing_analysis.py` so all 13 tests execute, including integration with production `release_manifest.py` and `benchmark_manifest.py`, tampered raw-evidence rejection and exact candidate identity checks. The existing whole-frame analyzer tests plus Debug/optimized Release C++ capture contracts and Clang ASan+UBSan/leak checks must remain green. No test may be weakened to obtain a pass.
+All three pull-request workflows associated with exact implementation candidate `ad338b0e12f6bfff0693b78071586ce246f96afb` completed successfully.
 
-Hosted source/build success still does not establish the registered local Windows GUI measurement, capture overhead, clean-machine launch, GPU timing, RAM/VRAM budget, continuous 86,400-second soak or independent acceptance.
+### Frame timing portability
+
+GitHub Actions run `35573072791`, job `106248709713`, `ubuntu-24.04`, conclusion `success`.
+
+Successful executable steps:
+
+- `Verify frame timing analyses and production provenance binding`, which runs both `Scripts/test_frame_timing_analysis.py` and the new `Scripts/test_frame_phase_timing_analysis.py` from the complete repository checkout;
+- Debug and optimized Release C++ capture contracts;
+- Clang AddressSanitizer + UndefinedBehaviorSanitizer capture contracts with leak checking.
+
+Because the complete checkout contains `benchmark_manifest.py` and `release_manifest.py`, the new production-binding test class is importable and this step exercises the real production manifest/package binding rather than the partial-fixture skip path. The structured Actions metadata records the combined analysis step as successful. This QA record does not invent stdout lines or per-test counts not exposed by the structured job response.
+
+### Windows production regression
+
+GitHub Actions run `35573072614`, job `106248724488`, `windows-2022`, conclusion `success`. Every executable step completed successfully: R0 parser/safety contracts, PE dependency contracts, prerequisite/runtime/bootstrap contracts, Release assertion/CTest safety, Visual Studio 2022 x64 configuration, Debug build and deterministic tests, Release build and deterministic tests, dependency/prerequisite/runtime inspection, milestone verifiers and clean tracked-tree check. R0 itself was not invoked; only its safety contracts ran.
+
+This confirms the analyzer/workflow packet did not regress the production Windows build/test lane. It does not establish a native interactive benchmark or package launch.
+
+### Package/provenance regression
+
+GitHub Actions run `35573072622`, job `106248727168`, `windows-2022`, conclusion `success`. Manifest, package runtime-receipt, restart-stress, continuous-soak receipt, soak-analysis, benchmark-manifest and PE reproducibility diagnostic contracts all passed. The same Release candidate was built twice and classified byte-identical; exact package staging/verification, hosted benchmark-manifest fixture and clean tracked-tree checks also passed.
+
+These hosted checks validate contracts and build/provenance integration only. They do not substitute for registered local GUI execution, clean-machine launch, actual GPU behavior, the continuous 86,400-second soak, or independent acceptance.
 
 ## Registered local executor handoff
 
@@ -73,4 +104,4 @@ Bind the immutable phase CSV into the benchmark manifest using role `cpu_phase_t
 
 GPU timestamps, hierarchical or worker/render-thread attribution, RAM/VRAM budgets, approved thresholds, matched UE5/Unity 3D and genuine-2D workloads, clean-machine package launch, failure-recovery stress, the required 86,400-second soak and independent acceptance remain unresolved.
 
-Next: obtain hosted complete-repository verification for this exact candidate. If green, the next native action remains the 3,600-sample registered-Windows run and immutable phase analysis. If native execution is still unavailable, a later independent E14 packet can research GPU timestamp feasibility for Astral's current graphics architecture without changing that architecture or adding dependencies.
+The single next useful native action is the 3,600-sample registered-Windows run followed by immutable phase analysis. If native execution is still unavailable to the coordinator, the next independent E14 research packet should address GPU timestamp feasibility for Astral's current graphics architecture without changing that architecture or adding dependencies.
