@@ -324,7 +324,7 @@ bool BenchmarkRunControl::FlushCompletion(std::string& error) {
     }
     stream
         << "{\n"
-        << "  \"schema_version\": 2,\n"
+        << "  \"schema_version\": 3,\n"
         << "  \"mode\": \"fixed_frame_count\",\n"
         << "  \"simulation_fixed_hz\": " << config_.simulationFixedHz << ",\n"
         << "  \"warmup_frames\": " << config_.warmupFrames << ",\n"
@@ -340,6 +340,9 @@ bool BenchmarkRunControl::FlushCompletion(std::string& error) {
             ? "environment_requested_and_verified" : "configured_contract")
         << "\",\n"
         << "  \"window_mode\": \"windowed\",\n"
+        << "  \"presentation_backend\": \"win32_gdi_window_dc\",\n"
+        << "  \"vsync_control\": \"unavailable_in_gdi_path\",\n"
+        << "  \"frame_pacing\": \"sleep_1ms_not_refresh_locked\",\n"
         << "  \"live_input\": \"suppressed\",\n"
         << "  \"termination\": \"exact_frame_limit\",\n"
         << "  \"performance_budget_verified\": false,\n"
