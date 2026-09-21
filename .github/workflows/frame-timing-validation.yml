@@ -12,7 +12,9 @@ on:
       - "Engine/Core/FrameTimingCapture.cpp"
       - "Engine/Core/FrameTimingCapture.h"
       - "Engine/Platform/Win32Application.cpp"
+      - "Scripts/analyze_frame_phase_timing_capture.py"
       - "Scripts/analyze_frame_timing_capture.py"
+      - "Scripts/test_frame_phase_timing_analysis.py"
       - "Scripts/test_frame_timing_analysis.py"
       - "Tests/FramePhaseTimingCaptureTests.cpp"
       - "Tests/FrameTimingCaptureTests.cpp"
@@ -29,7 +31,9 @@ on:
       - "Engine/Core/FrameTimingCapture.cpp"
       - "Engine/Core/FrameTimingCapture.h"
       - "Engine/Platform/Win32Application.cpp"
+      - "Scripts/analyze_frame_phase_timing_capture.py"
       - "Scripts/analyze_frame_timing_capture.py"
+      - "Scripts/test_frame_phase_timing_analysis.py"
       - "Scripts/test_frame_timing_analysis.py"
       - "Tests/FramePhaseTimingCaptureTests.cpp"
       - "Tests/FrameTimingCaptureTests.cpp"
@@ -50,8 +54,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Verify frame timing analysis and production provenance binding
-        run: python Scripts/test_frame_timing_analysis.py
+      - name: Verify frame timing analyses and production provenance binding
+        run: |
+          python Scripts/test_frame_timing_analysis.py
+          python Scripts/test_frame_phase_timing_analysis.py
 
       - name: Debug and optimized Release capture contracts
         shell: bash
