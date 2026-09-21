@@ -15,6 +15,8 @@ on:
       - "Engine/Core/FrameTimingCapture.h"
       - "Engine/Core/ProcessMemoryCapture.cpp"
       - "Engine/Core/ProcessMemoryCapture.h"
+      - "Engine/Core/ProfilingCaptureStateReceipt.cpp"
+      - "Engine/Core/ProfilingCaptureStateReceipt.h"
       - "Engine/Core/SimulationTimeStep.cpp"
       - "Engine/Core/SimulationTimeStep.h"
       - "Engine/Platform/Win32Application.cpp"
@@ -30,12 +32,15 @@ on:
       - "Scripts/test_frame_phase_timing_analysis.py"
       - "Scripts/test_frame_timing_analysis.py"
       - "Scripts/test_process_memory_analysis.py"
+      - "Scripts/test_profiling_capture_state.py"
       - "Scripts/verify_benchmark_run_control.py"
       - "Scripts/verify_benchmark_stream_coherence.py"
+      - "Scripts/verify_profiling_capture_state.py"
       - "Tests/BenchmarkRunControlTests.cpp"
       - "Tests/FramePhaseTimingCaptureTests.cpp"
       - "Tests/FrameTimingCaptureTests.cpp"
       - "Tests/ProcessMemoryCaptureTests.cpp"
+      - "Tests/ProfilingCaptureStateReceiptTests.cpp"
       - "Tests/SimulationTimeStepTests.cpp"
       - "Tests/FrameTiming/**"
       - ".github/workflows/frame-timing-validation.yml"
@@ -53,6 +58,8 @@ on:
       - "Engine/Core/FrameTimingCapture.h"
       - "Engine/Core/ProcessMemoryCapture.cpp"
       - "Engine/Core/ProcessMemoryCapture.h"
+      - "Engine/Core/ProfilingCaptureStateReceipt.cpp"
+      - "Engine/Core/ProfilingCaptureStateReceipt.h"
       - "Engine/Core/SimulationTimeStep.cpp"
       - "Engine/Core/SimulationTimeStep.h"
       - "Engine/Platform/Win32Application.cpp"
@@ -68,12 +75,15 @@ on:
       - "Scripts/test_frame_phase_timing_analysis.py"
       - "Scripts/test_frame_timing_analysis.py"
       - "Scripts/test_process_memory_analysis.py"
+      - "Scripts/test_profiling_capture_state.py"
       - "Scripts/verify_benchmark_run_control.py"
       - "Scripts/verify_benchmark_stream_coherence.py"
+      - "Scripts/verify_profiling_capture_state.py"
       - "Tests/BenchmarkRunControlTests.cpp"
       - "Tests/FramePhaseTimingCaptureTests.cpp"
       - "Tests/FrameTimingCaptureTests.cpp"
       - "Tests/ProcessMemoryCaptureTests.cpp"
+      - "Tests/ProfilingCaptureStateReceiptTests.cpp"
       - "Tests/SimulationTimeStepTests.cpp"
       - "Tests/FrameTiming/**"
       - ".github/workflows/frame-timing-validation.yml"
@@ -94,12 +104,18 @@ jobs:
 
       - name: Verify profiling analyses and production provenance binding
         run: |
+          python -m py_compile \
+            Scripts/verify_profiling_capture_state.py \
+            Scripts/test_profiling_capture_state.py \
+            Scripts/verify_benchmark_capture_pair.py \
+            Scripts/test_benchmark_capture_pair.py
           python Scripts/test_frame_timing_analysis.py
           python Scripts/test_frame_phase_timing_analysis.py
           python Scripts/test_process_memory_analysis.py
           python Scripts/test_benchmark_stream_coherence.py
           python Scripts/test_benchmark_environment.py
           python Scripts/test_benchmark_run_control.py
+          python Scripts/test_profiling_capture_state.py
           python Scripts/test_benchmark_capture_pair.py
 
       - name: Debug and optimized Release profiling capture contracts

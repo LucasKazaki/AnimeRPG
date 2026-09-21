@@ -41,9 +41,80 @@ def receipt() -> dict:
     }
 
 
+def capture_receipt(profiled: bool) -> dict:
+    def frame(name: str) -> dict:
+        if profiled:
+            return {
+                "state": "enabled",
+                "output_path": f"{name}.csv",
+                "warmup_frames": 120,
+                "max_samples": 3600,
+            }
+        return {
+            "state": "not_requested",
+            "output_path": None,
+            "warmup_frames": None,
+            "max_samples": None,
+        }
+
+    memory = (
+        {
+            "state": "enabled",
+            "output_path": "memory.csv",
+            "warmup_frames": 120,
+            "sample_every_frames": 10,
+            "max_samples": 360,
+            "sample_source": "windows_process_counters",
+        }
+        if profiled
+        else {
+            "state": "not_requested",
+            "output_path": None,
+            "warmup_frames": None,
+            "sample_every_frames": None,
+            "max_samples": None,
+            "sample_source": None,
+        }
+    )
+    return {
+        "schema_version": 1,
+        "capture_state_semantics": "post_configuration_pre_frame_loop",
+        "environment_scope": "known_astral_profiling_controls_only",
+        "raw_environment_dumped": False,
+        "run_control": {
+            "simulation_fixed_hz": 60,
+            "warmup_frames": 120,
+            "measured_frames": 3600,
+            "total_frames": 3720,
+            "client_width_px": 1920,
+            "client_height_px": 1080,
+            "window_mode": "windowed",
+            "vsync_requested": False,
+            "presentation_backend": "win32_gdi_window_dc",
+            "vsync_control": "unavailable_in_gdi_path",
+            "frame_pacing": "sleep_1ms_not_refresh_locked",
+            "live_input": "suppressed",
+            "termination": "exact_frame_limit",
+        },
+        "streams": {
+            "cpu_frame_timing": frame("frame"),
+            "cpu_phase_timing": frame("phase"),
+            "process_memory": memory,
+        },
+        "claim_boundaries": {
+            "instrumentation_overhead_verified": False,
+            "performance_budget_verified": False,
+            "gpu_timing_verified": False,
+            "comparative_parity_verified": False,
+            "independent_acceptance": False,
+        },
+    }
+
+
 def spec(profiled: bool) -> dict:
     evidence = [
         {"path": "benchmark-control.json", "role": "benchmark_run_control_json"},
+        {"path": "capture-state.json", "role": "profiling_capture_state_json"},
         {"path": "astral.log", "role": "engine_log"},
     ]
     if profiled:
@@ -112,6 +183,9 @@ class Fixture:
         (root / "benchmark-control.json").write_text(
             json.dumps(receipt(), indent=2) + "\n", encoding="utf-8"
         )
+        (root / "capture-state.json").write_text(
+            json.dumps(capture_receipt(profiled), indent=2) + "\n", encoding="utf-8"
+        )
         (root / "astral.log").write_text("fixture\n", encoding="utf-8")
         if profiled:
             (root / "frame.csv").write_text("fixture-frame\n", encoding="utf-8")
@@ -159,11 +233,20 @@ class CapturePairVerificationTests(unittest.TestCase):
             fx = Fixture(Path(td))
             report = fx.verify()
             self.assertTrue(report["capture_pairing_verified"])
+            self.assertTrue(report["startup_capture_state_verified"])
             self.assertEqual(report["candidate_commit"], COMMIT)
             self.assertEqual(
                 report["profiled_capture_roles"], sorted(pair.PROFILE_ROLES)
             )
             self.assertEqual(report["control_capture_roles"], [])
+            self.assertEqual(
+                report["profiled_startup_streams"]["cpu_frame_timing"]["state"],
+                "enabled",
+            )
+            self.assertEqual(
+                report["control_startup_streams"]["cpu_frame_timing"]["state"],
+                "not_requested",
+            )
             self.assertFalse(
                 report["acceptance"]["instrumentation_overhead_verified"]
             )
@@ -192,6 +275,28 @@ class CapturePairVerificationTests(unittest.TestCase):
                 {"path": "frame-2.csv", "role": "cpu_frame_timing_csv"}
             )
             fx.rebuild_profiled(duplicate)
+            with self.assertRaises(pair.CapturePairError):
+                fx.verify()
+
+    def test_startup_capture_state_is_required_and_must_match_mode(self):
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            missing = spec(True)
+            missing["evidence"] = [
+                item for item in missing["evidence"]
+                if item["role"] != "profiling_capture_state_json"
+            ]
+            fx.rebuild_profiled(missing)
+            with self.assertRaises(pair.CapturePairError):
+                fx.verify()
+
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            wrong_mode = capture_receipt(False)
+            (fx.profiled_evidence / "capture-state.json").write_text(
+                json.dumps(wrong_mode, indent=2) + "\n", encoding="utf-8"
+            )
+            fx.rebuild_profiled()
             with self.assertRaises(pair.CapturePairError):
                 fx.verify()
 
