@@ -1,6 +1,7 @@
 #include "Engine/Core/Clock.h"
 
 #include <cstdio>
+#include <stdexcept>
 #include <string>
 
 namespace Astral::Core {
@@ -17,6 +18,12 @@ Clock::Clock() : lastTick_(std::chrono::steady_clock::now()), start_(lastTick_) 
     if (memoryStatus == ProcessMemoryEnvironmentStatus::Invalid) {
         std::fprintf(stderr, "Astral process memory capture configuration rejected: %s\n",
             error.c_str());
+    }
+
+    error.clear();
+    const auto timeStepStatus = simulationTimeStep_.ConfigureFromEnvironment(error);
+    if (timeStepStatus == SimulationTimeStepEnvironmentStatus::Invalid) {
+        throw std::runtime_error("Astral simulation time-step configuration rejected: " + error);
     }
 }
 
@@ -40,10 +47,10 @@ Clock::~Clock() {
 
 float Clock::Tick() {
     const auto now = std::chrono::steady_clock::now();
-    const auto delta = std::chrono::duration<float>(now - lastTick_).count();
+    const auto wallDelta = std::chrono::duration<float>(now - lastTick_).count();
     lastTick_ = now;
     if (frameTimingCapture_.Enabled()) {
-        frameTimingCapture_.Record(frameIndex_, static_cast<double>(delta) * 1000.0);
+        frameTimingCapture_.Record(frameIndex_, static_cast<double>(wallDelta) * 1000.0);
     }
     if (processMemoryCapture_.Enabled()
         && !processMemoryCapture_.RecordCurrentProcess(frameIndex_)
@@ -53,7 +60,7 @@ float Clock::Tick() {
         processMemoryFailureReported_ = true;
     }
     ++frameIndex_;
-    return delta;
+    return simulationTimeStep_.Resolve(wallDelta);
 }
 
 double Clock::ElapsedSeconds() const {

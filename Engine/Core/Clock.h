@@ -2,6 +2,7 @@
 
 #include "Engine/Core/FrameTimingCapture.h"
 #include "Engine/Core/ProcessMemoryCapture.h"
+#include "Engine/Core/SimulationTimeStep.h"
 
 #include <chrono>
 #include <cstdint>
@@ -21,6 +22,7 @@ private:
     std::uint64_t frameIndex_ = 0;
     FrameTimingCapture frameTimingCapture_;
     ProcessMemoryCapture processMemoryCapture_;
+    SimulationTimeStep simulationTimeStep_;
     bool processMemoryFailureReported_ = false;
 };
 
