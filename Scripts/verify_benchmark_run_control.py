@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import sys
@@ -61,6 +62,24 @@ def _load_json(path: Path, limit: int, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise BenchmarkRunControlError(f"{label} root must be an object")
     return value
+
+
+def _duration_frames(value: Any, fixed_hz: int, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise BenchmarkRunControlError(f"{label} must be numeric")
+    try:
+        seconds = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise BenchmarkRunControlError(f"{label} must be finite numeric seconds") from exc
+    if not seconds.is_finite() or seconds < 0:
+        raise BenchmarkRunControlError(f"{label} must be finite non-negative seconds")
+    frames = seconds * Decimal(fixed_hz)
+    integral = frames.to_integral_value()
+    if frames != integral:
+        raise BenchmarkRunControlError(
+            f"{label} does not map to an exact integer frame count at {fixed_hz} Hz"
+        )
+    return int(integral)
 
 
 def validate_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
@@ -123,6 +142,33 @@ def validate_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
     return dict(receipt)
 
 
+def _validate_protocol_coherence(protocol: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any]:
+    fixed_hz = receipt["simulation_fixed_hz"]
+    warmup_seconds = protocol.get("warmup_seconds")
+    sample_seconds = protocol.get("sample_seconds")
+    expected_warmup_frames = _duration_frames(
+        warmup_seconds, fixed_hz, "benchmark protocol warmup_seconds"
+    )
+    expected_measured_frames = _duration_frames(
+        sample_seconds, fixed_hz, "benchmark protocol sample_seconds"
+    )
+    if expected_warmup_frames != receipt["warmup_frames"]:
+        raise BenchmarkRunControlError(
+            "run-control warmup frame count does not match benchmark protocol duration"
+        )
+    if expected_measured_frames != receipt["measured_frames"]:
+        raise BenchmarkRunControlError(
+            "run-control measured frame count does not match benchmark protocol duration"
+        )
+    return {
+        "warmup_seconds": warmup_seconds,
+        "sample_seconds": sample_seconds,
+        "warmup_frames": expected_warmup_frames,
+        "measured_frames": expected_measured_frames,
+        "simulation_fixed_hz": fixed_hz,
+    }
+
+
 def verify(
     manifest_path: Path,
     package_root: Path,
@@ -162,10 +208,12 @@ def verify(
         raise BenchmarkRunControlError("run-control client height does not match benchmark protocol")
     if receipt["window_mode"] != protocol.get("window_mode"):
         raise BenchmarkRunControlError("run-control window mode does not match benchmark protocol")
+    duration = _validate_protocol_coherence(protocol, receipt)
 
     return {
         "schema_version": 1,
         "benchmark_run_control_verified": True,
+        "benchmark_duration_protocol_coherent": True,
         "candidate_commit": benchmark_report["candidate_commit"],
         "executable_sha256": benchmark_report["executable_sha256"],
         "benchmark_descriptor_sha256": benchmark_report["benchmark_descriptor_sha256"],
@@ -173,6 +221,8 @@ def verify(
         "simulation_fixed_hz": receipt["simulation_fixed_hz"],
         "warmup_frames": receipt["warmup_frames"],
         "measured_frames": receipt["measured_frames"],
+        "warmup_seconds": duration["warmup_seconds"],
+        "sample_seconds": duration["sample_seconds"],
         "total_frames": receipt["total_frames"],
         "completed_frames": receipt["completed_frames"],
         "client_width_px": receipt["client_width_px"],
@@ -189,7 +239,8 @@ def verify(
             "independent_acceptance": False,
         },
         "limitations": [
-            "The fixed simulation rate and explicitly requested, observed stable render-client area are bound transitively to the benchmark descriptor through the SHA-256-bound run-control receipt evidence.",
+            "The fixed simulation rate, exact frame counts, descriptor-declared warmup/sample durations, and explicitly requested stable render-client area are bound and checked for mutual consistency through the SHA-256-bound run-control receipt evidence.",
+            "VSync remains a benchmark-descriptor setting rather than a runtime-proven run-control field in the current GDI path.",
             "This verifier proves run-control/package/protocol/evidence consistency only; it does not prove GPU timing, performance budgets, matched Unreal/Unity workloads, clean-machine compatibility, or independent acceptance.",
         ],
     }
