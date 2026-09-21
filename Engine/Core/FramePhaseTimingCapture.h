@@ -36,6 +36,7 @@ public:
     bool Configure(const FramePhaseTimingCaptureConfig& config, std::string& error);
     FramePhaseTimingEnvironmentStatus ConfigureFromEnvironment(std::string& error);
     bool Enabled() const noexcept;
+    const FramePhaseTimingCaptureConfig& Config() const noexcept { return config_; }
     bool Record(std::uint64_t frameIndex, double messagePumpMs, double updateControlMs,
         double renderSubmitMs, double frameWaitMs) noexcept;
     bool Flush(std::string& error);
