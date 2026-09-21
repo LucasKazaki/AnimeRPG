@@ -170,9 +170,12 @@ void TestExactFrameCompletionAndReceipt() {
     CHECK(std::filesystem::exists(receipt));
     CHECK(!std::filesystem::exists(receipt.string() + ".partial"));
 
-    std::ifstream stream(receipt);
-    const std::string text((std::istreambuf_iterator<char>(stream)),
-        std::istreambuf_iterator<char>());
+    std::string text;
+    {
+        std::ifstream stream(receipt);
+        CHECK(stream.good());
+        text.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+    }
     CHECK(text.find("\"simulation_fixed_hz\": 60") != std::string::npos);
     CHECK(text.find("\"warmup_frames\": 2") != std::string::npos);
     CHECK(text.find("\"measured_frames\": 3") != std::string::npos);
