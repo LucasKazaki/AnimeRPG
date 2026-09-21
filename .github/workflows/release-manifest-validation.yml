@@ -16,6 +16,8 @@ on:
       - "Scripts/test_package_restart_stress.py"
       - "Scripts/run_package_continuous_soak.py"
       - "Scripts/test_package_continuous_soak.py"
+      - "Scripts/analyze_package_soak_telemetry.py"
+      - "Scripts/test_package_soak_telemetry_analysis.py"
       - ".github/workflows/release-manifest-validation.yml"
 
 permissions:
@@ -43,6 +45,9 @@ jobs:
 
       - name: Verify package continuous-soak receipt contracts
         run: python Scripts/test_package_continuous_soak.py
+
+      - name: Verify package soak-analysis contracts
+        run: python Scripts/test_package_soak_telemetry_analysis.py
 
       - name: Configure and build Release executable
         shell: pwsh
