@@ -46,6 +46,75 @@ bool ParseUnsigned(std::wstring_view text, std::uint64_t maximum, std::uint64_t&
 
 namespace Astral::Core {
 
+BenchmarkRunControlEnvironmentStatus BenchmarkRunControl::RequestedClientAreaFromEnvironment(
+    std::uint32_t& widthPx,
+    std::uint32_t& heightPx,
+    std::string& error) {
+    error.clear();
+    widthPx = 0;
+    heightPx = 0;
+
+#ifdef _WIN32
+    const wchar_t* mode = _wgetenv(L"ASTRAL_BENCHMARK_MODE");
+    const wchar_t* width = _wgetenv(L"ASTRAL_BENCHMARK_CLIENT_WIDTH_PX");
+    const wchar_t* height = _wgetenv(L"ASTRAL_BENCHMARK_CLIENT_HEIGHT_PX");
+    if (mode == nullptr) {
+        if (width != nullptr || height != nullptr) {
+            error = "ASTRAL_BENCHMARK_MODE is required when benchmark client dimensions are present";
+            return BenchmarkRunControlEnvironmentStatus::Invalid;
+        }
+        return BenchmarkRunControlEnvironmentStatus::NotRequested;
+    }
+    if (std::wstring_view(mode) != L"1") {
+        error = "ASTRAL_BENCHMARK_MODE must be exactly 1";
+        return BenchmarkRunControlEnvironmentStatus::Invalid;
+    }
+    if (width == nullptr || height == nullptr || width[0] == L'\0' || height[0] == L'\0') {
+        error = "benchmark mode requires client width and height";
+        return BenchmarkRunControlEnvironmentStatus::Invalid;
+    }
+    std::uint64_t requestedWidth = 0;
+    std::uint64_t requestedHeight = 0;
+    if (!ParseUnsigned(std::wstring_view(width), kHardMaxClientDimension, requestedWidth)
+        || !ParseUnsigned(std::wstring_view(height), kHardMaxClientDimension, requestedHeight)
+        || requestedWidth == 0 || requestedHeight == 0) {
+        error = "benchmark client dimensions must be unsigned decimals in [1, 16384]";
+        return BenchmarkRunControlEnvironmentStatus::Invalid;
+    }
+#else
+    const char* mode = std::getenv("ASTRAL_BENCHMARK_MODE");
+    const char* width = std::getenv("ASTRAL_BENCHMARK_CLIENT_WIDTH_PX");
+    const char* height = std::getenv("ASTRAL_BENCHMARK_CLIENT_HEIGHT_PX");
+    if (mode == nullptr) {
+        if (width != nullptr || height != nullptr) {
+            error = "ASTRAL_BENCHMARK_MODE is required when benchmark client dimensions are present";
+            return BenchmarkRunControlEnvironmentStatus::Invalid;
+        }
+        return BenchmarkRunControlEnvironmentStatus::NotRequested;
+    }
+    if (std::string_view(mode) != "1") {
+        error = "ASTRAL_BENCHMARK_MODE must be exactly 1";
+        return BenchmarkRunControlEnvironmentStatus::Invalid;
+    }
+    if (width == nullptr || height == nullptr || width[0] == '\0' || height[0] == '\0') {
+        error = "benchmark mode requires client width and height";
+        return BenchmarkRunControlEnvironmentStatus::Invalid;
+    }
+    std::uint64_t requestedWidth = 0;
+    std::uint64_t requestedHeight = 0;
+    if (!ParseUnsigned(std::string_view(width), kHardMaxClientDimension, requestedWidth)
+        || !ParseUnsigned(std::string_view(height), kHardMaxClientDimension, requestedHeight)
+        || requestedWidth == 0 || requestedHeight == 0) {
+        error = "benchmark client dimensions must be unsigned decimals in [1, 16384]";
+        return BenchmarkRunControlEnvironmentStatus::Invalid;
+    }
+#endif
+
+    widthPx = static_cast<std::uint32_t>(requestedWidth);
+    heightPx = static_cast<std::uint32_t>(requestedHeight);
+    return BenchmarkRunControlEnvironmentStatus::Enabled;
+}
+
 bool BenchmarkRunControl::Configure(
     const BenchmarkRunControlConfig& config, std::string& error) {
     error.clear();
@@ -53,6 +122,7 @@ bool BenchmarkRunControl::Configure(
     flushed_ = false;
     overrun_ = false;
     clientAreaInvalid_ = false;
+    explicitClientAreaRequested_ = false;
     completedFrames_ = 0;
     clientAreaObservations_ = 0;
     config_ = {};
@@ -110,21 +180,24 @@ BenchmarkRunControlEnvironmentStatus BenchmarkRunControl::ConfigureFromEnvironme
     std::string& error) {
     error.clear();
 
+    std::uint32_t requestedClientWidthPx = 0;
+    std::uint32_t requestedClientHeightPx = 0;
+    const auto requestedClientStatus = RequestedClientAreaFromEnvironment(
+        requestedClientWidthPx, requestedClientHeightPx, error);
+    if (requestedClientStatus == BenchmarkRunControlEnvironmentStatus::Invalid) {
+        return BenchmarkRunControlEnvironmentStatus::Invalid;
+    }
+
 #ifdef _WIN32
-    const wchar_t* mode = _wgetenv(L"ASTRAL_BENCHMARK_MODE");
     const wchar_t* warmup = _wgetenv(L"ASTRAL_BENCHMARK_WARMUP_FRAMES");
     const wchar_t* measured = _wgetenv(L"ASTRAL_BENCHMARK_MEASURED_FRAMES");
     const wchar_t* receipt = _wgetenv(L"ASTRAL_BENCHMARK_CONTROL_JSON");
-    if (mode == nullptr) {
+    if (requestedClientStatus == BenchmarkRunControlEnvironmentStatus::NotRequested) {
         if (warmup != nullptr || measured != nullptr || receipt != nullptr) {
             error = "ASTRAL_BENCHMARK_MODE is required when benchmark controls are present";
             return BenchmarkRunControlEnvironmentStatus::Invalid;
         }
         return BenchmarkRunControlEnvironmentStatus::NotRequested;
-    }
-    if (std::wstring_view(mode) != L"1") {
-        error = "ASTRAL_BENCHMARK_MODE must be exactly 1";
-        return BenchmarkRunControlEnvironmentStatus::Invalid;
     }
     if (warmup == nullptr || measured == nullptr || receipt == nullptr || receipt[0] == L'\0') {
         error = "benchmark mode requires warmup frames, measured frames, and control receipt path";
@@ -140,22 +213,17 @@ BenchmarkRunControlEnvironmentStatus BenchmarkRunControl::ConfigureFromEnvironme
     }
     BenchmarkRunControlConfig config{
         std::filesystem::path(receipt), simulationFixedHz, warmupFrames, measuredFrames,
-        clientWidthPx, clientHeightPx};
+        requestedClientWidthPx, requestedClientHeightPx};
 #else
-    const char* mode = std::getenv("ASTRAL_BENCHMARK_MODE");
     const char* warmup = std::getenv("ASTRAL_BENCHMARK_WARMUP_FRAMES");
     const char* measured = std::getenv("ASTRAL_BENCHMARK_MEASURED_FRAMES");
     const char* receipt = std::getenv("ASTRAL_BENCHMARK_CONTROL_JSON");
-    if (mode == nullptr) {
+    if (requestedClientStatus == BenchmarkRunControlEnvironmentStatus::NotRequested) {
         if (warmup != nullptr || measured != nullptr || receipt != nullptr) {
             error = "ASTRAL_BENCHMARK_MODE is required when benchmark controls are present";
             return BenchmarkRunControlEnvironmentStatus::Invalid;
         }
         return BenchmarkRunControlEnvironmentStatus::NotRequested;
-    }
-    if (std::string_view(mode) != "1") {
-        error = "ASTRAL_BENCHMARK_MODE must be exactly 1";
-        return BenchmarkRunControlEnvironmentStatus::Invalid;
     }
     if (warmup == nullptr || measured == nullptr || receipt == nullptr || receipt[0] == '\0') {
         error = "benchmark mode requires warmup frames, measured frames, and control receipt path";
@@ -171,12 +239,17 @@ BenchmarkRunControlEnvironmentStatus BenchmarkRunControl::ConfigureFromEnvironme
     }
     BenchmarkRunControlConfig config{
         std::filesystem::u8path(receipt), simulationFixedHz, warmupFrames, measuredFrames,
-        clientWidthPx, clientHeightPx};
+        requestedClientWidthPx, requestedClientHeightPx};
 #endif
 
+    if (clientWidthPx != requestedClientWidthPx || clientHeightPx != requestedClientHeightPx) {
+        error = "actual benchmark client area does not match the requested client dimensions";
+        return BenchmarkRunControlEnvironmentStatus::Invalid;
+    }
     if (!Configure(config, error)) {
         return BenchmarkRunControlEnvironmentStatus::Invalid;
     }
+    explicitClientAreaRequested_ = true;
     return BenchmarkRunControlEnvironmentStatus::Enabled;
 }
 
@@ -251,7 +324,7 @@ bool BenchmarkRunControl::FlushCompletion(std::string& error) {
     }
     stream
         << "{\n"
-        << "  \"schema_version\": 1,\n"
+        << "  \"schema_version\": 2,\n"
         << "  \"mode\": \"fixed_frame_count\",\n"
         << "  \"simulation_fixed_hz\": " << config_.simulationFixedHz << ",\n"
         << "  \"warmup_frames\": " << config_.warmupFrames << ",\n"
@@ -262,6 +335,10 @@ bool BenchmarkRunControl::FlushCompletion(std::string& error) {
         << "  \"client_height_px\": " << config_.clientHeightPx << ",\n"
         << "  \"client_area_observations\": " << clientAreaObservations_ << ",\n"
         << "  \"client_area_stable\": true,\n"
+        << "  \"client_area_control\": \""
+        << (explicitClientAreaRequested_
+            ? "environment_requested_and_verified" : "configured_contract")
+        << "\",\n"
         << "  \"window_mode\": \"windowed\",\n"
         << "  \"live_input\": \"suppressed\",\n"
         << "  \"termination\": \"exact_frame_limit\",\n"
