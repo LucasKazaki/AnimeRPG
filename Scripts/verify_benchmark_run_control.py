@@ -25,6 +25,11 @@ RECEIPT_KEYS = {
     "measured_frames",
     "total_frames",
     "completed_frames",
+    "client_width_px",
+    "client_height_px",
+    "client_area_observations",
+    "client_area_stable",
+    "window_mode",
     "live_input",
     "termination",
     *FALSE_CLAIMS.keys(),
@@ -68,6 +73,10 @@ def validate_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
         raise BenchmarkRunControlError("benchmark live input was not suppressed")
     if receipt["termination"] != "exact_frame_limit":
         raise BenchmarkRunControlError("benchmark did not use exact frame-limit termination")
+    if receipt["window_mode"] != "windowed":
+        raise BenchmarkRunControlError("run-control window_mode must be windowed")
+    if receipt["client_area_stable"] is not True:
+        raise BenchmarkRunControlError("benchmark client area was not stable")
     for key, expected in FALSE_CLAIMS.items():
         if receipt[key] is not expected:
             raise BenchmarkRunControlError(f"run-control claim boundary changed: {key}")
@@ -77,12 +86,18 @@ def validate_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
     measured = receipt["measured_frames"]
     total = receipt["total_frames"]
     completed = receipt["completed_frames"]
+    width = receipt["client_width_px"]
+    height = receipt["client_height_px"]
+    observations = receipt["client_area_observations"]
     for key, value in (
         ("simulation_fixed_hz", fixed_hz),
         ("warmup_frames", warmup),
         ("measured_frames", measured),
         ("total_frames", total),
         ("completed_frames", completed),
+        ("client_width_px", width),
+        ("client_height_px", height),
+        ("client_area_observations", observations),
     ):
         if isinstance(value, bool) or not isinstance(value, int):
             raise BenchmarkRunControlError(f"{key} must be an integer")
@@ -96,6 +111,10 @@ def validate_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
         raise BenchmarkRunControlError("warmup plus measured frames exceeds hard limit")
     if total != warmup + measured or completed != total:
         raise BenchmarkRunControlError("benchmark did not complete the exact admitted frame count")
+    if not 1 <= width <= 16384 or not 1 <= height <= 16384:
+        raise BenchmarkRunControlError("client dimensions must be in [1, 16384]")
+    if observations != total:
+        raise BenchmarkRunControlError("client area was not observed exactly once per completed frame")
     return dict(receipt)
 
 
@@ -129,6 +148,16 @@ def verify(
     if entry.get("sha256") != digest:
         raise BenchmarkRunControlError("run-control receipt hash does not match benchmark manifest")
 
+    protocol = manifest.get("run_protocol")
+    if not isinstance(protocol, dict):
+        raise BenchmarkRunControlError("benchmark manifest run_protocol is invalid")
+    if receipt["client_width_px"] != protocol.get("width"):
+        raise BenchmarkRunControlError("run-control client width does not match benchmark protocol")
+    if receipt["client_height_px"] != protocol.get("height"):
+        raise BenchmarkRunControlError("run-control client height does not match benchmark protocol")
+    if receipt["window_mode"] != protocol.get("window_mode"):
+        raise BenchmarkRunControlError("run-control window mode does not match benchmark protocol")
+
     return {
         "schema_version": 1,
         "benchmark_run_control_verified": True,
@@ -141,6 +170,11 @@ def verify(
         "measured_frames": receipt["measured_frames"],
         "total_frames": receipt["total_frames"],
         "completed_frames": receipt["completed_frames"],
+        "client_width_px": receipt["client_width_px"],
+        "client_height_px": receipt["client_height_px"],
+        "client_area_observations": receipt["client_area_observations"],
+        "client_area_stable": receipt["client_area_stable"],
+        "window_mode": receipt["window_mode"],
         "live_input": receipt["live_input"],
         "termination": receipt["termination"],
         "acceptance": {
@@ -149,8 +183,8 @@ def verify(
             "independent_acceptance": False,
         },
         "limitations": [
-            "The fixed simulation rate is bound transitively to the benchmark descriptor through the SHA-256-bound run-control receipt evidence.",
-            "This verifier proves run-control/package/evidence consistency only; it does not prove GPU timing, performance budgets, matched Unreal/Unity workloads, clean-machine compatibility, or independent acceptance.",
+            "The fixed simulation rate and stable rendered client area are bound transitively to the benchmark descriptor through the SHA-256-bound run-control receipt evidence.",
+            "This verifier proves run-control/package/protocol/evidence consistency only; it does not prove GPU timing, performance budgets, matched Unreal/Unity workloads, clean-machine compatibility, or independent acceptance.",
         ],
     }
 
