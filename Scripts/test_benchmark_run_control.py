@@ -17,7 +17,7 @@ COMMIT = "b" * 40
 
 def receipt() -> dict:
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "mode": "fixed_frame_count",
         "simulation_fixed_hz": 60,
         "warmup_frames": 120,
@@ -30,6 +30,9 @@ def receipt() -> dict:
         "client_area_stable": True,
         "client_area_control": "environment_requested_and_verified",
         "window_mode": "windowed",
+        "presentation_backend": "win32_gdi_window_dc",
+        "vsync_control": "unavailable_in_gdi_path",
+        "frame_pacing": "sleep_1ms_not_refresh_locked",
         "live_input": "suppressed",
         "termination": "exact_frame_limit",
         "performance_budget_verified": False,
@@ -114,6 +117,7 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
             report = fx.verify()
             self.assertTrue(report["benchmark_run_control_verified"])
             self.assertTrue(report["benchmark_duration_protocol_coherent"])
+            self.assertTrue(report["benchmark_presentation_policy_coherent"])
             self.assertEqual(report["simulation_fixed_hz"], 60)
             self.assertEqual(report["warmup_frames"], 120)
             self.assertEqual(report["measured_frames"], 3600)
@@ -128,8 +132,21 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
                 report["client_area_control"], "environment_requested_and_verified"
             )
             self.assertEqual(report["window_mode"], "windowed")
+            self.assertFalse(report["vsync_requested"])
+            self.assertEqual(report["presentation_backend"], "win32_gdi_window_dc")
+            self.assertEqual(report["vsync_control"], "unavailable_in_gdi_path")
+            self.assertEqual(report["frame_pacing"], "sleep_1ms_not_refresh_locked")
             self.assertEqual(report["live_input"], "suppressed")
             self.assertFalse(report["acceptance"]["comparative_parity_verified"])
+
+    def test_vsync_true_is_rejected_after_manifest_rehash(self):
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            incompatible = spec()
+            incompatible["run_protocol"]["vsync"] = True
+            fx.rebuild(incompatible)
+            with self.assertRaises(run_control.BenchmarkRunControlError):
+                fx.verify()
 
     def test_duration_mismatch_is_rejected_after_manifest_rehash(self):
         with tempfile.TemporaryDirectory() as td:
@@ -215,12 +232,15 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
                 with self.assertRaises(run_control.BenchmarkRunControlError):
                     run_control.validate_receipt(data)
 
-    def test_wrong_mode_input_termination_or_window_state_is_rejected(self):
+    def test_wrong_mode_input_termination_window_or_presentation_state_is_rejected(self):
         cases = (
             ("mode", "variable_time"),
             ("live_input", "enabled"),
             ("termination", "window_close"),
             ("window_mode", "borderless"),
+            ("presentation_backend", "dxgi_swap_chain"),
+            ("vsync_control", "enabled"),
+            ("frame_pacing", "refresh_locked"),
             ("client_area_stable", False),
             ("client_area_control", "configured_contract"),
         )
@@ -233,7 +253,7 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
 
     def test_old_receipt_schema_is_rejected(self):
         data = receipt()
-        data["schema_version"] = 1
+        data["schema_version"] = 2
         with self.assertRaises(run_control.BenchmarkRunControlError):
             run_control.validate_receipt(data)
 
@@ -291,7 +311,7 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
         with self.assertRaises(run_control.BenchmarkRunControlError):
             run_control.validate_receipt(data)
         data = receipt()
-        del data["client_area_control"]
+        del data["presentation_backend"]
         with self.assertRaises(run_control.BenchmarkRunControlError):
             run_control.validate_receipt(data)
 
