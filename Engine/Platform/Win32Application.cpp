@@ -161,11 +161,64 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
         return false;
     }
 
-    window_ = CreateWindowExW(0, kWindowClass, L"Astral Engine", WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, nullptr, nullptr, instance, nullptr);
+    constexpr DWORD windowStyle = WS_OVERLAPPEDWINDOW;
+    int outerWidth = 1280;
+    int outerHeight = 720;
+    std::uint32_t requestedClientWidthPx = 0;
+    std::uint32_t requestedClientHeightPx = 0;
+    std::string benchmarkWindowError;
+    const auto requestedClientStatus =
+        Astral::Core::BenchmarkRunControl::RequestedClientAreaFromEnvironment(
+            requestedClientWidthPx, requestedClientHeightPx, benchmarkWindowError);
+    if (requestedClientStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid) {
+        std::fprintf(stderr, "Astral benchmark window configuration rejected: %s\n",
+            benchmarkWindowError.c_str());
+        return false;
+    }
+    if (requestedClientStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Enabled) {
+        RECT requestedClientRect{0, 0,
+            static_cast<LONG>(requestedClientWidthPx),
+            static_cast<LONG>(requestedClientHeightPx)};
+        if (!AdjustWindowRectEx(&requestedClientRect, windowStyle, FALSE, 0)) {
+            std::fprintf(stderr,
+                "Astral benchmark window sizing failed while adjusting the requested client area\n");
+            return false;
+        }
+        const LONG adjustedWidth = requestedClientRect.right - requestedClientRect.left;
+        const LONG adjustedHeight = requestedClientRect.bottom - requestedClientRect.top;
+        if (adjustedWidth <= 0 || adjustedHeight <= 0) {
+            std::fprintf(stderr,
+                "Astral benchmark window sizing produced invalid outer dimensions\n");
+            return false;
+        }
+        outerWidth = static_cast<int>(adjustedWidth);
+        outerHeight = static_cast<int>(adjustedHeight);
+    }
+
+    window_ = CreateWindowExW(0, kWindowClass, L"Astral Engine", windowStyle,
+        CW_USEDEFAULT, CW_USEDEFAULT, outerWidth, outerHeight,
+        nullptr, nullptr, instance, nullptr);
     if (!window_) {
         g_logger.Info("CreateWindowExW failed");
         return false;
+    }
+
+    if (requestedClientStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Enabled) {
+        RECT actualClientRect{};
+        const bool actualClientRectAvailable = GetClientRect(window_, &actualClientRect) != 0;
+        const LONG actualWidth = actualClientRectAvailable
+            ? actualClientRect.right - actualClientRect.left : 0;
+        const LONG actualHeight = actualClientRectAvailable
+            ? actualClientRect.bottom - actualClientRect.top : 0;
+        if (actualWidth <= 0 || actualHeight <= 0
+            || static_cast<std::uint32_t>(actualWidth) != requestedClientWidthPx
+            || static_cast<std::uint32_t>(actualHeight) != requestedClientHeightPx) {
+            std::fprintf(stderr,
+                "Astral benchmark window client area did not match the requested resolution\n");
+            DestroyWindow(window_);
+            window_ = nullptr;
+            return false;
+        }
     }
 
     ShowWindow(window_, showCommand);
