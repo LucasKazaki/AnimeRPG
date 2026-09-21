@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Core/FrameTimingCapture.h"
+#include "Engine/Core/ProcessMemoryCapture.h"
 
 #include <chrono>
 #include <cstdint>
@@ -19,6 +20,8 @@ private:
     std::chrono::steady_clock::time_point start_;
     std::uint64_t frameIndex_ = 0;
     FrameTimingCapture frameTimingCapture_;
+    ProcessMemoryCapture processMemoryCapture_;
+    bool processMemoryFailureReported_ = false;
 };
 
 } // namespace Astral::Core
