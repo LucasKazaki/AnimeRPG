@@ -8,14 +8,14 @@ namespace Astral::Core {
 
 Clock::Clock() : lastTick_(std::chrono::steady_clock::now()), start_(lastTick_) {
     std::string error;
-    const auto timingStatus = frameTimingCapture_.ConfigureFromEnvironment(error);
-    if (timingStatus == FrameTimingEnvironmentStatus::Invalid) {
+    frameTimingStatus_ = frameTimingCapture_.ConfigureFromEnvironment(error);
+    if (frameTimingStatus_ == FrameTimingEnvironmentStatus::Invalid) {
         std::fprintf(stderr, "Astral frame timing capture configuration rejected: %s\n", error.c_str());
     }
 
     error.clear();
-    const auto memoryStatus = processMemoryCapture_.ConfigureFromEnvironment(error);
-    if (memoryStatus == ProcessMemoryEnvironmentStatus::Invalid) {
+    processMemoryStatus_ = processMemoryCapture_.ConfigureFromEnvironment(error);
+    if (processMemoryStatus_ == ProcessMemoryEnvironmentStatus::Invalid) {
         std::fprintf(stderr, "Astral process memory capture configuration rejected: %s\n",
             error.c_str());
     }
