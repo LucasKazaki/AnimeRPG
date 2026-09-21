@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <array>
+#include <cwchar>
 #include <string>
 
 namespace {
@@ -135,7 +136,7 @@ void DrawViewport(HDC dc) {
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, RGB(225, 230, 240));
     const wchar_t* title = L"Astral Editor Viewport | procedural fixture | GDI preview";
-    TextOutW(dc, v.x + 12, v.y + 10, title, static_cast<int>(wcslen(title)));
+    TextOutW(dc, v.x + 12, v.y + 10, title, static_cast<int>(std::wcslen(title)));
 
     int selection = static_cast<int>(SendMessageW(g_outliner, LB_GETCURSEL, 0, 0));
     if (selection >= 0 && selection < static_cast<int>(kFixtureNames.size())) {
