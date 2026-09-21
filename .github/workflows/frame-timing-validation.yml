@@ -9,6 +9,8 @@ on:
       - "Engine/Core/Clock.h"
       - "Engine/Core/FrameTimingCapture.cpp"
       - "Engine/Core/FrameTimingCapture.h"
+      - "Scripts/analyze_frame_timing_capture.py"
+      - "Scripts/test_frame_timing_analysis.py"
       - "Tests/FrameTimingCaptureTests.cpp"
       - "Tests/FrameTiming/**"
       - ".github/workflows/frame-timing-validation.yml"
@@ -20,6 +22,8 @@ on:
       - "Engine/Core/Clock.h"
       - "Engine/Core/FrameTimingCapture.cpp"
       - "Engine/Core/FrameTimingCapture.h"
+      - "Scripts/analyze_frame_timing_capture.py"
+      - "Scripts/test_frame_timing_analysis.py"
       - "Tests/FrameTimingCaptureTests.cpp"
       - "Tests/FrameTiming/**"
       - ".github/workflows/frame-timing-validation.yml"
@@ -37,6 +41,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+
+      - name: Verify frame timing analysis and production provenance binding
+        run: python Scripts/test_frame_timing_analysis.py
 
       - name: Debug and optimized Release capture contracts
         shell: bash
