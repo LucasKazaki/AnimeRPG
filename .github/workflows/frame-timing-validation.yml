@@ -17,6 +17,8 @@ on:
       - "Scripts/analyze_frame_phase_timing_capture.py"
       - "Scripts/analyze_frame_timing_capture.py"
       - "Scripts/analyze_process_memory_capture.py"
+      - "Scripts/benchmark_environment.py"
+      - "Scripts/test_benchmark_environment.py"
       - "Scripts/test_benchmark_stream_coherence.py"
       - "Scripts/test_frame_phase_timing_analysis.py"
       - "Scripts/test_frame_timing_analysis.py"
@@ -43,6 +45,8 @@ on:
       - "Scripts/analyze_frame_phase_timing_capture.py"
       - "Scripts/analyze_frame_timing_capture.py"
       - "Scripts/analyze_process_memory_capture.py"
+      - "Scripts/benchmark_environment.py"
+      - "Scripts/test_benchmark_environment.py"
       - "Scripts/test_benchmark_stream_coherence.py"
       - "Scripts/test_frame_phase_timing_analysis.py"
       - "Scripts/test_frame_timing_analysis.py"
@@ -74,6 +78,7 @@ jobs:
           python Scripts/test_frame_phase_timing_analysis.py
           python Scripts/test_process_memory_analysis.py
           python Scripts/test_benchmark_stream_coherence.py
+          python Scripts/test_benchmark_environment.py
 
       - name: Debug and optimized Release profiling capture contracts
         shell: bash

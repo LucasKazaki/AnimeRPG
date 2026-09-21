@@ -1,0 +1,62 @@
+name: Benchmark environment evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "Scripts/benchmark_environment.py"
+      - "Scripts/test_benchmark_environment.py"
+      - ".github/workflows/benchmark-environment-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Scripts/benchmark_environment.py"
+      - "Scripts/test_benchmark_environment.py"
+      - ".github/workflows/benchmark-environment-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-environment-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate portable environment binding contracts
+        run: |
+          python -m py_compile Scripts/benchmark_environment.py Scripts/test_benchmark_environment.py
+          python Scripts/test_benchmark_environment.py
+
+  windows-cim-capture:
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate contracts on Windows
+        run: python Scripts/test_benchmark_environment.py
+      - name: Capture real hosted Windows CIM environment receipt
+        shell: pwsh
+        run: |
+          $receipt = Join-Path $env:RUNNER_TEMP "astral-benchmark-environment.json"
+          python Scripts/benchmark_environment.py capture --machine-label github-hosted-windows-2022 --output $receipt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python Scripts/benchmark_environment.py validate --receipt $receipt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $data = Get-Content $receipt -Raw | ConvertFrom-Json
+          if ($data.source -ne "Windows_CIM_GetCimInstance" -or $data.capture_platform -ne "Windows") {
+            Write-Error "Hosted capture did not use the required local Windows CIM source."
+            exit 1
+          }
+          if ($data.acceptance.environment_binding_verified -ne $false -or
+              $data.acceptance.performance_budget_verified -ne $false -or
+              $data.acceptance.comparative_parity_verified -ne $false -or
+              $data.acceptance.clean_machine_compatibility_verified -ne $false -or
+              $data.acceptance.independent_acceptance -ne $false) {
+            Write-Error "Environment capture must not pre-claim benchmark or acceptance gates."
+            exit 1
+          }
