@@ -13,6 +13,13 @@ constexpr int kToolbarButtonGap = 6;
 constexpr int kToolbarButtonPreferredWidth = 104;
 constexpr int kToolbarButtonPreferredHeight = 28;
 constexpr int kToolbarButtonCount = 5;
+constexpr int kPanelHorizontalPadding = 8;
+constexpr int kPanelLabelTop = 6;
+constexpr int kPanelLabelHeight = 18;
+constexpr int kPanelBodyTop = 28;
+constexpr int kPanelBottomPadding = 8;
+constexpr int kStatusHorizontalPadding = 8;
+constexpr int kStatusVerticalPadding = 3;
 }
 
 EditorLayout ComputeEditorLayout(int clientWidth, int clientHeight) {
@@ -72,6 +79,44 @@ EditorToolbarLayout ComputeEditorToolbarLayout(const EditorRect& toolbar) {
     layout.scale = nextButton();
     layout.play = nextButton();
     return layout;
+}
+
+EditorPanelContentLayout ComputeEditorPanelContentLayout(const EditorRect& panel) {
+    const int panelWidth = std::max(0, panel.width);
+    const int panelHeight = std::max(0, panel.height);
+    const int horizontalPadding = std::min(kPanelHorizontalPadding, panelWidth / 2);
+    const int innerWidth = std::max(0, panelWidth - 2 * horizontalPadding);
+
+    const int labelTop = std::min(kPanelLabelTop, panelHeight);
+    const int labelHeight = std::min(kPanelLabelHeight, panelHeight - labelTop);
+    const int bodyTop = std::min(kPanelBodyTop, panelHeight);
+    const int bodyRemaining = panelHeight - bodyTop;
+    const int bottomPadding = std::min(kPanelBottomPadding, bodyRemaining);
+
+    EditorPanelContentLayout layout{};
+    layout.label = {
+        panel.x + horizontalPadding,
+        panel.y + labelTop,
+        innerWidth,
+        labelHeight};
+    layout.body = {
+        panel.x + horizontalPadding,
+        panel.y + bodyTop,
+        innerWidth,
+        std::max(0, bodyRemaining - bottomPadding)};
+    return layout;
+}
+
+EditorRect ComputeEditorStatusContentLayout(const EditorRect& status) {
+    const int statusWidth = std::max(0, status.width);
+    const int statusHeight = std::max(0, status.height);
+    const int horizontalPadding = std::min(kStatusHorizontalPadding, statusWidth / 2);
+    const int verticalPadding = std::min(kStatusVerticalPadding, statusHeight / 2);
+    return {
+        status.x + horizontalPadding,
+        status.y + verticalPadding,
+        std::max(0, statusWidth - 2 * horizontalPadding),
+        std::max(0, statusHeight - 2 * verticalPadding)};
 }
 
 bool Contains(const EditorRect& outer, const EditorRect& inner) {

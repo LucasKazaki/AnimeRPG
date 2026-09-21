@@ -62,23 +62,26 @@ void ApplyLayout(HWND window) {
     MoveControl(g_playButton, toolbar.play.x, toolbar.play.y,
         toolbar.play.width, toolbar.play.height);
 
-    const auto& outliner = g_layout.outliner;
-    MoveControl(g_outlinerLabel, outliner.x + 8, outliner.y + 6, outliner.width - 16, 18);
-    MoveControl(g_outliner, outliner.x + 8, outliner.y + 28,
-        outliner.width - 16, outliner.height - 36);
+    const auto outliner = Astral::Editor::ComputeEditorPanelContentLayout(g_layout.outliner);
+    MoveControl(g_outlinerLabel, outliner.label.x, outliner.label.y,
+        outliner.label.width, outliner.label.height);
+    MoveControl(g_outliner, outliner.body.x, outliner.body.y,
+        outliner.body.width, outliner.body.height);
 
-    const auto& inspector = g_layout.inspector;
-    MoveControl(g_inspectorLabel, inspector.x + 8, inspector.y + 6, inspector.width - 16, 18);
-    MoveControl(g_inspector, inspector.x + 8, inspector.y + 28,
-        inspector.width - 16, inspector.height - 36);
+    const auto inspector = Astral::Editor::ComputeEditorPanelContentLayout(g_layout.inspector);
+    MoveControl(g_inspectorLabel, inspector.label.x, inspector.label.y,
+        inspector.label.width, inspector.label.height);
+    MoveControl(g_inspector, inspector.body.x, inspector.body.y,
+        inspector.body.width, inspector.body.height);
 
-    const auto& assets = g_layout.assets;
-    MoveControl(g_assetsLabel, assets.x + 8, assets.y + 6, assets.width - 16, 18);
-    MoveControl(g_assets, assets.x + 8, assets.y + 28,
-        assets.width - 16, assets.height - 36);
+    const auto assets = Astral::Editor::ComputeEditorPanelContentLayout(g_layout.assets);
+    MoveControl(g_assetsLabel, assets.label.x, assets.label.y,
+        assets.label.width, assets.label.height);
+    MoveControl(g_assets, assets.body.x, assets.body.y,
+        assets.body.width, assets.body.height);
 
-    const auto& status = g_layout.status;
-    MoveControl(g_status, status.x + 8, status.y + 3, status.width - 16, status.height - 6);
+    const auto status = Astral::Editor::ComputeEditorStatusContentLayout(g_layout.status);
+    MoveControl(g_status, status.x, status.y, status.width, status.height);
     InvalidateRect(window, nullptr, TRUE);
 }
 

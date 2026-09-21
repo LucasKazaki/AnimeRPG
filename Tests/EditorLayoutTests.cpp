@@ -6,6 +6,8 @@
 
 namespace {
 using Astral::Editor::ComputeEditorLayout;
+using Astral::Editor::ComputeEditorPanelContentLayout;
+using Astral::Editor::ComputeEditorStatusContentLayout;
 using Astral::Editor::ComputeEditorToolbarLayout;
 using Astral::Editor::Contains;
 using Astral::Editor::EditorRect;
@@ -38,6 +40,15 @@ bool CheckToolbarLayout(const EditorRect& toolbar) {
     return ok;
 }
 
+bool CheckPanelContentLayout(const EditorRect& panel) {
+    const auto content = ComputeEditorPanelContentLayout(panel);
+    bool ok = true;
+    ok &= Expect(Contains(panel, content.label), "panel label outside panel");
+    ok &= Expect(Contains(panel, content.body), "panel body outside panel");
+    ok &= Expect(!Overlaps(content.label, content.body), "panel label overlaps body");
+    return ok;
+}
+
 bool CheckLayout(int width, int height) {
     const auto layout = ComputeEditorLayout(width, height);
     const EditorRect client{0, 0, width < 0 ? 0 : width, height < 0 ? 0 : height};
@@ -54,6 +65,11 @@ bool CheckLayout(int width, int height) {
     ok &= Expect(!Overlaps(layout.toolbar, layout.outliner), "toolbar overlaps content");
     ok &= Expect(!Overlaps(layout.status, layout.assets), "status overlaps assets");
     ok &= CheckToolbarLayout(layout.toolbar);
+    ok &= CheckPanelContentLayout(layout.outliner);
+    ok &= CheckPanelContentLayout(layout.inspector);
+    ok &= CheckPanelContentLayout(layout.assets);
+    ok &= Expect(Contains(layout.status, ComputeEditorStatusContentLayout(layout.status)),
+        "status text control outside status area");
     return ok;
 }
 }
@@ -64,7 +80,10 @@ int main() {
     ok &= CheckLayout(1920, 1080);
     ok &= CheckLayout(800, 600);
     ok &= CheckLayout(320, 200);
+    ok &= CheckLayout(100, 100);
     ok &= CheckLayout(100, 50);
+    ok &= CheckLayout(16, 16);
+    ok &= CheckLayout(1, 1);
     ok &= CheckLayout(0, 0);
     ok &= CheckLayout(-1, -1);
 
@@ -85,12 +104,39 @@ int main() {
     ok &= Expect(standardToolbar.play.x + standardToolbar.play.width <= 1280,
         "standard toolbar overflows client width");
 
+    const auto standardOutlinerContent = ComputeEditorPanelContentLayout(standard.outliner);
+    ok &= Expect(standardOutlinerContent.label.x == standard.outliner.x + 8,
+        "standard panel horizontal padding changed");
+    ok &= Expect(standardOutlinerContent.label.y == standard.outliner.y + 6,
+        "standard panel label top changed");
+    ok &= Expect(standardOutlinerContent.label.height == 18,
+        "standard panel label height changed");
+    ok &= Expect(standardOutlinerContent.body.y == standard.outliner.y + 28,
+        "standard panel body top changed");
+    ok &= Expect(standardOutlinerContent.body.height == standard.outliner.height - 36,
+        "standard panel body height changed");
+
+    const auto standardStatusContent = ComputeEditorStatusContentLayout(standard.status);
+    ok &= Expect(standardStatusContent.x == standard.status.x + 8,
+        "standard status horizontal padding changed");
+    ok &= Expect(standardStatusContent.y == standard.status.y + 3,
+        "standard status vertical padding changed");
+    ok &= Expect(standardStatusContent.height == standard.status.height - 6,
+        "standard status height changed");
+
     const auto narrow = ComputeEditorLayout(320, 200);
     const auto narrowToolbar = ComputeEditorToolbarLayout(narrow.toolbar);
     ok &= Expect(narrowToolbar.select.width == 56,
         "narrow toolbar should compress buttons instead of overflowing");
     ok &= Expect(narrowToolbar.play.x + narrowToolbar.play.width <= 320,
         "narrow toolbar still overflows client width");
+
+    const auto shortLayout = ComputeEditorLayout(100, 50);
+    const auto shortAssetsContent = ComputeEditorPanelContentLayout(shortLayout.assets);
+    ok &= Expect(shortAssetsContent.label.height == 0,
+        "zero-height asset panel should collapse its label");
+    ok &= Expect(shortAssetsContent.body.height == 0,
+        "zero-height asset panel should collapse its body");
 
     ok &= Expect(!IsEditorToolAvailable(EditorTool::Select),
         "Select toolbar control must remain disabled until viewport selection exists");
