@@ -29,6 +29,7 @@ RECEIPT_KEYS = {
     "client_height_px",
     "client_area_observations",
     "client_area_stable",
+    "client_area_control",
     "window_mode",
     "live_input",
     "termination",
@@ -65,8 +66,8 @@ def _load_json(path: Path, limit: int, label: str) -> dict[str, Any]:
 def validate_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
     if set(receipt) != RECEIPT_KEYS:
         raise BenchmarkRunControlError("run-control receipt shape/schema mismatch")
-    if receipt["schema_version"] != 1 or isinstance(receipt["schema_version"], bool):
-        raise BenchmarkRunControlError("run-control schema_version must be 1")
+    if receipt["schema_version"] != 2 or isinstance(receipt["schema_version"], bool):
+        raise BenchmarkRunControlError("run-control schema_version must be 2")
     if receipt["mode"] != "fixed_frame_count":
         raise BenchmarkRunControlError("run-control mode must be fixed_frame_count")
     if receipt["live_input"] != "suppressed":
@@ -77,6 +78,10 @@ def validate_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
         raise BenchmarkRunControlError("run-control window_mode must be windowed")
     if receipt["client_area_stable"] is not True:
         raise BenchmarkRunControlError("benchmark client area was not stable")
+    if receipt["client_area_control"] != "environment_requested_and_verified":
+        raise BenchmarkRunControlError(
+            "benchmark client area was not explicitly requested and verified"
+        )
     for key, expected in FALSE_CLAIMS.items():
         if receipt[key] is not expected:
             raise BenchmarkRunControlError(f"run-control claim boundary changed: {key}")
@@ -174,6 +179,7 @@ def verify(
         "client_height_px": receipt["client_height_px"],
         "client_area_observations": receipt["client_area_observations"],
         "client_area_stable": receipt["client_area_stable"],
+        "client_area_control": receipt["client_area_control"],
         "window_mode": receipt["window_mode"],
         "live_input": receipt["live_input"],
         "termination": receipt["termination"],
@@ -183,7 +189,7 @@ def verify(
             "independent_acceptance": False,
         },
         "limitations": [
-            "The fixed simulation rate and stable rendered client area are bound transitively to the benchmark descriptor through the SHA-256-bound run-control receipt evidence.",
+            "The fixed simulation rate and explicitly requested, observed stable render-client area are bound transitively to the benchmark descriptor through the SHA-256-bound run-control receipt evidence.",
             "This verifier proves run-control/package/protocol/evidence consistency only; it does not prove GPU timing, performance budgets, matched Unreal/Unity workloads, clean-machine compatibility, or independent acceptance.",
         ],
     }
