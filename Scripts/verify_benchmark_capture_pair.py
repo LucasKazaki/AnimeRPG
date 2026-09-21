@@ -10,8 +10,9 @@ from typing import Any
 
 import benchmark_manifest
 import verify_benchmark_run_control as run_control
+import verify_profiling_capture_state as capture_state
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MAX_JSON_BYTES = benchmark_manifest.MAX_MANIFEST_BYTES
 PROFILE_ROLES = (
     "cpu_frame_timing_csv",
@@ -51,6 +52,7 @@ MATCHED_RUN_CONTROL_FIELDS = (
 )
 ACCEPTANCE = {
     "capture_pairing_verified": True,
+    "startup_capture_state_verified": True,
     "instrumentation_overhead_verified": False,
     "performance_budget_verified": False,
     "ram_budget_verified": False,
@@ -61,9 +63,9 @@ ACCEPTANCE = {
     "independent_acceptance": False,
 }
 LIMITATIONS = [
-    "This receipt proves a profiled/control benchmark pair is package-, workload-, protocol-, environment-, and run-control-matched while the control manifest omits Astral profiling-stream evidence roles.",
-    "The profiled manifest role checks do not replace the existing stream-coherence verifier, and the absence of profiling roles from the control manifest does not itself prove that every profiling environment variable was absent at process launch.",
-    "This packet does not calculate instrumentation overhead. A later native analysis must use retained launch/environment receipts and measured control/profiled timings before instrumentation_overhead_verified can become true.",
+    "This receipt proves a profiled/control benchmark pair is package-, workload-, protocol-, environment-, and run-control-matched, and it requires package-bound startup capture-state receipts showing all three admitted profiling streams enabled for the profiled run and not requested for the control run.",
+    "Startup capture-state receipts bind interpreted capture settings and output identities before the frame loop. Final CSV bytes remain separately SHA-256-bound by each benchmark manifest after the run.",
+    "This packet does not calculate instrumentation overhead. A later native analysis must compare measured control/profiled timings before instrumentation_overhead_verified can become true.",
     "No GPU timing, VRAM budget, performance budget, Unreal/Unity parity, clean-machine compatibility, soak completion, or independent acceptance follows from capture-pair verification.",
 ]
 
@@ -202,6 +204,24 @@ def verify_capture_pair(
             f"control manifest must omit profiling-stream evidence roles: {present_control}"
         )
 
+    try:
+        profiled_capture = capture_state.verify(
+            profiled_manifest_path,
+            package_root,
+            release_manifest,
+            profiled_evidence_root,
+            "profiled",
+        )
+        control_capture = capture_state.verify(
+            control_manifest_path,
+            package_root,
+            release_manifest,
+            control_evidence_root,
+            "control",
+        )
+    except Exception as exc:
+        raise CapturePairError(f"startup profiling capture-state verification failed: {exc}") from exc
+
     profiled_descriptor = profiled_benchmark.get("benchmark_descriptor_sha256")
     control_descriptor = control_benchmark.get("benchmark_descriptor_sha256")
     if not isinstance(profiled_descriptor, str) or not isinstance(control_descriptor, str):
@@ -212,10 +232,13 @@ def verify_capture_pair(
         "verification_kind": "astral_benchmark_capture_pair",
         "generated_at_utc": _now(),
         "capture_pairing_verified": True,
+        "startup_capture_state_verified": True,
         "candidate_commit": profiled_run["candidate_commit"],
         "executable_sha256": profiled_run["executable_sha256"],
         "profiled_benchmark_descriptor_sha256": profiled_descriptor,
         "control_benchmark_descriptor_sha256": control_descriptor,
+        "profiled_capture_state_receipt_sha256": profiled_capture["capture_state_receipt_sha256"],
+        "control_capture_state_receipt_sha256": control_capture["capture_state_receipt_sha256"],
         "workload": json.loads(json.dumps(profiled["workload"])),
         "run_protocol": json.loads(json.dumps(profiled["run_protocol"])),
         "environment": json.loads(json.dumps(profiled["environment"])),
@@ -224,6 +247,8 @@ def verify_capture_pair(
         "run_control": profiled_control,
         "profiled_capture_roles": sorted(PROFILE_ROLES),
         "control_capture_roles": [],
+        "profiled_startup_streams": profiled_capture["streams"],
+        "control_startup_streams": control_capture["streams"],
         "acceptance": dict(ACCEPTANCE),
         "limitations": list(LIMITATIONS),
     }
