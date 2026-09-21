@@ -50,15 +50,17 @@ void ApplyLayout(HWND window) {
     GetClientRect(window, &client);
     g_layout = Astral::Editor::ComputeEditorLayout(client.right, client.bottom);
 
-    int buttonX = 8;
-    constexpr int buttonY = 7;
-    constexpr int buttonWidth = 104;
-    constexpr int buttonHeight = 28;
-    constexpr int buttonGap = 6;
-    for (HWND button : {g_selectButton, g_moveButton, g_rotateButton, g_scaleButton, g_playButton}) {
-        MoveControl(button, buttonX, buttonY, buttonWidth, buttonHeight);
-        buttonX += buttonWidth + buttonGap;
-    }
+    const auto toolbar = Astral::Editor::ComputeEditorToolbarLayout(g_layout.toolbar);
+    MoveControl(g_selectButton, toolbar.select.x, toolbar.select.y,
+        toolbar.select.width, toolbar.select.height);
+    MoveControl(g_moveButton, toolbar.move.x, toolbar.move.y,
+        toolbar.move.width, toolbar.move.height);
+    MoveControl(g_rotateButton, toolbar.rotate.x, toolbar.rotate.y,
+        toolbar.rotate.width, toolbar.rotate.height);
+    MoveControl(g_scaleButton, toolbar.scale.x, toolbar.scale.y,
+        toolbar.scale.width, toolbar.scale.height);
+    MoveControl(g_playButton, toolbar.play.x, toolbar.play.y,
+        toolbar.play.width, toolbar.play.height);
 
     const auto& outliner = g_layout.outliner;
     MoveControl(g_outlinerLabel, outliner.x + 8, outliner.y + 6, outliner.width - 16, 18);

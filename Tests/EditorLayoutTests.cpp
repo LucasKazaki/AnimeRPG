@@ -1,10 +1,12 @@
 #include "Engine/Editor/EditorLayout.h"
 
+#include <array>
 #include <cstdlib>
 #include <iostream>
 
 namespace {
 using Astral::Editor::ComputeEditorLayout;
+using Astral::Editor::ComputeEditorToolbarLayout;
 using Astral::Editor::Contains;
 using Astral::Editor::EditorRect;
 using Astral::Editor::EditorTool;
@@ -17,6 +19,23 @@ bool Expect(bool condition, const char* message) {
         return false;
     }
     return true;
+}
+
+bool CheckToolbarLayout(const EditorRect& toolbar) {
+    const auto layout = ComputeEditorToolbarLayout(toolbar);
+    const std::array<EditorRect, 5> buttons{
+        layout.select, layout.move, layout.rotate, layout.scale, layout.play};
+    bool ok = true;
+    for (const auto& button : buttons) {
+        ok &= Expect(Contains(toolbar, button), "toolbar button outside toolbar");
+    }
+    for (std::size_t left = 0; left < buttons.size(); ++left) {
+        for (std::size_t right = left + 1; right < buttons.size(); ++right) {
+            ok &= Expect(!Overlaps(buttons[left], buttons[right]),
+                "toolbar buttons overlap");
+        }
+    }
+    return ok;
 }
 
 bool CheckLayout(int width, int height) {
@@ -34,6 +53,7 @@ bool CheckLayout(int width, int height) {
     ok &= Expect(!Overlaps(layout.viewport, layout.assets), "viewport overlaps asset browser");
     ok &= Expect(!Overlaps(layout.toolbar, layout.outliner), "toolbar overlaps content");
     ok &= Expect(!Overlaps(layout.status, layout.assets), "status overlaps assets");
+    ok &= CheckToolbarLayout(layout.toolbar);
     return ok;
 }
 }
@@ -44,6 +64,7 @@ int main() {
     ok &= CheckLayout(1920, 1080);
     ok &= CheckLayout(800, 600);
     ok &= CheckLayout(320, 200);
+    ok &= CheckLayout(100, 50);
     ok &= CheckLayout(0, 0);
     ok &= CheckLayout(-1, -1);
 
@@ -55,6 +76,21 @@ int main() {
     ok &= Expect(standard.assets.height == 180, "standard asset browser height changed");
     ok &= Expect(standard.viewport.width == 800, "standard viewport width changed");
     ok &= Expect(standard.viewport.height == 474, "standard viewport height changed");
+
+    const auto standardToolbar = ComputeEditorToolbarLayout(standard.toolbar);
+    ok &= Expect(standardToolbar.select.width == 104,
+        "standard toolbar button width changed");
+    ok &= Expect(standardToolbar.select.height == 28,
+        "standard toolbar button height changed");
+    ok &= Expect(standardToolbar.play.x + standardToolbar.play.width <= 1280,
+        "standard toolbar overflows client width");
+
+    const auto narrow = ComputeEditorLayout(320, 200);
+    const auto narrowToolbar = ComputeEditorToolbarLayout(narrow.toolbar);
+    ok &= Expect(narrowToolbar.select.width == 56,
+        "narrow toolbar should compress buttons instead of overflowing");
+    ok &= Expect(narrowToolbar.play.x + narrowToolbar.play.width <= 320,
+        "narrow toolbar still overflows client width");
 
     ok &= Expect(!IsEditorToolAvailable(EditorTool::Select),
         "Select toolbar control must remain disabled until viewport selection exists");

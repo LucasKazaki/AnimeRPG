@@ -8,6 +8,11 @@ constexpr int kToolbarHeight = 42;
 constexpr int kStatusHeight = 24;
 constexpr int kPreferredSideWidth = 240;
 constexpr int kPreferredAssetHeight = 180;
+constexpr int kToolbarHorizontalPadding = 8;
+constexpr int kToolbarButtonGap = 6;
+constexpr int kToolbarButtonPreferredWidth = 104;
+constexpr int kToolbarButtonPreferredHeight = 28;
+constexpr int kToolbarButtonCount = 5;
 }
 
 EditorLayout ComputeEditorLayout(int clientWidth, int clientHeight) {
@@ -33,6 +38,39 @@ EditorLayout ComputeEditorLayout(int clientWidth, int clientHeight) {
     layout.inspector = {leftWidth + centerWidth, toolbarHeight, rightWidth, contentHeight};
     layout.assets = {leftWidth, toolbarHeight + viewportHeight, centerWidth, assetHeight};
     layout.status = {0, toolbarHeight + contentHeight, clientWidth, statusHeight};
+    return layout;
+}
+
+EditorToolbarLayout ComputeEditorToolbarLayout(const EditorRect& toolbar) {
+    const int toolbarWidth = std::max(0, toolbar.width);
+    const int toolbarHeight = std::max(0, toolbar.height);
+    const int padding = std::min(kToolbarHorizontalPadding, toolbarWidth / 2);
+    const int availableWidth = std::max(0, toolbarWidth - 2 * padding);
+
+    int gap = 0;
+    if (availableWidth > kToolbarButtonCount) {
+        gap = std::min(kToolbarButtonGap,
+            (availableWidth - kToolbarButtonCount) / (kToolbarButtonCount - 1));
+    }
+    const int totalGap = gap * (kToolbarButtonCount - 1);
+    const int buttonWidth = std::min(kToolbarButtonPreferredWidth,
+        std::max(0, (availableWidth - totalGap) / kToolbarButtonCount));
+    const int buttonHeight = std::min(kToolbarButtonPreferredHeight, toolbarHeight);
+    const int buttonY = toolbar.y + (toolbarHeight - buttonHeight) / 2;
+
+    int buttonX = toolbar.x + padding;
+    auto nextButton = [&]() {
+        const EditorRect rect{buttonX, buttonY, buttonWidth, buttonHeight};
+        buttonX += buttonWidth + gap;
+        return rect;
+    };
+
+    EditorToolbarLayout layout{};
+    layout.select = nextButton();
+    layout.move = nextButton();
+    layout.rotate = nextButton();
+    layout.scale = nextButton();
+    layout.play = nextButton();
     return layout;
 }
 

@@ -18,6 +18,14 @@ struct EditorLayout {
     EditorRect status;
 };
 
+struct EditorToolbarLayout {
+    EditorRect select;
+    EditorRect move;
+    EditorRect rotate;
+    EditorRect scale;
+    EditorRect play;
+};
+
 enum class EditorTool {
     Select,
     Move,
@@ -27,6 +35,7 @@ enum class EditorTool {
 };
 
 EditorLayout ComputeEditorLayout(int clientWidth, int clientHeight);
+EditorToolbarLayout ComputeEditorToolbarLayout(const EditorRect& toolbar);
 bool Contains(const EditorRect& outer, const EditorRect& inner);
 bool Overlaps(const EditorRect& a, const EditorRect& b);
 bool IsEditorToolAvailable(EditorTool tool);
