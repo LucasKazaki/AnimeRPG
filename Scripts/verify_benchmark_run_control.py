@@ -32,6 +32,9 @@ RECEIPT_KEYS = {
     "client_area_stable",
     "client_area_control",
     "window_mode",
+    "presentation_backend",
+    "vsync_control",
+    "frame_pacing",
     "live_input",
     "termination",
     *FALSE_CLAIMS.keys(),
@@ -85,8 +88,8 @@ def _duration_frames(value: Any, fixed_hz: int, label: str) -> int:
 def validate_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
     if set(receipt) != RECEIPT_KEYS:
         raise BenchmarkRunControlError("run-control receipt shape/schema mismatch")
-    if receipt["schema_version"] != 2 or isinstance(receipt["schema_version"], bool):
-        raise BenchmarkRunControlError("run-control schema_version must be 2")
+    if receipt["schema_version"] != 3 or isinstance(receipt["schema_version"], bool):
+        raise BenchmarkRunControlError("run-control schema_version must be 3")
     if receipt["mode"] != "fixed_frame_count":
         raise BenchmarkRunControlError("run-control mode must be fixed_frame_count")
     if receipt["live_input"] != "suppressed":
@@ -95,6 +98,12 @@ def validate_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
         raise BenchmarkRunControlError("benchmark did not use exact frame-limit termination")
     if receipt["window_mode"] != "windowed":
         raise BenchmarkRunControlError("run-control window_mode must be windowed")
+    if receipt["presentation_backend"] != "win32_gdi_window_dc":
+        raise BenchmarkRunControlError("benchmark presentation backend is not the admitted GDI path")
+    if receipt["vsync_control"] != "unavailable_in_gdi_path":
+        raise BenchmarkRunControlError("benchmark VSync control policy changed")
+    if receipt["frame_pacing"] != "sleep_1ms_not_refresh_locked":
+        raise BenchmarkRunControlError("benchmark frame-pacing policy changed")
     if receipt["client_area_stable"] is not True:
         raise BenchmarkRunControlError("benchmark client area was not stable")
     if receipt["client_area_control"] != "environment_requested_and_verified":
@@ -208,12 +217,17 @@ def verify(
         raise BenchmarkRunControlError("run-control client height does not match benchmark protocol")
     if receipt["window_mode"] != protocol.get("window_mode"):
         raise BenchmarkRunControlError("run-control window mode does not match benchmark protocol")
+    if protocol.get("vsync") is not False:
+        raise BenchmarkRunControlError(
+            "benchmark protocol requests VSync but the admitted GDI path has no VSync control"
+        )
     duration = _validate_protocol_coherence(protocol, receipt)
 
     return {
         "schema_version": 1,
         "benchmark_run_control_verified": True,
         "benchmark_duration_protocol_coherent": True,
+        "benchmark_presentation_policy_coherent": True,
         "candidate_commit": benchmark_report["candidate_commit"],
         "executable_sha256": benchmark_report["executable_sha256"],
         "benchmark_descriptor_sha256": benchmark_report["benchmark_descriptor_sha256"],
@@ -231,6 +245,10 @@ def verify(
         "client_area_stable": receipt["client_area_stable"],
         "client_area_control": receipt["client_area_control"],
         "window_mode": receipt["window_mode"],
+        "vsync_requested": False,
+        "presentation_backend": receipt["presentation_backend"],
+        "vsync_control": receipt["vsync_control"],
+        "frame_pacing": receipt["frame_pacing"],
         "live_input": receipt["live_input"],
         "termination": receipt["termination"],
         "acceptance": {
@@ -239,8 +257,9 @@ def verify(
             "independent_acceptance": False,
         },
         "limitations": [
-            "The fixed simulation rate, exact frame counts, descriptor-declared warmup/sample durations, and explicitly requested stable render-client area are bound and checked for mutual consistency through the SHA-256-bound run-control receipt evidence.",
-            "VSync remains a benchmark-descriptor setting rather than a runtime-proven run-control field in the current GDI path.",
+            "The fixed simulation rate, exact frame counts, descriptor-declared warmup/sample durations, explicitly requested stable render-client area, and admitted GDI presentation policy are bound and checked for mutual consistency through the SHA-256-bound run-control receipt evidence.",
+            "The current Win32 GDI window-DC path has no admitted swap-chain VSync control, so only benchmark descriptors with vsync=false are coherent. This does not prove physical display synchronization is disabled, nor does it measure DWM/compositor scheduling, tearing, scanout, or GPU-present timing.",
+            "The sleep_1ms_not_refresh_locked field records the current frame-pacing policy; it is not a scheduler-duration guarantee or a frame-time result.",
             "This verifier proves run-control/package/protocol/evidence consistency only; it does not prove GPU timing, performance budgets, matched Unreal/Unity workloads, clean-machine compatibility, or independent acceptance.",
         ],
     }
