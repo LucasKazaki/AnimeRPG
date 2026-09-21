@@ -182,9 +182,19 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
 int Win32Application::Run() {
     Astral::Core::Clock clock;
     Astral::Core::BenchmarkRunControl benchmarkRunControl;
+    RECT initialClientRect{};
+    const bool initialClientRectAvailable = GetClientRect(window_, &initialClientRect) != 0;
+    const LONG initialClientWidth = initialClientRectAvailable
+        ? initialClientRect.right - initialClientRect.left : 0;
+    const LONG initialClientHeight = initialClientRectAvailable
+        ? initialClientRect.bottom - initialClientRect.top : 0;
+    const auto initialClientWidthPx = initialClientWidth > 0
+        ? static_cast<std::uint32_t>(initialClientWidth) : 0u;
+    const auto initialClientHeightPx = initialClientHeight > 0
+        ? static_cast<std::uint32_t>(initialClientHeight) : 0u;
     std::string benchmarkError;
     const auto benchmarkStatus = benchmarkRunControl.ConfigureFromEnvironment(
-        clock.FixedSimulationHz(), benchmarkError);
+        clock.FixedSimulationHz(), initialClientWidthPx, initialClientHeightPx, benchmarkError);
     if (benchmarkStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid) {
         std::fprintf(stderr, "Astral benchmark run-control configuration rejected: %s\n",
             benchmarkError.c_str());
@@ -204,6 +214,7 @@ int Win32Application::Run() {
     int frameCount = 0;
     std::uint64_t phaseFrameIndex = 0;
     bool benchmarkFrameLimitReached = false;
+    bool benchmarkClientAreaStable = true;
     using PhaseClock = std::chrono::steady_clock;
     const auto toMilliseconds = [](PhaseClock::duration duration) {
         return std::chrono::duration<double, std::milli>(duration).count();
@@ -358,6 +369,19 @@ int Win32Application::Run() {
             playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
             thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
         ReleaseDC(window_, deviceContext);
+
+        if (benchmarkRunControl.Enabled()) {
+            const LONG clientWidth = viewport.right - viewport.left;
+            const LONG clientHeight = viewport.bottom - viewport.top;
+            if (clientWidth <= 0 || clientHeight <= 0
+                || !benchmarkRunControl.ObserveClientArea(
+                    static_cast<std::uint32_t>(clientWidth),
+                    static_cast<std::uint32_t>(clientHeight))) {
+                benchmarkClientAreaStable = false;
+                break;
+            }
+        }
+
         if (phaseTimingCapture.Enabled()) {
             afterRender = PhaseClock::now();
         }
@@ -390,6 +414,11 @@ int Win32Application::Run() {
     }
 
     if (benchmarkRunControl.Enabled()) {
+        if (!benchmarkClientAreaStable) {
+            std::fprintf(stderr,
+                "Astral benchmark client area changed or became invalid during the run\n");
+            return 6;
+        }
         if (!benchmarkFrameLimitReached) {
             std::fprintf(stderr,
                 "Astral benchmark ended before the exact warmup plus measured frame limit\n");
