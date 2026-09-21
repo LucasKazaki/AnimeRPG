@@ -26,6 +26,9 @@ add_executable(AstralGame WIN32
 target_include_directories(AstralGame PRIVATE .)
 target_compile_definitions(AstralGame PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(AstralGame PRIVATE user32 gdi32)
+if(MSVC)
+    target_link_options(AstralGame PRIVATE "$<$<CONFIG:Release>:/Brepro>")
+endif()
 
 include(CTest)
 if(BUILD_TESTING)
