@@ -43,6 +43,7 @@ public:
     bool Configure(const ProcessMemoryCaptureConfig& config, std::string& error);
     ProcessMemoryEnvironmentStatus ConfigureFromEnvironment(std::string& error);
     bool Enabled() const noexcept;
+    const ProcessMemoryCaptureConfig& Config() const noexcept { return config_; }
     bool RecordSample(const ProcessMemorySample& sample) noexcept;
     bool RecordCurrentProcess(std::uint64_t frameIndex) noexcept;
     bool Flush(std::string& error);
