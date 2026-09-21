@@ -52,7 +52,9 @@ bool BenchmarkRunControl::Configure(
     enabled_ = false;
     flushed_ = false;
     overrun_ = false;
+    clientAreaInvalid_ = false;
     completedFrames_ = 0;
+    clientAreaObservations_ = 0;
     config_ = {};
 
     if (config.simulationFixedHz < 1 || config.simulationFixedHz > 1000) {
@@ -66,6 +68,11 @@ bool BenchmarkRunControl::Configure(
     if (config.warmupFrames > kHardMaxFrames
         || config.warmupFrames > kHardMaxFrames - config.measuredFrames) {
         error = "benchmark warmup plus measured frames must be <= 1000000";
+        return false;
+    }
+    if (config.clientWidthPx == 0 || config.clientWidthPx > kHardMaxClientDimension
+        || config.clientHeightPx == 0 || config.clientHeightPx > kHardMaxClientDimension) {
+        error = "benchmark client dimensions must be in [1, 16384] pixels";
         return false;
     }
     if (config.receiptPath.empty() || !config.receiptPath.is_absolute()) {
@@ -97,7 +104,10 @@ bool BenchmarkRunControl::Configure(
 }
 
 BenchmarkRunControlEnvironmentStatus BenchmarkRunControl::ConfigureFromEnvironment(
-    std::uint32_t simulationFixedHz, std::string& error) {
+    std::uint32_t simulationFixedHz,
+    std::uint32_t clientWidthPx,
+    std::uint32_t clientHeightPx,
+    std::string& error) {
     error.clear();
 
 #ifdef _WIN32
@@ -129,7 +139,8 @@ BenchmarkRunControlEnvironmentStatus BenchmarkRunControl::ConfigureFromEnvironme
         return BenchmarkRunControlEnvironmentStatus::Invalid;
     }
     BenchmarkRunControlConfig config{
-        std::filesystem::path(receipt), simulationFixedHz, warmupFrames, measuredFrames};
+        std::filesystem::path(receipt), simulationFixedHz, warmupFrames, measuredFrames,
+        clientWidthPx, clientHeightPx};
 #else
     const char* mode = std::getenv("ASTRAL_BENCHMARK_MODE");
     const char* warmup = std::getenv("ASTRAL_BENCHMARK_WARMUP_FRAMES");
@@ -159,7 +170,8 @@ BenchmarkRunControlEnvironmentStatus BenchmarkRunControl::ConfigureFromEnvironme
         return BenchmarkRunControlEnvironmentStatus::Invalid;
     }
     BenchmarkRunControlConfig config{
-        std::filesystem::u8path(receipt), simulationFixedHz, warmupFrames, measuredFrames};
+        std::filesystem::u8path(receipt), simulationFixedHz, warmupFrames, measuredFrames,
+        clientWidthPx, clientHeightPx};
 #endif
 
     if (!Configure(config, error)) {
@@ -172,10 +184,29 @@ std::uint64_t BenchmarkRunControl::TotalFrames() const noexcept {
     return config_.warmupFrames + config_.measuredFrames;
 }
 
+bool BenchmarkRunControl::ObserveClientArea(
+    std::uint32_t widthPx, std::uint32_t heightPx) noexcept {
+    if (!enabled_ || flushed_ || clientAreaInvalid_) return false;
+    if (clientAreaObservations_ != completedFrames_) {
+        clientAreaInvalid_ = true;
+        return false;
+    }
+    if (widthPx != config_.clientWidthPx || heightPx != config_.clientHeightPx) {
+        clientAreaInvalid_ = true;
+        return false;
+    }
+    ++clientAreaObservations_;
+    return true;
+}
+
 bool BenchmarkRunControl::CompleteFrame() noexcept {
-    if (!enabled_ || flushed_) return false;
+    if (!enabled_ || flushed_ || clientAreaInvalid_) return false;
     if (completedFrames_ >= TotalFrames()) {
         overrun_ = true;
+        return false;
+    }
+    if (clientAreaObservations_ != completedFrames_ + 1) {
+        clientAreaInvalid_ = true;
         return false;
     }
     ++completedFrames_;
@@ -190,6 +221,10 @@ bool BenchmarkRunControl::FlushCompletion(std::string& error) {
     }
     if (flushed_) {
         error = "benchmark control receipt has already been flushed";
+        return false;
+    }
+    if (clientAreaInvalid_ || clientAreaObservations_ != TotalFrames()) {
+        error = "benchmark client area was not observed as stable for every completed frame";
         return false;
     }
     if (overrun_ || completedFrames_ != TotalFrames()) {
@@ -223,6 +258,11 @@ bool BenchmarkRunControl::FlushCompletion(std::string& error) {
         << "  \"measured_frames\": " << config_.measuredFrames << ",\n"
         << "  \"total_frames\": " << TotalFrames() << ",\n"
         << "  \"completed_frames\": " << completedFrames_ << ",\n"
+        << "  \"client_width_px\": " << config_.clientWidthPx << ",\n"
+        << "  \"client_height_px\": " << config_.clientHeightPx << ",\n"
+        << "  \"client_area_observations\": " << clientAreaObservations_ << ",\n"
+        << "  \"client_area_stable\": true,\n"
+        << "  \"window_mode\": \"windowed\",\n"
         << "  \"live_input\": \"suppressed\",\n"
         << "  \"termination\": \"exact_frame_limit\",\n"
         << "  \"performance_budget_verified\": false,\n"
