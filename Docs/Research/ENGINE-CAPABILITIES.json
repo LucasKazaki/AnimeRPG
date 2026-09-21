@@ -47,8 +47,8 @@
     {
       "id": "E11-EDITOR-SHELL-2026-09-22",
       "kind": "editor-tooling-slice",
-      "status": "portable_layout_verified_windows_and_native_gui_pending",
-      "covered_subrequirement": "separate Win32 editor frame with toolbar, Outliner, procedural viewport, Inspector and primitive asset browser; no scene mutation or serialization",
+      "status": "portable_and_hosted_windows_verified_native_gui_pending",
+      "covered_subrequirement": "separate Win32 editor frame with toolbar, Outliner, procedural viewport, Inspector and primitive asset browser; unsupported Select/Move/Rotate/Scale/Play toolbar actions are explicitly disabled pending real behavior; no scene mutation or serialization",
       "task": "Tasks/E11-EDITOR-SHELL-2026-09-22.md",
       "evidence": "Docs/QA/E11-EDITOR-SHELL-2026-09-22.md"
     }

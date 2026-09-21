@@ -14,14 +14,24 @@ Accessed 2026-09-22:
 
 - Epic, Unreal Engine 5.8, Unreal Editor Interface: https://dev.epicgames.com/documentation/unreal-engine/unreal-editor-interface
   - Relevant minimum concepts: toolbar, level viewport, Outliner, Details panel and Content Drawer/Browser.
+- Epic, Unreal Engine 5.8, Viewport Toolbar: https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar
+  - Relevant minimum concept: Select, Move, Rotate and Scale are executable viewport manipulation modes backed by transform gizmos, not decorative toolbar labels.
 - Epic, Unreal Engine 5.8, Content Browser: https://dev.epicgames.com/documentation/en-us/unreal-engine/content-browser-in-unreal-engine
   - Relevant minimum concept: project asset browsing/management is a first-class editor surface.
-- Unity Manual, Unity 6.1 Scene view navigation: https://docs.unity3d.com/Manual/SceneViewNavigation.html
+- Unity Manual, Unity 6.0 (6000.0), Position GameObjects: https://docs.unity3d.com/6000.0/Documentation/Manual/PositioningGameObjects.html
+  - Relevant minimum concept: Move, Rotate and Scale tools manipulate selected GameObjects through gizmos or Inspector transform fields.
+- Unity 6.1 Scene view navigation: https://docs.unity3d.com/Manual/SceneViewNavigation.html
   - Relevant minimum concept: Scene view is the authoring view, distinct from the final Game view.
-- Unity Manual editor-interface documentation (current/manual family): https://docs.unity3d.com/Manual/UsingTheEditor.html
+- Unity editor interface manual family: https://docs.unity3d.com/Manual/UsingTheEditor.html
   - Relevant minimum concepts: Hierarchy, Scene view, Inspector, Project window and Play controls.
 
-No proprietary source was copied. The panel arrangement is an original Astral implementation using Win32 child controls and GDI.
+No proprietary source was copied. The panel arrangement and command-state model are original Astral implementations using Win32 child controls, GDI and dependency-free C++17.
+
+## Bounded command-honesty repair
+
+A source audit after the first hosted editor build found that `Select`, `Move`, `Rotate` and `Scale` were enabled Win32 buttons even though `WM_COMMAND` implemented no handlers for them. Only `Play (pending)` was visibly disabled. That made unsupported editor actions look executable.
+
+This repair stays inside the E11.0 shell packet rather than starting the deferred transform/scene-document feature. The editor now has a deterministic `EditorTool` availability contract. All five toolbar actions are disabled and labeled `(pending)` until the corresponding behavior exists. Outliner selection remains the only admitted live selection path. Enabling a tool in a later packet must be accompanied by its behavior and tests rather than changing presentation alone.
 
 ## Allowed paths
 
@@ -42,7 +52,7 @@ No proprietary source was copied. The panel arrangement is an original Astral im
 
 1. Build a separate `AstralEditor` Windows executable using only existing Win32/GDI system libraries.
 2. Show a toolbar, selection-linked Outliner, central procedural viewport, Inspector, asset/default-primitives browser and status area.
-3. Keep not-yet-implemented controls honest. Play is disabled; save/reopen, gizmos, undo/redo, import and real scene mutation remain explicitly pending.
+3. Keep not-yet-implemented controls honest. `Select`, `Move`, `Rotate`, `Scale` and `Play` toolbar actions are disabled and labeled pending until their actual viewport/edit/play behavior exists. Outliner selection remains functional. Save/reopen, gizmos, undo/redo, import and real scene mutation remain explicitly pending.
 4. Use only procedural editor fixtures (`Scene Root`, camera, light, cube and floor), not paused game content or production art.
 5. Resize without negative panel geometry or panel overlap.
 6. Do not modify `AstralGame`, change GDI, install dependencies or invoke R0.
@@ -55,6 +65,8 @@ Portable source check:
 g++ -std=c++17 -Wall -Wextra -Werror -I. Engine/Editor/EditorLayout.cpp Tests/EditorLayoutTests.cpp -o editor_layout_tests
 ./editor_layout_tests
 ```
+
+`EditorLayoutTests` must cover both panel geometry and the command-state contract: all five toolbar actions remain unavailable in this shell packet. A later packet that enables one must update the corresponding test with actual implementation evidence.
 
 Windows hosted/local gate:
 
@@ -71,6 +83,7 @@ Registered local interactive acceptance, still required after hosted compilation
 - Launch `AstralEditor.exe` from the exact candidate SHA.
 - Capture machine/toolchain identity, command line, UTC timestamps, exit status and screenshots.
 - Verify Outliner selection changes Inspector text and selected viewport label.
+- Verify Select/Move/Rotate/Scale/Play are visibly disabled and labeled pending; clicking/tabbing must not imply an implemented transform or Play mode.
 - Resize repeatedly at 800x600, 1280x720, 1440x900 and maximized desktop size; verify panels remain contained and usable.
 - Verify `AstralGame` still launches separately and no game-content behavior is changed by this packet.
 
