@@ -26,6 +26,11 @@ public:
     static constexpr std::uint64_t kHardMaxFrames = 1000000;
     static constexpr std::uint32_t kHardMaxClientDimension = 16384;
 
+    static BenchmarkRunControlEnvironmentStatus RequestedClientAreaFromEnvironment(
+        std::uint32_t& widthPx,
+        std::uint32_t& heightPx,
+        std::string& error);
+
     bool Configure(const BenchmarkRunControlConfig& config, std::string& error);
     BenchmarkRunControlEnvironmentStatus ConfigureFromEnvironment(
         std::uint32_t simulationFixedHz,
@@ -58,6 +63,7 @@ private:
     bool flushed_{};
     bool overrun_{};
     bool clientAreaInvalid_{};
+    bool explicitClientAreaRequested_{};
 };
 
 } // namespace Astral::Core
