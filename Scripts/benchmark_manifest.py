@@ -161,12 +161,16 @@ def validate_spec(spec: dict[str, Any]) -> dict[str, Any]:
 
 
 def _evidence_file(root: Path, rel: str) -> Path:
+    if root.is_symlink():
+        raise BenchmarkManifestError("evidence root must not be a symlink")
     root = root.resolve(strict=True)
     if not root.is_dir():
         raise BenchmarkManifestError("evidence root must be a directory")
-    p = root.joinpath(*PurePosixPath(rel).parts)
-    if p.is_symlink():
-        raise BenchmarkManifestError(f"symlinked evidence file: {rel}")
+    p = root
+    for part in PurePosixPath(rel).parts:
+        p = p / part
+        if p.is_symlink():
+            raise BenchmarkManifestError(f"symlinked evidence path component: {rel}")
     try:
         resolved = p.resolve(strict=True)
         if os.path.commonpath((str(root), str(resolved))) != str(root):
@@ -223,13 +227,23 @@ def build_manifest(spec: dict[str, Any], package_root: Path, release_path: Path,
 
 def verify_manifest(manifest: dict[str, Any], package_root: Path, release_path: Path, evidence_root: Path) -> dict[str, Any]:
     top = {"schema_version","generated_at_utc","candidate","workload","run_protocol","environment","reference_versions","provenance","evidence","benchmark_descriptor_sha256","acceptance","limitations"}
-    if set(manifest) != top or manifest.get("schema_version") != SCHEMA_VERSION:
+    if not isinstance(manifest, dict) or set(manifest) != top:
+        raise BenchmarkManifestError("benchmark manifest shape/schema mismatch")
+    if isinstance(manifest.get("schema_version"), bool) or manifest.get("schema_version") != SCHEMA_VERSION:
         raise BenchmarkManifestError("benchmark manifest shape/schema mismatch")
     if not isinstance(manifest.get("generated_at_utc"), str) or not UTC_RE.fullmatch(manifest["generated_at_utc"]):
         raise BenchmarkManifestError("generated_at_utc must be second-resolution UTC RFC3339 text")
-    if manifest.get("acceptance") != ACCEPTANCE or manifest.get("limitations") != LIMITATIONS:
+    acceptance = _keys(manifest.get("acceptance"), set(ACCEPTANCE), "acceptance")
+    if any(acceptance[key] is not False for key in ACCEPTANCE) or manifest.get("limitations") != LIMITATIONS:
         raise BenchmarkManifestError("benchmark manifest claim boundaries were changed")
     candidate = _keys(manifest["candidate"], {"commit","build_config","release_manifest_sha256","executable_sha256","package_files_verified"}, "candidate")
+    for key in ("release_manifest_sha256", "executable_sha256"):
+        if not isinstance(candidate[key], str) or not SHA_RE.fullmatch(candidate[key]):
+            raise BenchmarkManifestError(f"candidate.{key} must be a SHA-256 digest")
+    if (isinstance(candidate["package_files_verified"], bool)
+            or not isinstance(candidate["package_files_verified"], int)
+            or candidate["package_files_verified"] < 0):
+        raise BenchmarkManifestError("candidate.package_files_verified must be a non-negative integer")
     evidence = manifest.get("evidence")
     if not isinstance(evidence, list):
         raise BenchmarkManifestError("benchmark evidence must be an array")
@@ -247,6 +261,10 @@ def verify_manifest(manifest: dict[str, Any], package_root: Path, release_path: 
     checked = []
     for item in evidence:
         item = _keys(item, {"path","role","bytes","sha256"}, "benchmark evidence entry")
+        if isinstance(item["bytes"], bool) or not isinstance(item["bytes"], int) or item["bytes"] < 0:
+            raise BenchmarkManifestError(f"invalid evidence byte count: {item['path']}")
+        if not isinstance(item["sha256"], str) or not SHA_RE.fullmatch(item["sha256"]):
+            raise BenchmarkManifestError(f"invalid evidence hash: {item['path']}")
         p = _evidence_file(evidence_root, _safe_rel(item["path"]))
         size, digest = p.stat().st_size, _sha256(p)
         if item["bytes"] != size or item["sha256"] != digest:
