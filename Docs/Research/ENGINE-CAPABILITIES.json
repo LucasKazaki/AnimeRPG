@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "assessed_at": "2026-09-20",
+  "assessed_at": "2026-09-22",
   "repository": "LucasKazaki/AnimeRPG",
   "inspected_base": "e12e6c559bf776ffc9c715c809a517f8e02ce5d5",
   "inspected_engine_tree": "804d643d3b253bd020b7bf6aa3d86c1113ec5d1b",
@@ -27,7 +27,7 @@
     {"id":"E08","title":"Physics and collision","repository_status":"not_found","source_ids":["UNITY-PHYSICS"],"depends_on":["E01","E02"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E09","title":"AI and navigation","repository_status":"partial","source_ids":["UE-AI"],"depends_on":["E02","E08"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E10","title":"Audio engine","repository_status":"not_found","source_ids":["UNITY-AUDIO"],"depends_on":["E01","E03"],"native_evidence":[],"independent_acceptance":false},
-    {"id":"E11","title":"UI and editor tooling","repository_status":"partial","source_ids":["UNITY-UI"],"depends_on":["E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E11","title":"UI and editor tooling","repository_status":"partial_editor_shell_candidate","source_ids":["UNITY-UI"],"depends_on":["E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E12","title":"Genuine 2D support","repository_status":"partial","source_ids":["UNITY-2D"],"depends_on":["E02","E03","E04","E08"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E13","title":"Networking and multiplayer runtime","repository_status":"not_found","source_ids":["UNITY-NET"],"depends_on":["E01","E02"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E14","title":"Profiling and budgets","repository_status":"partial","source_ids":["UE-PROFILE","UNITY-PROFILE"],"depends_on":["E00","E01"],"native_evidence":[],"independent_acceptance":false},
@@ -43,6 +43,16 @@
     "task": "Tasks/E0-ASSET-VALIDATION-2026-09-20.md",
     "evidence": "Docs/QA/E0-ASSET-VALIDATION-2026-09-20.md"
   },
+  "active_candidates": [
+    {
+      "id": "E11-EDITOR-SHELL-2026-09-22",
+      "kind": "editor-tooling-slice",
+      "status": "portable_layout_verified_windows_and_native_gui_pending",
+      "covered_subrequirement": "separate Win32 editor frame with toolbar, Outliner, procedural viewport, Inspector and primitive asset browser; no scene mutation or serialization",
+      "task": "Tasks/E11-EDITOR-SHELL-2026-09-22.md",
+      "evidence": "Docs/QA/E11-EDITOR-SHELL-2026-09-22.md"
+    }
+  ],
   "benchmark_proposals": {
     "status": "not_approved_not_measured",
     "initial_resolutions": ["1920x1080", "2560x1440"],
