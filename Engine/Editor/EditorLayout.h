@@ -18,8 +18,17 @@ struct EditorLayout {
     EditorRect status;
 };
 
+enum class EditorTool {
+    Select,
+    Move,
+    Rotate,
+    Scale,
+    Play,
+};
+
 EditorLayout ComputeEditorLayout(int clientWidth, int clientHeight);
 bool Contains(const EditorRect& outer, const EditorRect& inner);
 bool Overlaps(const EditorRect& a, const EditorRect& b);
+bool IsEditorToolAvailable(EditorTool tool);
 
 } // namespace Astral::Editor

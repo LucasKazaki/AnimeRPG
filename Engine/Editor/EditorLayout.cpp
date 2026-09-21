@@ -53,4 +53,16 @@ bool Overlaps(const EditorRect& a, const EditorRect& b) {
         && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
+bool IsEditorToolAvailable(EditorTool tool) {
+    switch (tool) {
+    case EditorTool::Select:
+    case EditorTool::Move:
+    case EditorTool::Rotate:
+    case EditorTool::Scale:
+    case EditorTool::Play:
+        return false;
+    }
+    return false;
+}
+
 } // namespace Astral::Editor

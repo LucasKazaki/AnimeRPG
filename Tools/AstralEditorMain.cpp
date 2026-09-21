@@ -52,7 +52,7 @@ void ApplyLayout(HWND window) {
 
     int buttonX = 8;
     constexpr int buttonY = 7;
-    constexpr int buttonWidth = 74;
+    constexpr int buttonWidth = 104;
     constexpr int buttonHeight = 28;
     constexpr int buttonGap = 6;
     for (HWND button : {g_selectButton, g_moveButton, g_rotateButton, g_scaleButton, g_playButton}) {
@@ -153,15 +153,25 @@ HWND MakeControl(HWND parent, const wchar_t* className, const wchar_t* text,
         GetModuleHandleW(nullptr), nullptr);
 }
 
+void ApplyToolAvailability() {
+    using Astral::Editor::EditorTool;
+    using Astral::Editor::IsEditorToolAvailable;
+    EnableWindow(g_selectButton, IsEditorToolAvailable(EditorTool::Select) ? TRUE : FALSE);
+    EnableWindow(g_moveButton, IsEditorToolAvailable(EditorTool::Move) ? TRUE : FALSE);
+    EnableWindow(g_rotateButton, IsEditorToolAvailable(EditorTool::Rotate) ? TRUE : FALSE);
+    EnableWindow(g_scaleButton, IsEditorToolAvailable(EditorTool::Scale) ? TRUE : FALSE);
+    EnableWindow(g_playButton, IsEditorToolAvailable(EditorTool::Play) ? TRUE : FALSE);
+}
+
 LRESULT CALLBACK EditorWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_CREATE: {
-        g_selectButton = MakeControl(window, L"BUTTON", L"Select", BS_PUSHBUTTON);
-        g_moveButton = MakeControl(window, L"BUTTON", L"Move", BS_PUSHBUTTON);
-        g_rotateButton = MakeControl(window, L"BUTTON", L"Rotate", BS_PUSHBUTTON);
-        g_scaleButton = MakeControl(window, L"BUTTON", L"Scale", BS_PUSHBUTTON);
+        g_selectButton = MakeControl(window, L"BUTTON", L"Select (pending)", BS_PUSHBUTTON);
+        g_moveButton = MakeControl(window, L"BUTTON", L"Move (pending)", BS_PUSHBUTTON);
+        g_rotateButton = MakeControl(window, L"BUTTON", L"Rotate (pending)", BS_PUSHBUTTON);
+        g_scaleButton = MakeControl(window, L"BUTTON", L"Scale (pending)", BS_PUSHBUTTON);
         g_playButton = MakeControl(window, L"BUTTON", L"Play (pending)", BS_PUSHBUTTON);
-        EnableWindow(g_playButton, FALSE);
+        ApplyToolAvailability();
 
         g_outlinerLabel = MakeControl(window, L"STATIC", L"OUTLINER", SS_LEFT);
         g_outliner = MakeControl(window, L"LISTBOX", L"",
@@ -179,7 +189,7 @@ LRESULT CALLBACK EditorWindowProc(HWND window, UINT message, WPARAM wParam, LPAR
         }
 
         g_status = MakeControl(window, L"STATIC",
-            L"E11.0 editor shell | selection-linked Outliner/Inspector | gizmos, undo/redo, save/reopen, Play and real asset import pending",
+            L"E11.0 editor shell | Outliner selection works | viewport transform tools, undo/redo, save/reopen, Play and real asset import pending",
             SS_LEFT);
         UpdateInspector();
         ApplyLayout(window);

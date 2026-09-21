@@ -7,6 +7,8 @@ namespace {
 using Astral::Editor::ComputeEditorLayout;
 using Astral::Editor::Contains;
 using Astral::Editor::EditorRect;
+using Astral::Editor::EditorTool;
+using Astral::Editor::IsEditorToolAvailable;
 using Astral::Editor::Overlaps;
 
 bool Expect(bool condition, const char* message) {
@@ -53,6 +55,17 @@ int main() {
     ok &= Expect(standard.assets.height == 180, "standard asset browser height changed");
     ok &= Expect(standard.viewport.width == 800, "standard viewport width changed");
     ok &= Expect(standard.viewport.height == 474, "standard viewport height changed");
+
+    ok &= Expect(!IsEditorToolAvailable(EditorTool::Select),
+        "Select toolbar control must remain disabled until viewport selection exists");
+    ok &= Expect(!IsEditorToolAvailable(EditorTool::Move),
+        "Move toolbar control must remain disabled until transform editing exists");
+    ok &= Expect(!IsEditorToolAvailable(EditorTool::Rotate),
+        "Rotate toolbar control must remain disabled until transform editing exists");
+    ok &= Expect(!IsEditorToolAvailable(EditorTool::Scale),
+        "Scale toolbar control must remain disabled until transform editing exists");
+    ok &= Expect(!IsEditorToolAvailable(EditorTool::Play),
+        "Play toolbar control must remain disabled until play-in-editor exists");
 
     if (!ok) return EXIT_FAILURE;
     std::cout << "EditorLayoutTests: PASS\n";
