@@ -46,7 +46,7 @@ Sources rechecked on 2026-09-21 before implementation:
    - `WorkingSetSize` is the current working-set size in bytes; `PeakWorkingSetSize` is its lifetime peak. `PrivateUsage` is process commit charge, the total private committed memory for the running process.
    - Applicability: Astral can retain OS process-level resident and private-commit evidence without claiming allocator ownership or leak attribution.
 2. Microsoft Learn, `GetProcessMemoryInfo`: https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo
-   - Retrieves process memory counters and returns zero on failure.
+   - Retrieves process memory counters and returns zero on failure. With current Windows SDK PSAPI headers, the modern symbol resolves through Kernel32; this packet adds no third-party or separately redistributed library.
    - Applicability: use the current Astral process handle and `PROCESS_MEMORY_COUNTERS_EX`; sampler failure must block evidence publication.
 3. Epic Games, Unreal Engine 5.8, Memory Insights: https://dev.epicgames.com/documentation/unreal-engine/memory-insights-in-unreal-engine
    - UE tracks allocation/free events, callstacks, LLM tags, memory growth/decline, and leak-oriented queries.
@@ -58,7 +58,7 @@ Sources rechecked on 2026-09-21 before implementation:
    - Unity provides allocation-focused memory profiling for Unity 6000.0.
    - Applicability: Astral's process counters are only an initial measurable RAM layer.
 
-No proprietary engine source is copied. No third-party package is imported. The Windows implementation uses documented OS APIs and the Windows SDK already required by the native project. `Psapi.lib` is a Windows system import library, not a new redistributed dependency.
+No proprietary engine source is copied. No third-party package is imported. The Windows implementation uses documented OS APIs and headers from the Windows SDK already required by the native project. No new redistributable runtime dependency is intentionally introduced.
 
 ## Implementation contract
 
