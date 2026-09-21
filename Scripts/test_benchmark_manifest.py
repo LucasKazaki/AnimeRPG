@@ -172,6 +172,39 @@ class BenchmarkManifestTests(unittest.TestCase):
             with self.assertRaises(benchmark_manifest.BenchmarkManifestError):
                 fx.verify(manifest)
 
+    def test_bool_laundering_in_verification_fields_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            manifest = fx.build()
+            manifest["acceptance"]["performance_budget_verified"] = 0
+            with self.assertRaises(benchmark_manifest.BenchmarkManifestError):
+                fx.verify(manifest)
+            manifest = fx.build()
+            manifest["candidate"]["package_files_verified"] = True
+            with self.assertRaises(benchmark_manifest.BenchmarkManifestError):
+                fx.verify(manifest)
+            manifest = fx.build()
+            manifest["evidence"][0]["bytes"] = False
+            with self.assertRaises(benchmark_manifest.BenchmarkManifestError):
+                fx.verify(manifest)
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlink unavailable")
+    def test_intermediate_symlink_evidence_path_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            real = fx.evidence / "real"
+            real.mkdir()
+            (real / "sample.log").write_text("sample\n", encoding="utf-8")
+            alias = fx.evidence / "alias"
+            try:
+                os.symlink(real, alias, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"directory symlink creation unavailable: {exc}")
+            spec = valid_spec()
+            spec["evidence"] = [{"path": "alias/sample.log", "role": "linked"}]
+            with self.assertRaises(benchmark_manifest.BenchmarkManifestError):
+                fx.build(spec)
+
     def test_cli_round_trip(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
