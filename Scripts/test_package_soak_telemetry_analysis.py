@@ -50,8 +50,12 @@ def write_fixture(root: Path, *, samples: list[dict] | None = None, passed: bool
         "telemetry_sha256": telemetry_hash,
         "telemetry_summary": summary,
         "passed": passed,
+        "evidence_kind": "synthetic_contract",
         "acceptance": {
+            "continuous_package_uptime_observed": False,
             "required_24h_duration_observed": False,
+            "ram_telemetry_observed": False,
+            "package_unchanged_after_soak": True,
             "required_24h_soak_verified": False,
             "ram_budget_verified": False,
             "vram_budget_verified": False,
@@ -124,6 +128,15 @@ class SoakTelemetryAnalysisTests(unittest.TestCase):
             with self.assertRaisesRegex(mod.SoakAnalysisError, "handle_count"):
                 mod.analyze(receipt, telemetry)
 
+    def test_non_boolean_passed_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            receipt, telemetry = write_fixture(Path(td))
+            data = json.loads(receipt.read_text(encoding="utf-8"))
+            data["passed"] = "true"
+            receipt.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(mod.SoakAnalysisError, "passed must be boolean"):
+                mod.analyze(receipt, telemetry)
+
     def test_false_acceptance_claim_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             receipt, telemetry = write_fixture(Path(td))
@@ -140,6 +153,17 @@ class SoakTelemetryAnalysisTests(unittest.TestCase):
             data["acceptance"]["required_24h_duration_observed"] = True
             receipt.write_text(json.dumps(data), encoding="utf-8")
             with self.assertRaisesRegex(mod.SoakAnalysisError, "24-hour"):
+                mod.analyze(receipt, telemetry)
+
+    def test_synthetic_receipt_cannot_claim_24h_even_with_long_duration(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            receipt, telemetry = write_fixture(Path(td))
+            data = json.loads(receipt.read_text(encoding="utf-8"))
+            data["requested_duration_seconds"] = 86400.0
+            data["elapsed_seconds"] = 86401.0
+            data["acceptance"]["required_24h_duration_observed"] = True
+            receipt.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(mod.SoakAnalysisError, "passed native continuous"):
                 mod.analyze(receipt, telemetry)
 
     def test_expected_identity_mismatch_rejected(self) -> None:
