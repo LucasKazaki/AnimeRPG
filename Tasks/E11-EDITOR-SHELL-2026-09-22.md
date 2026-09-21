@@ -30,10 +30,13 @@ No proprietary source was copied. The panel arrangement is an original Astral im
 - `Engine/Editor/EditorLayout.cpp`
 - `Tools/AstralEditorMain.cpp`
 - `Tests/EditorLayoutTests.cpp`
+- `Scripts/test_test_safety.py`
 - `Tasks/E11-EDITOR-SHELL-2026-09-22.md`
 - `Docs/QA/E11-EDITOR-SHELL-2026-09-22.md`
 - `Docs/Research/ENGINE-CAPABILITIES-2026-09-20.md`
 - `Docs/Research/ENGINE-CAPABILITIES.json`
+
+`Scripts/test_test_safety.py` is admitted only if hosted CI demonstrates that its current executable-discovery rule falsely classifies the new non-test editor product target as a CTest target. Any repair must continue requiring every executable declared inside the `BUILD_TESTING` block to use `astral_add_test`; it must not weaken Release assertions, timeouts or runtime-smoke serialization.
 
 ## Required behavior
 
