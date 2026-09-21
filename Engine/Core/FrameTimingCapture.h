@@ -32,6 +32,7 @@ public:
     bool Configure(const FrameTimingCaptureConfig& config, std::string& error);
     FrameTimingEnvironmentStatus ConfigureFromEnvironment(std::string& error);
     bool Enabled() const noexcept;
+    const FrameTimingCaptureConfig& Config() const noexcept { return config_; }
     bool Record(std::uint64_t frameIndex, double cpuFrameIntervalMs) noexcept;
     bool Flush(std::string& error);
 
