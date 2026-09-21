@@ -24,6 +24,11 @@ def receipt() -> dict:
         "measured_frames": 3600,
         "total_frames": 3720,
         "completed_frames": 3720,
+        "client_width_px": 1920,
+        "client_height_px": 1080,
+        "client_area_observations": 3720,
+        "client_area_stable": True,
+        "window_mode": "windowed",
         "live_input": "suppressed",
         "termination": "exact_frame_limit",
         "performance_budget_verified": False,
@@ -108,6 +113,11 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
             self.assertEqual(report["warmup_frames"], 120)
             self.assertEqual(report["measured_frames"], 3600)
             self.assertEqual(report["completed_frames"], 3720)
+            self.assertEqual(report["client_width_px"], 1920)
+            self.assertEqual(report["client_height_px"], 1080)
+            self.assertEqual(report["client_area_observations"], 3720)
+            self.assertTrue(report["client_area_stable"])
+            self.assertEqual(report["window_mode"], "windowed")
             self.assertEqual(report["live_input"], "suppressed")
             self.assertFalse(report["acceptance"]["comparative_parity_verified"])
 
@@ -151,11 +161,13 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
                 with self.assertRaises(run_control.BenchmarkRunControlError):
                     run_control.validate_receipt(data)
 
-    def test_wrong_mode_input_or_termination_is_rejected(self):
+    def test_wrong_mode_input_termination_or_window_state_is_rejected(self):
         cases = (
             ("mode", "variable_time"),
             ("live_input", "enabled"),
             ("termination", "window_close"),
+            ("window_mode", "borderless"),
+            ("client_area_stable", False),
         )
         for key, value in cases:
             with self.subTest(key=key):
@@ -164,7 +176,7 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
                 with self.assertRaises(run_control.BenchmarkRunControlError):
                     run_control.validate_receipt(data)
 
-    def test_invalid_rate_and_counts_are_rejected(self):
+    def test_invalid_rate_counts_and_client_area_are_rejected(self):
         cases = (
             ("simulation_fixed_hz", 0),
             ("simulation_fixed_hz", 1001),
@@ -173,6 +185,12 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
             ("measured_frames", 0),
             ("total_frames", 3719),
             ("completed_frames", 3719),
+            ("client_width_px", 0),
+            ("client_width_px", 16385),
+            ("client_width_px", True),
+            ("client_height_px", 0),
+            ("client_height_px", 16385),
+            ("client_area_observations", 3719),
         )
         for key, value in cases:
             with self.subTest(key=key):
@@ -180,6 +198,31 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
                 data[key] = value
                 with self.assertRaises(run_control.BenchmarkRunControlError):
                     run_control.validate_receipt(data)
+
+    def test_protocol_client_area_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            wrong_width = spec()
+            wrong_width["run_protocol"]["width"] = 1919
+            fx.rebuild(wrong_width)
+            with self.assertRaises(run_control.BenchmarkRunControlError):
+                fx.verify()
+
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            wrong_height = spec()
+            wrong_height["run_protocol"]["height"] = 1079
+            fx.rebuild(wrong_height)
+            with self.assertRaises(run_control.BenchmarkRunControlError):
+                fx.verify()
+
+        with tempfile.TemporaryDirectory() as td:
+            fx = Fixture(Path(td))
+            wrong_mode = spec()
+            wrong_mode["run_protocol"]["window_mode"] = "borderless"
+            fx.rebuild(wrong_mode)
+            with self.assertRaises(run_control.BenchmarkRunControlError):
+                fx.verify()
 
     def test_extra_or_missing_keys_are_rejected(self):
         data = receipt()
