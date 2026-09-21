@@ -17,7 +17,7 @@ COMMIT = "b" * 40
 
 def receipt() -> dict:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "mode": "fixed_frame_count",
         "simulation_fixed_hz": 60,
         "warmup_frames": 120,
@@ -28,6 +28,7 @@ def receipt() -> dict:
         "client_height_px": 1080,
         "client_area_observations": 3720,
         "client_area_stable": True,
+        "client_area_control": "environment_requested_and_verified",
         "window_mode": "windowed",
         "live_input": "suppressed",
         "termination": "exact_frame_limit",
@@ -117,6 +118,9 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
             self.assertEqual(report["client_height_px"], 1080)
             self.assertEqual(report["client_area_observations"], 3720)
             self.assertTrue(report["client_area_stable"])
+            self.assertEqual(
+                report["client_area_control"], "environment_requested_and_verified"
+            )
             self.assertEqual(report["window_mode"], "windowed")
             self.assertEqual(report["live_input"], "suppressed")
             self.assertFalse(report["acceptance"]["comparative_parity_verified"])
@@ -168,6 +172,7 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
             ("termination", "window_close"),
             ("window_mode", "borderless"),
             ("client_area_stable", False),
+            ("client_area_control", "configured_contract"),
         )
         for key, value in cases:
             with self.subTest(key=key):
@@ -175,6 +180,12 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
                 data[key] = value
                 with self.assertRaises(run_control.BenchmarkRunControlError):
                     run_control.validate_receipt(data)
+
+    def test_old_receipt_schema_is_rejected(self):
+        data = receipt()
+        data["schema_version"] = 1
+        with self.assertRaises(run_control.BenchmarkRunControlError):
+            run_control.validate_receipt(data)
 
     def test_invalid_rate_counts_and_client_area_are_rejected(self):
         cases = (
@@ -230,7 +241,7 @@ class BenchmarkRunControlVerificationTests(unittest.TestCase):
         with self.assertRaises(run_control.BenchmarkRunControlError):
             run_control.validate_receipt(data)
         data = receipt()
-        del data["termination"]
+        del data["client_area_control"]
         with self.assertRaises(run_control.BenchmarkRunControlError):
             run_control.validate_receipt(data)
 
