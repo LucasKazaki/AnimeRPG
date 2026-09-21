@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_executable(AstralGame WIN32
     Engine/Assets/StaticMesh.cpp
     Engine/Core/Clock.cpp
+    Engine/Core/FrameTimingCapture.cpp
     Engine/Core/Logger.cpp
     Engine/Platform/Win32Application.cpp
     Engine/Renderer/Renderer.cpp
@@ -36,6 +37,14 @@ if(BUILD_TESTING)
     add_executable(AstralMathTests Tests/MathTests.cpp)
     target_include_directories(AstralMathTests PRIVATE .)
     astral_add_test(AstralMathTests)
+
+    add_executable(FrameTimingCaptureTests
+        Engine/Core/Clock.cpp
+        Engine/Core/FrameTimingCapture.cpp
+        Tests/FrameTimingCaptureTests.cpp
+    )
+    target_include_directories(FrameTimingCaptureTests PRIVATE .)
+    astral_add_test(FrameTimingCaptureTests)
 
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp
