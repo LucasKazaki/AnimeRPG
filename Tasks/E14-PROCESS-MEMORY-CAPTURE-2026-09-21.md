@@ -25,13 +25,16 @@ Only these paths may change in this packet:
 
 1. `Engine/Core/ProcessMemoryCapture.h`
 2. `Engine/Core/ProcessMemoryCapture.cpp`
-3. `Engine/Platform/Win32Application.cpp`
-4. `Tests/ProcessMemoryCaptureTests.cpp`
-5. `Tests/FrameTiming/CMakeLists.txt`
-6. `CMakeLists.txt`
-7. `.github/workflows/frame-timing-validation.yml`
-8. `Tasks/E14-PROCESS-MEMORY-CAPTURE-2026-09-21.md`
-9. `Docs/QA/E14-PROCESS-MEMORY-CAPTURE-2026-09-21.md`
+3. `Engine/Core/Clock.h`
+4. `Engine/Core/Clock.cpp`
+5. `Tests/ProcessMemoryCaptureTests.cpp`
+6. `Tests/FrameTiming/CMakeLists.txt`
+7. `CMakeLists.txt`
+8. `.github/workflows/frame-timing-validation.yml`
+9. `Tasks/E14-PROCESS-MEMORY-CAPTURE-2026-09-21.md`
+10. `Docs/QA/E14-PROCESS-MEMORY-CAPTURE-2026-09-21.md`
+
+The initial task draft named `Win32Application.cpp`, but inspection showed that `Clock::Tick()` already owns the frame index and whole-frame capture. The packet was narrowed before application integration so process sampling can share that existing frame identity without touching the larger platform loop. `Win32Application.cpp` is not modified by this packet.
 
 No dependency, renderer/API, game-content, Company Runtime, scheduler, repository-permission, release, or deployment path is authorized.
 
@@ -76,7 +79,7 @@ On Windows, sampled frames use `GetProcessMemoryInfo(GetCurrentProcess(), PROCES
 
 The stream must label its scope and limitations explicitly: current process only, OS counters, allocator attribution unavailable, VRAM unavailable, leak detection not established, no performance-budget claim, and no acceptance claim. Output uses a fresh `.partial` file followed by no-overwrite publication, matching the existing E14 evidence style. Any measured invalid sample or production-sampler failure blocks final publication. Warmup and non-stride frames are ignored before validation.
 
-The Win32 loop records the process sample after the existing render/wait and phase sample for the same monotonically increasing frame index. Capture remains off unless explicitly requested.
+`Clock` owns both the existing whole-frame stream and the new process-memory capture. On each `Tick()`, both receive the same monotonically increasing frame index before it advances. The memory sample therefore represents process state at that frame's `Clock::Tick()` boundary, not allocator attribution or GPU residency. Capture remains off unless explicitly requested.
 
 ## Verification contract
 
