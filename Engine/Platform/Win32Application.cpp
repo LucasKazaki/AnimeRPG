@@ -4,6 +4,7 @@
 #include "Engine/Core/Clock.h"
 #include "Engine/Core/FramePhaseTimingCapture.h"
 #include "Engine/Core/Logger.h"
+#include "Engine/Core/ProfilingCaptureStateReceipt.h"
 #include "Engine/Renderer/Renderer.h"
 
 #include <chrono>
@@ -260,6 +261,24 @@ int Win32Application::Run() {
     if (phaseTimingStatus == Astral::Core::FramePhaseTimingEnvironmentStatus::Invalid) {
         std::fprintf(stderr, "Astral frame phase timing capture configuration rejected: %s\n",
             phaseTimingError.c_str());
+    }
+
+    std::string captureStateError;
+    const auto captureStateStatus = Astral::Core::ProfilingCaptureStateReceipt::WriteFromEnvironment(
+        benchmarkRunControl,
+        clock.FrameTimingStatus(), clock.FrameTimingConfig(),
+        phaseTimingStatus, phaseTimingCapture.Config(),
+        clock.ProcessMemoryStatus(), clock.ProcessMemoryConfig(),
+        captureStateError);
+    if (captureStateStatus == Astral::Core::ProfilingCaptureStateReceiptStatus::Invalid
+        || (benchmarkRunControl.Enabled()
+            && captureStateStatus != Astral::Core::ProfilingCaptureStateReceiptStatus::Written)) {
+        if (captureStateError.empty()) {
+            captureStateError = "benchmark mode requires ASTRAL_PROFILING_CAPTURE_STATE_JSON";
+        }
+        std::fprintf(stderr, "Astral profiling capture-state receipt rejected: %s\n",
+            captureStateError.c_str());
+        return 7;
     }
 
     MSG message{};
