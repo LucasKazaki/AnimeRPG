@@ -18,6 +18,8 @@ on:
       - "Scripts/test_package_continuous_soak.py"
       - "Scripts/analyze_package_soak_telemetry.py"
       - "Scripts/test_package_soak_telemetry_analysis.py"
+      - "Scripts/benchmark_manifest.py"
+      - "Scripts/test_benchmark_manifest.py"
       - ".github/workflows/release-manifest-validation.yml"
 
 permissions:
@@ -48,6 +50,9 @@ jobs:
 
       - name: Verify package soak-analysis contracts
         run: python Scripts/test_package_soak_telemetry_analysis.py
+
+      - name: Verify benchmark-manifest contracts
+        run: python Scripts/test_benchmark_manifest.py
 
       - name: Configure and build Release executable
         shell: pwsh
@@ -84,8 +89,85 @@ jobs:
             Write-Error "Manifest verification must not claim launch, clean-machine, or independent acceptance"
             exit 1
           }
+          "ASTRAL_MANIFEST_PACKAGE=$package" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ASTRAL_MANIFEST_PATH=$manifest" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ASTRAL_MANIFEST_COMMIT=$commit" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ASTRAL_MANIFEST_EXE_SHA256=$exeHash" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "Hosted manifest commit: $commit"
           Write-Host "Hosted AstralGame.exe SHA-256: $exeHash"
+
+      - name: Bind hosted benchmark-manifest contract fixture
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP "Astral-benchmark-evidence"
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          $timing = Join-Path $evidence "contract-frame-timings.json"
+          $machine = Join-Path $evidence "contract-machine.txt"
+          '{"fixture":true,"performance_measurement":false}' | Set-Content $timing -Encoding utf8
+          $os = Get-CimInstance Win32_OperatingSystem
+          $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+          $system = Get-CimInstance Win32_ComputerSystem
+          $video = Get-CimInstance Win32_VideoController | Select-Object -First 1
+          @(
+            "Hosted contract fixture only; not native performance evidence."
+            "OS=$($os.Caption) $($os.Version)"
+            "CPU=$($cpu.Name)"
+            "LogicalProcessors=$($cpu.NumberOfLogicalProcessors)"
+            "RAM=$($system.TotalPhysicalMemory)"
+            "Video=$($video.Name)"
+            "VideoDriver=$($video.DriverVersion)"
+          ) | Set-Content $machine -Encoding utf8
+          $cpuName = if ($cpu.Name) { $cpu.Name.Trim() } else { "GitHub-hosted Windows CPU" }
+          $logical = [int]$cpu.NumberOfLogicalProcessors
+          if ($logical -lt 1) { $logical = 1 }
+          $ram = [int64]$system.TotalPhysicalMemory
+          if ($ram -lt 1) { $ram = 1 }
+          $gpuName = if ($video.Name) { $video.Name.Trim() } else { "No benchmark GPU claimed" }
+          $driver = if ($video.DriverVersion) { $video.DriverVersion.Trim() } else { "not-claimed" }
+          $spec = [ordered]@{
+            candidate = [ordered]@{ commit = $env:ASTRAL_MANIFEST_COMMIT; build_config = "Release" }
+            workload = [ordered]@{
+              id = "hosted-contract-3d-v1"
+              dimension = "3d"
+              fixture_description = "Hosted package-bound schema fixture only; no rendered performance workload executed"
+            }
+            run_protocol = [ordered]@{
+              width = 1920; height = 1080; window_mode = "windowed"; vsync = $false
+              warmup_seconds = 0; sample_seconds = 1
+            }
+            environment = [ordered]@{
+              os = "$($os.Caption) $($os.Version)"
+              cpu = $cpuName
+              logical_cpus = $logical
+              ram_bytes = $ram
+              gpu = $gpuName
+              gpu_driver = $driver
+            }
+            reference_versions = [ordered]@{ unreal = "5.8"; unity = "6000.0" }
+            provenance = [ordered]@{ evidence_class = "hosted_contract_fixture"; machine_label = "github-windows-2022" }
+            evidence = @(
+              [ordered]@{ path = "contract-frame-timings.json"; role = "contract_timing_fixture" },
+              [ordered]@{ path = "contract-machine.txt"; role = "machine_receipt" }
+            )
+          }
+          $specPath = Join-Path $env:RUNNER_TEMP "Astral-benchmark-spec.json"
+          $benchmark = Join-Path $env:RUNNER_TEMP "Astral-benchmark-manifest.json"
+          $verify = Join-Path $env:RUNNER_TEMP "Astral-benchmark-verification.json"
+          $spec | ConvertTo-Json -Depth 8 | Set-Content $specPath -Encoding utf8
+          python Scripts/benchmark_manifest.py create $specPath $env:ASTRAL_MANIFEST_PACKAGE $env:ASTRAL_MANIFEST_PATH $evidence $benchmark
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python Scripts/benchmark_manifest.py verify $benchmark $env:ASTRAL_MANIFEST_PACKAGE $env:ASTRAL_MANIFEST_PATH $evidence --json $verify
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $result = Get-Content $verify -Raw | ConvertFrom-Json
+          if ($result.benchmark_manifest_verified -ne $true -or $result.candidate_commit -ne $env:ASTRAL_MANIFEST_COMMIT -or $result.executable_sha256 -ne $env:ASTRAL_MANIFEST_EXE_SHA256) {
+            Write-Error "Hosted benchmark manifest did not remain bound to the exact staged package"
+            exit 1
+          }
+          if ($result.acceptance.performance_budget_verified -ne $false -or $result.acceptance.comparative_parity_verified -ne $false -or $result.acceptance.clean_machine_compatibility_verified -ne $false -or $result.acceptance.independent_acceptance -ne $false) {
+            Write-Error "Hosted benchmark contract fixture must not claim native performance or acceptance"
+            exit 1
+          }
+          Write-Host "Hosted benchmark descriptor SHA-256: $($result.benchmark_descriptor_sha256)"
 
       - name: Confirm clean tracked tree
         shell: pwsh
