@@ -257,7 +257,7 @@ void TestExactFrameCompletionAndReceipt() {
     CHECK(!std::filesystem::exists(receipt.string() + ".partial"));
 
     const std::string text = ReadText(receipt);
-    CHECK(text.find("\"schema_version\": 2") != std::string::npos);
+    CHECK(text.find("\"schema_version\": 3") != std::string::npos);
     CHECK(text.find("\"simulation_fixed_hz\": 60") != std::string::npos);
     CHECK(text.find("\"warmup_frames\": 2") != std::string::npos);
     CHECK(text.find("\"measured_frames\": 3") != std::string::npos);
@@ -268,6 +268,9 @@ void TestExactFrameCompletionAndReceipt() {
     CHECK(text.find("\"client_area_stable\": true") != std::string::npos);
     CHECK(text.find("\"client_area_control\": \"configured_contract\"") != std::string::npos);
     CHECK(text.find("\"window_mode\": \"windowed\"") != std::string::npos);
+    CHECK(text.find("\"presentation_backend\": \"win32_gdi_window_dc\"") != std::string::npos);
+    CHECK(text.find("\"vsync_control\": \"unavailable_in_gdi_path\"") != std::string::npos);
+    CHECK(text.find("\"frame_pacing\": \"sleep_1ms_not_refresh_locked\"") != std::string::npos);
     CHECK(text.find("\"live_input\": \"suppressed\"") != std::string::npos);
     CHECK(text.find("\"termination\": \"exact_frame_limit\"") != std::string::npos);
     CHECK(text.find("\"comparative_parity_verified\": false") != std::string::npos);
@@ -374,8 +377,14 @@ void TestEnvironmentHappyPath() {
     CHECK(control.CompleteFrame());
     CHECK(control.FlushCompletion(error));
     const std::string text = ReadText(receipt);
-    CHECK(text.find("\"schema_version\": 2") != std::string::npos);
+    CHECK(text.find("\"schema_version\": 3") != std::string::npos);
     CHECK(text.find("\"client_area_control\": \"environment_requested_and_verified\"")
+        != std::string::npos);
+    CHECK(text.find("\"presentation_backend\": \"win32_gdi_window_dc\"")
+        != std::string::npos);
+    CHECK(text.find("\"vsync_control\": \"unavailable_in_gdi_path\"")
+        != std::string::npos);
+    CHECK(text.find("\"frame_pacing\": \"sleep_1ms_not_refresh_locked\"")
         != std::string::npos);
 
     ClearBenchmarkEnv();
