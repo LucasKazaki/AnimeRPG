@@ -3,21 +3,20 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-22",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "96646c67b034982faf7051f1fb869806a90fe9bd",
+  "last_verified_main_at_pass_start": "e782f595696c046c2c394b636622f700a18d0425",
   "last_merged_pass": {
-    "id": "GAME-PASS8-TRAINING-JOURNEY-2026-09-22",
-    "pr": 22,
-    "merge_sha": "96646c67b034982faf7051f1fb869806a90fe9bd",
-    "head_sha": "3a6f36237e1e487d7ee056ef8801ee889ec7be08",
+    "id": "GAME-PASS9-DIALOGUE-LORE-2026-09-22",
+    "pr": 24,
+    "merge_sha": "e782f595696c046c2c394b636622f700a18d0425",
+    "head_sha": "e5a00c0087669dbc6456c42b2f90c2ae8f752ae3",
     "hosted_windows_ci": "passed",
     "release_manifest": "passed",
-    "profiling_portability": "passed",
     "independent_review": "completed_no_unresolved_major_issues",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-22-dialogue-lore-pass9",
-  "pass": "GAME-PASS9-DIALOGUE-LORE-2026-09-22",
-  "pr": 24,
+  "working_branch": "game/2026-09-22-enemy-patterns-pass10",
+  "pass": "GAME-PASS10-ENEMY-PATTERNS-2026-09-22",
+  "pr": null,
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -29,27 +28,27 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-042","title":"Choice-specific landmark dialogue responses","status":"implemented_domain_behavior_integrated_with_landmark_state"},
-    {"id":"GAME-043","title":"Bounded trust and remembered dialogue topics","status":"implemented_domain_behavior"},
-    {"id":"GAME-044","title":"Original lore journal unlock state","status":"implemented_domain_behavior"},
-    {"id":"GAME-045","title":"Exploration-sensitive investigation clues","status":"implemented_domain_behavior_integrated_with_landmark_state"},
-    {"id":"GAME-046","title":"One-time branching side-objective outcome","status":"implemented_domain_behavior"},
-    {"id":"QOL-010","title":"Eight-beat recent dialogue history","status":"implemented_domain_behavior_no_rendered_history_ui"}
+    {"id":"GAME-047","title":"Deterministic enemy attack plans","status":"implemented_game_domain_registered_test_coverage"},
+    {"id":"GAME-048","title":"Selectable enemy aggression cadence","status":"implemented_game_domain_registered_test_coverage"},
+    {"id":"GAME-049","title":"Boss pressure-phase attack rotation","status":"implemented_game_domain_registered_test_coverage"},
+    {"id":"GAME-050","title":"Stagger interrupts queued enemy windup","status":"implemented_game_domain_registered_test_coverage"},
+    {"id":"GAME-051","title":"Perfect-defense punish opening","status":"implemented_game_domain_registered_test_coverage"},
+    {"id":"QOL-011","title":"Selectable boss practice phase","status":"implemented_game_domain_no_rendered_phase_picker"}
   ],
   "verification": {
-    "compile_time_contract": "passed_gcc_and_clang_cxx17_exact_header_before_push",
-    "sandbox_gcc": "passed_-std=c++17_-Wall_-Wextra_-Werror_exact_LandmarkDialogue_header_runtime_fixture",
-    "sandbox_clang_sanitizers": "passed_-fsanitize=address,undefined_exact_LandmarkDialogue_header_runtime_fixture",
+    "sandbox_gcc": "passed_cxx17_-Wall_-Wextra_-Werror_fixture_exit_0",
+    "sandbox_clang_sanitizers": "passed_cxx17_ASan_UBSan_fixture_exit_0",
+    "registered_test_target": "CombatSandboxTests_via_existing_astral_add_test",
     "hosted_windows_ci": "pending_exact_final_head",
     "release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
     "independent_review": "pending_exact_final_head",
-    "persistence_restart_test": "not_applicable_no_save_format_in_this_packet"
+    "save_compatibility": "not_applicable_no_persistent_format_changed"
   },
   "coordination": {
-    "engine_pr_13": "active draft editor runtime-smoke verification; no overlap with pass-9 game paths",
-    "art_pr_23": "active starter-art documentation/material-source work; no overlap with pass-9 game paths",
-    "shared_engine_paths": "CMake renderer platform editor import audio physics and workflows unchanged"
+    "engine_pr_13": "active draft engine/editor/runtime-smoke work; no overlap with pass-10 paths",
+    "art_pr_23": "active starter-art work; no overlap with pass-10 paths",
+    "shared_engine_paths": "CMake renderer platform editor import animation audio physics workflows dependencies and R0 unchanged"
   },
-  "next_action": "Freeze PR #24, require exact-head hosted Windows/release checks and independent Codex review, repair any finding without weakening acceptance, then merge with expected-head protection only if every applicable gate is green and verify main afterward."
+  "next_action": "Open one scoped pass-10 PR, freeze the exact head, require hosted Windows/repository checks and independent Codex review, fix any finding without weakening acceptance, then merge with expected-head protection only if all applicable gates are green and verify main afterward."
 }
