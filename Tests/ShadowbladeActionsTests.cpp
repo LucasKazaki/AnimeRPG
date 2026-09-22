@@ -213,6 +213,299 @@ void TestInsufficientResourceRejection() {
     Expect(Near(actions.Resource(), 20.0f) && combat.Dummy().health == 100,
         "fatal resource rejection changes no resource or health");
 }
+
+void TestThreatDodgeAndDefenseCounter() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions actions;
+    Expect(actions.BeginIncomingAttack({1.0f, 20, 30, true}),
+        "valid incoming attack enters the telegraph state");
+    const DefenseReport tooEarly = actions.TryDefend(DefenseInput::Dodge);
+    Expect(tooEarly.result == DefenseResult::TooEarly && actions.HasIncomingAttack(),
+        "early dodge does not erase the pending attack");
+
+    actions.AdvanceTime(0.70f);
+    const DefenseReport evaded = actions.TryDefend(DefenseInput::Dodge);
+    Expect(evaded.result == DefenseResult::Evaded && !evaded.counterGranted,
+        "dodge inside the evade window avoids damage without an automatic counter");
+    Expect(actions.PlayerHealth() == ShadowbladeActions::MaximumPlayerHealth,
+        "ordinary evade takes no damage");
+
+    Expect(actions.BeginIncomingAttack({1.0f, 20, 30, true}),
+        "second attack can be queued after an evade");
+    actions.AdvanceTime(0.90f);
+    const DefenseReport perfect = actions.TryDefend(DefenseInput::Dodge);
+    Expect(perfect.result == DefenseResult::PerfectDodge && perfect.counterGranted
+            && actions.HasDefenseCounter(),
+        "late dodge inside the perfect window grants one bounded counter");
+
+    CombatSandbox combat;
+    const float resourceBeforeRejectedCounter = actions.Resource();
+    const auto outOfRange = actions.TryFatalStrike({-10.0f, 0.0f, 0.0f}, combat);
+    Expect(outOfRange.result == ShadowActionResult::OutOfRange && actions.HasDefenseCounter(),
+        "rejected counter strike preserves the earned counter window");
+    Expect(Near(actions.Resource(), resourceBeforeRejectedCounter),
+        "rejected counter strike spends no resource");
+
+    const auto counter = actions.TryFatalStrike({0.0f, 0.0f, 0.0f}, combat);
+    Expect(counter.result == ShadowActionResult::Activated && counter.followUp,
+        "successful fatal strike consumes the defense-earned follow-up");
+    Expect(Near(counter.resourceSpent, ShadowbladeActions::DefenseCounterFatalStrikeCost),
+        "defense counter uses its reduced resource cost");
+    Expect(!actions.HasDefenseCounter(), "successful counter is single-use");
+}
+
+void TestGuardIntegrityBreakAndUnblockableHit() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions actions;
+    Expect(actions.BeginIncomingAttack({1.0f, 20, 30, true}),
+        "guard test queues a blockable hit");
+    const DefenseReport guarded = actions.TryDefend(DefenseInput::Guard);
+    Expect(guarded.result == DefenseResult::Guarded && guarded.damageTaken == 0,
+        "ordinary guard prevents health damage");
+    Expect(actions.GuardIntegrity() == 70 && actions.PlayerHealth() == 100,
+        "ordinary guard consumes bounded guard integrity");
+
+    Expect(actions.BeginIncomingAttack({1.0f, 20, 80, true}),
+        "guard-break attack queues after prior guard");
+    const DefenseReport broken = actions.TryDefend(DefenseInput::Guard);
+    Expect(broken.result == DefenseResult::GuardBroken && actions.GuardIntegrity() == 0,
+        "excess guard damage produces an explicit guard break");
+    Expect(actions.PlayerHealth() == 80 && broken.damageTaken == 20,
+        "guard break applies the attack's bounded health damage once");
+
+    actions.ResetDefenseState();
+    Expect(actions.BeginIncomingAttack({1.0f, 20, 30, false}),
+        "unblockable attack is accepted as a threat");
+    const DefenseReport unblockable = actions.TryDefend(DefenseInput::Guard);
+    Expect(unblockable.result == DefenseResult::UnblockableHit
+            && actions.PlayerHealth() == 80,
+        "unblockable attacks bypass ordinary guard without double damage");
+}
+
+void TestPerfectGuardTimingPresetAndAutomaticHit() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions standard;
+    Expect(standard.BeginIncomingAttack({0.18f, 20, 30, true}),
+        "standard-window attack queues");
+    const DefenseReport standardGuard = standard.TryDefend(DefenseInput::Guard);
+    Expect(standardGuard.result == DefenseResult::Guarded && !standardGuard.counterGranted,
+        "0.18 second guard is ordinary under the standard timing preset");
+
+    ShadowbladeActions forgiving;
+    forgiving.SetDefenseTimingPreset(DefenseTimingPreset::Forgiving);
+    Expect(forgiving.BeginIncomingAttack({0.18f, 20, 30, true}),
+        "forgiving-window attack queues");
+    const DefenseReport forgivingGuard = forgiving.TryDefend(DefenseInput::Guard);
+    Expect(forgivingGuard.result == DefenseResult::PerfectGuard
+            && forgivingGuard.counterGranted && forgiving.GuardIntegrity() == 100,
+        "forgiving preset widens the perfect window without reducing guard integrity");
+
+    ShadowbladeActions automaticHit;
+    Expect(automaticHit.BeginIncomingAttack({0.20f, 20, 30, true}),
+        "automatic-hit threat queues");
+    for (int step = 0; step < 4; ++step) automaticHit.AdvanceTime(0.05f);
+    Expect(!automaticHit.HasIncomingAttack()
+            && automaticHit.LastDefense().result == DefenseResult::Hit
+            && automaticHit.PlayerHealth() == 80,
+        "expired telegraph resolves one deterministic hit across split frame steps");
+
+    ShadowbladeActions invalid;
+    Expect(!invalid.BeginIncomingAttack({std::numeric_limits<float>::quiet_NaN(), 20, 30, true}),
+        "nonfinite windup is rejected");
+    Expect(!invalid.BeginIncomingAttack({1.0f, 0, 30, true}),
+        "nonpositive damage is rejected");
+    Expect(invalid.LastDefense().result == DefenseResult::InvalidThreat,
+        "invalid threat rejection is visible in deterministic state");
+}
+
+void TestDefenseCounterExpiryIsSplitStable() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions oneStep;
+    ShadowbladeActions split;
+    oneStep.BeginIncomingAttack({0.10f, 20, 30, true});
+    split.BeginIncomingAttack({0.10f, 20, 30, true});
+    Expect(oneStep.TryDefend(DefenseInput::Dodge).result == DefenseResult::PerfectDodge,
+        "one-step setup grants a counter");
+    Expect(split.TryDefend(DefenseInput::Dodge).result == DefenseResult::PerfectDodge,
+        "split-step setup grants a counter");
+    oneStep.AdvanceTime(ShadowbladeActions::DefenseCounterWindowSeconds);
+    for (int step = 0; step < 8; ++step) split.AdvanceTime(0.1f);
+    Expect(!oneStep.HasDefenseCounter() && !split.HasDefenseCounter(),
+        "counter expiration is stable across equivalent frame splits");
+}
+
+void TestIncomingAttackTimingIsSplitStable() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions oneStep;
+    ShadowbladeActions split;
+    Expect(oneStep.BeginIncomingAttack({8.06f, 20, 30, true})
+            && split.BeginIncomingAttack({8.06f, 20, 30, true}),
+        "long split-stability threats queue");
+    oneStep.AdvanceTime(7.94f);
+    for (int step = 0; step < 794; ++step) split.AdvanceTime(0.01f);
+    const DefenseReport oneStepGuard = oneStep.TryDefend(DefenseInput::Guard);
+    const DefenseReport splitGuard = split.TryDefend(DefenseInput::Guard);
+    Expect(oneStepGuard.result == DefenseResult::PerfectGuard
+            && splitGuard.result == DefenseResult::PerfectGuard,
+        "equivalent elapsed time reaches the same perfect-guard boundary");
+    Expect(Near(oneStepGuard.timeToImpact, 0.12f)
+            && Near(splitGuard.timeToImpact, 0.12f),
+        "equivalent elapsed time reports the same quantized impact time");
+
+    ShadowbladeActions fractionalOneStep;
+    ShadowbladeActions fractionalSplit;
+    Expect(fractionalOneStep.BeginIncomingAttack({1.12001f, 20, 30, true})
+            && fractionalSplit.BeginIncomingAttack({1.12001f, 20, 30, true}),
+        "fractional-microsecond split-stability threats queue");
+    fractionalOneStep.AdvanceTime(1.0f);
+    for (int step = 0; step < 60; ++step) {
+        fractionalSplit.AdvanceTime(1.0f / 60.0f);
+    }
+    const DefenseReport fractionalOneStepGuard = fractionalOneStep.TryDefend(DefenseInput::Guard);
+    const DefenseReport fractionalSplitGuard = fractionalSplit.TryDefend(DefenseInput::Guard);
+    Expect(fractionalOneStepGuard.result == DefenseResult::Guarded
+            && fractionalSplitGuard.result == DefenseResult::Guarded,
+        "fractional frame splits do not round into a different perfect-guard outcome");
+
+    ShadowbladeActions oneStepExpiry;
+    ShadowbladeActions splitExpiry;
+    Expect(oneStepExpiry.BeginIncomingAttack({8.06f, 20, 30, true})
+            && splitExpiry.BeginIncomingAttack({8.06f, 20, 30, true}),
+        "expiry split-stability threats queue");
+    oneStepExpiry.AdvanceTime(8.06f);
+    for (int step = 0; step < 806; ++step) splitExpiry.AdvanceTime(0.01f);
+    Expect(!oneStepExpiry.HasIncomingAttack() && !splitExpiry.HasIncomingAttack(),
+        "equivalent elapsed time expires the telegraph on the same boundary");
+    Expect(oneStepExpiry.LastDefense().result == DefenseResult::Hit
+            && splitExpiry.LastDefense().result == DefenseResult::Hit
+            && oneStepExpiry.PlayerHealth() == 80 && splitExpiry.PlayerHealth() == 80,
+        "equivalent expiry applies exactly one identical incoming hit");
+
+    ShadowbladeActions fractionalOneStepExpiry;
+    ShadowbladeActions fractionalSplitExpiry;
+    Expect(fractionalOneStepExpiry.BeginIncomingAttack({1.00001f, 20, 30, true})
+            && fractionalSplitExpiry.BeginIncomingAttack({1.00001f, 20, 30, true}),
+        "fractional expiry split-stability threats queue");
+    fractionalOneStepExpiry.AdvanceTime(1.0f);
+    for (int step = 0; step < 60; ++step) {
+        fractionalSplitExpiry.AdvanceTime(1.0f / 60.0f);
+    }
+    Expect(fractionalOneStepExpiry.HasIncomingAttack()
+            && fractionalSplitExpiry.HasIncomingAttack(),
+        "fractional equivalent elapsed time preserves the same pre-expiry state");
+    fractionalOneStepExpiry.AdvanceTime(0.00002f);
+    fractionalSplitExpiry.AdvanceTime(0.00002f);
+    Expect(!fractionalOneStepExpiry.HasIncomingAttack()
+            && !fractionalSplitExpiry.HasIncomingAttack()
+            && fractionalOneStepExpiry.LastDefense().result == DefenseResult::Hit
+            && fractionalSplitExpiry.LastDefense().result == DefenseResult::Hit,
+        "fractional equivalent elapsed time crosses expiry identically");
+}
+
+void TestSixtyHzBoundaryToleranceIsSplitStable() {
+    using namespace Astral::Scene;
+
+    const float frame = 1.0f / 60.0f;
+    const float windup = frame * 122.0f;
+    ShadowbladeActions oneStep;
+    ShadowbladeActions split;
+    Expect(oneStep.BeginIncomingAttack({windup, 20, 30, true})
+            && split.BeginIncomingAttack({windup, 20, 30, true}),
+        "60 Hz boundary threats queue");
+    oneStep.AdvanceTime(windup);
+    for (int step = 0; step < 122; ++step) split.AdvanceTime(frame);
+    Expect(!oneStep.HasIncomingAttack() && !split.HasIncomingAttack(),
+        "ordinary 60 Hz frame splitting reaches the same attack deadline");
+    Expect(oneStep.LastDefense().result == DefenseResult::Hit
+            && split.LastDefense().result == DefenseResult::Hit
+            && oneStep.PlayerHealth() == 80 && split.PlayerHealth() == 80,
+        "60 Hz split and single-step expiry apply the same one-time hit");
+}
+
+void TestLongSixtyHzBoundaryToleranceIsSplitStable() {
+    using namespace Astral::Scene;
+
+    const float frame = 1.0f / 60.0f;
+    const float windup = frame * 3842.0f;
+    ShadowbladeActions oneStep;
+    ShadowbladeActions split;
+    Expect(oneStep.BeginIncomingAttack({windup, 20, 30, true})
+            && split.BeginIncomingAttack({windup, 20, 30, true}),
+        "long 60 Hz boundary threats queue");
+    oneStep.AdvanceTime(windup);
+    for (int step = 0; step < 3842; ++step) split.AdvanceTime(frame);
+    Expect(!oneStep.HasIncomingAttack() && !split.HasIncomingAttack(),
+        "long 60 Hz split and one-step timing reach the same deadline");
+    Expect(oneStep.LastDefense().result == DefenseResult::Hit
+            && split.LastDefense().result == DefenseResult::Hit,
+        "long 60 Hz split and one-step timing resolve the same hit");
+}
+
+void TestMinimumThreatAndWindowBoundaryPrecision() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions tinyThreat;
+    Expect(tinyThreat.BeginIncomingAttack({0.000001f, 20, 30, true}),
+        "one-microsecond threat is accepted");
+    Expect(tinyThreat.HasIncomingAttack() && tinyThreat.IncomingAttackRemaining() > 0.0f,
+        "one-microsecond threat retains positive time immediately after queueing");
+    tinyThreat.AdvanceTime(0.0000001f);
+    Expect(tinyThreat.HasIncomingAttack(),
+        "sub-microsecond progress does not consume a one-microsecond threat early");
+    tinyThreat.AdvanceTime(0.0000009f);
+    Expect(!tinyThreat.HasIncomingAttack() && tinyThreat.LastDefense().result == DefenseResult::Hit,
+        "one-microsecond threat resolves once its full duration elapses");
+
+    ShadowbladeActions outsidePerfectWindow;
+    Expect(outsidePerfectWindow.BeginIncomingAttack({0.120001f, 20, 30, true}),
+        "just-outside-perfect-window threat queues");
+    const DefenseReport ordinaryGuard = outsidePerfectWindow.TryDefend(DefenseInput::Guard);
+    Expect(ordinaryGuard.result == DefenseResult::Guarded && !ordinaryGuard.counterGranted,
+        "one-microsecond-outside guard remains ordinary instead of becoming perfect");
+
+    ShadowbladeActions counter;
+    Expect(counter.BeginIncomingAttack({0.10f, 20, 30, true}),
+        "counter-boundary setup threat queues");
+    Expect(counter.TryDefend(DefenseInput::Dodge).result == DefenseResult::PerfectDodge
+            && counter.HasDefenseCounter(),
+        "counter-boundary setup grants a counter");
+    counter.AdvanceTime(ShadowbladeActions::DefenseCounterWindowSeconds - 0.000001f);
+    Expect(counter.HasDefenseCounter(),
+        "defense counter remains active one microsecond before its requested expiry");
+    counter.AdvanceTime(0.000002f);
+    Expect(!counter.HasDefenseCounter(),
+        "defense counter expires after crossing its requested boundary");
+}
+
+void TestDefenseClockRebasesAfterSaturation() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions guarded;
+    guarded.AdvanceTime(1.0e13f);
+    Expect(guarded.BeginIncomingAttack({1.0f, 20, 30, true}),
+        "valid threat can be queued after the defense clock reaches saturation");
+    Expect(Near(guarded.IncomingAttackRemaining(), 1.0f),
+        "rebased threat keeps its full requested windup");
+    const DefenseReport immediateGuard = guarded.TryDefend(DefenseInput::Guard);
+    Expect(immediateGuard.result == DefenseResult::Guarded
+            && !immediateGuard.counterGranted && guarded.GuardIntegrity() == 70,
+        "rebased one-second threat is not misclassified as an immediate perfect guard");
+
+    ShadowbladeActions automaticHit;
+    automaticHit.AdvanceTime(1.0e13f);
+    Expect(automaticHit.BeginIncomingAttack({1.0f, 20, 30, true}),
+        "automatic-hit threat queues after saturation");
+    automaticHit.AdvanceTime(1.0f);
+    Expect(!automaticHit.HasIncomingAttack()
+            && automaticHit.LastDefense().result == DefenseResult::Hit
+            && automaticHit.PlayerHealth() == 80,
+        "rebased threat still expires once after its requested duration");
+}
 }
 
 int main() {
@@ -224,6 +517,15 @@ int main() {
     TestStaggerFollowUpCostAndConsumption();
     TestGuardConflicts();
     TestInsufficientResourceRejection();
+    TestThreatDodgeAndDefenseCounter();
+    TestGuardIntegrityBreakAndUnblockableHit();
+    TestPerfectGuardTimingPresetAndAutomaticHit();
+    TestDefenseCounterExpiryIsSplitStable();
+    TestIncomingAttackTimingIsSplitStable();
+    TestSixtyHzBoundaryToleranceIsSplitStable();
+    TestLongSixtyHzBoundaryToleranceIsSplitStable();
+    TestMinimumThreatAndWindowBoundaryPrecision();
+    TestDefenseClockRebasesAfterSaturation();
     if (failures != 0) return 1;
     std::cout << "Shadowblade action tests passed\n";
     return 0;
