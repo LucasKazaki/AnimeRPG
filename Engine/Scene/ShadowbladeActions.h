@@ -135,8 +135,8 @@ private:
     int guardIntegrity_{MaximumGuardIntegrity};
     bool incomingAttackActive_{};
     IncomingAttackDefinition incomingAttack_{};
-    double incomingAttackRemainingPrecise_{};
-    double defenseCounterRemainingPrecise_{};
+    std::int64_t incomingAttackRemainingMicros_{};
+    std::int64_t defenseCounterRemainingMicros_{};
     DefenseTimingPreset defenseTimingPreset_{DefenseTimingPreset::Standard};
     DefenseReport lastDefense_{};
 };
