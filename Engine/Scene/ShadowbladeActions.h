@@ -122,12 +122,15 @@ public:
 
 private:
     static constexpr std::int64_t DefenseMicrosPerSecond = 1000000;
-    static constexpr std::int64_t DefenseBoundaryToleranceMicros = 2;
     static std::int64_t DefenseSecondsToMicros(double seconds);
-    static std::int64_t SaturatingMicrosAdd(std::int64_t left, std::int64_t right);
-    static bool DefenseDeadlineReached(std::int64_t now, std::int64_t deadline);
-    static bool DefenseWindowContains(std::int64_t remaining, std::int64_t window);
+    static double FloatHalfUlpSeconds(float seconds);
+    std::int64_t DefenseTimingToleranceMicros(double deadlineUncertaintySeconds) const;
+    static bool DefenseDeadlineReached(std::int64_t now, std::int64_t deadline,
+        std::int64_t toleranceMicros);
+    static bool DefenseWindowContains(std::int64_t remaining, std::int64_t window,
+        std::int64_t toleranceMicros);
     std::int64_t CurrentDefenseMicros() const;
+    void RebaseDefenseClock();
     std::int64_t StartDefenseCounterDeadline();
     DefenseReport ResolveIncomingHit(DefenseResult result);
 
@@ -142,8 +145,11 @@ private:
     bool incomingAttackActive_{};
     IncomingAttackDefinition incomingAttack_{};
     double defenseElapsedSecondsPrecise_{};
+    double defenseElapsedUncertaintySeconds_{};
     std::int64_t incomingAttackEndMicros_{};
+    double incomingAttackDeadlineUncertaintySeconds_{};
     std::int64_t defenseCounterEndMicros_{};
+    double defenseCounterDeadlineUncertaintySeconds_{};
     DefenseTimingPreset defenseTimingPreset_{DefenseTimingPreset::Standard};
     DefenseReport lastDefense_{};
 };
