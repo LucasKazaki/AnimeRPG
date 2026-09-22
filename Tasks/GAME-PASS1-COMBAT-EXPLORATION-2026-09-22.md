@@ -8,16 +8,16 @@ Target: `main`
 
 ## Purpose
 
-Implement six small, testable gameplay increments for the existing Astral Engine prototype without taking over generic engine infrastructure:
+Implement six small, testable gameplay-domain increments for the existing Astral Engine prototype without taking over generic engine infrastructure:
 
-1. `GAME-001` direction-aware normalized Shadowblade dash.
+1. `GAME-001` direction-aware normalized Shadowblade dash API.
 2. `GAME-006` deterministic attack-combo tracking inspired by fast basic/special attack flow.
 3. `GAME-003` bounded posture, stagger, recovery, and one-shot stagger openings.
 4. `GAME-004` contextual Fatal Strike follow-up that consumes a stagger opening for a reduced resource cost.
 5. `GAME-005` ordered National Mall landmark objective progression while preserving free out-of-order discovery.
-6. `QOL-002` resettable training session metrics, based on repeated player requests for a training target with damage history/statistics.
+6. `QOL-002` resettable training-session metrics, based on repeated player requests for a training target with damage history/statistics.
 
-These adapt interaction patterns only. They do not copy another game's content, characters, assets, story, monetization, or code.
+These adapt interaction patterns only. They do not copy another game's content, characters, assets, story, monetization, or code. This packet deliberately stops at production-domain behavior. Player-facing input/HUD presentation for directional dash, objective guidance, and training metrics/reset belongs to a later coordinated input/UI packet and is not counted as native-playable verification here.
 
 ## Research map
 
@@ -41,20 +41,18 @@ New community item for this pass:
 - `Engine/Scene/ShadowbladeActions.cpp`
 - `Engine/Scene/LandmarkInteraction.h`
 - `Engine/Scene/LandmarkInteraction.cpp`
-- `Engine/Platform/Win32Application.h`
-- `Engine/Platform/Win32Application.cpp`
 - `Tests/CombatSandboxTests.cpp`
 - `Tests/ShadowbladeActionsTests.cpp`
 - `Tests/LandmarkInteractionTests.cpp`
-- `Docs/Agents/animerpg-hourly/BACKLOG.json`
+- `Docs/Agents/animerpg-hourly/STATE.json`
 - `Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS1.md`
 - this task packet
 
-No CMake, renderer, editor, asset pipeline, CI workflow, dependency, recovery runner, release, or deployment changes are admitted.
+No CMake, renderer, platform/input, editor, asset pipeline, CI workflow, dependency, recovery runner, release, or deployment changes are admitted.
 
 ## Ownership check
 
-At admission, the only open PR found was #13, `Add native Astral Editor runtime smoke coverage`, based on the same main revision. Its stated scope is the Astral Editor smoke and CMake wiring. This packet does not modify its editor smoke file or CMake. The Win32 application edits here are narrow gameplay-input/title integration and require hosted compilation plus native runtime acceptance before claiming full playable verification.
+At admission, the only open PR found was #13, `Add native Astral Editor runtime smoke coverage`, based on the same main revision. Its stated scope is the Astral Editor smoke and CMake wiring. This packet does not modify those paths. Existing game-loop call sites already exercise the combat and landmark domain objects, but no new input or HUD claims are made here.
 
 ## Acceptance
 
@@ -62,7 +60,7 @@ At admission, the only open PR found was #13, `Add native Astral Editor runtime 
 - cardinal and diagonal dash displacement has the same magnitude;
 - invalid or neutral direction uses the existing deterministic forward fallback;
 - cooldown/resource semantics remain unchanged;
-- live `Q` dash uses current movement input when provided, while thought-command dash remains deterministic.
+- the two-argument production API accepts a requested direction, while existing one-argument call sites remain behavior-compatible until a later input-integration packet.
 
 ### GAME-006
 - successful attacks inside the combo window increase the combo;
@@ -89,17 +87,16 @@ At admission, the only open PR found was #13, `Add native Astral Editor runtime 
 
 ### QOL-002
 - successful damage records total damage, hit count, peak hit, and best combo;
-- `R` resets dummy health, posture, cooldown/session clocks, combo, and metrics without resetting the completed landmark encounter or granting rewards;
+- the production reset API restores dummy health/posture, attack cooldown/session clocks, combo, and metrics without touching quest/landmark state or granting rewards;
 - invalid/zero damage does not inflate metrics.
 
 ## Verification plan
 
-1. Compile and run the three affected deterministic domain test targets in Debug and Release-equivalent configurations where available.
-2. Run the broader deterministic CTest suite through hosted Windows CI after push.
-3. Run existing static milestone verifiers because the Win32 input path changes.
-4. Native Windows runtime smokes remain a distinct gate. Existing M4/M7 smoke behavior must still compile, and the registered local executor should exercise directional `WASD+Q` plus `R` reset before this slice is called fully playable.
-5. Independent PR review is required before merge. Author review is not independent.
+1. Compile and run the three affected deterministic domain test targets in available source-fixture verification before PR.
+2. Run the broader deterministic CTest suite through hosted Windows CI after opening the PR.
+3. Preserve existing runtime behavior and do not claim native input/UI acceptance from domain tests or hosted compilation.
+4. Independent PR review is required before merge. Author review is not independent.
 
 ## Stop conditions
 
-Stop and leave the PR unmerged on any new test failure, unresolved independent review request, overlapping concurrent write, broken benchmark-input suppression, or evidence that a change requires engine architecture work beyond this packet.
+Stop and leave the PR unmerged on any new test failure, unresolved independent review request, overlapping concurrent write, or evidence that a change requires engine architecture work beyond this packet.
