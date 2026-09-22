@@ -85,6 +85,10 @@ int CombatSandbox::ApplyDamage(int damage) {
     return applied;
 }
 
+void CombatSandbox::RegisterSuccessfulAttackHit() {
+    RegisterComboHit();
+}
+
 bool CombatSandbox::ConsumeStaggerOpening() {
     if (!IsStaggered()) return false;
 
