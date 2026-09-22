@@ -29,6 +29,14 @@ void ShadowbladeActions::SetGuarding(bool guarding) {
         guarding ? ShadowActionResult::Guarding : ShadowActionResult::Ready, 0, {}};
 }
 
+void ShadowbladeActions::ResetForEncounter() {
+    resource_ = MaximumResource;
+    dashCooldownRemaining_ = 0.0f;
+    fatalStrikeCooldownRemaining_ = 0.0f;
+    guarding_ = false;
+    lastAction_ = {};
+}
+
 ShadowActionReport ShadowbladeActions::TryDash(const Math::Vec3& position,
     const Math::Vec3& direction) {
     lastAction_ = {ShadowActionType::Dash, ShadowActionResult::Ready, 0, position};
