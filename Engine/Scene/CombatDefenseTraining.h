@@ -153,7 +153,14 @@ public:
             if (OwnsGeneration(actions) && actions.HasIncomingAttack()) {
                 actions.CancelIncomingAttack();
             }
-            return InterruptLinked(combat, false);
+            const bool interrupted = InterruptLinked(combat, false);
+            // This was still a valid frame. Once the stale owned threat is
+            // canceled, forward the full delta through the ordinary subsystem
+            // clocks so stagger recovery, cooldowns, resource regeneration, and
+            // any replacement planner event do not lose time.
+            combat.AdvanceTime(deltaSeconds);
+            actions.AdvanceTime(deltaSeconds);
+            return interrupted;
         }
 
         // If the owned threat was canceled/replaced outside this coordinator,
