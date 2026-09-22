@@ -51,12 +51,52 @@ struct TrainingStats {
     int bestCombo{};
 };
 
+enum class ComboFinisherResult {
+    NotReady,
+    OutOfRange,
+    TargetDefeated,
+    Activated,
+};
+
+struct ComboFinisherReport {
+    ComboFinisherResult result{ComboFinisherResult::NotReady};
+    int damageApplied{};
+};
+
+enum class ManaAffinity {
+    None,
+    Solar,
+    Umbral,
+};
+
+enum class ManaReaction {
+    None,
+    Eclipse,
+};
+
+struct ManaReactionReport {
+    ManaAffinity applied{ManaAffinity::None};
+    ManaAffinity previous{ManaAffinity::None};
+    ManaAffinity remaining{ManaAffinity::None};
+    ManaReaction reaction{ManaReaction::None};
+    int bonusDamage{};
+};
+
+enum class CombatAssistPreset {
+    Standard,
+    Accessible,
+};
+
 class CombatSandbox {
 public:
     static constexpr float ComboWindowSeconds = 1.25f;
     static constexpr float StaggerDurationSeconds = 1.5f;
     static constexpr float PostureRecoveryDelaySeconds = 1.5f;
     static constexpr float PostureRecoveryPerSecond = 35.0f;
+    static constexpr int StandardComboFinisherHits = 3;
+    static constexpr int AccessibleComboFinisherHits = 2;
+    static constexpr int ComboFinisherDamage = 45;
+    static constexpr int EclipseReactionDamage = 20;
 
     CombatSandbox();
 
@@ -66,15 +106,23 @@ public:
     void RegisterSuccessfulAttackHit();
     bool ConsumeStaggerOpening();
     void ResetTrainingSession();
+    ComboFinisherReport TryComboFinisher(const Math::Vec3& attackerPosition);
+    ManaReactionReport ApplyManaAffinity(ManaAffinity affinity);
+    void SetCombatAssistPreset(CombatAssistPreset preset) { assistPreset_ = preset; }
 
     const TrainingDummy& Dummy() const { return dummy_; }
     const AttackReport& LastAttack() const { return lastAttack_; }
     const TrainingStats& Stats() const { return stats_; }
     float ElapsedSeconds() const;
+    double ElapsedSecondsPrecise() const { return elapsedSecondsPrecise_; }
     float CooldownRemaining() const;
     float StaggerRemaining() const;
     bool IsStaggered() const;
     int ComboCount() const { return comboCount_; }
+    bool ComboFinisherReady() const;
+    int ComboFinisherRequiredHits() const;
+    ManaAffinity TargetAffinity() const { return targetAffinity_; }
+    CombatAssistPreset AssistPreset() const { return assistPreset_; }
     float TrainingDps() const;
     const AttackDefinition& Definition(AttackType type) const;
 
@@ -97,6 +145,8 @@ private:
     int postureAtRecoveryStart_{};
     std::int64_t lastComboHitMicros_{-1000000000};
     int comboCount_{};
+    ManaAffinity targetAffinity_{ManaAffinity::None};
+    CombatAssistPreset assistPreset_{CombatAssistPreset::Standard};
 };
 
 } // namespace Astral::Scene

@@ -32,6 +32,7 @@ class LandmarkInteraction {
 public:
     static constexpr float ProximityRadius = 3.0f;
     static constexpr float LincolnReward = 20.0f;
+    static constexpr float ObjectiveCompletionReward = 15.0f;
     static constexpr std::size_t LedgerCapacity = 3;
 
     bool UpdateSelection(const Math::Vec3& playerPosition, const WorldBlockout& world);
@@ -48,6 +49,9 @@ public:
     bool ObjectiveComplete() const {
         return CurrentObjective() == LandmarkObjectiveStage::Complete;
     }
+    bool ObjectiveCompletionRewardGranted() const {
+        return objectiveCompletionRewardGranted_;
+    }
     const LandmarkInteractionReport& LastReport() const { return lastReport_; }
 
 private:
@@ -55,6 +59,7 @@ private:
 
     std::array<bool, LedgerCapacity> visited_{};
     std::size_t selectedIndex_{LedgerCapacity};
+    bool objectiveCompletionRewardGranted_{};
     LandmarkInteractionReport lastReport_{};
 };
 

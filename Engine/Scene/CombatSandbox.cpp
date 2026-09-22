@@ -93,6 +93,7 @@ int CombatSandbox::ApplyDamage(int damage) {
         dummy_.posture = 0;
         staggerEndMicros_ = 0;
         postureAtRecoveryStart_ = 0;
+        targetAffinity_ = ManaAffinity::None;
     }
     return applied;
 }
@@ -122,6 +123,49 @@ void CombatSandbox::ResetTrainingSession() {
     postureAtRecoveryStart_ = 0;
     lastComboHitMicros_ = -1000000000;
     comboCount_ = 0;
+    targetAffinity_ = ManaAffinity::None;
+}
+
+ComboFinisherReport CombatSandbox::TryComboFinisher(const Math::Vec3& attackerPosition) {
+    if (dummy_.IsDefeated()) {
+        return {ComboFinisherResult::TargetDefeated, 0};
+    }
+    if (!ComboFinisherReady()) {
+        return {ComboFinisherResult::NotReady, 0};
+    }
+    if (!std::isfinite(attackerPosition.x) || !std::isfinite(attackerPosition.y)) {
+        return {ComboFinisherResult::OutOfRange, 0};
+    }
+
+    const float deltaX = dummy_.position.x - attackerPosition.x;
+    const float deltaY = dummy_.position.y - attackerPosition.y;
+    if (deltaX * deltaX + deltaY * deltaY > lightAttack_.range * lightAttack_.range) {
+        return {ComboFinisherResult::OutOfRange, 0};
+    }
+
+    const int applied = ApplyDamage(ComboFinisherDamage);
+    comboCount_ = 0;
+    lastComboHitMicros_ = -1000000000;
+    return {ComboFinisherResult::Activated, applied};
+}
+
+ManaReactionReport CombatSandbox::ApplyManaAffinity(ManaAffinity affinity) {
+    ManaReactionReport report{affinity, targetAffinity_, targetAffinity_, ManaReaction::None, 0};
+    if (affinity == ManaAffinity::None || dummy_.IsDefeated()) {
+        return report;
+    }
+
+    if (targetAffinity_ == ManaAffinity::None || targetAffinity_ == affinity) {
+        targetAffinity_ = affinity;
+        report.remaining = targetAffinity_;
+        return report;
+    }
+
+    targetAffinity_ = ManaAffinity::None;
+    report.remaining = ManaAffinity::None;
+    report.reaction = ManaReaction::Eclipse;
+    report.bonusDamage = ApplyDamage(EclipseReactionDamage);
+    return report;
 }
 
 float CombatSandbox::ElapsedSeconds() const {
@@ -142,6 +186,16 @@ float CombatSandbox::StaggerRemaining() const {
 
 bool CombatSandbox::IsStaggered() const {
     return !dummy_.IsDefeated() && staggerEndMicros_ > CurrentMicros();
+}
+
+bool CombatSandbox::ComboFinisherReady() const {
+    return !dummy_.IsDefeated() && comboCount_ >= ComboFinisherRequiredHits();
+}
+
+int CombatSandbox::ComboFinisherRequiredHits() const {
+    return assistPreset_ == CombatAssistPreset::Accessible
+        ? AccessibleComboFinisherHits
+        : StandardComboFinisherHits;
 }
 
 float CombatSandbox::TrainingDps() const {

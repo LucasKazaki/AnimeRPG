@@ -48,8 +48,14 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
     }
 
     visited_[selectedIndex_] = true;
-    const float reward = kind == LandmarkKind::LincolnMemorial
-        ? shadowbladeActions.RestoreResource(LincolnReward) : 0.0f;
+    float reward = 0.0f;
+    if (kind == LandmarkKind::LincolnMemorial) {
+        reward += shadowbladeActions.RestoreResource(LincolnReward);
+    }
+    if (ObjectiveComplete() && !objectiveCompletionRewardGranted_) {
+        objectiveCompletionRewardGranted_ = true;
+        reward += shadowbladeActions.RestoreResource(ObjectiveCompletionReward);
+    }
     lastReport_ = {LandmarkInteractionResult::Discovered, kind, reward};
     return lastReport_;
 }
