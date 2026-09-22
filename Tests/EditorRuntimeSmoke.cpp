@@ -247,6 +247,41 @@ std::vector<ChildControl> DirectChildren(HWND window, DWORD processId) {
     return collection.controls;
 }
 
+bool SameControlHandles(const std::vector<ChildControl>& expected,
+    const std::vector<ChildControl>& observed) {
+    if (expected.size() != observed.size()) return false;
+    std::vector<bool> matched(observed.size(), false);
+    for (const auto& expectedControl : expected) {
+        bool found = false;
+        for (std::size_t index = 0; index < observed.size(); ++index) {
+            if (!matched[index]
+                && observed[index].handle == expectedControl.handle
+                && observed[index].className == expectedControl.className) {
+                matched[index] = true;
+                found = true;
+                break;
+            }
+        }
+        if (!found) return false;
+    }
+    return true;
+}
+
+bool CaptureInitialControlInventory(HWND window, DWORD processId,
+    std::vector<ChildControl>& controls, std::wstring& failure) {
+    if (!WindowOwnedByProcess(window, processId)) {
+        failure = L"editor top-level ownership changed before initial child inventory capture";
+        return false;
+    }
+    controls = DirectChildren(window, processId);
+    if (controls.size() != 12) {
+        failure = L"expected 12 direct process-owned controls at initial capture, observed "
+            + std::to_wstring(controls.size());
+        return false;
+    }
+    return true;
+}
+
 int CountClass(const std::vector<ChildControl>& controls, const wchar_t* className) {
     int count = 0;
     for (const auto& control : controls) {
@@ -268,7 +303,8 @@ HWND FindDirectVisibleChildByText(const std::vector<ChildControl>& controls, HWN
     return nullptr;
 }
 
-bool ValidateShellState(HWND window, DWORD processId, const wchar_t* expectedInspectorText,
+bool ValidateShellState(HWND window, DWORD processId,
+    const std::vector<ChildControl>& initialControls, const wchar_t* expectedInspectorText,
     int expectedSelection, std::wstring& failure) {
     if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)) {
         failure = L"editor top-level ownership or visibility changed";
@@ -288,6 +324,10 @@ bool ValidateShellState(HWND window, DWORD processId, const wchar_t* expectedIns
     if (controls.size() != 12) {
         failure = L"expected 12 direct process-owned controls, observed "
             + std::to_wstring(controls.size());
+        return false;
+    }
+    if (!SameControlHandles(initialControls, controls)) {
+        failure = L"direct child HWND inventory no longer matches the initial shell inventory";
         return false;
     }
     if (CountClass(controls, L"Button") != 5
@@ -377,10 +417,17 @@ bool ValidateShellState(HWND window, DWORD processId, const wchar_t* expectedIns
         failure = L"Inspector fixture changed during validated read";
         return false;
     }
+
+    const auto finalControls = DirectChildren(window, processId);
+    if (!SameControlHandles(initialControls, finalControls)) {
+        failure = L"direct child HWND inventory changed during shell-state validation";
+        return false;
+    }
     return true;
 }
 
-bool DirectChildrenContained(HWND window, DWORD processId, std::wstring& failure) {
+bool DirectChildrenContained(HWND window, DWORD processId,
+    const std::vector<ChildControl>& initialControls, std::wstring& failure) {
     if (!WindowOwnedByProcess(window, processId)) {
         failure = L"editor top-level ownership changed before containment check";
         return false;
@@ -395,6 +442,10 @@ bool DirectChildrenContained(HWND window, DWORD processId, std::wstring& failure
     if (controls.size() != 12) {
         failure = L"expected 12 direct process-owned controls during containment, observed "
             + std::to_wstring(controls.size());
+        return false;
+    }
+    if (!SameControlHandles(initialControls, controls)) {
+        failure = L"direct child HWND inventory changed before containment validation";
         return false;
     }
 
@@ -425,10 +476,15 @@ bool DirectChildrenContained(HWND window, DWORD processId, std::wstring& failure
     return true;
 }
 
-bool ResizeAndCheck(HWND window, DWORD processId, int width, int height,
+bool ResizeAndCheck(HWND window, DWORD processId,
+    const std::vector<ChildControl>& initialControls, int width, int height,
     const wchar_t* expectedInspectorText, int expectedSelection, std::wstring& failure) {
     if (!WindowOwnedByProcess(window, processId)) {
         failure = L"editor HWND is no longer owned by launched process before resize";
+        return false;
+    }
+    if (!SameControlHandles(initialControls, DirectChildren(window, processId))) {
+        failure = L"direct child HWND inventory changed before resize";
         return false;
     }
     if (!SetWindowPos(window, nullptr, 0, 0, width, height,
@@ -449,9 +505,9 @@ bool ResizeAndCheck(HWND window, DWORD processId, int width, int height,
             return false;
         }
         if (rect.right - rect.left == width && rect.bottom - rect.top == height) {
-            if (!DirectChildrenContained(window, processId, failure)) return false;
-            return ValidateShellState(
-                window, processId, expectedInspectorText, expectedSelection, failure);
+            if (!DirectChildrenContained(window, processId, initialControls, failure)) return false;
+            return ValidateShellState(window, processId, initialControls,
+                expectedInspectorText, expectedSelection, failure);
         }
         if (GetTickCount64() >= deadline) {
             failure = L"asynchronous resize did not complete within deadline";
@@ -461,11 +517,17 @@ bool ResizeAndCheck(HWND window, DWORD processId, int width, int height,
     }
 }
 
-bool SelectCubeAndNotify(HWND window, DWORD processId, std::wstring& failure) {
+bool SelectCubeAndNotify(HWND window, DWORD processId,
+    const std::vector<ChildControl>& initialControls, std::wstring& failure) {
     if (!WindowOwnedByProcess(window, processId)) {
         failure = L"editor top-level ownership changed before selection";
         return false;
     }
+    if (!SameControlHandles(initialControls, DirectChildren(window, processId))) {
+        failure = L"direct child HWND inventory changed before selection";
+        return false;
+    }
+
     const HWND outliner = GetDlgItem(window, kOutlinerId);
     if (!DirectVisibleControlOwnedByProcessAndParent(
             outliner, window, processId, kOutlinerId, L"ListBox")) {
@@ -480,7 +542,8 @@ bool SelectCubeAndNotify(HWND window, DWORD processId, std::wstring& failure) {
         return false;
     }
 
-    if (!DirectVisibleControlOwnedByProcessAndParent(
+    if (!SameControlHandles(initialControls, DirectChildren(window, processId))
+        || !DirectVisibleControlOwnedByProcessAndParent(
             outliner, window, processId, kOutlinerId, L"ListBox")
         || !WindowOwnedByProcess(window, processId)) {
         failure = L"Outliner/editor identity changed before selection notification";
@@ -494,7 +557,8 @@ bool SelectCubeAndNotify(HWND window, DWORD processId, std::wstring& failure) {
         return false;
     }
 
-    return ValidateShellState(window, processId, kCubeInspectorText, 3, failure);
+    return ValidateShellState(
+        window, processId, initialControls, kCubeInspectorText, 3, failure);
 }
 
 bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) {
@@ -511,7 +575,7 @@ void CleanupProcess(HANDLE process) {
         WaitForSingleObject(process, kCleanupTimeoutMs);
     }
 }
-}
+} // namespace
 
 int wmain(int argc, wchar_t** argv) {
     if (argc != 3) {
@@ -532,6 +596,7 @@ int wmain(int argc, wchar_t** argv) {
     bool passed = false;
     std::wstring failure;
     DWORD exitCode = 1;
+    std::vector<ChildControl> initialControls;
 
     WaitForInputIdle(process.hProcess, 5000);
     int visibleTopLevelCount = 0;
@@ -545,15 +610,19 @@ int wmain(int argc, wchar_t** argv) {
             failure = L"expected one stable visible process-owned top-level window, observed "
                 + std::to_wstring(visibleTopLevelCount);
         }
-    } else if (!ValidateShellState(
-                   window, process.dwProcessId, kSceneRootInspectorText, 0, failure)) {
+    } else if (!CaptureInitialControlInventory(
+                   window, process.dwProcessId, initialControls, failure)) {
+        // failure set by capture helper.
+    } else if (!ValidateShellState(window, process.dwProcessId, initialControls,
+                   kSceneRootInspectorText, 0, failure)) {
         // failure set by validator.
-    } else if (!SelectCubeAndNotify(window, process.dwProcessId, failure)) {
+    } else if (!SelectCubeAndNotify(
+                   window, process.dwProcessId, initialControls, failure)) {
         // failure set by selector/validator.
-    } else if (!ResizeAndCheck(window, process.dwProcessId, 800, 600,
+    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, 800, 600,
                    kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
-    } else if (!ResizeAndCheck(window, process.dwProcessId, 420, 260,
+    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, 420, 260,
                    kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
     } else {
@@ -567,8 +636,8 @@ int wmain(int argc, wchar_t** argv) {
                 failure = L"editor did not remain one stable visible process-owned top-level window; observed "
                     + std::to_wstring(finalVisibleTopLevelCount);
             }
-        } else if (!ValidateShellState(
-                       window, process.dwProcessId, kCubeInspectorText, 3, failure)) {
+        } else if (!ValidateShellState(window, process.dwProcessId, initialControls,
+                       kCubeInspectorText, 3, failure)) {
             // failure set by validator.
         } else if (CloseEditor(window, process.dwProcessId, process.hProcess, exitCode)
             && exitCode == 0) {
@@ -592,9 +661,9 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible process-owned top-level editor window before and after "
-        << L"interaction; exact process-owned child inventory, disabled pending tools, shell labels, "
-        << L"Outliner/assets identities, and Inspector state were revalidated around every bounded "
-        << L"cross-process read and after both normal+narrow resizes; Cube selection stayed synchronized, "
-        << L"all direct children remained contained, and shutdown exited cleanly.\n";
+        << L"interaction; the original 12 process-owned child HWND identities, disabled pending tools, "
+        << L"shell labels, Outliner/assets identities, and Inspector state were revalidated around every "
+        << L"bounded cross-process read and after both normal+narrow resizes; Cube selection stayed "
+        << L"synchronized, all direct children remained contained, and shutdown exited cleanly.\n";
     return 0;
 }
