@@ -21,8 +21,16 @@ constexpr wchar_t kSceneRootInspectorText[] =
 constexpr wchar_t kCubeInspectorText[] =
     L"Name: Cube\r\nType: Primitive placeholder\r\n\r\nPosition: 0, 0.5, 0\r\n"
     L"Rotation: 0, 0, 0\r\nScale: 1, 1, 1";
+constexpr wchar_t kOutlinerLabelText[] = L"OUTLINER";
+constexpr wchar_t kInspectorLabelText[] = L"INSPECTOR";
+constexpr wchar_t kAssetsLabelText[] = L"ASSETS / DEFAULT PRIMITIVES";
+constexpr wchar_t kStatusText[] =
+    L"E11.0 editor shell | Outliner selection works | viewport transform tools, undo/redo, "
+    L"save/reopen, Play and real asset import pending";
 constexpr std::array<const wchar_t*, 4> kExpectedAssetItems{{
     L"Primitive/Cube", L"Primitive/Plane", L"Camera", L"DirectionalLight"}};
+constexpr std::array<const wchar_t*, 4> kExpectedShellStaticTexts{{
+    kOutlinerLabelText, kInspectorLabelText, kAssetsLabelText, kStatusText}};
 
 struct ProcessWindowCollection {
     DWORD processId{};
@@ -340,8 +348,19 @@ int wmain(int argc, wchar_t** argv) {
             const HWND outliner = GetDlgItem(window, kOutlinerId);
             const HWND assets = GetDlgItem(window, kAssetListId);
             const HWND inspector = FindControlByText(controls, L"Static", kSceneRootInspectorText);
-            if (pendingStateOk && (!outliner || !assets || !inspector)) {
-                failure = L"required Outliner/assets/exact Scene Root Inspector control not found";
+            if (pendingStateOk) {
+                for (const wchar_t* expectedText : kExpectedShellStaticTexts) {
+                    const HWND staticControl = FindControlByText(controls, L"Static", expectedText);
+                    if (!staticControl || !IsWindowVisible(staticControl)) {
+                        failure = L"required shell static is missing, hidden, or mislabeled: "
+                            + std::wstring(expectedText);
+                        pendingStateOk = false;
+                        break;
+                    }
+                }
+            }
+            if (pendingStateOk && (!outliner || !assets || !inspector || !IsWindowVisible(inspector))) {
+                failure = L"required Outliner/assets/exact visible Scene Root Inspector control not found";
                 pendingStateOk = false;
             }
 
@@ -452,9 +471,9 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible process-owned top-level editor window before and after "
-        << L"interaction, 12 required controls, disabled pending tools, exact Outliner and asset "
-        << L"item identities and complete Inspector fixture text with post-notification selection "
-        << L"ownership+synchronization, ownership-checked bounded asynchronous normal+narrow "
-        << L"resizes, and clean exit.\n";
+        << L"interaction, 12 required controls, disabled pending tools, exact shell labels/status, "
+        << L"exact Outliner and asset item identities and complete Inspector fixture text with "
+        << L"post-notification selection ownership+synchronization, ownership-checked bounded "
+        << L"asynchronous normal+narrow resizes, and clean exit.\n";
     return 0;
 }
