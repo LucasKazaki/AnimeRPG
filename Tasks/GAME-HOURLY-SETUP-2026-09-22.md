@@ -1,17 +1,21 @@
 # GAME-HOURLY-SETUP-2026-09-22
 
 Owner: `animerpg-game-hourly`. Phase: documentation and research setup only.
-Baseline: `771b61ac116dfa4a70d81b53a390f672aaf3bf4e`.
+Research baseline: `771b61ac116dfa4a70d81b53a390f672aaf3bf4e`.
+Integration baseline after concurrent PR #6 merge: `8df6d2fc3814564c39049bb154361205f0f00309`.
 Authority: Lucas's September 22 request for a separate hourly game worker and explicit follow-up to push/merge this cycle into main.
 
 ## Allowed paths
 
-- `AGENTS.md`: append scoped operator authorization, preserve original rules.
+- `AGENTS.md`: append scoped operator authorization, preserve the newly integrated PR #6 rules verbatim.
+- `GAME_DEVELOPMENT_CONTROL.md`: append the same dated operator update, preserving engine acceptance requirements and eliminating the otherwise contradictory blanket pause.
 - `Docs/Agents/ANIMERPG-HOURLY.md`: operating/research/merge contract.
 - `Docs/Agents/animerpg-hourly/BACKLOG.json`: five reference candidates plus one separate sourced community request.
 - `Tasks/GAME-HOURLY-SETUP-2026-09-22.md`: this packet.
 
-No Engine/Game/Tests source, CMake, CI, runtime databases, existing task records, art archives, dependencies, or other worker branches may be changed in this packet. It does not admit an implementation packet or satisfy gameplay acceptance. The engine worker's own scope is unchanged.
+No Engine/Game/Tests source, CMake, CI, runtime databases, other task records, art archives, dependencies, or other worker branches may be changed in this packet. It does not admit an implementation packet or satisfy gameplay acceptance. The engine worker's own scope is unchanged.
+
+The additional control-file path was admitted during setup because PR #6 reached main concurrently at 04:37 UTC. Preserve that commit and its native-test safety rules; reconcile through a non-forced merge commit on this worker branch. Do not replace main with the old setup tree. The operating contract and backlog retain their original research baseline as historical evidence.
 
 ## Verification and merge conditions
 
