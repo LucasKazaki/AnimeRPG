@@ -19,6 +19,29 @@ enum class AttackResult {
     TargetDefeated,
 };
 
+enum class AttackResistance {
+    None,
+    Light,
+    Heavy,
+};
+
+enum class EnemyPhase {
+    Normal,
+    Pressure,
+};
+
+enum class TechniqueType {
+    None,
+    Reaction,
+    Stagger,
+    Finisher,
+};
+
+enum class TrainingTargetMode {
+    Standard,
+    Endless,
+};
+
 struct AttackDefinition {
     int damage{};
     float cooldownSeconds{};
@@ -32,6 +55,8 @@ struct AttackReport {
     int damageApplied{};
     int comboCount{};
     bool staggerTriggered{};
+    bool resistanceApplied{};
+    bool staggerBonusApplied{};
 };
 
 enum class ManaAffinity {
@@ -44,12 +69,14 @@ enum class TrainingEnemyProfile {
     Standard,
     Vanguard,
     Bulwark,
+    Boss,
 };
 
 struct TrainingEnemyDefinition {
     int maximumHealth{100};
     int maximumPosture{80};
     ManaAffinity weakness{ManaAffinity::None};
+    AttackResistance resistance{AttackResistance::None};
 };
 
 struct TrainingDummy {
@@ -123,6 +150,10 @@ public:
     static constexpr int ReactionTechniquePoints = 20;
     static constexpr int StaggerTechniquePoints = 15;
     static constexpr int FinisherTechniquePoints = 25;
+    static constexpr int ResistantAttackDamageNumerator = 4;
+    static constexpr int ResistantAttackDamageDenominator = 5;
+    static constexpr int StaggerDamageNumerator = 5;
+    static constexpr int StaggerDamageDenominator = 4;
     static constexpr double FastChallengeSeconds = 5.0;
     static constexpr double StandardChallengeSeconds = 10.0;
 
@@ -135,6 +166,7 @@ public:
     bool ConsumeStaggerOpening();
     void ResetTrainingSession();
     bool SetTrainingEnemyProfile(TrainingEnemyProfile profile);
+    bool SetTrainingTargetMode(TrainingTargetMode mode);
     ComboFinisherReport TryComboFinisher(const Math::Vec3& attackerPosition);
     ManaReactionReport ApplyManaAffinity(ManaAffinity affinity);
     void SetCombatAssistPreset(CombatAssistPreset preset) { assistPreset_ = preset; }
@@ -153,9 +185,12 @@ public:
     ManaAffinity TargetAffinity() const { return targetAffinity_; }
     CombatAssistPreset AssistPreset() const { return assistPreset_; }
     TrainingEnemyProfile EnemyProfile() const { return enemyProfile_; }
+    TrainingTargetMode TargetMode() const { return targetMode_; }
+    EnemyPhase CurrentEnemyPhase() const;
     TrainingEnemyDefinition CurrentEnemyDefinition() const;
     bool EclipseOpeningReady() const { return eclipseOpening_; }
     int TechniqueChain() const { return techniqueChain_; }
+    TechniqueType LastTechniqueType() const { return lastTechniqueType_; }
     int TrainingChallengeScore() const;
     float TrainingDps() const;
     const AttackDefinition& Definition(AttackType type) const;
@@ -166,12 +201,14 @@ private:
     std::int64_t CurrentMicros() const;
     bool ApplyPostureDamage(int postureDamage);
     void RegisterComboHit();
-    void RegisterTechnique(int basePoints);
+    void RegisterTechnique(TechniqueType type, int basePoints);
+    int AdjustDirectAttackDamage(AttackType type, int damage,
+        bool& resistanceApplied, bool& staggerBonusApplied) const;
 
     TrainingDummy dummy_{};
     AttackDefinition lightAttack_{25, 0.4f, 3.5f, 25};
     AttackDefinition heavyAttack_{60, 1.0f, 3.5f, 70};
-    AttackReport lastAttack_{AttackType::Light, AttackResult::Ready, 0, 0, false};
+    AttackReport lastAttack_{AttackType::Light, AttackResult::Ready, 0, 0, false, false, false};
     TrainingStats stats_{};
     double elapsedSecondsPrecise_{};
     double targetDefeatElapsedSeconds_{-1.0};
@@ -185,7 +222,9 @@ private:
     bool eclipseOpening_{};
     int techniqueChain_{};
     std::int64_t lastTechniqueMicros_{-1000000000};
+    TechniqueType lastTechniqueType_{TechniqueType::None};
     TrainingEnemyProfile enemyProfile_{TrainingEnemyProfile::Standard};
+    TrainingTargetMode targetMode_{TrainingTargetMode::Standard};
     CombatAssistPreset assistPreset_{CombatAssistPreset::Standard};
 };
 
