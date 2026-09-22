@@ -2,12 +2,30 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace Astral::Scene {
 
 std::int64_t ShadowbladeActions::DefenseSecondsToMicros(double seconds) {
+    if (!std::isfinite(seconds) || seconds <= 0.0) return 0;
+    constexpr double MaximumSeconds = static_cast<double>(
+        std::numeric_limits<std::int64_t>::max())
+        / static_cast<double>(DefenseMicrosPerSecond);
+    if (seconds >= MaximumSeconds) return std::numeric_limits<std::int64_t>::max();
     return static_cast<std::int64_t>(std::llround(
         seconds * static_cast<double>(DefenseMicrosPerSecond)));
+}
+
+std::int64_t ShadowbladeActions::SaturatingMicrosAdd(std::int64_t left,
+    std::int64_t right) {
+    if (left <= 0) return std::max<std::int64_t>(0, right);
+    if (right <= 0) return left;
+    const std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
+    return left > maximum - right ? maximum : left + right;
+}
+
+std::int64_t ShadowbladeActions::CurrentDefenseMicros() const {
+    return DefenseSecondsToMicros(defenseElapsedSecondsPrecise_);
 }
 
 void ShadowbladeActions::AdvanceTime(float deltaSeconds) {
@@ -19,17 +37,19 @@ void ShadowbladeActions::AdvanceTime(float deltaSeconds) {
     fatalStrikeCooldownRemaining_ = std::max(0.0f,
         fatalStrikeCooldownRemaining_ - deltaSeconds);
 
-    const std::int64_t defenseDeltaMicros = std::max<std::int64_t>(0,
-        DefenseSecondsToMicros(static_cast<double>(deltaSeconds)));
-    defenseCounterRemainingMicros_ = std::max<std::int64_t>(0,
-        defenseCounterRemainingMicros_ - defenseDeltaMicros);
+    defenseElapsedSecondsPrecise_ += static_cast<double>(deltaSeconds);
+    if (!std::isfinite(defenseElapsedSecondsPrecise_)) {
+        defenseElapsedSecondsPrecise_ = static_cast<double>(
+            std::numeric_limits<std::int64_t>::max())
+            / static_cast<double>(DefenseMicrosPerSecond);
+    }
+    const std::int64_t now = CurrentDefenseMicros();
+    if (defenseCounterEndMicros_ > 0 && now >= defenseCounterEndMicros_) {
+        defenseCounterEndMicros_ = 0;
+    }
 
-    if (incomingAttackActive_) {
-        incomingAttackRemainingMicros_ = std::max<std::int64_t>(0,
-            incomingAttackRemainingMicros_ - defenseDeltaMicros);
-        if (incomingAttackRemainingMicros_ <= 0) {
-            ResolveIncomingHit(DefenseResult::Hit);
-        }
+    if (incomingAttackActive_ && now >= incomingAttackEndMicros_) {
+        ResolveIncomingHit(DefenseResult::Hit);
     }
 }
 
@@ -131,7 +151,7 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
         combatSandbox.ConsumeStaggerOpening();
     }
     if (defenseCounter) {
-        defenseCounterRemainingMicros_ = 0;
+        defenseCounterEndMicros_ = 0;
     }
     lastAction_.damageApplied = combatSandbox.ApplyDamage(FatalStrikeDamage);
     if (lastAction_.damageApplied > 0) {
@@ -151,7 +171,7 @@ bool ShadowbladeActions::BeginIncomingAttack(const IncomingAttackDefinition& att
     }
 
     incomingAttack_ = attack;
-    incomingAttackRemainingMicros_ = windupMicros;
+    incomingAttackEndMicros_ = SaturatingMicrosAdd(CurrentDefenseMicros(), windupMicros);
     incomingAttackActive_ = true;
     lastDefense_ = {DefenseResult::ThreatQueued, 0, 0, false,
         static_cast<float>(windupMicros) / static_cast<float>(DefenseMicrosPerSecond)};
@@ -164,7 +184,8 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
         return lastDefense_;
     }
 
-    const std::int64_t remainingMicros = incomingAttackRemainingMicros_;
+    const std::int64_t remainingMicros = std::max<std::int64_t>(0,
+        incomingAttackEndMicros_ - CurrentDefenseMicros());
     const float remaining = static_cast<float>(remainingMicros)
         / static_cast<float>(DefenseMicrosPerSecond);
     const std::int64_t perfectWindowMicros = DefenseSecondsToMicros(
@@ -177,10 +198,10 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
         }
 
         incomingAttackActive_ = false;
-        incomingAttackRemainingMicros_ = 0;
+        incomingAttackEndMicros_ = 0;
         if (remainingMicros <= perfectWindowMicros) {
-            defenseCounterRemainingMicros_ = DefenseSecondsToMicros(
-                DefenseCounterWindowSeconds);
+            defenseCounterEndMicros_ = SaturatingMicrosAdd(CurrentDefenseMicros(),
+                DefenseSecondsToMicros(DefenseCounterWindowSeconds));
             lastDefense_ = {DefenseResult::PerfectDodge, 0, 0, true, remaining};
         } else {
             lastDefense_ = {DefenseResult::Evaded, 0, 0, false, remaining};
@@ -193,10 +214,10 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
     }
 
     incomingAttackActive_ = false;
-    incomingAttackRemainingMicros_ = 0;
+    incomingAttackEndMicros_ = 0;
     if (remainingMicros <= perfectWindowMicros) {
-        defenseCounterRemainingMicros_ = DefenseSecondsToMicros(
-            DefenseCounterWindowSeconds);
+        defenseCounterEndMicros_ = SaturatingMicrosAdd(CurrentDefenseMicros(),
+            DefenseSecondsToMicros(DefenseCounterWindowSeconds));
         lastDefense_ = {DefenseResult::PerfectGuard, 0, 0, true, remaining};
         return lastDefense_;
     }
@@ -220,24 +241,28 @@ void ShadowbladeActions::ResetDefenseState() {
     playerHealth_ = MaximumPlayerHealth;
     guardIntegrity_ = MaximumGuardIntegrity;
     incomingAttackActive_ = false;
-    incomingAttackRemainingMicros_ = 0;
-    defenseCounterRemainingMicros_ = 0;
+    defenseElapsedSecondsPrecise_ = 0.0;
+    incomingAttackEndMicros_ = 0;
+    defenseCounterEndMicros_ = 0;
     defenseTimingPreset_ = DefenseTimingPreset::Standard;
     lastDefense_ = {};
 }
 
 float ShadowbladeActions::IncomingAttackRemaining() const {
-    return static_cast<float>(std::max<std::int64_t>(0, incomingAttackRemainingMicros_))
-        / static_cast<float>(DefenseMicrosPerSecond);
+    if (!incomingAttackActive_) return 0.0f;
+    const std::int64_t remaining = std::max<std::int64_t>(0,
+        incomingAttackEndMicros_ - CurrentDefenseMicros());
+    return static_cast<float>(remaining) / static_cast<float>(DefenseMicrosPerSecond);
 }
 
 bool ShadowbladeActions::HasDefenseCounter() const {
-    return defenseCounterRemainingMicros_ > 0;
+    return defenseCounterEndMicros_ > CurrentDefenseMicros();
 }
 
 float ShadowbladeActions::DefenseCounterRemaining() const {
-    return static_cast<float>(std::max<std::int64_t>(0, defenseCounterRemainingMicros_))
-        / static_cast<float>(DefenseMicrosPerSecond);
+    const std::int64_t remaining = std::max<std::int64_t>(0,
+        defenseCounterEndMicros_ - CurrentDefenseMicros());
+    return static_cast<float>(remaining) / static_cast<float>(DefenseMicrosPerSecond);
 }
 
 float ShadowbladeActions::PerfectDefenseWindowSeconds() const {
@@ -255,7 +280,7 @@ DefenseReport ShadowbladeActions::ResolveIncomingHit(DefenseResult result) {
     const int previousHealth = playerHealth_;
     playerHealth_ = std::max(0, playerHealth_ - incomingAttack_.damage);
     incomingAttackActive_ = false;
-    incomingAttackRemainingMicros_ = 0;
+    incomingAttackEndMicros_ = 0;
     lastDefense_ = {result, previousHealth - playerHealth_, 0, false, 0.0f};
     return lastDefense_;
 }
