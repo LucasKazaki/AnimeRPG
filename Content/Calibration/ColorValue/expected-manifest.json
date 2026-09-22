@@ -1,0 +1,41 @@
+{
+  "color_note": "role hex values and PNG RGB are sRGB display references; do not treat as scene-linear shader constants",
+  "files": [
+    {
+      "bytes": 6969,
+      "path": "neutral_lut_16.png",
+      "sha256": "b9c2e13d85416055d65c6eb9d9a42e297515123c52b8dfd2a9d040458e1b256a"
+    },
+    {
+      "bytes": 2289,
+      "path": "palette_card.png",
+      "sha256": "c1ab8182f37aab7e91fbb919226c46b86a3496698669d21f89b7511e9cd7e564"
+    },
+    {
+      "bytes": 362,
+      "path": "value_ramp_16.png",
+      "sha256": "7c61e5e17eb2873dd0ae3fc861cb5e51881a08c2492962f2e553f8698c810226"
+    }
+  ],
+  "generator": "astral-color-calibration-1",
+  "lut_layout": "16x16x16 neutral cube; x=R+16*B, y=G; diagnostic only",
+  "roles": [
+    {"hex": "#C8BEA1", "id": "civic_limestone", "relative_luminance": 0.516795},
+    {"hex": "#20242A", "id": "graphite", "relative_luminance": 0.01736},
+    {"hex": "#34373A", "id": "asphalt", "relative_luminance": 0.037679},
+    {"hex": "#52694E", "id": "vegetation", "relative_luminance": 0.12447},
+    {"hex": "#42D9C8", "id": "ion_teal", "relative_luminance": 0.549541},
+    {"hex": "#8068F2", "id": "ultraviolet", "relative_luminance": 0.209006},
+    {"hex": "#F15B52", "id": "vermilion", "relative_luminance": 0.267921},
+    {"hex": "#E6C878", "id": "rare_gold", "relative_luminance": 0.594876}
+  ],
+  "schema_version": 1,
+  "source_sha256": "21e44310b4de21e085736b1a49a17705e6794285db7bede76ff0423322f96a22",
+  "status": "art_reference_source_validated_not_runtime",
+  "ui_screening": [
+    {"background": "graphite", "foreground": "civic_limestone", "minimum_ratio": 4.5, "ratio": 8.414417},
+    {"background": "graphite", "foreground": "rare_gold", "minimum_ratio": 4.5, "ratio": 9.573582},
+    {"background": "graphite", "foreground": "ion_teal", "minimum_ratio": 4.5, "ratio": 8.900553},
+    {"background": "graphite", "foreground": "vermilion", "minimum_ratio": 4.5, "ratio": 4.719738}
+  ]
+}

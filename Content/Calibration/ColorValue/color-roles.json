@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "status": "proposed_art_reference_not_runtime",
+  "roles": [
+    {"id":"civic_limestone","hex":"#C8BEA1","use":"quiet civic stone and neutral light reference"},
+    {"id":"graphite","hex":"#20242A","use":"UI darks, equipment neutrals, shadow mass"},
+    {"id":"asphalt","hex":"#34373A","use":"roads and grounded dark surfaces"},
+    {"id":"vegetation","hex":"#52694E","use":"natural midtone"},
+    {"id":"ion_teal","hex":"#42D9C8","use":"primary mana and friendly supernatural accent"},
+    {"id":"ultraviolet","hex":"#8068F2","use":"secondary supernatural depth/state accent"},
+    {"id":"vermilion","hex":"#F15B52","use":"danger and hostile telegraph accent"},
+    {"id":"rare_gold","hex":"#E6C878","use":"permanent progression and exceptional reward accent"}
+  ],
+  "ui_screening_pairs": [
+    {"foreground":"civic_limestone","background":"graphite","minimum_ratio":4.5},
+    {"foreground":"rare_gold","background":"graphite","minimum_ratio":4.5},
+    {"foreground":"ion_teal","background":"graphite","minimum_ratio":4.5},
+    {"foreground":"vermilion","background":"graphite","minimum_ratio":4.5}
+  ]
+}
