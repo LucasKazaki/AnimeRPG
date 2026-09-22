@@ -88,6 +88,83 @@ void TestCompletionRewardsOnceThroughExistingCap() {
         "completion reward obeys the existing maximum-resource cap");
 }
 
+void TestConfiguredChallengeRewardsPersistAcrossRetryAndRespectCap() {
+    using namespace Astral::Scene;
+
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    LandmarkEncounter encounter;
+    encounter.ConfigureChallenge(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Balanced);
+
+    actions.TryFatalStrike({}, combat);
+    Expect(Near(actions.Resource(), 50.0f) && combat.Dummy().health == 20,
+        "challenge reward setup creates room under the resource cap");
+    Expect(encounter.TryActivate(Discovery(LandmarkKind::LincolnMemorial), combat).result
+            == LandmarkEncounterResult::Activated,
+        "configured challenge uses the existing encounter activation path");
+    combat.ApplyDamage(20);
+    Expect(encounter.Update(combat, actions),
+        "configured challenge resolves when the encounter completes");
+
+    const LandmarkEncounterReport first = encounter.LastReport();
+    Expect(first.challenge.firstClear
+            && Near(first.challenge.firstClearRewardRequested,
+                EncounterChallengeTracker::StandardFirstClearReward)
+            && Near(first.challenge.firstClearRewardApplied,
+                EncounterChallengeTracker::StandardFirstClearReward),
+        "first configured Standard clear requests and applies its challenge reward");
+    Expect(Near(first.rewardApplied,
+            LandmarkEncounter::CompletionReward
+                + EncounterChallengeTracker::StandardFirstClearReward)
+            && Near(actions.Resource(), 90.0f),
+        "challenge reward is applied through the same bounded Shadowblade resource path");
+    Expect(encounter.ChallengeTracker().FirstClearGranted(
+            EncounterChallengeDifficulty::Standard),
+        "encounter-owned challenge tracker records the Standard first clear");
+
+    const auto retry = encounter.Retry(combat, actions);
+    Expect(retry.result == LandmarkEncounterResult::Retried
+            && encounter.State() == LandmarkEncounterState::Active,
+        "configured completed encounter can retry without rebuilding challenge state");
+    combat.ApplyDamage(combat.Dummy().maximumHealth);
+    Expect(encounter.Update(combat, actions),
+        "configured retry can complete normally");
+    const LandmarkEncounterReport repeated = encounter.LastReport();
+    Expect(!repeated.challenge.firstClear
+            && Near(repeated.challenge.firstClearRewardRequested, 0.0f)
+            && Near(repeated.challenge.firstClearRewardApplied, 0.0f)
+            && Near(repeated.rewardApplied, 0.0f),
+        "retry preserves first-clear ledger and cannot duplicate encounter or challenge rewards");
+    Expect(encounter.ChallengeTracker().FirstClearGranted(
+            EncounterChallengeDifficulty::Standard),
+        "retry leaves the Standard first-clear ledger entry intact");
+
+    CombatSandbox cappedCombat;
+    ShadowbladeActions cappedActions;
+    LandmarkEncounter cappedEncounter;
+    cappedEncounter.ConfigureChallenge(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Balanced);
+    Expect(cappedEncounter.TryActivate(
+            Discovery(LandmarkKind::LincolnMemorial), cappedCombat).result
+            == LandmarkEncounterResult::Activated,
+        "full-resource challenge activates through the normal encounter path");
+    cappedCombat.ApplyDamage(cappedCombat.Dummy().maximumHealth);
+    Expect(cappedEncounter.Update(cappedCombat, cappedActions),
+        "full-resource challenge still records completion");
+    const LandmarkEncounterReport capped = cappedEncounter.LastReport();
+    Expect(capped.challenge.firstClear
+            && Near(capped.challenge.firstClearRewardRequested,
+                EncounterChallengeTracker::StandardFirstClearReward)
+            && Near(capped.challenge.firstClearRewardApplied, 0.0f),
+        "first-clear ledger advances even when the existing resource cap applies zero reward");
+    Expect(Near(capped.rewardApplied, 0.0f)
+            && Near(cappedActions.Resource(), ShadowbladeActions::MaximumResource)
+            && cappedEncounter.ChallengeTracker().FirstClearGranted(
+                EncounterChallengeDifficulty::Standard),
+        "challenge and completion rewards cannot overflow or bypass the maximum resource cap");
+}
+
 void TestManaReactionStateAndReset() {
     using namespace Astral::Scene;
     CombatSandbox combat;
@@ -479,6 +556,7 @@ void TestOrderedLandmarkResonanceBonus() {
 int main() {
     TestActivationRequiresDesignatedDiscoveryAndLiveTarget();
     TestCompletionRewardsOnceThroughExistingCap();
+    TestConfiguredChallengeRewardsPersistAcrossRetryAndRespectCap();
     TestManaReactionStateAndReset();
     TestComboFinisherAndAccessibleAssistPreset();
     TestObjectiveCompletionRewardIsOneShot();
