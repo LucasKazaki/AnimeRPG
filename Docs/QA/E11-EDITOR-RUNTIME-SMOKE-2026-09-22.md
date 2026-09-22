@@ -61,6 +61,37 @@ Two additional final-candidate workflows also completed successfully:
 
 An earlier Windows run for superseded code-only head `0dc4d44a2ab26d0fd9c7d00012a277453c96e4a1` reached successful test-safety, VS2022 configure, Debug build and deterministic Debug tests before GitHub cancelled it after later branch commits. It is not used as final-head acceptance evidence.
 
+## 2026-09-22 continuation: exact top-level window cardinality
+
+A source audit of `Tests/EditorRuntimeSmoke.cpp` at pre-pass head `7f30690faec7532a35b2e7e050e873a40a562889` found that acceptance item 1 was weaker in code than in the task contract. The callback stopped `EnumWindows` at the first visible process-owned top-level window. That proves at least one such window exists but cannot prove the required **exactly one** visible top-level editor window.
+
+Primary Win32 sources rechecked on 2026-09-22:
+
+- `EnumWindows`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumwindows. The API enumerates top-level windows and continues until the last window or the callback returns `FALSE`.
+- `GetWindowThreadProcessId`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid. Used to bind every enumerated top-level window to the exact launched editor process.
+- `IsWindowVisible`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-iswindowvisible. Used to count only process-owned windows with visible state.
+
+Implementation commit `ea9fe671a1734d836cc792bb45342b360d96cb04` changes only the already-authorized runtime-smoke source plus this task record. `Tests/EditorRuntimeSmoke.cpp` blob `2bc63048f546203f58c8f621c76048895d6fd073` now collects all visible top-level windows owned by the launched process during each bounded poll and succeeds only when the observed set has cardinality one. Enumeration failure is reported separately from persistent zero/multiple-window observations. Existing message deadlines, resize checks, close timeout, and owned-process-only cleanup remain intact.
+
+A disposable C++17 logic fixture modeled the old first-match algorithm and the exact-cardinality rule. The old logic accepts a two-window observation by selecting the first handle; the repaired rule rejects zero and two windows and accepts exactly one. Fixture SHA-256: `d9b25b1c9919d485a251542bafed19059582117163aff15d80bc39e02ac1fa0a`.
+
+Commands executed in the coordinator sandbox:
+
+```bash
+g++ -std=c++17 -Wall -Wextra -Werror /tmp/e11_window_selection_fixture.cpp -o /tmp/e11_window_selection_fixture
+/tmp/e11_window_selection_fixture
+clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer /tmp/e11_window_selection_fixture.cpp -o /tmp/e11_window_selection_fixture_san
+ASAN_OPTIONS=detect_leaks=1 /tmp/e11_window_selection_fixture_san
+```
+
+All four commands exited 0. This is a source-logic fixture only, not a native Win32 execution of `EditorRuntimeSmoke`. A full repository clone was attempted once in the coordinator sandbox and failed because `github.com` DNS resolution was unavailable; the unchanged failure was not retried.
+
+Hosted Windows Server 2022 run `35694592339`, job `106638569670`, executed against exact implementation candidate `ea9fe671a1734d836cc792bb45342b360d96cb04` and completed successfully at 2026-09-22T06:25:10Z. It passed the R0 parser-only and safety-contract steps, Release assertion/CTest safety contracts, VS2022 x64 configure, MSVC Debug build and deterministic Debug tests, MSVC Release build, release runtime-dependency/prerequisite policy checks, deterministic Release tests, static milestone verifiers, and clean tracked-tree verification. The historical R0 runner itself was not executed. Release manifest integrity run `35694592328` and profiling capture portability run `35694592335` also passed for the same candidate.
+
+Hosted deterministic CTest still excludes every RuntimeSmoke target, so these hosted passes establish compile/build and non-runtime regression status, not native execution of the repaired top-level cardinality check.
+
+Repository search also found the older game RuntimeSmoke sources use the same first-visible-window helper pattern. They are outside this E11 packet's allowed paths and were not changed. Treat that only as a future test-harness audit item, not as an E11 acceptance failure.
+
 ## Environment limitation and deferred evidence
 
 The coordinator environment does not provide the Windows SDK/Win32 headers required to compile or run this native smoke locally. No synthetic Win32 runtime result is substituted for that missing environment. The hosted runner compiled the target but did not execute its interactive process/window checks.
@@ -81,6 +112,6 @@ The registered executor must retain exact source SHA, machine and Windows identi
 
 ## Result and next action
 
-Status: **hosted Debug/Release compile and deterministic regression gate passed; native editor smoke execution pending; independent review pending**.
+Status: **hosted Debug/Release compile and deterministic regression gate passed for the exact-cardinality repair; native editor smoke execution pending; independent review pending**.
 
 The single next useful action is to run the exact `EditorRuntimeSmoke` in Debug and Release on the registered owned Windows desktop, preserve the required receipts/screenshots, then obtain independent review. Do not start dependent scene-document, transform-gizmo, save/reopen, or undo/redo work on the strength of hosted compilation alone. Issue #7 remains a separate open local/native/package acceptance gate and the R0 runner was not executed by this packet.
