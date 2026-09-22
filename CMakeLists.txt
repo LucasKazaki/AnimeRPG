@@ -119,6 +119,12 @@ if(BUILD_TESTING)
 namespace {
 constexpr DWORD kSupervisorWorkerTimeoutMs = 150000;
 constexpr DWORD kSupervisorCleanupTimeoutMs = 5000;
+constexpr DWORD kSupervisorSelfTestAliveMs = 100;
+
+struct SupervisorContainedProcess {
+    HANDLE job{};
+    HANDLE process{};
+};
 
 std::wstring SupervisorQuoteArgument(const wchar_t* value) {
     std::wstring quoted = L"\"";
@@ -149,21 +155,181 @@ std::wstring SupervisorModulePath() {
         const DWORD copied = GetModuleFileNameW(
             nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
         if (copied == 0) return {};
-        if (copied < buffer.size() - 1) {
-            return std::wstring(buffer.data(), copied);
-        }
+        if (copied < buffer.size() - 1) return std::wstring(buffer.data(), copied);
         if (buffer.size() >= 32768) return {};
         buffer.resize(buffer.size() * 2);
     }
 }
 
-void SupervisorPrintWin32Failure(const char* operation, DWORD error) {
-    std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (" << operation
-              << ", Win32 error " << error << ")\n";
+std::wstring SupervisorWin32Failure(const wchar_t* operation, DWORD error) {
+    return std::wstring(operation) + L" failed with Win32 error " + std::to_wstring(error);
+}
+
+void SupervisorCloseProcessHandles(SupervisorContainedProcess& child) {
+    if (child.process) {
+        CloseHandle(child.process);
+        child.process = nullptr;
+    }
+    if (child.job) {
+        CloseHandle(child.job);
+        child.job = nullptr;
+    }
+}
+
+bool SupervisorLaunchContained(const std::wstring& application,
+    std::wstring command, const wchar_t* workingDirectory,
+    SupervisorContainedProcess& child, std::wstring& failure) {
+    HANDLE job = CreateJobObjectW(nullptr, nullptr);
+    if (!job) {
+        failure = SupervisorWin32Failure(L"CreateJobObjectW", GetLastError());
+        return false;
+    }
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation,
+            &limits, sizeof(limits))) {
+        failure = SupervisorWin32Failure(L"SetInformationJobObject", GetLastError());
+        CloseHandle(job);
+        return false;
+    }
+
+    SIZE_T attributeBytes = 0;
+    SetLastError(ERROR_SUCCESS);
+    const BOOL probeResult = InitializeProcThreadAttributeList(nullptr, 1, 0, &attributeBytes);
+    if (probeResult != FALSE || GetLastError() != ERROR_INSUFFICIENT_BUFFER
+        || attributeBytes == 0) {
+        failure = SupervisorWin32Failure(
+            L"InitializeProcThreadAttributeList probe", GetLastError());
+        CloseHandle(job);
+        return false;
+    }
+
+    std::vector<unsigned char> attributeStorage(attributeBytes);
+    auto* attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributeStorage.data());
+    if (!InitializeProcThreadAttributeList(attributes, 1, 0, &attributeBytes)) {
+        failure = SupervisorWin32Failure(
+            L"InitializeProcThreadAttributeList", GetLastError());
+        CloseHandle(job);
+        return false;
+    }
+
+    HANDLE jobList[] = {job};
+    if (!UpdateProcThreadAttribute(attributes, 0, PROC_THREAD_ATTRIBUTE_JOB_LIST,
+            jobList, sizeof(jobList), nullptr, nullptr)) {
+        failure = SupervisorWin32Failure(
+            L"UpdateProcThreadAttribute(PROC_THREAD_ATTRIBUTE_JOB_LIST)", GetLastError());
+        DeleteProcThreadAttributeList(attributes);
+        CloseHandle(job);
+        return false;
+    }
+
+    STARTUPINFOEXW startup{};
+    startup.StartupInfo.cb = sizeof(startup);
+    startup.lpAttributeList = attributes;
+    PROCESS_INFORMATION process{};
+    const BOOL created = CreateProcessW(application.c_str(), command.data(), nullptr, nullptr,
+        FALSE, EXTENDED_STARTUPINFO_PRESENT, nullptr, workingDirectory,
+        &startup.StartupInfo, &process);
+    const DWORD createError = created ? ERROR_SUCCESS : GetLastError();
+    DeleteProcThreadAttributeList(attributes);
+
+    if (!created) {
+        failure = SupervisorWin32Failure(L"CreateProcessW(contained child)", createError);
+        CloseHandle(job);
+        return false;
+    }
+
+    CloseHandle(process.hThread);
+    child.job = job;
+    child.process = process.hProcess;
+    return true;
+}
+
+bool SupervisorCloseJobAndVerifyTermination(SupervisorContainedProcess& child,
+    DWORD timeoutMs, DWORD& exitCode, std::wstring& failure) {
+    if (!child.job || !child.process) {
+        failure = L"contained-process handles were not both available";
+        return false;
+    }
+    if (!CloseHandle(child.job)) {
+        failure = SupervisorWin32Failure(L"CloseHandle(kill-on-close job)", GetLastError());
+        return false;
+    }
+    child.job = nullptr;
+    const DWORD waitState = WaitForSingleObject(child.process, timeoutMs);
+    if (waitState != WAIT_OBJECT_0) {
+        failure = waitState == WAIT_TIMEOUT
+            ? L"kill-on-close job did not terminate contained child before deadline"
+            : SupervisorWin32Failure(L"WaitForSingleObject(contained child)", GetLastError());
+        return false;
+    }
+    if (!GetExitCodeProcess(child.process, &exitCode) || exitCode == STILL_ACTIVE) {
+        failure = SupervisorWin32Failure(L"GetExitCodeProcess(contained child)", GetLastError());
+        return false;
+    }
+    return true;
+}
+
+int SupervisorRunContainmentSelfTest(const std::wstring& selfPath) {
+    std::wstring failure;
+    SupervisorContainedProcess child{};
+    std::wstring command = SupervisorQuoteArgument(selfPath.c_str())
+        + L" --contained-self-test-child";
+    if (!SupervisorLaunchContained(selfPath, command, nullptr, child, failure)) {
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    const DWORD initialWait = WaitForSingleObject(child.process, kSupervisorSelfTestAliveMs);
+    if (initialWait != WAIT_TIMEOUT) {
+        failure = initialWait == WAIT_OBJECT_0
+            ? L"contained self-test child exited before kill-on-close was exercised"
+            : SupervisorWin32Failure(L"WaitForSingleObject(self-test liveness)", GetLastError());
+        DWORD ignoredExit = 0;
+        std::wstring cleanupFailure;
+        if (!SupervisorCloseJobAndVerifyTermination(
+                child, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
+            && !cleanupFailure.empty()) {
+            failure += L"; " + cleanupFailure;
+        }
+        SupervisorCloseProcessHandles(child);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    DWORD exitCode = STILL_ACTIVE;
+    const bool terminated = SupervisorCloseJobAndVerifyTermination(
+        child, kSupervisorCleanupTimeoutMs, exitCode, failure);
+    SupervisorCloseProcessHandles(child);
+    if (!terminated) {
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    std::wcout << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: PASS\n";
+    return 0;
 }
 } // namespace
 
 int wmain(int argc, wchar_t** argv) {
+    if (argc == 2 && std::wcscmp(argv[1], L"--contained-self-test-child") == 0) {
+        Sleep(30000);
+        return 99;
+    }
+
+    const std::wstring selfPath = SupervisorModulePath();
+    if (selfPath.empty()) {
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL (module path)\n";
+        return 1;
+    }
+
+    if (argc == 2 && std::wcscmp(argv[1], L"--self-test") == 0) {
+        return SupervisorRunContainmentSelfTest(selfPath);
+    }
     if (argc == 4 && std::wcscmp(argv[1], L"--worker") == 0) {
         wchar_t* workerArgv[] = {argv[0], argv[2], argv[3]};
         return AstralEditorRuntimeSmokeWorkerMain(3, workerArgv);
@@ -173,128 +339,66 @@ int wmain(int argc, wchar_t** argv) {
         return 1;
     }
 
-    const std::wstring selfPath = SupervisorModulePath();
-    if (selfPath.empty()) {
-        SupervisorPrintWin32Failure("GetModuleFileNameW", GetLastError());
-        return 1;
-    }
-
-    HANDLE job = CreateJobObjectW(nullptr, nullptr);
-    if (!job) {
-        SupervisorPrintWin32Failure("CreateJobObjectW", GetLastError());
-        return 1;
-    }
-
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
-    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation,
-            &limits, sizeof(limits))) {
-        const DWORD error = GetLastError();
-        CloseHandle(job);
-        SupervisorPrintWin32Failure("SetInformationJobObject", error);
-        return 1;
-    }
-
-    SIZE_T attributeBytes = 0;
-    SetLastError(ERROR_SUCCESS);
-    const BOOL probeResult = InitializeProcThreadAttributeList(
-        nullptr, 1, 0, &attributeBytes);
-    if (probeResult != FALSE || GetLastError() != ERROR_INSUFFICIENT_BUFFER
-        || attributeBytes == 0) {
-        const DWORD error = GetLastError();
-        CloseHandle(job);
-        SupervisorPrintWin32Failure("InitializeProcThreadAttributeList probe", error);
-        return 1;
-    }
-
-    std::vector<unsigned char> attributeStorage(attributeBytes);
-    auto* attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(
-        attributeStorage.data());
-    if (!InitializeProcThreadAttributeList(attributes, 1, 0, &attributeBytes)) {
-        const DWORD error = GetLastError();
-        CloseHandle(job);
-        SupervisorPrintWin32Failure("InitializeProcThreadAttributeList", error);
-        return 1;
-    }
-
-    HANDLE jobList[] = {job};
-    if (!UpdateProcThreadAttribute(attributes, 0, PROC_THREAD_ATTRIBUTE_JOB_LIST,
-            jobList, sizeof(jobList), nullptr, nullptr)) {
-        const DWORD error = GetLastError();
-        DeleteProcThreadAttributeList(attributes);
-        CloseHandle(job);
-        SupervisorPrintWin32Failure("UpdateProcThreadAttribute(PROC_THREAD_ATTRIBUTE_JOB_LIST)", error);
-        return 1;
-    }
-
-    STARTUPINFOEXW startup{};
-    startup.StartupInfo.cb = sizeof(startup);
-    startup.lpAttributeList = attributes;
-    PROCESS_INFORMATION worker{};
+    std::wstring failure;
+    SupervisorContainedProcess worker{};
     std::wstring command = SupervisorQuoteArgument(selfPath.c_str()) + L" --worker "
         + SupervisorQuoteArgument(argv[1]) + L" " + SupervisorQuoteArgument(argv[2]);
-
-    const BOOL created = CreateProcessW(selfPath.c_str(), command.data(), nullptr, nullptr,
-        FALSE, EXTENDED_STARTUPINFO_PRESENT, nullptr, argv[2],
-        &startup.StartupInfo, &worker);
-    const DWORD createError = created ? ERROR_SUCCESS : GetLastError();
-    DeleteProcThreadAttributeList(attributes);
-
-    if (!created) {
-        CloseHandle(job);
-        SupervisorPrintWin32Failure("CreateProcessW(worker)", createError);
+    if (!SupervisorLaunchContained(selfPath, command, argv[2], worker, failure)) {
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL\nReason: " << failure << L"\n";
         return 1;
     }
 
-    CloseHandle(worker.hThread);
-    const DWORD waitState = WaitForSingleObject(
-        worker.hProcess, kSupervisorWorkerTimeoutMs);
+    const DWORD waitState = WaitForSingleObject(worker.process, kSupervisorWorkerTimeoutMs);
     if (waitState != WAIT_OBJECT_0) {
-        std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (worker "
-                  << (waitState == WAIT_TIMEOUT ? "timeout" : "wait") << ")\n";
-        const BOOL closed = CloseHandle(job);
-        job = nullptr;
-        if (!closed) {
-            std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (could not close kill-on-close job)\n";
+        failure = waitState == WAIT_TIMEOUT
+            ? L"contained worker exceeded the 150-second supervisor deadline"
+            : SupervisorWin32Failure(L"WaitForSingleObject(worker)", GetLastError());
+        DWORD cleanupExit = STILL_ACTIVE;
+        std::wstring cleanupFailure;
+        if (!SupervisorCloseJobAndVerifyTermination(
+                worker, kSupervisorCleanupTimeoutMs, cleanupExit, cleanupFailure)) {
+            failure += L"; " + cleanupFailure;
         }
-        const DWORD cleanupState = WaitForSingleObject(
-            worker.hProcess, kSupervisorCleanupTimeoutMs);
-        if (cleanupState != WAIT_OBJECT_0) {
-            std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (kill-on-close job did not terminate worker in time)\n";
-        }
-        CloseHandle(worker.hProcess);
+        SupervisorCloseProcessHandles(worker);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL\nReason: " << failure << L"\n";
         return 1;
     }
 
     DWORD workerExitCode = 1;
-    if (!GetExitCodeProcess(worker.hProcess, &workerExitCode)
+    if (!GetExitCodeProcess(worker.process, &workerExitCode)
         || workerExitCode == STILL_ACTIVE) {
-        const DWORD error = GetLastError();
-        CloseHandle(job);
-        CloseHandle(worker.hProcess);
-        SupervisorPrintWin32Failure("GetExitCodeProcess(worker)", error);
+        failure = SupervisorWin32Failure(L"GetExitCodeProcess(worker)", GetLastError());
+        SupervisorCloseProcessHandles(worker);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL\nReason: " << failure << L"\n";
         return 1;
     }
 
-    CloseHandle(worker.hProcess);
-    CloseHandle(job);
+    SupervisorCloseProcessHandles(worker);
     if (workerExitCode != 0) {
-        std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (worker exit "
-                  << workerExitCode << ")\n";
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL (worker exit "
+                   << workerExitCode << L")\n";
         return 1;
     }
 
-    std::cout << "EDITOR RUNTIME SUPERVISOR: PASS (worker completed inside kill-on-close job)\n";
+    std::wcout << L"EDITOR RUNTIME SUPERVISOR: PASS (worker completed inside kill-on-close job)\n";
     return 0;
 }
 ]=])
 
     add_executable(EditorRuntimeSmoke "${ASTRAL_EDITOR_RUNTIME_SUPERVISOR_SOURCE}")
     target_include_directories(EditorRuntimeSmoke PRIVATE .)
-    target_compile_definitions(EditorRuntimeSmoke PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_definitions(EditorRuntimeSmoke PRIVATE
+        UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
     target_link_libraries(EditorRuntimeSmoke PRIVATE user32 kernel32)
     astral_add_test(EditorRuntimeSmoke
         $<TARGET_FILE:AstralEditor> ${CMAKE_SOURCE_DIR})
+
+    add_executable(EditorRuntimeSmokeContainmentTests "${ASTRAL_EDITOR_RUNTIME_SUPERVISOR_SOURCE}")
+    target_include_directories(EditorRuntimeSmokeContainmentTests PRIVATE .)
+    target_compile_definitions(EditorRuntimeSmokeContainmentTests PRIVATE
+        UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
+    target_link_libraries(EditorRuntimeSmokeContainmentTests PRIVATE user32 kernel32)
+    astral_add_test(EditorRuntimeSmokeContainmentTests --self-test)
 
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp
