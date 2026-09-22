@@ -262,13 +262,22 @@ bool WindowOwnedByProcess(HWND window, DWORD processId) {
     return ownerProcessId == processId;
 }
 
-bool DirectControlOwnedByProcessAndParent(HWND control, HWND parent, DWORD processId,
-    int expectedControlId) {
+bool DirectVisibleChildOwnedByProcessAndParent(HWND control, HWND parent, DWORD processId,
+    const wchar_t* expectedClassName) {
     if (!WindowOwnedByProcess(parent, processId)
         || !WindowOwnedByProcess(control, processId)) {
         return false;
     }
-    return GetParent(control) == parent && GetDlgItem(parent, expectedControlId) == control;
+    return GetParent(control) == parent
+        && ClassName(control) == expectedClassName
+        && IsWindowVisible(control);
+}
+
+bool DirectVisibleControlOwnedByProcessAndParent(HWND control, HWND parent, DWORD processId,
+    int expectedControlId, const wchar_t* expectedClassName) {
+    return DirectVisibleChildOwnedByProcessAndParent(
+               control, parent, processId, expectedClassName)
+        && GetDlgItem(parent, expectedControlId) == control;
 }
 
 bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) {
@@ -359,8 +368,14 @@ int wmain(int argc, wchar_t** argv) {
                     }
                 }
             }
-            if (pendingStateOk && (!outliner || !assets || !inspector || !IsWindowVisible(inspector))) {
-                failure = L"required Outliner/assets/exact visible Scene Root Inspector control not found";
+            if (pendingStateOk
+                && (!DirectVisibleControlOwnedByProcessAndParent(
+                        outliner, window, process.dwProcessId, kOutlinerId, L"ListBox")
+                    || !DirectVisibleControlOwnedByProcessAndParent(
+                        assets, window, process.dwProcessId, kAssetListId, L"ListBox")
+                    || !DirectVisibleChildOwnedByProcessAndParent(
+                        inspector, window, process.dwProcessId, L"Static"))) {
+                failure = L"required Outliner/assets/Inspector surface identity, ownership, parent, class, or visibility is invalid";
                 pendingStateOk = false;
             }
 
@@ -396,14 +411,14 @@ int wmain(int argc, wchar_t** argv) {
             if (pendingStateOk) {
                 LRESULT newSelection = LB_ERR;
                 LRESULT commandResult = 0;
-                const bool selectionTargetValid = DirectControlOwnedByProcessAndParent(
-                    outliner, window, process.dwProcessId, kOutlinerId);
+                const bool selectionTargetValid = DirectVisibleControlOwnedByProcessAndParent(
+                    outliner, window, process.dwProcessId, kOutlinerId, L"ListBox");
                 const bool selected = selectionTargetValid
                     && SendMessageBounded(outliner, LB_SETCURSEL, 3, 0, newSelection)
                     && newSelection != LB_ERR;
                 const bool notificationTargetValid = selected
-                    && DirectControlOwnedByProcessAndParent(
-                        outliner, window, process.dwProcessId, kOutlinerId);
+                    && DirectVisibleControlOwnedByProcessAndParent(
+                        outliner, window, process.dwProcessId, kOutlinerId, L"ListBox");
                 const bool notified = notificationTargetValid
                     && SendMessageBounded(window, WM_COMMAND,
                         MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
@@ -411,8 +426,10 @@ int wmain(int argc, wchar_t** argv) {
                 LRESULT confirmedSelection = LB_ERR;
                 std::wstring confirmedItem;
                 const bool synchronized = notified
-                    && DirectControlOwnedByProcessAndParent(
-                        outliner, window, process.dwProcessId, kOutlinerId)
+                    && DirectVisibleControlOwnedByProcessAndParent(
+                        outliner, window, process.dwProcessId, kOutlinerId, L"ListBox")
+                    && DirectVisibleChildOwnedByProcessAndParent(
+                        inspector, window, process.dwProcessId, L"Static")
                     && ReadListboxValue(outliner, LB_GETCURSEL, 0, confirmedSelection)
                     && confirmedSelection == 3
                     && ReadListboxText(outliner, static_cast<int>(confirmedSelection), confirmedItem)
@@ -472,8 +489,8 @@ int wmain(int argc, wchar_t** argv) {
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible process-owned top-level editor window before and after "
         << L"interaction, 12 required controls, disabled pending tools, exact shell labels/status, "
-        << L"exact Outliner and asset item identities and complete Inspector fixture text with "
-        << L"post-notification selection ownership+synchronization, ownership-checked bounded "
-        << L"asynchronous normal+narrow resizes, and clean exit.\n";
+        << L"exact visible process-owned Outliner/assets surfaces, exact item identities and complete "
+        << L"Inspector fixture text with post-notification selection ownership+synchronization, "
+        << L"ownership-checked bounded asynchronous normal+narrow resizes, and clean exit.\n";
     return 0;
 }
