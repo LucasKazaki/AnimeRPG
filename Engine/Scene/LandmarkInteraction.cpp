@@ -33,7 +33,8 @@ bool LandmarkInteraction::UpdateSelection(const Math::Vec3& playerPosition,
 }
 
 LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& playerPosition,
-    const WorldBlockout& world, ShadowbladeActions& shadowbladeActions) {
+    const WorldBlockout& world, ShadowbladeActions& shadowbladeActions,
+    CharacterProgression* progression) {
     UpdateSelection(playerPosition, world);
     if (!HasSelection()) {
         lastReport_ = {LandmarkInteractionResult::OutOfRange,
@@ -65,8 +66,8 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
     if (ObjectiveComplete() && !objectiveCompletionRewardGranted_) {
         objectiveCompletionRewardGranted_ = true;
         reward += shadowbladeActions.RestoreResource(ObjectiveCompletionReward);
-        if (progression_ != nullptr) {
-            progressionReward = progression_->GrantRewards(
+        if (progression != nullptr) {
+            progressionReward = progression->GrantRewards(
                 ObjectiveExperienceReward,
                 ObjectiveMasteryReward,
                 ObjectiveEnhancementMaterialReward);
