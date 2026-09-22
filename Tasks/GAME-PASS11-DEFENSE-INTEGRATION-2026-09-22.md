@@ -11,7 +11,7 @@ Bridge the already-merged pass-10 enemy attack planner into the already-merged S
 
 Allowed paths:
 - `Engine/Scene/ShadowbladeActions.h`
-- `Engine/Scene/ShadowbladeActions.cpp`
+- `Engine/Scene/CombatDefenseTraining.h`
 - `Tests/ShadowbladeActionsTests.cpp`
 - `Tasks/GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22.md`
 - `Docs/Agents/animerpg-hourly/STATE.json`
