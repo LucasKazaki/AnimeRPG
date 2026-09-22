@@ -13,6 +13,7 @@ Allowed implementation paths:
 - `Tests/EditorRuntimeSmoke.cpp`
 - `Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`
 - `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`
+- `Docs/Research/ENGINE-CAPABILITIES.json`
 
 No other path is authorized by this packet.
 
@@ -81,4 +82,4 @@ Retain source SHA, machine identity, Windows version, MSVC/CMake versions, GPU/d
 
 Stop at the first deterministic build/test failure introduced by this packet and keep the failing logs. Do not weaken `EditorRuntimeSmoke`, `astral_add_test`, Release assertions, `RUN_SERIAL`, or timeout rules to obtain green CI. Do not run R0.
 
-Rollback is deletion of this packet's new test/task/QA files and the corresponding `CMakeLists.txt` registration on the owned branch only. Do not rewrite history or alter `main`.
+Rollback is deletion of this packet's new test/task/QA files and capability-map entry plus the corresponding `CMakeLists.txt` registration on the owned branch only. Do not rewrite history or alter `main`.
