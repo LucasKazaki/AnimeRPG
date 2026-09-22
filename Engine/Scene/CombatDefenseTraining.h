@@ -305,12 +305,10 @@ public:
 
     DefenseTrainingTutorialHint TutorialHint(const CombatSandbox& combat,
         const ShadowbladeActions& actions) const {
+        (void)combat;
+        (void)actions;
         if (stats_.consecutiveHits >= 2) {
-            const DefenseTrainingCue cue = Cue(combat, actions);
-            const bool blockable = cue.phase != DefenseTrainingCuePhase::None
-                ? cue.blockable
-                : stats_.lastMissedAttackBlockable;
-            return blockable
+            return stats_.lastMissedAttackBlockable
                 ? DefenseTrainingTutorialHint::GuardBlockable
                 : DefenseTrainingTutorialHint::DodgeUnblockable;
         }
