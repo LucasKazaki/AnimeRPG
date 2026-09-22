@@ -33,7 +33,7 @@ References are behavioral/API references only. No proprietary engine source, art
 - Epic Games, Unreal Engine 5.8, Outliner: https://dev.epicgames.com/documentation/unreal-engine/outliner-in-unreal-engine
   - The Outliner is a named hierarchical selection surface.
 - Unity Manual, editor interface family: https://docs.unity3d.com/Manual/UsingTheEditor.html
-  - Unity likewise exposes distinct named Hierarchy, Scene, Inspector and Project surfaces; Astral's E11 fixture is far smaller, but its claimed surfaces should be identity-checked.
+  - Unity likewise exposes distinct named Hierarchy, Scene, Inspector and Project surfaces; Astral's E11 fixture is far smaller, but its claimed surfaces should be identity-checked. This is a behavioral reference, not a copied implementation.
 - Microsoft `WM_GETTEXT`: https://learn.microsoft.com/windows/win32/winmsg/wm-gettext
   - Text static controls return text through this message; the smoke's existing bounded `WindowText` helper uses `WM_GETTEXTLENGTH`/`WM_GETTEXT`. List-box rows remain on LB_GETTEXTLEN/LB_GETTEXT.
 
@@ -75,17 +75,19 @@ Additional exact-candidate hosted checks:
 
 These hosted results prove compilation of the real Win32 smoke and green deterministic non-runtime regressions. Hosted deterministic CTest intentionally excludes all `RuntimeSmoke` tests, so this is not native editor GUI execution evidence.
 
-## Independent review
+## Independent review and evidence reconciliation
 
-The prior independent Codex review at head `c8e0bd2e3952f7b77a3f9701cf69af8544f39620` predates the shell-static identity change and is stale for current code.
+Codex completed an independent review of exact code head `625e744e8c20bdb5c768e643e6cbaf4113808212` at `2026-09-22T14:31:35Z`. No new runtime-code finding was produced. The review produced one P2 evidence finding: this QA receipt still named the superseded `40d2e3f...` / `49391f9...` implementation. That stale implementation receipt was corrected in evidence commit `6d8f47ed9cb369337c1c585ea83821304e01316c`, which produced QA blob `5c40ad84fbc8c27e3e78720551ff33bd6ffe03ef` and task blob `359fadc388ca9a52a60e42535d693e02b9933c53`.
 
-A fresh independent Codex code review was requested for exact code head `625e744e8c20bdb5c768e643e6cbaf4113808212` in PR #13 comment `5778307947`. At this checkpoint the review is still running. Do not count it as independent acceptance until completion and any findings are resolved. Independent code review also does not substitute for native runtime acceptance.
+Codex then reviewed reconciliation head `bc6ad8f620d573f90cb24317d20e0a0ec3a5c433` and completed at `2026-09-22T14:38:51Z`. It found one P2 evidence-consistency issue, not a runtime-code defect: the repaired QA/task receipts still said the already-completed `625e744...` review was running. This QA update and companion task update correct that status and identify the remaining gates accurately.
+
+A final independent recheck of the post-fix evidence head remains pending. Independent code/evidence review does not substitute for native runtime acceptance.
 
 ## Native evidence and handoff
 
 `native_evidence` remains empty. The coordinator did not access or claim a registered Windows interactive desktop.
 
-Run on one owned interactive Windows desktop:
+Run exact code candidate `625e744e8c20bdb5c768e643e6cbaf4113808212` on one owned interactive Windows desktop:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -99,8 +101,8 @@ Retain source SHA, machine/Windows identity, MSVC and CMake versions, GPU/driver
 
 ## Result
 
-Status: **same-count shell-static false passes are now covered; exact candidate hosted Debug/Release and deterministic non-runtime checks are green; native Debug/Release RuntimeSmoke execution and fresh independent review remain pending**.
+Status: **same-count shell-static false passes are covered; exact code candidate hosted Debug/Release and deterministic non-runtime checks are green; the code review found no new runtime-code issue; evidence receipt findings have been repaired; a final receipt recheck plus native Debug/Release RuntimeSmoke execution remain pending**.
 
 E11 remains a partial editor-shell candidate, not UE5/Unity parity. No native GUI, GPU/performance, clean-machine, stress/recovery, soak, or final independent runtime acceptance claim is made. Issue #7 remains separate and open, and R0 was not invoked.
 
-Single next useful action: finish independent review of `625e744...`, then execute Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with the required receipts/screenshots.
+Single next useful action: independently recheck the repaired evidence head for internal consistency; after that is clean, execute Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with the required receipts/screenshots.
