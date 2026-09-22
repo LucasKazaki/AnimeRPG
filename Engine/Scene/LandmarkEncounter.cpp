@@ -20,7 +20,7 @@ LandmarkEncounterReport LandmarkEncounter::TryActivate(
     }
 
     state_ = LandmarkEncounterState::Active;
-    activationElapsedSeconds_ = combatSandbox.ElapsedSeconds();
+    activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
     lastReport_ = {LandmarkEncounterResult::Activated, 0.0f};
     return lastReport_;
 }
@@ -32,15 +32,16 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
     }
 
     state_ = LandmarkEncounterState::Completed;
-    const float completionSeconds = std::max(
-        0.0f, combatSandbox.ElapsedSeconds() - activationElapsedSeconds_);
+    const double completionSecondsPrecise = std::max(
+        0.0, combatSandbox.ElapsedSecondsPrecise() - activationElapsedSeconds_);
+    const float completionSeconds = static_cast<float>(completionSecondsPrecise);
     float rewardApplied = 0.0f;
     if (!completionRewardGranted_) {
         completionRewardGranted_ = true;
         rewardApplied = shadowbladeActions.RestoreResource(CompletionReward);
     }
     lastReport_ = {LandmarkEncounterResult::Completed, rewardApplied,
-        GradeForSeconds(completionSeconds), completionSeconds};
+        GradeForSeconds(completionSecondsPrecise), completionSeconds};
     return true;
 }
 
@@ -60,12 +61,12 @@ LandmarkEncounterReport LandmarkEncounter::Retry(CombatSandbox& combatSandbox,
     shadowbladeActions = ShadowbladeActions{};
     shadowbladeActions.SetDefenseTimingPreset(timingPreset);
     state_ = LandmarkEncounterState::Active;
-    activationElapsedSeconds_ = combatSandbox.ElapsedSeconds();
+    activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
     lastReport_ = {LandmarkEncounterResult::Retried, 0.0f};
     return lastReport_;
 }
 
-EncounterGrade LandmarkEncounter::GradeForSeconds(float seconds) {
+EncounterGrade LandmarkEncounter::GradeForSeconds(double seconds) {
     if (seconds <= GoldTimeSeconds) return EncounterGrade::Gold;
     if (seconds <= SilverTimeSeconds) return EncounterGrade::Silver;
     return EncounterGrade::Bronze;
