@@ -222,6 +222,8 @@ bool ShadowbladeActions::BeginIncomingAttack(const IncomingAttackDefinition& att
         return false;
     }
 
+    ++incomingAttackGeneration_;
+    if (incomingAttackGeneration_ == 0) ++incomingAttackGeneration_;
     RebaseDefenseClock();
     incomingAttack_ = attack;
     incomingAttackEndSeconds_ = static_cast<double>(attack.windupSeconds);
