@@ -87,8 +87,8 @@ private:
     float elapsedSeconds_{};
     float nextAttackTime_{};
     float staggerRemaining_{};
-    float timeSincePostureHit_{};
-    float postureRecoveryRemainder_{};
+    double timeSincePostureHit_{};
+    int postureAtRecoveryStart_{};
     float lastComboHitTime_{-1000.0f};
     int comboCount_{};
 };
