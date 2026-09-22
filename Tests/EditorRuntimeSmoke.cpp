@@ -191,7 +191,13 @@ bool DirectChildrenContained(HWND window, std::wstring& failure) {
     return true;
 }
 
-bool ResizeAndCheck(HWND window, int width, int height, std::wstring& failure) {
+bool WindowOwnedByProcess(HWND window, DWORD processId);
+
+bool ResizeAndCheck(HWND window, DWORD processId, int width, int height, std::wstring& failure) {
+    if (!WindowOwnedByProcess(window, processId)) {
+        failure = L"editor HWND is no longer owned by launched process before resize";
+        return false;
+    }
     if (!SetWindowPos(window, nullptr, 0, 0, width, height,
             SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS)) {
         failure = L"SetWindowPos failed";
@@ -368,10 +374,12 @@ int wmain(int argc, wchar_t** argv) {
                 }
             }
 
-            if (pendingStateOk && !ResizeAndCheck(window, 800, 600, failure)) {
+            if (pendingStateOk
+                && !ResizeAndCheck(window, process.dwProcessId, 800, 600, failure)) {
                 pendingStateOk = false;
             }
-            if (pendingStateOk && !ResizeAndCheck(window, 420, 260, failure)) {
+            if (pendingStateOk
+                && !ResizeAndCheck(window, process.dwProcessId, 420, 260, failure)) {
                 pendingStateOk = false;
             }
 
@@ -415,6 +423,7 @@ int wmain(int argc, wchar_t** argv) {
         << L"Observed one stable visible process-owned top-level editor window before and after "
         << L"interaction, 12 required controls, disabled pending tools, exact Outliner item "
         << L"identities and complete Inspector fixture text with post-notification selection "
-        << L"synchronization, bounded asynchronous normal+narrow resizes, and clean exit.\n";
+        << L"synchronization, ownership-checked bounded asynchronous normal+narrow resizes, and "
+        << L"clean exit.\n";
     return 0;
 }
