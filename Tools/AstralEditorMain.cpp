@@ -190,26 +190,42 @@ LRESULT CALLBACK EditorWindowProc(HWND window, UINT message, WPARAM wParam, LPAR
         g_rotateButton = MakeControl(window, L"BUTTON", L"Rotate (pending)", BS_PUSHBUTTON);
         g_scaleButton = MakeControl(window, L"BUTTON", L"Scale (pending)", BS_PUSHBUTTON);
         g_playButton = MakeControl(window, L"BUTTON", L"Play (pending)", BS_PUSHBUTTON);
-        ApplyToolAvailability();
-
         g_outlinerLabel = MakeControl(window, L"STATIC", L"OUTLINER", SS_LEFT);
         g_outliner = MakeControl(window, L"LISTBOX", L"",
             LBS_NOTIFY | WS_BORDER | WS_VSCROLL, kOutlinerId);
-        for (const wchar_t* name : kFixtureNames) SendMessageW(g_outliner, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name));
-        SendMessageW(g_outliner, LB_SETCURSEL, 0, 0);
-
         g_inspectorLabel = MakeControl(window, L"STATIC", L"INSPECTOR", SS_LEFT);
         g_inspector = MakeControl(window, L"STATIC", L"", SS_LEFT | WS_BORDER);
-
         g_assetsLabel = MakeControl(window, L"STATIC", L"ASSETS / DEFAULT PRIMITIVES", SS_LEFT);
         g_assets = MakeControl(window, L"LISTBOX", L"", WS_BORDER | WS_VSCROLL, kAssetListId);
+        g_status = MakeControl(window, L"STATIC",
+            L"E11.0 editor shell | Outliner selection works | viewport transform tools, undo/redo, save/reopen, Play and real asset import pending",
+            SS_LEFT);
+
+        const Astral::Editor::EditorControlCreationState createdControls{{
+            g_selectButton != nullptr,
+            g_moveButton != nullptr,
+            g_rotateButton != nullptr,
+            g_scaleButton != nullptr,
+            g_playButton != nullptr,
+            g_outlinerLabel != nullptr,
+            g_outliner != nullptr,
+            g_inspectorLabel != nullptr,
+            g_inspector != nullptr,
+            g_assetsLabel != nullptr,
+            g_assets != nullptr,
+            g_status != nullptr,
+        }};
+        if (!Astral::Editor::AreRequiredEditorControlsCreated(createdControls)) return -1;
+
+        ApplyToolAvailability();
+        for (const wchar_t* name : kFixtureNames) {
+            SendMessageW(g_outliner, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(name));
+        }
+        SendMessageW(g_outliner, LB_SETCURSEL, 0, 0);
         for (const wchar_t* asset : {L"Primitive/Cube", L"Primitive/Plane", L"Camera", L"DirectionalLight"}) {
             SendMessageW(g_assets, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(asset));
         }
 
-        g_status = MakeControl(window, L"STATIC",
-            L"E11.0 editor shell | Outliner selection works | viewport transform tools, undo/redo, save/reopen, Play and real asset import pending",
-            SS_LEFT);
         UpdateInspector();
         ApplyLayout(window);
         return 0;
