@@ -2,7 +2,7 @@ from __future__ import annotations
 import argparse, base64, hashlib, json, struct, zlib
 from pathlib import Path
 
-VERSION="astral-calibration-gltf-1"
+VERSION="astral-calibration-gltf-2"
 SIZE=16
 
 def png_rgb8(width,height,pixel):
@@ -44,8 +44,10 @@ def build():
     for f in faces:
         base=len(pos); p,n,t,u,i=f
         pos+=p;norm+=n;tan+=t;uv+=u;idx += [base+x for x in i]
+    # Marker faces +Z under glTF CCW winding. Its UV V axis points opposite
+    # cross(normal, tangent), so tangent.w is -1 to encode the correct bitangent.
     mpos=[(-0.15,1.15,1.01),(-0.15,1.35,1.01),(0.32,1.25,1.01)]
-    mnorm=[(0,0,1)]*3; mtan=[(1,0,0,1)]*3; muv=[(0,1),(0,0),(1,0.5)]; midx=[0,1,2]
+    mnorm=[(0,0,1)]*3; mtan=[(1,0,0,-1)]*3; muv=[(0,1),(0,0),(1,0.5)]; midx=[0,2,1]
     buf=bytearray(); views=[]; accessors=[]
     def add_accessor(vals,ctype,atype,target=None,minv=None,maxv=None):
         flat=[c for v in vals for c in (v if isinstance(v,(tuple,list)) else (v,))]
