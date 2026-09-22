@@ -36,20 +36,23 @@
     {"id":"QOL-007","title":"Technique-first scoring mode","status":"implemented_domain_behavior"}
   ],
   "verification": {
-    "focused_gcc": "passed_challenge_rules_and_boundary_tests",
-    "focused_clang_asan_ubsan": "initial_overflow_found_then_fixed_and_passed",
+    "focused_gcc": "passed_on_earlier_challenge_head; final_review_repair_head_requires_hosted_exact_head_verification",
+    "focused_clang_asan_ubsan": "initial_overflow_found_then_fixed_and_passed_on_earlier_head; final_review_repair_head_requires_hosted_exact_head_verification",
     "review_repairs": [
-      "P1 fixed by moving challenge regressions into registered LandmarkInteractionTests and removing the unregistered duplicate",
+      "P1 fixed by moving pure challenge regressions into registered LandmarkInteractionTests and removing the unregistered duplicate",
       "P2 fixed with stricter Apex 2-goal=None, 3-goal=Bronze, 4-goal=Silver unless Gold time, plus registered boundary coverage",
-      "P2 integration gap fixed by adding configured LandmarkEncounter reward tests covering retry persistence, requested/applied reward accounting, and full resource-cap behavior"
+      "P2 integration gap fixed by adding configured LandmarkEncounter reward tests covering retry persistence, requested/applied reward accounting, and full resource-cap behavior",
+      "P1 packet-scope finding fixed by explicitly admitting the already-registered LandmarkEncounterTests integration path before subsequent repair work",
+      "P2 pre-activation metric leakage fixed by snapshotting TrainingStats at activation/retry and resolving damage, technique score, reaction, stagger, and finisher metrics from nonnegative activation-local deltas; registered integration coverage proves a pre-activation Eclipse cannot satisfy encounter tactical/variety goals or inflate score"
     ],
-    "hosted_windows_ci": "pending_exact_final_head_after_integration_test_fix",
-    "release_manifest": "pending_exact_final_head_after_integration_test_fix",
+    "latest_code_repair_commit": "c61b462d2efac815714a05bc83834044dcae3705",
+    "hosted_windows_ci": "pending_exact_final_head_after_state_and_receipt_update",
+    "release_manifest": "pending_exact_final_head_after_state_and_receipt_update",
     "native_windows_interactive": "not_run",
-    "independent_review": "pending_exact_final_head_after_integration_test_fix"
+    "independent_review": "pending_exact_final_head_after_state_and_receipt_update"
   },
   "coordination": {
     "engine_pr_13": "active; owns CMakeLists.txt and editor runtime-smoke files; pass 6 does not touch those paths"
   },
-  "next_action": "Verify exact final head Windows/manifest workflows and fresh Codex review after configured encounter reward integration coverage, re-read main and final diff, then merge PR 20 with expected-head protection only if all gates pass."
+  "next_action": "On the immutable final PR head after this state/receipt update, require Windows Debug/Release deterministic workflow, release-manifest integrity, and fresh independent Codex review; re-read main and final diff, then merge PR 20 with expected-head protection only if every gate passes."
 }
