@@ -3,69 +3,87 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-22",
   "target_branch": "main",
+  "last_verified_main_at_pass_start": "84dc005e4e6259faf7209265def762339a6c0cf9",
   "last_merged_pass": {
-    "id": "GAME-PASS1-COMBAT-EXPLORATION-2026-09-22",
-    "pr": 14,
-    "head": "f445f156acf7ed2899f93a34191782aa357ad0d1",
-    "merge_sha": "a14aef5c484705567adac741809f7f4eebb4cbde",
+    "id": "GAME-PASS2-DEFENSE-TIMING-2026-09-22",
+    "pr": 16,
+    "merge_sha": "84dc005e4e6259faf7209265def762339a6c0cf9",
     "hosted_windows_ci": "passed",
     "release_manifest": "passed",
-    "independent_review": "completed_no_new_findings",
+    "independent_review": "completed",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-22-defense-pass2-v2",
-  "pass": "GAME-PASS2-DEFENSE-TIMING-2026-09-22",
-  "candidate_code_head_before_state_receipt": "3c25dc89c9bb13d81a5e5466647dd060c8fd0af8",
+  "working_branch": "game/2026-09-22-reactions-retry-pass3",
+  "pass": "GAME-PASS3-REACTIONS-RETRY-2026-09-22",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
-    "increments_with_regression_tests_added": 6,
+    "increments_with_focused_tests": 6,
     "increments_native_playable_verified": 0,
     "increments_independently_reviewed": 0,
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-007","title":"Incoming attack telegraph state","status":"implemented_domain_api","note":"Validated attacks carry windup, damage, guard damage, and blockability; expiry resolves exactly one hit. No renderer or enemy-AI cue is claimed."},
-    {"id":"GAME-008","title":"Guard integrity and guard break","status":"implemented_domain_behavior","note":"Ordinary guard spends bounded guard integrity instead of health; an over-limit block breaks guard and applies the attack once."},
-    {"id":"GAME-009","title":"Perfect guard","status":"implemented_domain_behavior","note":"Guard inside the perfect window preserves health and guard integrity and grants one bounded defense counter."},
-    {"id":"GAME-010","title":"Timed dodge and perfect dodge","status":"implemented_domain_behavior","note":"Too-early dodge preserves the threat, normal evade prevents damage, and perfect dodge grants one bounded counter."},
-    {"id":"GAME-011","title":"Defense-earned Fatal Strike counter","status":"implemented_domain_behavior","note":"A valid perfect defense can reduce one eligible Fatal Strike to 35 resource; rejection does not consume the counter and successful use consumes it once."},
-    {"id":"QOL-003","title":"Forgiving perfect-defense timing preset","status":"implemented_domain_setting","note":"Standard remains default at 0.12 s; optional forgiving preset uses 0.20 s without altering damage, resource, enemy timing, or dodge reach."}
+    {
+      "id": "GAME-012",
+      "title": "Solar/Umbral Eclipse mana reaction",
+      "status": "implemented_domain_behavior",
+      "note": "Opposing original affinities trigger one bounded Eclipse bonus hit and clear the primed affinity; same/None applications do not fabricate reactions."
+    },
+    {
+      "id": "GAME-013",
+      "title": "Earned combo finisher",
+      "status": "implemented_domain_behavior",
+      "note": "Standard play arms one finisher after three successful combo hits; out-of-range rejection preserves it and successful use consumes it."
+    },
+    {
+      "id": "GAME-014",
+      "title": "Accessible combo-assist preset",
+      "status": "implemented_domain_setting",
+      "note": "Opt-in Accessible lowers only the finisher threshold from three hits to two and persists through training-session resets; Standard remains default."
+    },
+    {
+      "id": "GAME-015",
+      "title": "Deterministic training encounter grade",
+      "status": "implemented_domain_behavior",
+      "note": "Lincoln completion records Gold at <=3 seconds, Silver at <=6 seconds, otherwise Bronze, using combat-domain elapsed time."
+    },
+    {
+      "id": "GAME-016",
+      "title": "National Mall objective-completion reward",
+      "status": "implemented_domain_behavior",
+      "note": "The existing free-discovery landmark chain grants one capped completion resource reward when all three objectives are satisfied; repeats cannot farm it."
+    },
+    {
+      "id": "QOL-004",
+      "title": "Clean completed-encounter retry",
+      "status": "implemented_domain_behavior",
+      "note": "Retry restores transient combat/Shadowblade attempt state and immediately re-enters the encounter, preserves the defense timing preset, and preserves the one-time completion reward ledger."
+    }
   ],
-  "community_source": {
-    "id": "GRANBLUE-PLAYER-PERFECT-GUARD",
-    "url": "https://steamcommunity.com/app/881020/discussions/0/7198511214976169414/",
-    "published": "2024-02-20",
+  "research": {
     "accessed": "2026-09-22",
-    "request": "A way to make the satisfying but very tight Perfect Guard timing more lenient.",
-    "corroboration": [
-      "https://www.reddit.com/r/GranblueFantasyRelink/comments/1ri45fu/help_with_getting_the_timing_down_for_perfect/",
-      "https://www.reddit.com/r/GranblueFantasyRelink/comments/1uzyzug/i_think_i_locked_in_and_blacked_out/"
+    "reference_sources": [
+      "https://store.playstation.com/en-fi/concept/10000896",
+      "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "https://store.playstation.com/en-us/product/UP5460-PPSA06954_00-GBRELINKERDGSTD1",
+      "https://zenless.hoyoverse.com/fr-fr/news/166073"
     ],
-    "evidence_limit": "Historical and individual community discussions, not consensus and not proof the current game retains the same timing. The implementation therefore keeps Standard unchanged and makes the wider window opt-in."
+    "community_sources": [
+      "https://www.reddit.com/r/GenshinImpact/comments/u0e71n/",
+      "https://www.reddit.com/r/Genshin_Impact/comments/mau8t9/"
+    ],
+    "community_limit": "Historical individual retry-friction reports, not consensus and not proof of current comparator behavior."
   },
-  "reference_sources": [
-    "https://www.playstation.com/en-us/games/zenless-zone-zero/",
-    "https://www.playstation.com/en-us/games/wuthering-waves/",
-    "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
-    "https://www.playstation.com/en-us/games/genshin-impact/"
-  ],
   "verification": {
-    "focused_design_fixture": "passed_before_initial_branch_packaging",
-    "repository_regression_tests": "includes 8.06/7.94/794x0.01, fractional 60fps, 122-frame and 3842-frame 60Hz deadlines, 1us minimum threat, 0.120001s non-perfect guard, counter pre-expiry, and large-idle-clock rebase regressions",
-    "hosted_windows_ci": "fresh_exact_head_required_after_interval_timing_fix",
-    "release_manifest": "fresh_exact_head_required_after_interval_timing_fix",
-    "native_windows_interactive": "not_run_domain_only_packet",
-    "independent_review": "fresh_exact_head_review_required_after_interval_timing_fix"
+    "focused_gcc": "passed",
+    "focused_clang_asan_ubsan": "passed",
+    "fixture_limit": "Exact modified sources plus a minimal test-only interface for unchanged Shadowblade dependency; not a full repository or native Windows run.",
+    "hosted_windows_ci": "pending_pr_exact_head",
+    "release_manifest": "pending_pr_exact_head",
+    "native_windows_interactive": "not_run",
+    "independent_review": "pending_pr_exact_head"
   },
-  "review_findings": [
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"2cd538aa60a1252699430ac450c7685c6a3a74b9","severity":"P2","finding":"Repeated float subtraction could move equivalent split timing across perfect-defense and expiry boundaries.","resolution":"Reworked timing away from repeatedly subtracting float remaining time and added direct split regressions."},
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"19fe9ad2ec2039b653221c3982081de0cda724c4","severity":"P2","finding":"Per-frame integer microsecond rounding still diverged for fractional frame durations.","resolution":"Moved comparison timing to an accumulated high-precision relative clock."},
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"83d403afdf5befdce29471d2314447f2d263c0c9","severity":"P2","finding":"A 122-frame 60Hz sequence exposed final rounding drift, and very large clocks could make newly queued deadlines unusable.","resolution":"Added explicit split-boundary normalization, idle/rebase behavior, and saturation regression coverage."},
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"0b06bedd8da5601d7a5a924755ca4f442da0a664","severity":"P1","finding":"A fixed 100us tolerance expired threats early and widened the perfect window materially.","resolution":"Removed broad fixed tolerances; subsequent work replaced fixed microsecond tolerances entirely."},
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"64f9ba33aed9594d8f156d8272d2585a4a2f6cc3","severity":"P2","finding":"A fixed 2us tolerance failed longer 3842-frame splits, and a large nonsaturating absolute clock could stall short newly queued timers.","resolution":"Accumulated float-input uncertainty and cleared/rebased idle relative timing instead of carrying a large absolute clock."},
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"89d1ebc60b87a11c81a334f49b80fd57ec759a36","severity":"P2","finding":"Integer-microsecond quantization plus an inclusive minimum tolerance consumed a 1us threat immediately, expired a counter early, and widened a 0.120001s guard into the standard perfect window.","resolution":"Removed integer-microsecond deadline/tolerance quantization. Current code compares relative double-second timing directly with only accumulated half-ULP uncertainty from float inputs, with direct 1us threat, 0.120001s guard, counter pre-expiry, and 3842-frame regressions."}
-  ],
-  "next_action": "Require fresh hosted Windows and release-manifest checks plus exact-head independent Codex review on the final state-receipt head; inspect the five-file diff and merge PR #16 only if no current finding remains."
+  "next_action": "Open the pass-3 PR, require real hosted Windows and release-manifest checks plus exact-head independent Codex review, then merge only if all gates are green."
 }
