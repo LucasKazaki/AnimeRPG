@@ -69,6 +69,7 @@ private:
     LandmarkEncounterState state_{LandmarkEncounterState::Locked};
     LandmarkEncounterReport lastReport_{};
     double activationElapsedSeconds_{};
+    TrainingStats activationTrainingStats_{};
     bool completionRewardGranted_{};
     EncounterChallengeTracker challengeTracker_{};
 };
