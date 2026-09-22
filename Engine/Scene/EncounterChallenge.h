@@ -195,8 +195,8 @@ private:
             silver = 3;
             gold = 4;
         } else if (difficulty_ == EncounterChallengeDifficulty::Apex) {
-            bronze = 2;
-            silver = 3;
+            bronze = 3;
+            silver = 4;
             gold = 4;
             if (sideGoals >= gold && timeGrade != EncounterTimeGrade::Gold) {
                 return EncounterChallengeRank::Silver;
