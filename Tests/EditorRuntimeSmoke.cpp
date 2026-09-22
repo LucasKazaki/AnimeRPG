@@ -354,8 +354,16 @@ int wmain(int argc, wchar_t** argv) {
                 const bool notified = selected && SendMessageBounded(window, WM_COMMAND,
                     MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
                     reinterpret_cast<LPARAM>(outliner), commandResult);
-                if (!notified || WindowText(inspector) != kCubeInspectorText) {
-                    failure = L"Outliner Cube selection did not produce the complete Cube Inspector fixture";
+                LRESULT confirmedSelection = LB_ERR;
+                std::wstring confirmedItem;
+                const bool synchronized = notified
+                    && ReadListboxValue(outliner, LB_GETCURSEL, 0, confirmedSelection)
+                    && confirmedSelection == 3
+                    && ReadListboxText(outliner, static_cast<int>(confirmedSelection), confirmedItem)
+                    && confirmedItem == L"Cube"
+                    && WindowText(inspector) == kCubeInspectorText;
+                if (!synchronized) {
+                    failure = L"Outliner Cube selection and Inspector fixture did not remain synchronized after notification";
                     pendingStateOk = false;
                 }
             }
@@ -406,7 +414,7 @@ int wmain(int argc, wchar_t** argv) {
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible process-owned top-level editor window before and after "
         << L"interaction, 12 required controls, disabled pending tools, exact Outliner item "
-        << L"identities and complete Inspector fixture text, bounded asynchronous normal+narrow "
-        << L"resizes, and clean exit.\n";
+        << L"identities and complete Inspector fixture text with post-notification selection "
+        << L"synchronization, bounded asynchronous normal+narrow resizes, and clean exit.\n";
     return 0;
 }
