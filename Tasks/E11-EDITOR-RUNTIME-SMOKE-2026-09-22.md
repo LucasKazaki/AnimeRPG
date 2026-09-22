@@ -90,13 +90,13 @@ sha256sum /tmp/e11_surface_identity_fixture.cpp
 
 Both executions exited 0 and printed `surface identity/visibility contract fixture: PASS`. This fixture proves only the portable source-level guard model. It is not Win32/native editor execution.
 
-Hosted workflow state for exact code candidate `b28b8cc079c92b925b3f59c223e67651a238d276` at this checkpoint:
+Hosted exact-candidate evidence for `b28b8cc079c92b925b3f59c223e67651a238d276`:
 
+- Windows Server 2022 run `35743225947`, job `106798072594`: PASS. Successful steps include R0 parser-only and runner-safety contracts, VS2022 x64 configure, MSVC Debug build plus deterministic tests, MSVC Release build plus deterministic tests, Release dependency/prerequisite checks, static milestone verifiers, and clean tracked-tree verification. The historical R0 runner itself was not executed.
 - Profiling capture portability run `35743225660`: PASS.
 - Release manifest integrity run `35743225770`: PASS.
-- Windows build and deterministic tests run `35743225947`: still in progress when last checked; no result is claimed here.
 
-Hosted deterministic CTest intentionally excludes every `RuntimeSmoke`, so even a successful Windows workflow proves compilation and deterministic non-runtime regression status, not native GUI execution.
+Hosted deterministic CTest intentionally excludes every `RuntimeSmoke`, so these results prove compilation and deterministic non-runtime regression status, not native GUI execution.
 
 ## Independent review state
 
@@ -124,4 +124,4 @@ Stop on unexpected edits outside the allowed paths, stale ownership, a failing i
 
 E11 remains partial. `native_evidence` remains empty and `independent_acceptance` remains false. Do not start dependent scene-document, transform-gizmo, undo/redo or save/reopen implementation based on hosted compilation alone. Issue #7 remains separate and open; do not invoke the historical R0 runner.
 
-Single next useful action: finish exact-head hosted verification and independent review, then run Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with retained receipts/screenshots.
+Single next useful action: obtain fresh independent review of this exact code/evidence state, then run Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with retained receipts/screenshots.
