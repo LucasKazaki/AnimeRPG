@@ -13,6 +13,17 @@ void CombatSandbox::AdvanceTime(float deltaSeconds) {
     elapsedSeconds_ += deltaSeconds;
     if (comboCount_ > 0 && elapsedSeconds_ - lastComboHitTime_ > ComboWindowSeconds) {
         comboCount_ = 0;
+        comboFinisherReady_ = false;
+    }
+
+    counterWindowRemaining_ = std::max(0.0,
+        counterWindowRemaining_ - static_cast<double>(deltaSeconds));
+
+    if (enemyAttackActive_) {
+        enemyAttackRemaining_ -= static_cast<double>(deltaSeconds);
+        if (enemyAttackRemaining_ <= 0.0) {
+            ResolveEnemyAttackHit();
+        }
     }
 
     if (staggerRemaining_ > 0.0f) {
@@ -81,6 +92,7 @@ int CombatSandbox::ApplyDamage(int damage) {
         dummy_.posture = 0;
         staggerRemaining_ = 0.0f;
         postureAtRecoveryStart_ = 0;
+        comboFinisherReady_ = false;
     }
     return applied;
 }
@@ -97,7 +109,9 @@ bool CombatSandbox::ConsumeStaggerOpening() {
 
 void CombatSandbox::ResetTrainingSession() {
     dummy_ = TrainingDummy{};
+    player_ = PlayerCombatState{};
     lastAttack_ = {AttackType::Light, AttackResult::Ready, 0, 0, false};
+    lastEnemyAttack_ = {};
     stats_ = {};
     elapsedSeconds_ = 0.0f;
     nextAttackTime_ = 0.0f;
@@ -106,6 +120,107 @@ void CombatSandbox::ResetTrainingSession() {
     postureAtRecoveryStart_ = 0;
     lastComboHitTime_ = -1000.0f;
     comboCount_ = 0;
+    comboFinisherReady_ = false;
+    enemyAttackActive_ = false;
+    enemyAttackRemaining_ = 0.0;
+    enemyAttackDamage_ = 0;
+    counterWindowRemaining_ = 0.0;
+    targetAffinity_ = ManaAffinity::None;
+}
+
+bool CombatSandbox::ScheduleEnemyAttack(float windupSeconds, int damage) {
+    if (enemyAttackActive_ || player_.IsDefeated() || damage <= 0
+        || windupSeconds <= 0.0f || !std::isfinite(windupSeconds)) {
+        return false;
+    }
+
+    enemyAttackActive_ = true;
+    enemyAttackRemaining_ = static_cast<double>(windupSeconds);
+    enemyAttackDamage_ = damage;
+    lastEnemyAttack_ = {EnemyAttackResult::Scheduled, 0, false, false};
+    return true;
+}
+
+EnemyAttackReport CombatSandbox::TryPerfectDodge() {
+    if (!enemyAttackActive_) {
+        lastEnemyAttack_ = {EnemyAttackResult::NoAttack, 0, false, false};
+        return lastEnemyAttack_;
+    }
+    if (enemyAttackRemaining_ > static_cast<double>(PerfectDodgeWindowSeconds)) {
+        lastEnemyAttack_ = {EnemyAttackResult::TooEarly, 0, false, false};
+        return lastEnemyAttack_;
+    }
+
+    enemyAttackActive_ = false;
+    enemyAttackRemaining_ = 0.0;
+    enemyAttackDamage_ = 0;
+    counterWindowRemaining_ = static_cast<double>(CounterWindowSeconds);
+    lastEnemyAttack_ = {EnemyAttackResult::PerfectDodged, 0, true, false};
+    return lastEnemyAttack_;
+}
+
+EnemyAttackReport CombatSandbox::TryPerfectGuard() {
+    if (!enemyAttackActive_) {
+        lastEnemyAttack_ = {EnemyAttackResult::NoAttack, 0, false, false};
+        return lastEnemyAttack_;
+    }
+    if (enemyAttackRemaining_ > static_cast<double>(PerfectGuardWindowSeconds)) {
+        lastEnemyAttack_ = {EnemyAttackResult::TooEarly, 0, false, false};
+        return lastEnemyAttack_;
+    }
+
+    enemyAttackActive_ = false;
+    enemyAttackRemaining_ = 0.0;
+    enemyAttackDamage_ = 0;
+    const bool staggerTriggered = ApplyPostureDamage(PerfectGuardPostureDamage);
+    lastEnemyAttack_ = {EnemyAttackResult::PerfectGuarded, 0, false, staggerTriggered};
+    return lastEnemyAttack_;
+}
+
+CounterAttackReport CombatSandbox::TryCounterAttack(const Math::Vec3& attackerPosition) {
+    if (!CounterReady()) return {CounterAttackResult::NotReady, 0};
+    if (dummy_.IsDefeated()) return {CounterAttackResult::TargetDefeated, 0};
+
+    const float deltaX = dummy_.position.x - attackerPosition.x;
+    const float deltaY = dummy_.position.y - attackerPosition.y;
+    if (deltaX * deltaX + deltaY * deltaY > CounterRange * CounterRange) {
+        return {CounterAttackResult::OutOfRange, 0};
+    }
+
+    counterWindowRemaining_ = 0.0;
+    return {CounterAttackResult::Activated, ApplyDamage(CounterDamage)};
+}
+
+ComboFinisherReport CombatSandbox::TryComboFinisher(const Math::Vec3& attackerPosition) {
+    if (!comboFinisherReady_) return {ComboFinisherResult::NotReady, 0};
+    if (dummy_.IsDefeated()) return {ComboFinisherResult::TargetDefeated, 0};
+
+    const float deltaX = dummy_.position.x - attackerPosition.x;
+    const float deltaY = dummy_.position.y - attackerPosition.y;
+    if (deltaX * deltaX + deltaY * deltaY > ComboFinisherRange * ComboFinisherRange) {
+        return {ComboFinisherResult::OutOfRange, 0};
+    }
+
+    comboFinisherReady_ = false;
+    comboCount_ = 0;
+    return {ComboFinisherResult::Activated, ApplyDamage(ComboFinisherDamage)};
+}
+
+ManaReactionReport CombatSandbox::ApplyManaAffinity(ManaAffinity affinity) {
+    ManaReactionReport report{affinity, targetAffinity_, targetAffinity_, ManaReaction::None, 0};
+    if (affinity == ManaAffinity::None || dummy_.IsDefeated()) return report;
+
+    if (targetAffinity_ == ManaAffinity::None || targetAffinity_ == affinity) {
+        targetAffinity_ = affinity;
+        report.remaining = targetAffinity_;
+        return report;
+    }
+
+    targetAffinity_ = ManaAffinity::None;
+    report.remaining = ManaAffinity::None;
+    report.reaction = ManaReaction::Eclipse;
+    report.bonusDamage = ApplyDamage(ManaReactionDamage);
+    return report;
 }
 
 float CombatSandbox::CooldownRemaining() const {
@@ -135,6 +250,13 @@ bool CombatSandbox::ApplyPostureDamage(int postureDamage) {
     return false;
 }
 
+int CombatSandbox::ApplyPlayerDamage(int damage) {
+    if (damage <= 0 || player_.IsDefeated()) return 0;
+    const int applied = std::min(damage, player_.health);
+    player_.health -= applied;
+    return applied;
+}
+
 void CombatSandbox::RegisterComboHit() {
     if (comboCount_ > 0 && elapsedSeconds_ - lastComboHitTime_ <= ComboWindowSeconds) {
         ++comboCount_;
@@ -142,7 +264,18 @@ void CombatSandbox::RegisterComboHit() {
         comboCount_ = 1;
     }
     lastComboHitTime_ = elapsedSeconds_;
+    comboFinisherReady_ = comboCount_ >= ComboFinisherThreshold;
     stats_.bestCombo = std::max(stats_.bestCombo, comboCount_);
+}
+
+void CombatSandbox::ResolveEnemyAttackHit() {
+    if (!enemyAttackActive_) return;
+
+    enemyAttackActive_ = false;
+    enemyAttackRemaining_ = 0.0;
+    const int damage = enemyAttackDamage_;
+    enemyAttackDamage_ = 0;
+    lastEnemyAttack_ = {EnemyAttackResult::Hit, ApplyPlayerDamage(damage), false, false};
 }
 
 } // namespace Astral::Scene
