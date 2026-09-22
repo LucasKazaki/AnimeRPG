@@ -13,6 +13,7 @@ Deepen the pass-11 defense bridge into a more useful offline practice loop witho
 - `Engine/Scene/CombatDefenseTraining.h`
 - `Engine/Scene/ShadowbladeActions.h`
 - `Tests/ShadowbladeActionsTests.cpp`
+- `Tests/DefensePracticePass12Tests.inc`
 - this task packet
 - `Docs/Agents/animerpg-hourly/STATE.json`
 - `Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS12.md`
@@ -43,15 +44,15 @@ Acceptance: reminder is None with no owned threat, Guard for ordinary blockable 
 
 ### GAME-060: tutorial reminder escalation
 Gap: repeated defensive mistakes do not surface actionable training guidance.
-Adaptation: after one consecutive hit suggest reading the telegraph; after repeated hits specialize the hint to Guard blockable or Dodge unblockable attacks; after three successful non-perfect defenses suggest tighter timing.
+Adaptation: after one consecutive hit suggest reading the telegraph; after repeated hits retain the missed attack's blockability so the recovery-time hint can say Guard blockable or Dodge unblockable; after three consecutive successful non-perfect defenses suggest tighter timing even if the session previously contained a perfect defense.
 Reference: Granblue Fantasy: Relink lists Tutorial Reminders as an accessibility feature. Same PlayStation source above.
-Acceptance: hints are bounded, deterministic, reset hit streaks on successful defense, and never mutate combat state.
+Acceptance: hints are bounded, deterministic, retain actionable post-hit context during recovery, reset hit streaks on successful defense, track the ordinary-defense streak separately from lifetime perfects, and never mutate combat state.
 
 ### GAME-061: pause/resume defense drill
 Gap: the practice coordinator cannot freeze an active drill without letting combat/action clocks advance.
 Adaptation: a drill-local pause freezes both linked clocks, suppresses queueing/input mutation, preserves the linked generations and cue, and resumes from the exact remaining windup.
 Reference: Granblue Fantasy: Relink lists Game Pausing and consequence-free Practice Mode. Same PlayStation source above.
-Acceptance: large paused deltas cause no damage, recovery, resource/cooldown, timing, telemetry, or generation changes; resume continues exactly once.
+Acceptance: large paused deltas cause no damage, recovery, resource/cooldown, timing, telemetry, or generation changes; wrong-object calls cannot mutate or impersonate the owned link; resume continues exactly once.
 
 ### QOL-013: non-color-only defense cue symbols
 Community request: Wuthering Waves players with color-vision deficiencies asked for important information to use shapes/symbols instead of relying only on color. Original discussions include May 25, 2024 and March 25, 2025. Sources: https://www.reddit.com/r/WutheringWaves/comments/1d0301u and https://www.reddit.com/r/WutheringWaves/comments/1jjw8ih . These are player anecdotes with corroborating replies, not proof of consensus. A 2026-09-22 search of Kuro's indexed official news did not establish whether later Wuthering Waves updates fully resolved the request, so this is used only as a design lesson.
@@ -61,12 +62,14 @@ Acceptance: active cue symbols derive from authoritative blockability/timing sta
 ## Regression contract
 
 Extend the already registered `ShadowbladeActionsTests` target, without modifying CMake, to cover:
-1. selected-pattern canonical values, invalid pattern rejection, generation behavior, recovery gates, and non-perturbation of normal rotation;
+1. selected-pattern canonical values, invalid pattern rejection, generation behavior, pending/recovery/stagger/death gates, and non-perturbation of normal rotation;
 2. goal progress and separation of guard/dodge/perfect counts;
 3. control reminders for blockable/unblockable and goal override;
-4. mistake-driven tutorial hints and hit-streak reset;
-5. pause/input/clock/generation preservation and exact resume;
+4. mistake-driven tutorial hints during recovery, retained blockability, hit-streak reset, and three consecutive ordinary defenses after an earlier perfect;
+5. pause/input/clock/generation preservation, wrong-object isolation, and exact resume;
 6. semantic cue symbols across blockable, unblockable, perfect, and no-threat states.
+
+`Tests/DefensePracticePass12Tests.inc` is included by the already registered `Tests/ShadowbladeActionsTests.cpp` translation unit so these regressions run in the existing Debug and Release test target without touching shared CMake.
 
 Also retain all prior pass-11 ownership, stale-threat, invalid-delta, split-frame, telemetry, and grade regressions.
 
