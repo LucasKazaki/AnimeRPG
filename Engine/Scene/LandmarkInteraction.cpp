@@ -42,26 +42,77 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
     }
 
     const LandmarkKind kind = world.Landmarks()[selectedIndex_].kind;
-    if (visited_[selectedIndex_]) {
+    const bool alreadyVisited = visited_[selectedIndex_];
+    const bool canAdvanceObjective = objectiveStarted_ && !objectiveVisited_[selectedIndex_];
+    if (alreadyVisited && !canAdvanceObjective) {
         lastReport_ = {LandmarkInteractionResult::AlreadyVisited, kind, 0.0f};
         return lastReport_;
     }
 
-    const std::size_t discoveryIndex = IndexOf(kind);
+    float reward = 0.0f;
+    ProgressionRewardReport progressionReward{};
+    LandmarkInteractionResult result = LandmarkInteractionResult::Discovered;
+
+    if (!alreadyVisited) {
+        visited_[selectedIndex_] = true;
+        if (kind == LandmarkKind::LincolnMemorial) {
+            reward += shadowbladeActions.RestoreResource(LincolnReward);
+        }
+    } else {
+        result = LandmarkInteractionResult::ObjectiveAdvanced;
+    }
+
+    if (canAdvanceObjective) {
+        RecordObjectiveVisit(selectedIndex_);
+        ApplyObjectiveRewards(shadowbladeActions, reward, progressionReward);
+    }
+
+    lastReport_ = {result, kind, reward, progressionReward};
+    return lastReport_;
+}
+
+bool LandmarkInteraction::SetObjectiveActivationMode(LandmarkObjectiveActivationMode mode) {
+    if (mode != LandmarkObjectiveActivationMode::AutoStart
+        && mode != LandmarkObjectiveActivationMode::ManualStart) {
+        return false;
+    }
+    if (mode == objectiveActivationMode_) return true;
+
+    const bool objectiveHistory = std::any_of(objectiveVisited_.begin(), objectiveVisited_.end(),
+        [](bool visited) { return visited; });
+    if (objectiveHistory || objectiveCompletionRewardGranted_
+        || orderedResonanceRewardGranted_) {
+        return false;
+    }
+    objectiveActivationMode_ = mode;
+    objectiveStarted_ = mode == LandmarkObjectiveActivationMode::AutoStart;
+    objectiveVisited_ = {};
+    orderedDiscoveryProgress_ = 0;
+    orderedSequenceIntact_ = true;
+    return true;
+}
+
+bool LandmarkInteraction::StartObjective() {
+    if (objectiveStarted_) return false;
+    objectiveStarted_ = true;
+    return true;
+}
+
+void LandmarkInteraction::RecordObjectiveVisit(std::size_t index) {
+    if (index >= LedgerCapacity || objectiveVisited_[index]) return;
+
     if (orderedSequenceIntact_) {
-        if (discoveryIndex == orderedDiscoveryProgress_) {
+        if (index == orderedDiscoveryProgress_) {
             ++orderedDiscoveryProgress_;
         } else {
             orderedSequenceIntact_ = false;
         }
     }
+    objectiveVisited_[index] = true;
+}
 
-    visited_[selectedIndex_] = true;
-    float reward = 0.0f;
-    ProgressionRewardReport progressionReward{};
-    if (kind == LandmarkKind::LincolnMemorial) {
-        reward += shadowbladeActions.RestoreResource(LincolnReward);
-    }
+void LandmarkInteraction::ApplyObjectiveRewards(ShadowbladeActions& shadowbladeActions,
+    float& reward, ProgressionRewardReport& progressionReward) {
     if (ObjectiveComplete() && !objectiveCompletionRewardGranted_) {
         objectiveCompletionRewardGranted_ = true;
         reward += shadowbladeActions.RestoreResource(ObjectiveCompletionReward);
@@ -78,8 +129,6 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
         orderedResonanceRewardGranted_ = true;
         reward += shadowbladeActions.RestoreResource(OrderedResonanceReward);
     }
-    lastReport_ = {LandmarkInteractionResult::Discovered, kind, reward, progressionReward};
-    return lastReport_;
 }
 
 LandmarkKind LandmarkInteraction::SelectedKind() const {
@@ -101,13 +150,15 @@ std::size_t LandmarkInteraction::VisitedCount() const {
 }
 
 std::size_t LandmarkInteraction::ObjectiveProgress() const {
-    if (!visited_[0]) return 0;
-    if (!visited_[1]) return 1;
-    if (!visited_[2]) return 2;
+    if (!objectiveStarted_) return 0;
+    if (!objectiveVisited_[0]) return 0;
+    if (!objectiveVisited_[1]) return 1;
+    if (!objectiveVisited_[2]) return 2;
     return LedgerCapacity;
 }
 
 LandmarkObjectiveStage LandmarkInteraction::CurrentObjective() const {
+    if (!objectiveStarted_) return LandmarkObjectiveStage::AwaitingStart;
     switch (ObjectiveProgress()) {
     case 0: return LandmarkObjectiveStage::DiscoverLincoln;
     case 1: return LandmarkObjectiveStage::DiscoverReflectingPool;

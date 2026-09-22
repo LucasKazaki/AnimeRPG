@@ -14,6 +14,12 @@ enum class CoreTalent {
     BreakerFocus,
 };
 
+enum class ShadowSkill {
+    Dash,
+    FatalStrike,
+    Defense,
+};
+
 enum class ProgressionActionResult {
     Success,
     Invalid,
@@ -21,6 +27,7 @@ enum class ProgressionActionResult {
     InsufficientResources,
     Maxed,
     EmptyPreset,
+    AlreadyClaimed,
 };
 
 struct ProgressionRewardReport {
@@ -30,10 +37,27 @@ struct ProgressionRewardReport {
     int enhancementMaterialsApplied{};
 };
 
+struct JourneyClaimReport {
+    ProgressionActionResult result{ProgressionActionResult::Invalid};
+    ProgressionRewardReport reward{};
+};
+
 struct BuildPreset {
     bool saved{};
     std::array<CoreTalent, 2> talents{CoreTalent::ShadowStep, CoreTalent::EclipseEdge};
     std::array<bool, 2> occupied{};
+};
+
+struct TrainingPlanStatus {
+    bool active{};
+    int targetsComplete{};
+    int targetsTotal{};
+    int remainingLevels{};
+    int remainingWeaponTiers{};
+    std::array<int, 3> remainingTalentTiers{};
+    std::array<int, 3> remainingSkillRanks{};
+
+    bool Complete() const { return active && targetsComplete == targetsTotal; }
 };
 
 class CharacterProgression {
@@ -43,8 +67,14 @@ public:
     static constexpr int MasteryPointsPerRank = 50;
     static constexpr int MaximumTalentTier = 3;
     static constexpr int MaximumWeaponTier = 5;
+    static constexpr int MaximumWeaponAwakeningRank = 2;
+    static constexpr int MaximumSkillRank = 5;
+    static constexpr int SkillPracticePerRank = 10;
     static constexpr std::size_t EquippedTalentSlots = 2;
     static constexpr std::size_t BuildPresetSlots = 3;
+    static constexpr std::size_t TalentCount = 3;
+    static constexpr std::size_t SkillCount = 3;
+    static constexpr std::size_t JourneyMilestoneCount = 4;
 
     int Level() const { return level_; }
     int ExperienceIntoLevel() const { return experienceIntoLevel_; }
@@ -64,7 +94,27 @@ public:
         return IsValidTalent(talent) ? talentTiers_[TalentIndex(talent)] : 0;
     }
     int WeaponTier() const { return weaponTier_; }
+    int WeaponAwakeningRank() const { return weaponAwakeningRank_; }
     int EnhancementMaterials() const { return enhancementMaterials_; }
+
+    int SkillPractice(ShadowSkill skill) const {
+        return IsValidSkill(skill) ? skillPractice_[SkillIndex(skill)] : 0;
+    }
+    int SkillRank(ShadowSkill skill) const {
+        if (!IsValidSkill(skill)) return 0;
+        const int practice = skillPractice_[SkillIndex(skill)];
+        return std::min(MaximumSkillRank, 1 + practice / SkillPracticePerRank);
+    }
+
+    int RecordSkillPractice(ShadowSkill skill, int amount) {
+        if (!IsValidSkill(skill) || amount <= 0) return 0;
+        const std::size_t index = SkillIndex(skill);
+        const int maximumPractice = (MaximumSkillRank - 1) * SkillPracticePerRank;
+        const int room = maximumPractice - skillPractice_[index];
+        const int applied = std::min(amount, std::max(0, room));
+        skillPractice_[index] += applied;
+        return applied;
+    }
 
     ProgressionRewardReport GrantRewards(int experience, int masteryPoints,
         int enhancementMaterials) {
@@ -152,6 +202,22 @@ public:
         return ProgressionActionResult::Success;
     }
 
+    ProgressionActionResult AwakenWeapon() {
+        if (weaponAwakeningRank_ >= MaximumWeaponAwakeningRank) {
+            return ProgressionActionResult::Maxed;
+        }
+        if (weaponTier_ < MaximumWeaponTier) return ProgressionActionResult::Locked;
+        const int requiredLevel = weaponAwakeningRank_ == 0 ? 15 : 20;
+        if (level_ < requiredLevel) return ProgressionActionResult::Locked;
+        const int cost = weaponAwakeningRank_ == 0 ? 100 : 200;
+        if (enhancementMaterials_ < cost) {
+            return ProgressionActionResult::InsufficientResources;
+        }
+        enhancementMaterials_ -= cost;
+        ++weaponAwakeningRank_;
+        return ProgressionActionResult::Success;
+    }
+
     ProgressionActionResult EquipTalent(std::size_t slot, CoreTalent talent) {
         if (slot >= EquippedTalentSlots || !IsValidTalent(talent)) {
             return ProgressionActionResult::Invalid;
@@ -209,6 +275,98 @@ public:
         return slot < BuildPresetSlots && presets_[slot].saved;
     }
 
+    ProgressionActionResult SetTrainingPlan(int targetLevel, int targetWeaponTier,
+        const std::array<int, TalentCount>& targetTalentTiers,
+        const std::array<int, SkillCount>& targetSkillRanks) {
+        if (targetLevel < 1 || targetLevel > MaximumLevel
+            || targetWeaponTier < 0 || targetWeaponTier > MaximumWeaponTier) {
+            return ProgressionActionResult::Invalid;
+        }
+        for (int tier : targetTalentTiers) {
+            if (tier < 0 || tier > MaximumTalentTier) return ProgressionActionResult::Invalid;
+        }
+        for (int rank : targetSkillRanks) {
+            if (rank < 1 || rank > MaximumSkillRank) return ProgressionActionResult::Invalid;
+        }
+        trainingPlanActive_ = true;
+        targetLevel_ = targetLevel;
+        targetWeaponTier_ = targetWeaponTier;
+        targetTalentTiers_ = targetTalentTiers;
+        targetSkillRanks_ = targetSkillRanks;
+        return ProgressionActionResult::Success;
+    }
+
+    void ClearTrainingPlan() {
+        trainingPlanActive_ = false;
+    }
+
+    TrainingPlanStatus CurrentTrainingPlanStatus() const {
+        TrainingPlanStatus status{};
+        status.active = trainingPlanActive_;
+        if (!trainingPlanActive_) return status;
+
+        status.targetsTotal = 2 + static_cast<int>(TalentCount + SkillCount);
+        status.remainingLevels = std::max(0, targetLevel_ - level_);
+        status.remainingWeaponTiers = std::max(0, targetWeaponTier_ - weaponTier_);
+        if (status.remainingLevels == 0) ++status.targetsComplete;
+        if (status.remainingWeaponTiers == 0) ++status.targetsComplete;
+
+        for (std::size_t index = 0; index < TalentCount; ++index) {
+            status.remainingTalentTiers[index] =
+                std::max(0, targetTalentTiers_[index] - talentTiers_[index]);
+            if (status.remainingTalentTiers[index] == 0) ++status.targetsComplete;
+        }
+        for (std::size_t index = 0; index < SkillCount; ++index) {
+            status.remainingSkillRanks[index] =
+                std::max(0, targetSkillRanks_[index] - SkillRank(SkillFromIndex(index)));
+            if (status.remainingSkillRanks[index] == 0) ++status.targetsComplete;
+        }
+        return status;
+    }
+
+    int CombatReadinessScore() const {
+        int score = level_ * 2;
+        score += weaponTier_ * 4;
+        score += weaponAwakeningRank_ * 5;
+        for (int tier : talentTiers_) score += tier * 2;
+        for (std::size_t index = 0; index < SkillCount; ++index) {
+            score += std::max(0, SkillRank(SkillFromIndex(index)) - 1);
+        }
+        return std::min(100, std::max(0, score));
+    }
+
+    static int JourneyMilestoneRequiredLevel(std::size_t milestone) {
+        static constexpr std::array<int, JourneyMilestoneCount> levels{5, 10, 15, 20};
+        return milestone < levels.size() ? levels[milestone] : 0;
+    }
+
+    bool JourneyMilestoneClaimed(std::size_t milestone) const {
+        return milestone < JourneyMilestoneCount && journeyMilestoneClaimed_[milestone];
+    }
+
+    JourneyClaimReport ClaimJourneyMilestone(std::size_t milestone) {
+        JourneyClaimReport report{};
+        if (milestone >= JourneyMilestoneCount) {
+            report.result = ProgressionActionResult::Invalid;
+            return report;
+        }
+        if (journeyMilestoneClaimed_[milestone]) {
+            report.result = ProgressionActionResult::AlreadyClaimed;
+            return report;
+        }
+        if (level_ < JourneyMilestoneRequiredLevel(milestone)) {
+            report.result = ProgressionActionResult::Locked;
+            return report;
+        }
+
+        journeyMilestoneClaimed_[milestone] = true;
+        const int masteryReward = 20 + static_cast<int>(milestone) * 10;
+        const int materialReward = 10 + static_cast<int>(milestone) * 5;
+        report.reward = GrantRewards(0, masteryReward, materialReward);
+        report.result = ProgressionActionResult::Success;
+        return report;
+    }
+
 private:
     static bool IsValidTalent(CoreTalent talent) {
         return talent == CoreTalent::ShadowStep
@@ -225,6 +383,30 @@ private:
         }
     }
 
+    static bool IsValidSkill(ShadowSkill skill) {
+        return skill == ShadowSkill::Dash
+            || skill == ShadowSkill::FatalStrike
+            || skill == ShadowSkill::Defense;
+    }
+
+    static std::size_t SkillIndex(ShadowSkill skill) {
+        switch (skill) {
+        case ShadowSkill::FatalStrike: return 1;
+        case ShadowSkill::Defense: return 2;
+        case ShadowSkill::Dash:
+        default: return 0;
+        }
+    }
+
+    static ShadowSkill SkillFromIndex(std::size_t index) {
+        switch (index) {
+        case 1: return ShadowSkill::FatalStrike;
+        case 2: return ShadowSkill::Defense;
+        case 0:
+        default: return ShadowSkill::Dash;
+        }
+    }
+
     static std::int64_t SaturatingAdd(std::int64_t left, std::int64_t right) {
         if (right <= 0) return left;
         const std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
@@ -236,12 +418,21 @@ private:
     int masteryPointsAvailable_{};
     std::int64_t masteryPointsEarned_{};
     int enhancementMaterials_{};
-    std::array<int, 3> talentTiers_{};
+    std::array<int, TalentCount> talentTiers_{};
     int weaponTier_{};
+    int weaponAwakeningRank_{};
+    std::array<int, SkillCount> skillPractice_{};
     std::array<CoreTalent, EquippedTalentSlots> equippedTalents_{
         CoreTalent::ShadowStep, CoreTalent::EclipseEdge};
     std::array<bool, EquippedTalentSlots> equippedOccupied_{};
     std::array<BuildPreset, BuildPresetSlots> presets_{};
+
+    bool trainingPlanActive_{};
+    int targetLevel_{1};
+    int targetWeaponTier_{};
+    std::array<int, TalentCount> targetTalentTiers_{};
+    std::array<int, SkillCount> targetSkillRanks_{1, 1, 1};
+    std::array<bool, JourneyMilestoneCount> journeyMilestoneClaimed_{};
 };
 
 } // namespace Astral::Scene

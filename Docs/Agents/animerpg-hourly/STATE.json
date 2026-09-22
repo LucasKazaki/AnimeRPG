@@ -3,20 +3,20 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-22",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "1ac6bf8d54219968effadd17e575aafb4ebd3847",
+  "last_verified_main_at_pass_start": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
   "last_merged_pass": {
-    "id": "GAME-PASS6-CHALLENGES-2026-09-22",
-    "pr": 20,
-    "merge_sha": "1ac6bf8d54219968effadd17e575aafb4ebd3847",
-    "head_sha": "9f1eaf022d46511a87743ff7946514eb814aaddd",
+    "id": "GAME-PASS7-PROGRESSION-LOADOUTS-2026-09-22",
+    "pr": 21,
+    "merge_sha": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
+    "head_sha": "4691472780c64906ca5fdbbabb261ddb03d1e4b6",
     "hosted_windows_ci": "passed",
     "release_manifest": "passed",
     "independent_review": "completed_no_unresolved_major_issues",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-22-progression-loadouts-pass7",
-  "pass": "GAME-PASS7-PROGRESSION-LOADOUTS-2026-09-22",
-  "pr": null,
+  "working_branch": "game/2026-09-22-training-journey-pass8",
+  "pass": "GAME-PASS8-TRAINING-JOURNEY-2026-09-22",
+  "pr": 22,
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -28,23 +28,29 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-032","title":"Character XP and level ladder","status":"implemented_domain_behavior"},
-    {"id":"GAME-033","title":"Shadowblade mastery rank and spendable mastery points","status":"implemented_domain_behavior"},
-    {"id":"GAME-034","title":"Rank-gated Shadowblade specialization tiers","status":"implemented_domain_behavior"},
-    {"id":"GAME-035","title":"Weapon enhancement tiers and materials","status":"implemented_domain_behavior"},
-    {"id":"GAME-036","title":"One-time landmark objective progression reward","status":"implemented_existing_exploration_integration"},
-    {"id":"QOL-008","title":"Three saved build preset slots","status":"implemented_domain_behavior"}
+    {"id":"GAME-037","title":"Shadowblade skill proficiency ranks","status":"implemented_domain_behavior_action_hook_deferred"},
+    {"id":"GAME-038","title":"Progression training plan targets","status":"implemented_domain_behavior"},
+    {"id":"GAME-039","title":"Combat readiness score","status":"implemented_domain_behavior"},
+    {"id":"GAME-040","title":"Journey milestone rewards","status":"implemented_domain_behavior"},
+    {"id":"GAME-041","title":"Late-progression weapon awakening","status":"implemented_domain_behavior"},
+    {"id":"QOL-009","title":"Opt-in landmark objective activation","status":"implemented_existing_exploration_integration_runtime_label_repaired"}
   ],
   "verification": {
     "registered_test_target": "LandmarkInteractionTests",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
+    "sandbox_character_progression_gcc": "passed_partial_source_fixture_wall_wextra_werror",
+    "sandbox_manual_objective_gcc": "passed_production_landmark_source_with_dependency_stubs_wall_wextra_werror",
+    "prior_head_970b733_hosted_windows_ci": "passed_run_35756612998",
+    "prior_head_970b733_release_manifest": "passed_run_35756613785",
+    "prior_head_970b733_independent_review": "p2_runtime_mapper_finding_repaired_after_review",
+    "hosted_windows_ci": "pending_exact_final_head_after_review_repair_and_record_updates",
+    "release_manifest": "pending_exact_final_head_after_review_repair_and_record_updates",
     "native_windows_interactive": "not_run",
-    "independent_review": "pending_exact_final_head",
+    "independent_review": "pending_exact_final_head_after_review_repair",
     "persistence_restart_test": "not_applicable_no_save_format_in_this_packet"
   },
   "coordination": {
-    "engine_pr_13": "active; owns CMakeLists.txt and editor runtime-smoke files; pass 7 does not modify those paths"
+    "engine_pr_13": "active; owns shared CMake/editor runtime-smoke paths and does not modify Engine/Platform/Win32Application.cpp",
+    "platform_integration_exception": "independent review required one line in Win32Application.cpp to map ObjectiveAdvanced to player-visible status; task scope explicitly amended; no other platform behavior changed"
   },
-  "next_action": "Open the scoped pass-7 PR, require exact-head Windows Debug/Release deterministic checks, release-manifest integrity, and fresh independent Codex review; repair findings before merge, then use expected-head protection and verify main after merge."
+  "next_action": "Freeze the branch head, require exact-head Windows Debug/Release deterministic checks, release-manifest integrity, and fresh independent Codex review on PR #22; merge with expected-head protection only if all gates pass, then verify main."
 }

@@ -14,13 +14,20 @@ enum class LandmarkInteractionResult {
     OutOfRange,
     Discovered,
     AlreadyVisited,
+    ObjectiveAdvanced,
 };
 
 enum class LandmarkObjectiveStage {
+    AwaitingStart,
     DiscoverLincoln,
     DiscoverReflectingPool,
     DiscoverWashingtonMonument,
     Complete,
+};
+
+enum class LandmarkObjectiveActivationMode {
+    AutoStart,
+    ManualStart,
 };
 
 struct LandmarkInteractionReport {
@@ -46,6 +53,13 @@ public:
         const WorldBlockout& world, ShadowbladeActions& shadowbladeActions);
     void SetCharacterProgression(CharacterProgression* progression) { progression_ = progression; }
 
+    bool SetObjectiveActivationMode(LandmarkObjectiveActivationMode mode);
+    bool StartObjective();
+    LandmarkObjectiveActivationMode ObjectiveActivationMode() const {
+        return objectiveActivationMode_;
+    }
+    bool ObjectiveActive() const { return objectiveStarted_; }
+
     bool HasSelection() const { return selectedIndex_ < LedgerCapacity; }
     std::size_t SelectedIndex() const { return selectedIndex_; }
     LandmarkKind SelectedKind() const;
@@ -54,7 +68,7 @@ public:
     std::size_t ObjectiveProgress() const;
     LandmarkObjectiveStage CurrentObjective() const;
     bool ObjectiveComplete() const {
-        return CurrentObjective() == LandmarkObjectiveStage::Complete;
+        return objectiveStarted_ && CurrentObjective() == LandmarkObjectiveStage::Complete;
     }
     bool ObjectiveCompletionRewardGranted() const {
         return objectiveCompletionRewardGranted_;
@@ -66,13 +80,20 @@ public:
 
 private:
     static std::size_t IndexOf(LandmarkKind kind);
+    void RecordObjectiveVisit(std::size_t index);
+    void ApplyObjectiveRewards(ShadowbladeActions& shadowbladeActions,
+        float& reward, ProgressionRewardReport& progressionReward);
 
     std::array<bool, LedgerCapacity> visited_{};
+    std::array<bool, LedgerCapacity> objectiveVisited_{};
     std::size_t selectedIndex_{LedgerCapacity};
     bool objectiveCompletionRewardGranted_{};
     std::size_t orderedDiscoveryProgress_{};
     bool orderedSequenceIntact_{true};
     bool orderedResonanceRewardGranted_{};
+    LandmarkObjectiveActivationMode objectiveActivationMode_{
+        LandmarkObjectiveActivationMode::AutoStart};
+    bool objectiveStarted_{true};
     CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
     LandmarkInteractionReport lastReport_{};
 };

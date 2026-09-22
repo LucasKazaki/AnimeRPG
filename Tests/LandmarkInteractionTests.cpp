@@ -2,6 +2,7 @@
 #include "Engine/Scene/EncounterChallenge.h"
 #include "Engine/Scene/LandmarkInteraction.h"
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -207,6 +208,93 @@ void TestSingleCharacterProgressionAndBuildPresets() {
         "experience after the level cap is ignored deterministically");
 }
 
+void TestProgressionTrainingReadinessJourneyAndAwakening() {
+    using namespace Astral::Scene;
+    CharacterProgression progression;
+
+    Expect(progression.SkillRank(ShadowSkill::Dash) == 1
+            && progression.SkillRank(ShadowSkill::FatalStrike) == 1
+            && progression.SkillRank(ShadowSkill::Defense) == 1,
+        "Shadowblade skill practice starts at bounded rank one");
+    Expect(progression.RecordSkillPractice(ShadowSkill::Dash, 10) == 10
+            && progression.SkillRank(ShadowSkill::Dash) == 2,
+        "skill practice advances Dash through a deterministic rank threshold");
+    Expect(progression.RecordSkillPractice(ShadowSkill::FatalStrike, 20) == 20
+            && progression.SkillRank(ShadowSkill::FatalStrike) == 3,
+        "Fatal Strike proficiency tracks independently from Dash");
+    Expect(progression.RecordSkillPractice(ShadowSkill::Defense,
+            std::numeric_limits<int>::max()) == 40
+            && progression.SkillRank(ShadowSkill::Defense)
+                == CharacterProgression::MaximumSkillRank,
+        "extreme practice input saturates at the skill-rank cap without overflow");
+    Expect(progression.RecordSkillPractice(static_cast<ShadowSkill>(999), 10) == 0,
+        "invalid skill identifiers fail closed");
+
+    const std::array<int, CharacterProgression::TalentCount> talentTargets{2, 1, 0};
+    const std::array<int, CharacterProgression::SkillCount> skillTargets{2, 3, 5};
+    Expect(progression.SetTrainingPlan(5, 1, talentTargets, skillTargets)
+            == ProgressionActionResult::Success,
+        "a valid training plan stores level, weapon, talent, and skill targets");
+    const TrainingPlanStatus initialPlan = progression.CurrentTrainingPlanStatus();
+    Expect(initialPlan.active && initialPlan.targetsTotal == 8
+            && !initialPlan.Complete() && initialPlan.remainingLevels == 4
+            && initialPlan.remainingWeaponTiers == 1
+            && initialPlan.remainingTalentTiers[0] == 2
+            && initialPlan.remainingSkillRanks[0] == 0
+            && initialPlan.remainingSkillRanks[1] == 0
+            && initialPlan.remainingSkillRanks[2] == 0,
+        "training plan reports only the unfinished progression targets");
+    Expect(progression.SetTrainingPlan(21, 1, talentTargets, skillTargets)
+            == ProgressionActionResult::Invalid,
+        "training plans reject targets beyond explicit progression caps");
+
+    progression.GrantRewards(1000, 300, 500);
+    Expect(progression.Level() == 5
+            && progression.UpgradeTalent(CoreTalent::ShadowStep)
+                == ProgressionActionResult::Success
+            && progression.UpgradeTalent(CoreTalent::ShadowStep)
+                == ProgressionActionResult::Success
+            && progression.UpgradeTalent(CoreTalent::EclipseEdge)
+                == ProgressionActionResult::Success
+            && progression.UpgradeWeapon() == ProgressionActionResult::Success,
+        "earned progression can satisfy a multi-axis training plan");
+    const TrainingPlanStatus completedPlan = progression.CurrentTrainingPlanStatus();
+    Expect(completedPlan.Complete() && completedPlan.targetsComplete == 8,
+        "training plan becomes complete only when every stored target is met");
+    Expect(progression.CombatReadinessScore() == 27,
+        "combat readiness combines bounded level, weapon, talent, and practiced-skill progress");
+
+    const JourneyClaimReport firstMilestone = progression.ClaimJourneyMilestone(0);
+    Expect(firstMilestone.result == ProgressionActionResult::Success
+            && firstMilestone.reward.masteryPointsApplied == 20
+            && firstMilestone.reward.enhancementMaterialsApplied == 10
+            && progression.JourneyMilestoneClaimed(0),
+        "reaching level five exposes one explicit Journey-style progression reward");
+    Expect(progression.ClaimJourneyMilestone(0).result
+            == ProgressionActionResult::AlreadyClaimed
+            && progression.ClaimJourneyMilestone(1).result
+                == ProgressionActionResult::Locked,
+        "journey milestone rewards cannot be duplicated or claimed before their level gate");
+
+    CharacterProgression weaponProgression;
+    int levelsGained = 0;
+    weaponProgression.GrantExperience(std::numeric_limits<int>::max(), levelsGained);
+    weaponProgression.GrantEnhancementMaterials(1000);
+    for (int tier = 0; tier < CharacterProgression::MaximumWeaponTier; ++tier) {
+        Expect(weaponProgression.UpgradeWeapon() == ProgressionActionResult::Success,
+            "max-level protagonist can enhance the weapon through each bounded tier");
+    }
+    Expect(weaponProgression.AwakenWeapon() == ProgressionActionResult::Success
+            && weaponProgression.WeaponAwakeningRank() == 1,
+        "max-tier weapon can earn its first late-progression awakening");
+    Expect(weaponProgression.AwakenWeapon() == ProgressionActionResult::Success
+            && weaponProgression.WeaponAwakeningRank()
+                == CharacterProgression::MaximumWeaponAwakeningRank,
+        "second awakening consumes its larger bounded material cost at level twenty");
+    Expect(weaponProgression.AwakenWeapon() == ProgressionActionResult::Maxed,
+        "weapon awakening cannot exceed its explicit cap");
+}
+
 void TestLandmarkObjectiveGrantsProgressionOnce() {
     using namespace Astral::Scene;
     WorldBlockout world;
@@ -258,6 +346,64 @@ void TestLandmarkObjectiveGrantsProgressionOnce() {
     Expect(compatibilityCompletion.result == LandmarkInteractionResult::Discovered
             && compatibilityCompletion.progressionReward.experienceApplied == 0,
         "callers that do not attach progression preserve the existing landmark behavior");
+}
+
+void TestManualObjectiveActivationPreservesFreeExploration() {
+    using namespace Astral::Scene;
+    WorldBlockout world;
+    LandmarkInteraction interaction;
+    ShadowbladeActions actions;
+    CharacterProgression progression;
+    interaction.SetCharacterProgression(&progression);
+
+    Expect(interaction.SetObjectiveActivationMode(LandmarkObjectiveActivationMode::ManualStart)
+            && !interaction.ObjectiveActive()
+            && interaction.CurrentObjective() == LandmarkObjectiveStage::AwaitingStart,
+        "manual objective mode waits for explicit player activation");
+    const auto earlyLincoln = interaction.TryInteract(
+        {-8.0f, 18.0f, 0.0f}, world, actions);
+    Expect(earlyLincoln.result == LandmarkInteractionResult::Discovered
+            && interaction.IsVisited(LandmarkKind::LincolnMemorial)
+            && interaction.ObjectiveProgress() == 0
+            && !interaction.ObjectiveCompletionRewardGranted(),
+        "free landmark discovery before activation does not silently start quest progress");
+
+    Expect(interaction.StartObjective()
+            && interaction.CurrentObjective() == LandmarkObjectiveStage::DiscoverLincoln,
+        "explicit activation starts the objective at its first authored step");
+    Expect(interaction.SetObjectiveActivationMode(LandmarkObjectiveActivationMode::ManualStart)
+            && interaction.ObjectiveActivationMode() == LandmarkObjectiveActivationMode::ManualStart
+            && interaction.ObjectiveActive()
+            && interaction.CurrentObjective() == LandmarkObjectiveStage::DiscoverLincoln,
+        "reapplying the current manual mode is idempotent and preserves an active objective");
+    Expect(!interaction.SetObjectiveActivationMode(
+                static_cast<LandmarkObjectiveActivationMode>(999))
+            && interaction.ObjectiveActivationMode() == LandmarkObjectiveActivationMode::ManualStart
+            && interaction.ObjectiveActive()
+            && interaction.CurrentObjective() == LandmarkObjectiveStage::DiscoverLincoln,
+        "invalid objective activation modes fail closed without mutating active objective state");
+    const auto revisitLincoln = interaction.TryInteract(
+        {-8.0f, 18.0f, 0.0f}, world, actions);
+    Expect(revisitLincoln.result == LandmarkInteractionResult::ObjectiveAdvanced
+            && interaction.ObjectiveProgress() == 1
+            && Near(revisitLincoln.rewardApplied, 0.0f),
+        "revisiting a previously explored landmark advances the opted-in quest without duplicating discovery reward");
+    Expect(interaction.TryInteract({4.0f, 39.0f, 0.0f}, world, actions).result
+            == LandmarkInteractionResult::Discovered,
+        "new discoveries continue to advance an active manual objective normally");
+    const auto completion = interaction.TryInteract(
+        {5.0f, 68.0f, 0.0f}, world, actions);
+    Expect(completion.result == LandmarkInteractionResult::Discovered
+            && interaction.ObjectiveComplete()
+            && completion.progressionReward.experienceApplied
+                == LandmarkInteraction::ObjectiveExperienceReward,
+        "manual objective completion grants its existing one-time progression reward");
+    const auto repeat = interaction.TryInteract({5.0f, 68.0f, 0.0f}, world, actions);
+    Expect(repeat.result == LandmarkInteractionResult::AlreadyVisited
+            && repeat.progressionReward.experienceApplied == 0
+            && !interaction.StartObjective()
+            && !interaction.SetObjectiveActivationMode(LandmarkObjectiveActivationMode::AutoStart),
+        "completed manual objectives cannot be restarted, mode-reset, or reward-farmed");
 }
 
 void TestEncounterChallengeScoringRanksAndFirstClears() {
@@ -379,7 +525,9 @@ int main() {
     TestOrderedObjectiveGuidanceKeepsFreeDiscovery();
     TestRewardRoutesThroughResourceRules();
     TestSingleCharacterProgressionAndBuildPresets();
+    TestProgressionTrainingReadinessJourneyAndAwakening();
     TestLandmarkObjectiveGrantsProgressionOnce();
+    TestManualObjectiveActivationPreservesFreeExploration();
     TestEncounterChallengeScoringRanksAndFirstClears();
     if (failures != 0) return 1;
     std::cout << "Landmark interaction tests passed\n";
