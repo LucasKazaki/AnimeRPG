@@ -48,11 +48,55 @@ jobs:
       - name: Parse R0 recovery runner
         run: python -m py_compile Scripts/invoke_r0_release_candidate.py
 
+      - name: Verify R0 runner safety contracts
+        run: python Scripts/test_r0_runner_safety.py
+
+      - name: Verify PE dependency inspector contracts
+        run: python Scripts/test_pe_dependencies.py
+
+      - name: Verify Windows prerequisite plan contracts
+        run: python Scripts/test_windows_prerequisite_plan.py
+
+      - name: Verify Windows runtime environment probe contracts
+        run: python Scripts/test_windows_runtime_environment.py
+
+      - name: Verify Windows runtime compatibility audit contracts
+        run: python Scripts/test_windows_runtime_compatibility.py
+
+      - name: Verify Windows Redistributable bootstrap contracts
+        run: python Scripts/test_windows_redist_bootstrap.py
+
       - name: Verify Release assertion and CTest safety contracts
         run: python Scripts/test_test_safety.py
 
       - name: Configure Visual Studio 2022 x64
         run: cmake -S . -B "$env:BUILD_ROOT" -G "Visual Studio 17 2022" -A x64
+
+      - name: Record Visual C++ Build Tools version
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) {
+            Write-Error "vswhere.exe is unavailable; cannot bind the package to an exact Visual Studio 2022 toolset."
+            exit 1
+          }
+          $installation = (& $vswhere -latest -version "[17.0,18.0)" -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
+          if (-not $installation) {
+            Write-Error "No Visual Studio 2022 C++ tool installation was discovered."
+            exit 1
+          }
+          $versionFile = Join-Path $installation.Trim() "VC\Auxiliary\Build\Microsoft.VCToolsVersion.default.txt"
+          if (-not (Test-Path $versionFile)) {
+            Write-Error "Visual C++ default toolset version file is missing: $versionFile"
+            exit 1
+          }
+          $vcToolsVersion = (Get-Content $versionFile -Raw).Trim()
+          if ($vcToolsVersion -notmatch '^\d+\.\d+\.\d+(?:\.\d+)?$') {
+            Write-Error "Unexpected Visual C++ toolset version: $vcToolsVersion"
+            exit 1
+          }
+          Write-Host "Visual C++ Build Tools version: $vcToolsVersion"
+          "VC_TOOLS_VERSION=$vcToolsVersion" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build Debug
         run: cmake --build "$env:BUILD_ROOT" --config Debug --parallel
@@ -62,6 +106,105 @@ jobs:
 
       - name: Build Release
         run: cmake --build "$env:BUILD_ROOT" --config Release --parallel
+
+      - name: Inspect Release runtime dependencies
+        run: python Scripts/inspect_pe_dependencies.py "$env:BUILD_ROOT/Release/AstralGame.exe" --json "$env:RUNNER_TEMP/AstralGame-runtime-dependencies.json" --fail-on-debug-runtime
+
+      - name: Plan Release Windows prerequisites
+        run: python Scripts/plan_windows_prerequisites.py "$env:RUNNER_TEMP/AstralGame-runtime-dependencies.json" --json "$env:RUNNER_TEMP/AstralGame-windows-prerequisites.json" --fail-on-debug-runtime
+
+      - name: Verify current Release prerequisite policy
+        shell: pwsh
+        run: |
+          $plan = Get-Content "$env:RUNNER_TEMP/AstralGame-windows-prerequisites.json" -Raw | ConvertFrom-Json
+          if ($plan.vc_runtime.strategy -ne "central_vc_redist") {
+            Write-Error "Current Release build no longer resolves to the reviewed central VC Redistributable policy."
+            exit 1
+          }
+          if ($plan.vc_runtime.architecture -ne "x64") {
+            Write-Error "Current Release prerequisite plan is not x64."
+            exit 1
+          }
+          if ($plan.vc_runtime.installer_bundled -ne $false -or $plan.vc_runtime.installer_executed -ne $false) {
+            Write-Error "Hosted CI must not claim that a redistributable installer was bundled or executed."
+            exit 1
+          }
+          if ($plan.release_policy.clean_machine_compatibility_verified -ne $false) {
+            Write-Error "Hosted import inspection cannot establish clean-machine compatibility."
+            exit 1
+          }
+
+      - name: Probe hosted central VC runtime environment
+        run: python Scripts/probe_windows_runtime_environment.py "$env:RUNNER_TEMP/AstralGame-runtime-dependencies.json" "$env:RUNNER_TEMP/AstralGame-windows-prerequisites.json" "$env:BUILD_ROOT/Release/AstralGame.exe" --json "$env:RUNNER_TEMP/AstralGame-windows-runtime-preflight.json" --fail-on-missing
+
+      - name: Audit hosted runtime version compatibility
+        run: python Scripts/audit_windows_runtime_compatibility.py "$env:RUNNER_TEMP/AstralGame-windows-runtime-preflight.json" --vc-tools-version "$env:VC_TOOLS_VERSION" --json "$env:RUNNER_TEMP/AstralGame-windows-runtime-compatibility.json" --fail-on-incompatible
+
+      - name: Plan hosted central VC Redistributable bootstrap
+        run: python Scripts/plan_windows_redist_bootstrap.py "$env:RUNNER_TEMP/AstralGame-windows-prerequisites.json" "$env:RUNNER_TEMP/AstralGame-windows-runtime-compatibility.json" --json "$env:RUNNER_TEMP/AstralGame-windows-redist-bootstrap.json"
+
+      - name: Verify hosted runtime and bootstrap claim boundaries
+        shell: pwsh
+        run: |
+          $probe = Get-Content "$env:RUNNER_TEMP/AstralGame-windows-runtime-preflight.json" -Raw | ConvertFrom-Json
+          if ($probe.vc_runtime.strategy -ne "central_vc_redist" -or $probe.package.architecture -ne "x64") {
+            Write-Error "Hosted runtime preflight is not the reviewed x64 central VC runtime policy."
+            exit 1
+          }
+          if ($probe.acceptance.preflight_passed -ne $true -or $probe.vc_runtime.all_required_files_present -ne $true -or $probe.vc_runtime.all_present_files_versioned -ne $true) {
+            Write-Error "Hosted runtime preflight did not inventory every required central VC runtime file."
+            exit 1
+          }
+          if ($probe.vc_runtime.runtime_version_compatibility_verified -ne $false -or $probe.acceptance.package_launch_verified -ne $false -or $probe.acceptance.clean_machine_compatibility_verified -ne $false -or $probe.acceptance.independent_acceptance -ne $false) {
+            Write-Error "The preflight layer must not pre-claim compatibility, package launch, clean-machine, or independent acceptance."
+            exit 1
+          }
+          foreach ($file in $probe.vc_runtime.files) {
+            if ($file.present -ne $true -or -not $file.sha256 -or -not $file.file_version -or $file.size_bytes -le 0) {
+              Write-Error "Hosted runtime evidence is incomplete for $($file.name)."
+              exit 1
+            }
+          }
+
+          $audit = Get-Content "$env:RUNNER_TEMP/AstralGame-windows-runtime-compatibility.json" -Raw | ConvertFrom-Json
+          $expectedToolsVersion = $env:VC_TOOLS_VERSION
+          if (($expectedToolsVersion -split '\.').Count -eq 3) { $expectedToolsVersion += ".0" }
+          if ($audit.build_toolchain.vc_tools_version -ne $expectedToolsVersion) {
+            Write-Error "Runtime compatibility evidence is not bound to the recorded Visual C++ Build Tools version."
+            exit 1
+          }
+          if ($audit.compatibility.runtime_file_version_floor_satisfied -ne $true -or $audit.compatibility.runtime_version_compatibility_verified -ne $true) {
+            Write-Error "Observed central VC runtime file versions are older than the build toolset used for AstralGame."
+            exit 1
+          }
+          if ($audit.compatibility.supported_redist_installation_verified -ne $false -or $audit.acceptance.package_launch_verified -ne $false -or $audit.acceptance.clean_machine_compatibility_verified -ne $false -or $audit.acceptance.independent_acceptance -ne $false) {
+            Write-Error "Hosted runtime version evidence must not claim installer provenance, package launch, clean-machine, or independent acceptance."
+            exit 1
+          }
+
+          $bootstrap = Get-Content "$env:RUNNER_TEMP/AstralGame-windows-redist-bootstrap.json" -Raw | ConvertFrom-Json
+          if ($bootstrap.package_sha256 -ne $audit.package_sha256 -or $bootstrap.architecture -ne "x64" -or $bootstrap.bootstrap.strategy -ne "central_vc_redist") {
+            Write-Error "Redistributable bootstrap decision is not bound to the reviewed x64 package evidence."
+            exit 1
+          }
+          if ($bootstrap.bootstrap.action -notin @("skip_install", "install_latest_supported")) {
+            Write-Error "Redistributable bootstrap decision has an unsupported action."
+            exit 1
+          }
+          if ($bootstrap.bootstrap.installer_downloaded -ne $false -or $bootstrap.bootstrap.installer_executed -ne $false -or $bootstrap.bootstrap.installation_receipt_verified -ne $false) {
+            Write-Error "Hosted CI must not download, execute, or claim an installer receipt."
+            exit 1
+          }
+          if ($bootstrap.acceptance.bootstrap_decision_verified -ne $true -or $bootstrap.acceptance.supported_redist_installation_verified -ne $false -or $bootstrap.acceptance.package_launch_verified -ne $false -or $bootstrap.acceptance.clean_machine_compatibility_verified -ne $false -or $bootstrap.acceptance.independent_acceptance -ne $false) {
+            Write-Error "Bootstrap planning must retain installer, launch, clean-machine, and independent acceptance gates."
+            exit 1
+          }
+          if ($bootstrap.bootstrap.action -eq "skip_install") {
+            if ($null -eq $bootstrap.registered_v14_redist -or $bootstrap.registered_v14_redist.version_floor_satisfied -ne $true) {
+              Write-Error "skip_install requires same-or-newer registered v14 Redistributable evidence."
+              exit 1
+            }
+          }
 
       - name: Run deterministic Release tests
         run: ctest --test-dir "$env:BUILD_ROOT" -C Release --output-on-failure -E "RuntimeSmoke" --no-tests=error

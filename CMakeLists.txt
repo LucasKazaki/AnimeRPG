@@ -7,7 +7,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(AstralGame WIN32
     Engine/Assets/StaticMesh.cpp
+    Engine/Core/BenchmarkRunControl.cpp
     Engine/Core/Clock.cpp
+    Engine/Core/FramePhaseTimingCapture.cpp
+    Engine/Core/FrameTimingCapture.cpp
+    Engine/Core/ProcessMemoryCapture.cpp
+    Engine/Core/ProfilingCaptureStateReceipt.cpp
+    Engine/Core/SimulationTimeStep.cpp
     Engine/Core/Logger.cpp
     Engine/Platform/Win32Application.cpp
     Engine/Renderer/Renderer.cpp
@@ -26,6 +32,9 @@ add_executable(AstralGame WIN32
 target_include_directories(AstralGame PRIVATE .)
 target_compile_definitions(AstralGame PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(AstralGame PRIVATE user32 gdi32)
+if(MSVC)
+    target_link_options(AstralGame PRIVATE "$<$<CONFIG:Release>:/Brepro>")
+endif()
 
 add_executable(AstralEditor WIN32
     Engine/Editor/EditorLayout.cpp
@@ -41,6 +50,55 @@ if(BUILD_TESTING)
     add_executable(AstralMathTests Tests/MathTests.cpp)
     target_include_directories(AstralMathTests PRIVATE .)
     astral_add_test(AstralMathTests)
+
+    add_executable(FrameTimingCaptureTests
+        Engine/Core/Clock.cpp
+        Engine/Core/FrameTimingCapture.cpp
+        Engine/Core/ProcessMemoryCapture.cpp
+        Engine/Core/SimulationTimeStep.cpp
+        Tests/FrameTimingCaptureTests.cpp
+    )
+    target_include_directories(FrameTimingCaptureTests PRIVATE .)
+    astral_add_test(FrameTimingCaptureTests)
+
+    add_executable(FramePhaseTimingCaptureTests
+        Engine/Core/FramePhaseTimingCapture.cpp
+        Tests/FramePhaseTimingCaptureTests.cpp
+    )
+    target_include_directories(FramePhaseTimingCaptureTests PRIVATE .)
+    astral_add_test(FramePhaseTimingCaptureTests)
+
+    add_executable(ProcessMemoryCaptureTests
+        Engine/Core/ProcessMemoryCapture.cpp
+        Tests/ProcessMemoryCaptureTests.cpp
+    )
+    target_include_directories(ProcessMemoryCaptureTests PRIVATE .)
+    astral_add_test(ProcessMemoryCaptureTests)
+
+    add_executable(SimulationTimeStepTests
+        Engine/Core/Clock.cpp
+        Engine/Core/FrameTimingCapture.cpp
+        Engine/Core/ProcessMemoryCapture.cpp
+        Engine/Core/SimulationTimeStep.cpp
+        Tests/SimulationTimeStepTests.cpp
+    )
+    target_include_directories(SimulationTimeStepTests PRIVATE .)
+    astral_add_test(SimulationTimeStepTests)
+
+    add_executable(BenchmarkRunControlTests
+        Engine/Core/BenchmarkRunControl.cpp
+        Tests/BenchmarkRunControlTests.cpp
+    )
+    target_include_directories(BenchmarkRunControlTests PRIVATE .)
+    astral_add_test(BenchmarkRunControlTests)
+
+    add_executable(ProfilingCaptureStateReceiptTests
+        Engine/Core/BenchmarkRunControl.cpp
+        Engine/Core/ProfilingCaptureStateReceipt.cpp
+        Tests/ProfilingCaptureStateReceiptTests.cpp
+    )
+    target_include_directories(ProfilingCaptureStateReceiptTests PRIVATE .)
+    astral_add_test(ProfilingCaptureStateReceiptTests)
 
     add_executable(EditorLayoutTests
         Engine/Editor/EditorLayout.cpp

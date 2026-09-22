@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run the bounded R0 recovery and package gate on the Windows Agent Studio host.
+"""Run the bounded R0 recovery/package gate on the registered Windows host.
 
-This script deliberately does not modify Engine/, Game/, Tests/, or CMakeLists.txt.
-It stops at the first deterministic failure and leaves the loop in review after the
-automated gate. A separate reviewer must still accept the evidence and package.
+The runner is intentionally one-shot for a specific admitted revision. It validates
+all filesystem roots before mutation, bounds every child command, preserves partial
+logs on failure, and leaves independent review as a separate acceptance gate.
 """
 
 from __future__ import annotations
@@ -13,16 +13,21 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
+import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Sequence
 
-DEADLINE = "2026-08-14T23:59:59-04:00"
+HISTORICAL_DEADLINE = "2026-08-14T23:59:59-04:00"
 REQUIRED_BASE = "181298f69b42899db83040d2d5b6c3e67804e242"
 DEFAULT_BRANCH = "agent/r0-loop-recovery-2026-08-11"
+DEFAULT_COMMAND_TIMEOUT_SECONDS = 1800.0
+DEFAULT_CAPTURE_TIMEOUT_SECONDS = 120.0
+TERMINATION_GRACE_SECONDS = 10.0
 ALLOWED_CHANGES = {
     "Docs/Agents/LOOP_HEARTBEAT.json",
     "Docs/Agents/LOOP_STATUS_2026-08-11.md",
@@ -46,7 +51,10 @@ class CommandRecord:
     cwd: str
     started_at: str
     finished_at: str
-    exit_code: int
+    exit_code: int | None
+    timed_out: bool
+    interrupted: bool
+    timeout_seconds: float
     log: str
 
 
@@ -59,7 +67,23 @@ def iso_now() -> str:
 
 
 def windows_path(path: str | Path) -> Path:
-    return Path(path).expanduser().resolve()
+    return Path(path).expanduser().resolve(strict=False)
+
+
+def canonical_path(path: Path) -> str:
+    """Return a symlink/junction-resolved, platform-normalized absolute path."""
+    return os.path.normcase(str(path.resolve(strict=False)))
+
+
+def paths_overlap(first: Path, second: Path) -> bool:
+    """Return True when two paths are equal or one is an ancestor of the other."""
+    a = canonical_path(first)
+    b = canonical_path(second)
+    try:
+        common = os.path.commonpath((a, b))
+    except ValueError:  # different Windows drives
+        return False
+    return common == a or common == b
 
 
 def parse_args() -> argparse.Namespace:
@@ -90,6 +114,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--recovery-branch", default=DEFAULT_BRANCH)
     parser.add_argument("--base-ref", default="origin/main")
     parser.add_argument("--skip-fetch", action="store_true")
+    parser.add_argument(
+        "--command-timeout-seconds",
+        type=float,
+        default=DEFAULT_COMMAND_TIMEOUT_SECONDS,
+        help="Per long-running build/test/package command deadline.",
+    )
+    parser.add_argument(
+        "--capture-timeout-seconds",
+        type=float,
+        default=DEFAULT_CAPTURE_TIMEOUT_SECONDS,
+        help="Per short git/probe command deadline.",
+    )
     return parser.parse_args()
 
 
@@ -104,11 +140,76 @@ class R0Runner:
         self.branch = args.recovery_branch
         self.base_ref = args.base_ref
         self.skip_fetch = args.skip_fetch
+        self.command_timeout = float(
+            getattr(args, "command_timeout_seconds", DEFAULT_COMMAND_TIMEOUT_SECONDS)
+        )
+        self.capture_timeout = float(
+            getattr(args, "capture_timeout_seconds", DEFAULT_CAPTURE_TIMEOUT_SECONDS)
+        )
+        if self.command_timeout <= 0 or self.capture_timeout <= 0:
+            raise RecoveryFailure("Command deadlines must be positive numbers of seconds.")
         self.heartbeat: Path | None = None
         self.records: list[CommandRecord] = []
         self.last_command: list[str] | None = None
         self.last_log: Path | None = None
+        self.run_started_at = iso_now()
         self.run_stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.admitted_revision: str | None = None
+
+    def validate_path_layout(self) -> None:
+        named = {
+            "source repository": self.source,
+            "R0 worktree": self.worktree,
+            "build root": self.build_root,
+            "release root": self.release_root,
+            "evidence root": self.evidence_root,
+        }
+        items = list(named.items())
+        for index, (first_name, first_path) in enumerate(items):
+            for second_name, second_path in items[index + 1 :]:
+                if paths_overlap(first_path, second_path):
+                    raise RecoveryFailure(
+                        "Unsafe path layout: "
+                        f"{first_name} ({first_path}) overlaps {second_name} ({second_path}). "
+                        "Use disjoint roots before retrying."
+                    )
+
+    def _popen_isolation(self) -> dict[str, object]:
+        if os.name == "nt":
+            return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        return {"start_new_session": True}
+
+    def _terminate_process_tree(self, process: subprocess.Popen[str]) -> None:
+        if process.poll() is not None:
+            return
+        if os.name == "nt":
+            try:
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
+                    timeout=TERMINATION_GRACE_SECONDS,
+                )
+            except (OSError, subprocess.SubprocessError):
+                pass
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
+        if process.poll() is None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+        try:
+            process.wait(timeout=TERMINATION_GRACE_SECONDS)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+    def _wait_process(self, process: subprocess.Popen[str], timeout: float) -> int:
+        return process.wait(timeout=timeout)
 
     def capture(
         self,
@@ -116,17 +217,35 @@ class R0Runner:
         *,
         cwd: Path | None = None,
         check: bool = True,
+        timeout_seconds: float | None = None,
     ) -> subprocess.CompletedProcess[str]:
         normalized = [str(part) for part in command]
-        result = subprocess.run(
+        timeout = self.capture_timeout if timeout_seconds is None else float(timeout_seconds)
+        process = subprocess.Popen(
             normalized,
             cwd=str(cwd or self.source),
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             errors="replace",
-            check=False,
+            **self._popen_isolation(),
         )
+        try:
+            output, _ = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            self._terminate_process_tree(process)
+            output, _ = process.communicate()
+            raise RecoveryFailure(
+                f"Command timed out after {timeout:g}s: {' '.join(normalized)}\n{output or ''}"
+            ) from exc
+        except BaseException:
+            self._terminate_process_tree(process)
+            try:
+                process.communicate(timeout=TERMINATION_GRACE_SECONDS)
+            except (OSError, subprocess.SubprocessError):
+                pass
+            raise
+        result = subprocess.CompletedProcess(normalized, process.returncode, output, None)
         if check and result.returncode != 0:
             raise RecoveryFailure(
                 f"Command failed ({result.returncode}): {' '.join(normalized)}\n{result.stdout}"
@@ -160,12 +279,15 @@ class R0Runner:
         payload = {
             "loop": "game-dev",
             "task": "R0-loop-recovery-release-candidate",
-            "deadline": DEADLINE,
+            "deadline": HISTORICAL_DEADLINE,
+            "deadline_is_historical": True,
+            "run_started_at": self.run_started_at,
             "status": status,
             "updated_at": iso_now(),
             "worktree": str(self.worktree),
             "branch": self.branch,
             "head": self.current_head(),
+            "admitted_revision": self.admitted_revision,
             "pid": os.getpid(),
             "current_command": list(current_command) if current_command else None,
             "last_artifact": str(self.release_root) if self.release_root.exists() else None,
@@ -183,9 +305,13 @@ class R0Runner:
         command: Sequence[str | Path],
         *,
         cwd: Path | None = None,
+        timeout_seconds: float | None = None,
     ) -> None:
         normalized = [str(part) for part in command]
         working_directory = cwd or self.worktree
+        timeout = self.command_timeout if timeout_seconds is None else float(timeout_seconds)
+        if timeout <= 0:
+            raise RecoveryFailure(f"{label} has a non-positive timeout.")
         index = len(self.records) + 1
         log_path = self.evidence_root / f"{index:02d}-{label}.log"
         self.last_command = normalized
@@ -198,12 +324,18 @@ class R0Runner:
         )
 
         started = iso_now()
+        finished = started
+        exit_code: int | None = None
+        timed_out = False
+        interrupted = False
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("w", encoding="utf-8", newline="\n") as log:
             log.write(f"label: {label}\n")
             log.write(f"started_at: {started}\n")
+            log.write(f"timeout_seconds: {timeout:g}\n")
             log.write(f"working_directory: {working_directory}\n")
             log.write("command: " + subprocess.list2cmdline(normalized) + "\n\n")
+            log.flush()
             process = subprocess.Popen(
                 normalized,
                 cwd=str(working_directory),
@@ -211,48 +343,91 @@ class R0Runner:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 errors="replace",
+                bufsize=1,
+                **self._popen_isolation(),
             )
             assert process.stdout is not None
-            for line in process.stdout:
-                print(line, end="")
-                log.write(line)
-            exit_code = process.wait()
-            finished = iso_now()
-            log.write(f"\nfinished_at: {finished}\nexit_code: {exit_code}\n")
 
-        self.records.append(
-            CommandRecord(
-                index=index,
-                label=label,
-                command=normalized,
-                cwd=str(working_directory),
-                started_at=started,
-                finished_at=finished,
-                exit_code=exit_code,
-                log=str(log_path),
-            )
-        )
+            def copy_output() -> None:
+                try:
+                    for line in process.stdout:
+                        print(line, end="")
+                        log.write(line)
+                        log.flush()
+                except (OSError, ValueError):
+                    return
+
+            reader = threading.Thread(target=copy_output, name=f"r0-log-{label}", daemon=True)
+            reader.start()
+            try:
+                exit_code = self._wait_process(process, timeout)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                self._terminate_process_tree(process)
+                exit_code = process.returncode
+            except BaseException:
+                interrupted = True
+                self._terminate_process_tree(process)
+                exit_code = process.returncode
+                raise
+            finally:
+                reader.join(timeout=TERMINATION_GRACE_SECONDS)
+                try:
+                    process.stdout.close()
+                except OSError:
+                    pass
+                finished = iso_now()
+                log.write(f"\nfinished_at: {finished}\n")
+                log.write(f"exit_code: {exit_code}\n")
+                log.write(f"timed_out: {str(timed_out).lower()}\n")
+                log.write(f"interrupted: {str(interrupted).lower()}\n")
+                log.flush()
+                self.records.append(
+                    CommandRecord(
+                        index=index,
+                        label=label,
+                        command=normalized,
+                        cwd=str(working_directory),
+                        started_at=started,
+                        finished_at=finished,
+                        exit_code=exit_code,
+                        timed_out=timed_out,
+                        interrupted=interrupted,
+                        timeout_seconds=timeout,
+                        log=str(log_path),
+                    )
+                )
+        if timed_out:
+            raise RecoveryFailure(f"{label} timed out after {timeout:g}s. Inspect {log_path}.")
         if exit_code != 0:
-            raise RecoveryFailure(
-                f"{label} failed with exit code {exit_code}. Inspect {log_path}."
-            )
+            raise RecoveryFailure(f"{label} failed with exit code {exit_code}. Inspect {log_path}.")
 
     def require_tools(self, names: Iterable[str]) -> None:
         missing = [name for name in names if shutil.which(name) is None]
         if missing:
             raise RecoveryFailure("Missing required tools on PATH: " + ", ".join(missing))
 
-    def archive_directory(self, path: Path, label: str) -> None:
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
-            return
-        if not any(path.iterdir()):
-            return
+    def _archive_target(self, path: Path) -> Path:
         archive = Path(str(path) + f".previous-{self.run_stamp}")
         suffix = 1
         while archive.exists():
             archive = Path(str(path) + f".previous-{self.run_stamp}-{suffix}")
             suffix += 1
+        protected = [self.source, self.worktree, self.build_root, self.release_root, self.evidence_root]
+        for item in protected:
+            if item != path and paths_overlap(archive, item):
+                raise RecoveryFailure(f"Archive target {archive} would overlap protected path {item}.")
+        return archive
+
+    def archive_directory(self, path: Path, label: str) -> None:
+        if not path.exists():
+            path.mkdir(parents=True, exist_ok=True)
+            return
+        if not path.is_dir():
+            raise RecoveryFailure(f"{label} exists but is not a directory: {path}")
+        if not any(path.iterdir()):
+            return
+        archive = self._archive_target(path)
         print(f"Preserving existing {label} at {archive}")
         path.rename(archive)
         path.mkdir(parents=True, exist_ok=True)
@@ -263,7 +438,11 @@ class R0Runner:
             cwd=repository,
         )
         if result.stdout.strip():
-            raise RecoveryFailure(f"{label} has unexplained changes:\n{result.stdout}")
+            raise RecoveryFailure(
+                f"{label} has unexplained changes:\n{result.stdout}\n"
+                "R0 is one-shot. Preserve and review the existing checkpoint, then use a new clean "
+                "worktree/output set for a new admitted revision. Do not discard or overwrite evidence."
+            )
 
     def establish_worktree(self) -> None:
         self.assert_clean(self.source, "Source repository")
@@ -274,76 +453,73 @@ class R0Runner:
             ["git", "-C", self.source, "rev-parse", self.base_ref]
         ).stdout.strip()
         ancestor = self.capture(
-            [
-                "git",
-                "-C",
-                self.source,
-                "merge-base",
-                "--is-ancestor",
-                REQUIRED_BASE,
-                base_head,
-            ],
+            ["git", "-C", self.source, "merge-base", "--is-ancestor", REQUIRED_BASE, base_head],
             check=False,
         )
         if ancestor.returncode != 0:
             raise RecoveryFailure(
                 f"{self.base_ref} does not contain required M10 baseline {REQUIRED_BASE}."
             )
+        self.admitted_revision = base_head
+
+        branch_ref = f"refs/heads/{self.branch}"
+        branch_exists = self.capture(
+            ["git", "-C", self.source, "show-ref", "--verify", "--quiet", branch_ref],
+            check=False,
+        ).returncode == 0
+        if branch_exists:
+            branch_head = self.capture(
+                ["git", "-C", self.source, "rev-parse", branch_ref]
+            ).stdout.strip()
+            if branch_head != base_head:
+                raise RecoveryFailure(
+                    f"Recovery branch {self.branch} is stale at {branch_head}; admitted revision is "
+                    f"{base_head}. Preserve the old checkpoint and use a new branch/worktree."
+                )
 
         if not self.worktree.exists():
             self.worktree.parent.mkdir(parents=True, exist_ok=True)
-            branch_exists = self.capture(
-                [
-                    "git",
-                    "-C",
-                    self.source,
-                    "show-ref",
-                    "--verify",
-                    "--quiet",
-                    f"refs/heads/{self.branch}",
-                ],
-                check=False,
-            ).returncode == 0
             if branch_exists:
                 command = ["git", "-C", self.source, "worktree", "add", self.worktree, self.branch]
             else:
                 command = [
-                    "git",
-                    "-C",
-                    self.source,
-                    "worktree",
-                    "add",
-                    "-b",
-                    self.branch,
-                    self.worktree,
-                    self.base_ref,
+                    "git", "-C", self.source, "worktree", "add", "-b", self.branch,
+                    self.worktree, base_head,
                 ]
             self.capture(command)
+        elif not self.worktree.is_dir():
+            raise RecoveryFailure(f"R0 worktree path exists but is not a directory: {self.worktree}")
 
+        top = windows_path(
+            self.capture(
+                ["git", "-C", self.worktree, "rev-parse", "--show-toplevel"], cwd=self.worktree
+            ).stdout.strip()
+        )
+        if canonical_path(top) != canonical_path(self.worktree):
+            raise RecoveryFailure(f"Configured R0 worktree is not its Git top level: {self.worktree}")
         branch = self.capture(
             ["git", "-C", self.worktree, "branch", "--show-current"], cwd=self.worktree
         ).stdout.strip()
         if branch != self.branch:
-            raise RecoveryFailure(
-                f"R0 worktree is on {branch!r}, expected {self.branch!r}."
-            )
+            raise RecoveryFailure(f"R0 worktree is on {branch!r}, expected {self.branch!r}.")
         self.assert_clean(self.worktree, "R0 worktree")
+        actual_head = self.current_head()
+        if actual_head != base_head:
+            raise RecoveryFailure(
+                f"R0 worktree HEAD {actual_head} does not match admitted revision {base_head}. "
+                "Preserve the old checkpoint and use a new clean branch/worktree."
+            )
         self.heartbeat = self.worktree / "Docs" / "Agents" / "LOOP_HEARTBEAT.json"
 
     def write_milestone_report(
-        self,
-        number: int,
-        capability: str,
-        domain_test: str,
-        smoke_test: str,
-        head: str,
+        self, number: int, capability: str, domain_test: str, smoke_test: str, head: str
     ) -> Path:
         path = self.worktree / "Docs" / "QA" / f"MILESTONE-{number}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            f"""# Implementation M{number} QA - {capability}
+        content = f"""# Implementation M{number} QA - {capability}
 
-Recovery date: August 11, 2026  
+Recovery run started: {self.run_started_at}  
+Historical filename/date lineage: August 11, 2026  
 Verified commit: {head}
 
 ## Scope
@@ -359,14 +535,13 @@ This report covers the later implementation task labeled M{number}: **{capabilit
 
 ## Not claimed
 
-This recovery does not claim that the full RPG, final art, complete National Mall, Shadow Summon, Enemy Set, or dungeon backlog is complete.
+This recovery does not claim clean-machine dependency acceptance, the full RPG, final art, complete National Mall, Shadow Summon, Enemy Set, dungeon backlog, or engine parity.
 
 ## Result
 
 **PASS for the bounded implementation M{number} contract, pending independent R0 package review.**
-""",
-            encoding="utf-8",
-        )
+"""
+        path.write_text(content, encoding="utf-8")
         return path
 
     def append_once(self, path: Path, marker: str, text: str) -> None:
@@ -381,9 +556,10 @@ This recovery does not claim that the full RPG, final art, complete National Mal
         self.write_milestone_report(10, "Landmark Encounter Loop", "LandmarkEncounterTests", "M10RuntimeSmoke", head)
 
         recovery = self.worktree / "Docs" / "QA" / "RECOVERY-2026-08-11.md"
-        recovery.write_text(
-            f"""# R0 Recovery Evidence - August 11, 2026
+        recovery_content = f"""# R0 Recovery Evidence
 
+Historical filename retained from August 11, 2026.  
+Recovery run started: {self.run_started_at}  
 Verified commit: {head}  
 Worktree: {self.worktree}  
 External build tree: {self.build_root}  
@@ -391,77 +567,62 @@ Release package: {self.release_root}
 
 ## Automated gates completed
 
-1. Clean-source and dedicated-worktree checks.
+1. Clean-source, exact-revision, path-layout, and dedicated-worktree checks.
 2. Visual Studio 2022 x64 configure.
 3. Debug and Release builds with complete local CTest runs.
 4. Static milestone verifiers and git diff checks.
 5. Package construction, SHA-256 manifest, and native M10 package smoke.
 
-All command logs, timestamps, and exit codes are stored under {self.evidence_root}.
+All command logs, timestamps, deadlines, and exit codes are stored under {self.evidence_root}.
 
-## Milestone-label reconciliation
+## Remaining gates
 
-- implementation M8: Thought Commands;
-- implementation M9: Landmark Interaction;
-- implementation M10: Landmark Encounter Loop.
-
-These implementation labels do not replace product-backlog M9 Shadow Summon, product-backlog M10 Enemy Set, or later dungeon work.
-
-## Remaining gate
-
-A separate reviewer must verify provenance, logs, manifest accuracy, allowed-file compliance, package launch evidence, and unsupported-claim absence before the heartbeat can become complete.
-""",
-            encoding="utf-8",
-        )
+A separate reviewer must verify provenance, logs, manifest accuracy, allowed-file compliance, package launch evidence, unsupported-claim absence, and clean-machine runtime dependency requirements. This run does not establish UE5/Unity parity.
+"""
+        recovery.write_text(recovery_content, encoding="utf-8")
 
         review = self.worktree / "Docs" / "Reviews" / "R0-independent-review.md"
         review.parent.mkdir(parents=True, exist_ok=True)
-        review.write_text(
-            f"""# R0 Independent Review
+        review_content = f"""# R0 Independent Review
 
 Status: **PENDING INDEPENDENT REVIEW**  
+Run started: {self.run_started_at}  
 Candidate commit: {head}  
 Candidate package: {self.release_root}
 
 - [ ] allowed-file compliance
-- [ ] exact commit and package provenance
+- [ ] exact admitted revision and package provenance
 - [ ] Debug and Release evidence
 - [ ] complete native RuntimeSmoke evidence
 - [ ] package-specific M10 smoke evidence
 - [ ] SHA-256 manifest accuracy
 - [ ] launch instructions, controls, and limitations
+- [ ] clean-machine runtime dependency verification
 - [ ] no hidden source or dependency change
 - [ ] milestone-number reconciliation
-- [ ] no unsupported product claim
+- [ ] no unsupported product or engine-parity claim
 
 Recommendation: **PENDING**
 
 The coordinator must not change the loop from review to complete until a separate reviewer records an evidence-backed recommendation here.
-""",
-            encoding="utf-8",
-        )
+"""
+        review.write_text(review_content, encoding="utf-8")
 
-        decision_marker = "## 2026-08-11 - R0 M10 release-candidate recovery"
-        self.append_once(
-            self.worktree / "Docs" / "Decision-Log.md",
-            decision_marker,
-            f"""{decision_marker}
+        decision_marker = f"## R0 M10 release-candidate recovery: {head}"
+        decision_text = f"""{decision_marker}
 
-Decision: Verify and package the accepted custom C++17 M10 baseline before starting another feature. The recovery uses a dedicated worktree and external build tree and does not modify Engine, Game, Tests, or CMakeLists.txt.
+Run started: {self.run_started_at}.
 
-Evidence: Fresh Debug and Release builds, complete local CTest runs including native RuntimeSmoke tests, static verifiers, package-specific M10 smoke, and a SHA-256 manifest passed for commit {head}.
+Decision: verify and package the accepted custom C++17 M10 baseline before starting another feature. The recovery uses an exact admitted revision, dedicated worktree, disjoint external outputs, and bounded child commands.
 
-Milestone reconciliation: implementation M8 is Thought Commands, implementation M9 is Landmark Interaction, and implementation M10 is Landmark Encounter Loop. These labels do not replace product-backlog M9 Shadow Summon or product-backlog M10 Enemy Set.
+Evidence: Debug and Release builds, complete local CTest runs including native RuntimeSmoke tests, static verifiers, package-specific M10 smoke, and a SHA-256 manifest passed for commit {head}.
 
-Consequence: the loop moves to review. No new feature begins before independent acceptance.
-""",
-        )
+Consequence: the loop moves to review. No new feature begins before independent acceptance; clean-machine dependency verification remains separate.
+"""
+        self.append_once(self.worktree / "Docs" / "Decision-Log.md", decision_marker, decision_text)
 
         milestone_marker = "## Later implementation-label reconciliation"
-        self.append_once(
-            self.worktree / "Docs" / "Planning" / "MILESTONES.md",
-            milestone_marker,
-            f"""{milestone_marker}
+        milestone_text = f"""{milestone_marker}
 
 The staged backlog remains the product roadmap. Later implementation-task numbering does not rewrite it.
 
@@ -472,21 +633,20 @@ The staged backlog remains the product roadmap. Later implementation-task number
 | implementation M10 | Landmark Encounter Loop | Additional vertical-slice capability, not backlog M10 Enemy Set |
 
 The R0 package represents the current implementation M10 baseline. Shadow Summon, Enemy Set, dungeon work, final art, and full National Mall completion remain future work unless separately verified.
-""",
-        )
+"""
+        self.append_once(self.worktree / "Docs" / "Planning" / "MILESTONES.md", milestone_marker, milestone_text)
         return recovery
 
     def write_package_readme(self, head: str) -> Path:
         path = self.release_root / "README-M10-RC.md"
-        path.write_text(
-            f"""# AstralGame M10 Release Candidate
+        content = f"""# AstralGame M10 Release Candidate
 
-Build date: August 11, 2026  
+Build run started: {self.run_started_at}  
 Verified commit: {head}
 
 ## Launch
 
-Run AstralGame.exe from this directory on Windows 10 or Windows 11.
+Run AstralGame.exe from this directory on the tested Windows host. Clean-machine MSVC runtime/dependency acceptance remains pending independent packaging verification.
 
 ## Controls
 
@@ -501,40 +661,39 @@ Run AstralGame.exe from this directory on Windows 10 or Windows 11.
 
 ## Verified scope
 
-This is the bounded custom C++17 Win32/GDI prototype through implementation M10. It is not a claim that the full RPG, final art, complete National Mall, dungeon set, or production engine is finished.
+This is the bounded custom C++17 Win32/GDI prototype through implementation M10. It is not a claim that the full RPG, production engine, clean-machine package, or UE5/Unity parity is finished.
 
 ## Evidence
 
 See RECOVERY-2026-08-11.md, R0-COMMAND-EVIDENCE.json, the evidence directory, and MANIFEST-M10-RC.json.
-""",
-            encoding="utf-8",
-        )
+"""
+        path.write_text(content, encoding="utf-8")
         return path
 
-    def write_manifest(self) -> Path:
+    def write_manifest(self, head: str) -> Path:
         manifest_path = self.release_root / "MANIFEST-M10-RC.json"
         entries = []
         for file in sorted(path for path in self.release_root.rglob("*") if path.is_file()):
             if file == manifest_path:
                 continue
-            digest = hashlib.sha256(file.read_bytes()).hexdigest()
             entries.append(
                 {
                     "path": file.relative_to(self.release_root).as_posix(),
                     "bytes": file.stat().st_size,
-                    "sha256": digest,
+                    "sha256": hashlib.sha256(file.read_bytes()).hexdigest(),
                 }
             )
         manifest_path.write_text(
             json.dumps(
                 {
                     "generated_at": iso_now(),
+                    "run_started_at": self.run_started_at,
+                    "commit": head,
                     "package_root": str(self.release_root),
                     "files": entries,
                 },
                 indent=2,
-            )
-            + "\n",
+            ) + "\n",
             encoding="utf-8",
         )
         return manifest_path
@@ -554,74 +713,60 @@ See RECOVERY-2026-08-11.md, R0-COMMAND-EVIDENCE.json, the evidence directory, an
             if path not in ALLOWED_CHANGES:
                 unexpected.append(line)
         if unexpected:
-            raise RecoveryFailure(
-                "Unexpected repository changes were detected:\n" + "\n".join(unexpected)
-            )
+            raise RecoveryFailure("Unexpected repository changes were detected:\n" + "\n".join(unexpected))
 
     def execute(self) -> None:
+        self.validate_path_layout()
         if os.name != "nt":
-            raise RecoveryFailure("R0 must run on the Windows Agent Studio host.")
+            raise RecoveryFailure("R0 must run on the registered Windows Agent Studio host.")
         self.require_tools(("git", "cmake", "ctest", "python"))
         if not self.source.is_dir():
             raise RecoveryFailure(f"Source repository does not exist: {self.source}")
 
         self.establish_worktree()
         head = self.current_head()
-        if head is None:
-            raise RecoveryFailure("Unable to resolve the R0 worktree commit.")
+        if head is None or head != self.admitted_revision:
+            raise RecoveryFailure("Unable to establish the exact admitted R0 worktree revision.")
         self.set_heartbeat(
             "running",
-            last_result=f"Dedicated clean worktree established at {head}",
-            next_action="Run the fresh Debug and Release gates, then package the candidate.",
+            last_result=f"Dedicated clean worktree established at admitted revision {head}",
+            next_action="Run the bounded Debug and Release gates, then package the candidate.",
         )
 
         self.archive_directory(self.build_root, "build tree")
         self.archive_directory(self.release_root, "release tree")
         self.archive_directory(self.evidence_root, "evidence tree")
 
+        for label, command in (
+            ("git-version", ["git", "--version"]),
+            ("cmake-version", ["cmake", "--version"]),
+            ("ctest-version", ["ctest", "--version"]),
+            ("python-version", ["python", "--version"]),
+        ):
+            self.run_command(label, command, cwd=self.worktree, timeout_seconds=self.capture_timeout)
+
         self.run_command(
             "configure-vs2022-x64",
-            [
-                "cmake",
-                "-S",
-                self.worktree,
-                "-B",
-                self.build_root,
-                "-G",
-                "Visual Studio 17 2022",
-                "-A",
-                "x64",
-            ],
+            ["cmake", "-S", self.worktree, "-B", self.build_root, "-G", "Visual Studio 17 2022", "-A", "x64"],
         )
-        self.run_command(
-            "build-debug",
-            ["cmake", "--build", self.build_root, "--config", "Debug", "--parallel"],
-        )
+        self.run_command("build-debug", ["cmake", "--build", self.build_root, "--config", "Debug", "--parallel"])
         self.run_command(
             "ctest-debug-full",
-            ["ctest", "--test-dir", self.build_root, "-C", "Debug", "--output-on-failure"],
+            ["ctest", "--test-dir", self.build_root, "-C", "Debug", "--output-on-failure", "--no-tests=error"],
         )
-        self.run_command(
-            "build-release",
-            ["cmake", "--build", self.build_root, "--config", "Release", "--parallel"],
-        )
+        self.run_command("build-release", ["cmake", "--build", self.build_root, "--config", "Release", "--parallel"])
         self.run_command(
             "ctest-release-full",
-            ["ctest", "--test-dir", self.build_root, "-C", "Release", "--output-on-failure"],
+            ["ctest", "--test-dir", self.build_root, "-C", "Release", "--output-on-failure", "--no-tests=error"],
         )
         for number in (1, 2, 3):
-            self.run_command(
-                f"verify-milestone-{number}",
-                ["python", f"Scripts/verify_milestone{number}.py"],
-            )
+            self.run_command(f"verify-milestone-{number}", ["python", f"Scripts/verify_milestone{number}.py"])
         self.run_command("git-diff-check-prepackage", ["git", "diff", "--check"])
 
         release_exe = self.build_root / "Release" / "AstralGame.exe"
         package_smoke = self.build_root / "Release" / "M10RuntimeSmoke.exe"
         if not release_exe.is_file() or not package_smoke.is_file():
-            raise RecoveryFailure(
-                f"Release output is incomplete: {release_exe} or {package_smoke} is missing."
-            )
+            raise RecoveryFailure(f"Release output is incomplete: {release_exe} or {package_smoke} is missing.")
         shutil.copy2(release_exe, self.release_root / "AstralGame.exe")
         self.write_package_readme(head)
         self.run_command(
@@ -640,15 +785,21 @@ See RECOVERY-2026-08-11.md, R0-COMMAND-EVIDENCE.json, the evidence directory, an
             json.dumps(
                 {
                     "generated_at": iso_now(),
+                    "run_started_at": self.run_started_at,
+                    "historical_deadline": HISTORICAL_DEADLINE,
                     "commit": head,
+                    "admitted_revision": self.admitted_revision,
+                    "base_ref": self.base_ref,
                     "worktree": str(self.worktree),
                     "build_root": str(self.build_root),
                     "release_root": str(self.release_root),
+                    "evidence_root": str(self.evidence_root),
+                    "command_timeout_seconds": self.command_timeout,
+                    "capture_timeout_seconds": self.capture_timeout,
                     "commands": [asdict(record) for record in self.records],
                 },
                 indent=2,
-            )
-            + "\n",
+            ) + "\n",
             encoding="utf-8",
         )
         package_evidence = self.release_root / "evidence"
@@ -656,7 +807,7 @@ See RECOVERY-2026-08-11.md, R0-COMMAND-EVIDENCE.json, the evidence directory, an
         for log in self.evidence_root.glob("*.log"):
             shutil.copy2(log, package_evidence / log.name)
 
-        manifest = self.write_manifest()
+        manifest = self.write_manifest(head)
         repo_release = self.worktree / "Release"
         repo_release.mkdir(parents=True, exist_ok=True)
         shutil.copy2(self.release_root / "README-M10-RC.md", repo_release / "README-M10-RC.md")
@@ -666,13 +817,13 @@ See RECOVERY-2026-08-11.md, R0-COMMAND-EVIDENCE.json, the evidence directory, an
         self.set_heartbeat(
             "review",
             last_result=(
-                "R0 automated build, complete native tests, evidence reconciliation, "
-                f"packaging, manifest, and package smoke passed. Candidate: {self.release_root}"
+                "R0 automated build, complete native tests, evidence reconciliation, packaging, "
+                f"manifest, and package smoke passed for admitted revision {head}. Candidate: {self.release_root}"
             ),
-            blocker="Independent review is still required before completion.",
+            blocker="Independent review and clean-machine runtime dependency verification are still required.",
             next_action=(
-                "Assign one independent reviewer to inspect Docs/Reviews/R0-independent-review.md, "
-                "the command logs, and the package manifest, then commit accepted evidence."
+                "Assign one independent reviewer to inspect Docs/Reviews/R0-independent-review.md, the command logs, "
+                "package manifest, and runtime dependencies. Commit accepted evidence; do not rerun this dirty worktree in place."
             ),
         )
         print("\nR0 AUTOMATED GATE: PASS")
@@ -687,7 +838,7 @@ def main() -> int:
     try:
         runner.execute()
         return 0
-    except Exception as exc:  # exact blocker is persisted before exit
+    except Exception as exc:
         try:
             runner.set_heartbeat(
                 "blocked",
@@ -698,8 +849,8 @@ def main() -> int:
                 ),
                 blocker=str(exc),
                 next_action=(
-                    "Inspect the named log, change one material condition, and resume from the "
-                    "preserved checkpoint. Do not repeat the identical failed command."
+                    "Inspect the named log and preserve the current checkpoint. Change one material condition before retrying. "
+                    "If tracked evidence exists, use a new clean worktree/output set rather than overwriting or discarding it."
                 ),
             )
         except Exception as heartbeat_error:

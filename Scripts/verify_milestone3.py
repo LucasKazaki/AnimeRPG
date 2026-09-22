@@ -15,7 +15,10 @@ CHECKS = {
     "Engine/Platform/Win32Application.cpp": [
         "Clock clock",
         "clock.Tick",
-        "GetAsyncKeyState('W')",
+        "const auto keyDown =",
+        "benchmarkRunControl.SuppressLiveInput()",
+        "GetAsyncKeyState(virtualKey)",
+        "keyDown('W')",
         "camera_.Follow",
         "WM_CLOSE",
     ],

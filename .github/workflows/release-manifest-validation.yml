@@ -1,0 +1,288 @@
+name: Release manifest integrity
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "Engine/**"
+      - "Game/**"
+      - "Scripts/release_manifest.py"
+      - "Scripts/test_release_manifest.py"
+      - "Scripts/run_package_runtime_smoke.py"
+      - "Scripts/test_package_runtime_smoke.py"
+      - "Scripts/run_package_restart_stress.py"
+      - "Scripts/test_package_restart_stress.py"
+      - "Scripts/run_package_continuous_soak.py"
+      - "Scripts/test_package_continuous_soak.py"
+      - "Scripts/analyze_package_soak_telemetry.py"
+      - "Scripts/test_package_soak_telemetry_analysis.py"
+      - "Scripts/benchmark_manifest.py"
+      - "Scripts/test_benchmark_manifest.py"
+      - "Scripts/diagnose_pe_reproducibility.py"
+      - "Scripts/test_pe_reproducibility_diagnostic.py"
+      - ".github/workflows/release-manifest-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-manifest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-package-manifest:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify manifest contracts
+        run: python Scripts/test_release_manifest.py
+
+      - name: Verify package runtime receipt contracts
+        run: python Scripts/test_package_runtime_smoke.py
+
+      - name: Verify package restart-stress receipt contracts
+        run: python Scripts/test_package_restart_stress.py
+
+      - name: Verify package continuous-soak receipt contracts
+        run: python Scripts/test_package_continuous_soak.py
+
+      - name: Verify package soak-analysis contracts
+        run: python Scripts/test_package_soak_telemetry_analysis.py
+
+      - name: Verify benchmark-manifest contracts
+        run: python Scripts/test_benchmark_manifest.py
+
+      - name: Verify PE reproducibility diagnostic contracts
+        run: python Scripts/test_pe_reproducibility_diagnostic.py
+
+      - name: Build same Release candidate twice and diagnose PE differences
+        id: release_repro
+        shell: pwsh
+        run: |
+          $build = Join-Path $env:RUNNER_TEMP "Astral-repro-build"
+          $evidence = Join-Path $env:RUNNER_TEMP "Astral-repro-evidence"
+          if (Test-Path $evidence) { Remove-Item $evidence -Recurse -Force }
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          $commit = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { Write-Error "Cannot resolve exact build commit"; exit 1 }
+          Write-Host "Repro diagnostic checkout: $commit"
+
+          for ($i = 1; $i -le 2; $i++) {
+            if (Test-Path $build) { Remove-Item $build -Recurse -Force }
+            cmake -S . -B $build -G "Visual Studio 17 2022" -A x64
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            cmake --build $build --config Release --target AstralGame --parallel
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+            $exe = Join-Path $build "Release/AstralGame.exe"
+            if (-not (Test-Path $exe -PathType Leaf)) { Write-Error "Missing Release AstralGame.exe"; exit 1 }
+            $exeOut = Join-Path $evidence "AstralGame-$i.exe"
+            Copy-Item $exe $exeOut
+
+            $project = Join-Path $build "AstralGame.vcxproj"
+            if (-not (Test-Path $project -PathType Leaf)) { Write-Error "Missing generated AstralGame.vcxproj"; exit 1 }
+            $projectOut = Join-Path $evidence "AstralGame-$i.vcxproj"
+            Copy-Item $project $projectOut
+
+            $exeHash = (Get-FileHash $exeOut -Algorithm SHA256).Hash.ToLowerInvariant()
+            $projectHash = (Get-FileHash $projectOut -Algorithm SHA256).Hash.ToLowerInvariant()
+            Write-Host "Build $i AstralGame.exe SHA-256: $exeHash"
+            Write-Host "Build $i AstralGame.vcxproj SHA-256: $projectHash"
+
+            $pdb = Join-Path $build "Release/AstralGame.pdb"
+            if (Test-Path $pdb -PathType Leaf) {
+              $pdbOut = Join-Path $evidence "AstralGame-$i.pdb"
+              Copy-Item $pdb $pdbOut
+              $pdbHash = (Get-FileHash $pdbOut -Algorithm SHA256).Hash.ToLowerInvariant()
+              Write-Host "Build $i AstralGame.pdb SHA-256: $pdbHash"
+            } else {
+              Write-Host "Build $i did not emit AstralGame.pdb; no PDB hash claimed."
+            }
+
+            if ($i -eq 1) { Start-Sleep -Seconds 2 }
+          }
+
+          $exeA = Join-Path $evidence "AstralGame-1.exe"
+          $exeB = Join-Path $evidence "AstralGame-2.exe"
+          $report = Join-Path $evidence "pe-reproducibility.json"
+          python Scripts/diagnose_pe_reproducibility.py $exeA $exeB --json $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $result = Get-Content $report -Raw | ConvertFrom-Json
+          $classification = [string]$result.comparison.classification
+          $fields = [string]::Join(",", @($result.comparison.changing_field_classes))
+          $marker = [bool]$result.image_a.reproducible_debug_entry_present -and [bool]$result.image_b.reproducible_debug_entry_present
+          $hashA = [string]$result.image_a.sha256
+          $hashB = [string]$result.image_b.sha256
+          Write-Host "PE reproducibility classification: $classification"
+          Write-Host "Changing recognized fields: $fields"
+          Write-Host "Both images contain IMAGE_DEBUG_TYPE_REPRO: $marker"
+          "classification=$classification" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "fields=$fields" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "repro_marker=$($marker.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "exe_a_sha256=$hashA" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "exe_b_sha256=$hashB" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: "Repro classification: byte-identical pair"
+        if: steps.release_repro.outputs.classification == 'identical'
+        shell: pwsh
+        run: Write-Host "The two fresh same-runner Release executables are byte-identical. This is pairwise evidence only."
+
+      - name: "Repro classification: recognized PE metadata only"
+        if: steps.release_repro.outputs.classification == 'recognized_pe_metadata_only'
+        shell: pwsh
+        run: Write-Host "The two fresh Release executables differ only within recognized PE metadata ranges. Root cause is not inferred."
+
+      - name: "Observed changing field: COFF timestamp"
+        if: contains(steps.release_repro.outputs.fields, 'coff_timestamp')
+        shell: pwsh
+        run: Write-Host "COFF timestamp bytes differ."
+
+      - name: "Observed changing field: optional-header checksum"
+        if: contains(steps.release_repro.outputs.fields, 'optional_header_checksum')
+        shell: pwsh
+        run: Write-Host "Optional-header checksum bytes differ."
+
+      - name: "Observed changing field: debug-directory timestamp"
+        if: contains(steps.release_repro.outputs.fields, 'debug_directory_timestamp')
+        shell: pwsh
+        run: Write-Host "Debug-directory timestamp bytes differ."
+
+      - name: "Observed changing field: CodeView data"
+        if: contains(steps.release_repro.outputs.fields, 'codeview_data')
+        shell: pwsh
+        run: Write-Host "CodeView debug-record bytes differ."
+
+      - name: Reject unclassified or layout-changing Release differences
+        if: steps.release_repro.outputs.classification != 'identical' && steps.release_repro.outputs.classification != 'recognized_pe_metadata_only'
+        shell: pwsh
+        run: |
+          Write-Error "Release reproducibility diagnostic found payload/unclassified or layout/size changes. Preserve the diagnostic log and stop before build-setting changes."
+          exit 1
+
+      - name: Configure and build Release executable
+        shell: pwsh
+        run: |
+          $build = Join-Path $env:RUNNER_TEMP "Astral-manifest-build"
+          "ASTRAL_MANIFEST_BUILD=$build" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          cmake -S . -B $build -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build $build --config Release --target AstralGame --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Stage, manifest, and verify exact hosted package bytes
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:RUNNER_TEMP "Astral-manifest-package"
+          New-Item -ItemType Directory -Path $package -Force | Out-Null
+          Copy-Item (Join-Path $env:ASTRAL_MANIFEST_BUILD "Release/AstralGame.exe") (Join-Path $package "AstralGame.exe")
+          "Hosted manifest fixture only. Not a clean-machine package acceptance result." | Set-Content (Join-Path $package "README.txt") -Encoding utf8
+          $commit = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $commit -notmatch '^[0-9a-f]{40}$') { Write-Error "Cannot resolve exact build commit"; exit 1 }
+          $manifest = Join-Path $package "MANIFEST.json"
+          python Scripts/release_manifest.py create $package $manifest --commit $commit
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exeHash = (Get-FileHash (Join-Path $package "AstralGame.exe") -Algorithm SHA256).Hash.ToLowerInvariant()
+          $report = Join-Path $env:RUNNER_TEMP "Astral-manifest-verification.json"
+          python Scripts/release_manifest.py verify $manifest $package --expected-commit $commit --expected-executable-sha256 $exeHash --json $report
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $verified = Get-Content $report -Raw | ConvertFrom-Json
+          if ($verified.manifest_integrity_verified -ne $true -or $verified.acceptance.package_manifest_verified -ne $true) {
+            Write-Error "Hosted package manifest verification did not pass"
+            exit 1
+          }
+          if ($verified.acceptance.package_launch_verified -ne $false -or $verified.acceptance.clean_machine_compatibility_verified -ne $false -or $verified.acceptance.independent_acceptance -ne $false) {
+            Write-Error "Manifest verification must not claim launch, clean-machine, or independent acceptance"
+            exit 1
+          }
+          "ASTRAL_MANIFEST_PACKAGE=$package" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ASTRAL_MANIFEST_PATH=$manifest" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ASTRAL_MANIFEST_COMMIT=$commit" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "ASTRAL_MANIFEST_EXE_SHA256=$exeHash" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Hosted manifest commit: $commit"
+          Write-Host "Hosted AstralGame.exe SHA-256: $exeHash"
+
+      - name: Bind hosted benchmark-manifest contract fixture
+        shell: pwsh
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP "Astral-benchmark-evidence"
+          New-Item -ItemType Directory -Path $evidence -Force | Out-Null
+          $timing = Join-Path $evidence "contract-frame-timings.json"
+          $machine = Join-Path $evidence "contract-machine.txt"
+          '{"fixture":true,"performance_measurement":false}' | Set-Content $timing -Encoding utf8
+          $os = Get-CimInstance Win32_OperatingSystem
+          $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+          $system = Get-CimInstance Win32_ComputerSystem
+          $video = Get-CimInstance Win32_VideoController | Select-Object -First 1
+          @(
+            "Hosted contract fixture only; not native performance evidence."
+            "OS=$($os.Caption) $($os.Version)"
+            "CPU=$($cpu.Name)"
+            "LogicalProcessors=$($cpu.NumberOfLogicalProcessors)"
+            "RAM=$($system.TotalPhysicalMemory)"
+            "Video=$($video.Name)"
+            "VideoDriver=$($video.DriverVersion)"
+          ) | Set-Content $machine -Encoding utf8
+          $cpuName = if ($cpu.Name) { $cpu.Name.Trim() } else { "GitHub-hosted Windows CPU" }
+          $logical = [int]$cpu.NumberOfLogicalProcessors
+          if ($logical -lt 1) { $logical = 1 }
+          $ram = [int64]$system.TotalPhysicalMemory
+          if ($ram -lt 1) { $ram = 1 }
+          $gpuName = if ($video.Name) { $video.Name.Trim() } else { "No benchmark GPU claimed" }
+          $driver = if ($video.DriverVersion) { $video.DriverVersion.Trim() } else { "not-claimed" }
+          $spec = [ordered]@{
+            candidate = [ordered]@{ commit = $env:ASTRAL_MANIFEST_COMMIT; build_config = "Release" }
+            workload = [ordered]@{
+              id = "hosted-contract-3d-v1"
+              dimension = "3d"
+              fixture_description = "Hosted package-bound schema fixture only; no rendered performance workload executed"
+            }
+            run_protocol = [ordered]@{
+              width = 1920; height = 1080; window_mode = "windowed"; vsync = $false
+              warmup_seconds = 0; sample_seconds = 1
+            }
+            environment = [ordered]@{
+              os = "$($os.Caption) $($os.Version)"
+              cpu = $cpuName
+              logical_cpus = $logical
+              ram_bytes = $ram
+              gpu = $gpuName
+              gpu_driver = $driver
+            }
+            reference_versions = [ordered]@{ unreal = "5.8"; unity = "6000.0" }
+            provenance = [ordered]@{ evidence_class = "hosted_contract_fixture"; machine_label = "github-windows-2022" }
+            evidence = @(
+              [ordered]@{ path = "contract-frame-timings.json"; role = "contract_timing_fixture" },
+              [ordered]@{ path = "contract-machine.txt"; role = "machine_receipt" }
+            )
+          }
+          $specPath = Join-Path $env:RUNNER_TEMP "Astral-benchmark-spec.json"
+          $benchmark = Join-Path $env:RUNNER_TEMP "Astral-benchmark-manifest.json"
+          $verify = Join-Path $env:RUNNER_TEMP "Astral-benchmark-verification.json"
+          $spec | ConvertTo-Json -Depth 8 | Set-Content $specPath -Encoding utf8
+          python Scripts/benchmark_manifest.py create $specPath $env:ASTRAL_MANIFEST_PACKAGE $env:ASTRAL_MANIFEST_PATH $evidence $benchmark
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python Scripts/benchmark_manifest.py verify $benchmark $env:ASTRAL_MANIFEST_PACKAGE $env:ASTRAL_MANIFEST_PATH $evidence --json $verify
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $result = Get-Content $verify -Raw | ConvertFrom-Json
+          if ($result.benchmark_manifest_verified -ne $true -or $result.candidate_commit -ne $env:ASTRAL_MANIFEST_COMMIT -or $result.executable_sha256 -ne $env:ASTRAL_MANIFEST_EXE_SHA256) {
+            Write-Error "Hosted benchmark manifest did not remain bound to the exact staged package"
+            exit 1
+          }
+          if ($result.acceptance.performance_budget_verified -ne $false -or $result.acceptance.comparative_parity_verified -ne $false -or $result.acceptance.clean_machine_compatibility_verified -ne $false -or $result.acceptance.independent_acceptance -ne $false) {
+            Write-Error "Hosted benchmark contract fixture must not claim native performance or acceptance"
+            exit 1
+          }
+          Write-Host "Hosted benchmark descriptor SHA-256: $($result.benchmark_descriptor_sha256)"
+
+      - name: Confirm clean tracked tree
+        shell: pwsh
+        run: |
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $changes = git status --porcelain --untracked-files=no
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($changes) { Write-Error "Tracked files changed during manifest verification"; exit 1 }

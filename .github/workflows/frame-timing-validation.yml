@@ -1,0 +1,144 @@
+name: Profiling capture portability
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "CMakeLists.txt"
+      - "Engine/Core/BenchmarkRunControl.cpp"
+      - "Engine/Core/BenchmarkRunControl.h"
+      - "Engine/Core/Clock.cpp"
+      - "Engine/Core/Clock.h"
+      - "Engine/Core/FramePhaseTimingCapture.cpp"
+      - "Engine/Core/FramePhaseTimingCapture.h"
+      - "Engine/Core/FrameTimingCapture.cpp"
+      - "Engine/Core/FrameTimingCapture.h"
+      - "Engine/Core/ProcessMemoryCapture.cpp"
+      - "Engine/Core/ProcessMemoryCapture.h"
+      - "Engine/Core/ProfilingCaptureStateReceipt.cpp"
+      - "Engine/Core/ProfilingCaptureStateReceipt.h"
+      - "Engine/Core/SimulationTimeStep.cpp"
+      - "Engine/Core/SimulationTimeStep.h"
+      - "Engine/Platform/Win32Application.cpp"
+      - "Scripts/analyze_frame_phase_timing_capture.py"
+      - "Scripts/analyze_frame_timing_capture.py"
+      - "Scripts/analyze_process_memory_capture.py"
+      - "Scripts/benchmark_environment.py"
+      - "Scripts/test_benchmark_capture_pair.py"
+      - "Scripts/test_benchmark_environment.py"
+      - "Scripts/verify_benchmark_capture_pair.py"
+      - "Scripts/test_benchmark_run_control.py"
+      - "Scripts/test_benchmark_stream_coherence.py"
+      - "Scripts/test_frame_phase_timing_analysis.py"
+      - "Scripts/test_frame_timing_analysis.py"
+      - "Scripts/test_process_memory_analysis.py"
+      - "Scripts/test_profiling_capture_state.py"
+      - "Scripts/verify_benchmark_run_control.py"
+      - "Scripts/verify_benchmark_stream_coherence.py"
+      - "Scripts/verify_profiling_capture_state.py"
+      - "Tests/BenchmarkRunControlTests.cpp"
+      - "Tests/FramePhaseTimingCaptureTests.cpp"
+      - "Tests/FrameTimingCaptureTests.cpp"
+      - "Tests/ProcessMemoryCaptureTests.cpp"
+      - "Tests/ProfilingCaptureStateReceiptTests.cpp"
+      - "Tests/SimulationTimeStepTests.cpp"
+      - "Tests/FrameTiming/**"
+      - ".github/workflows/frame-timing-validation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "CMakeLists.txt"
+      - "Engine/Core/BenchmarkRunControl.cpp"
+      - "Engine/Core/BenchmarkRunControl.h"
+      - "Engine/Core/Clock.cpp"
+      - "Engine/Core/Clock.h"
+      - "Engine/Core/FramePhaseTimingCapture.cpp"
+      - "Engine/Core/FramePhaseTimingCapture.h"
+      - "Engine/Core/FrameTimingCapture.cpp"
+      - "Engine/Core/FrameTimingCapture.h"
+      - "Engine/Core/ProcessMemoryCapture.cpp"
+      - "Engine/Core/ProcessMemoryCapture.h"
+      - "Engine/Core/ProfilingCaptureStateReceipt.cpp"
+      - "Engine/Core/ProfilingCaptureStateReceipt.h"
+      - "Engine/Core/SimulationTimeStep.cpp"
+      - "Engine/Core/SimulationTimeStep.h"
+      - "Engine/Platform/Win32Application.cpp"
+      - "Scripts/analyze_frame_phase_timing_capture.py"
+      - "Scripts/analyze_frame_timing_capture.py"
+      - "Scripts/analyze_process_memory_capture.py"
+      - "Scripts/benchmark_environment.py"
+      - "Scripts/test_benchmark_capture_pair.py"
+      - "Scripts/test_benchmark_environment.py"
+      - "Scripts/verify_benchmark_capture_pair.py"
+      - "Scripts/test_benchmark_run_control.py"
+      - "Scripts/test_benchmark_stream_coherence.py"
+      - "Scripts/test_frame_phase_timing_analysis.py"
+      - "Scripts/test_frame_timing_analysis.py"
+      - "Scripts/test_process_memory_analysis.py"
+      - "Scripts/test_profiling_capture_state.py"
+      - "Scripts/verify_benchmark_run_control.py"
+      - "Scripts/verify_benchmark_stream_coherence.py"
+      - "Scripts/verify_profiling_capture_state.py"
+      - "Tests/BenchmarkRunControlTests.cpp"
+      - "Tests/FramePhaseTimingCaptureTests.cpp"
+      - "Tests/FrameTimingCaptureTests.cpp"
+      - "Tests/ProcessMemoryCaptureTests.cpp"
+      - "Tests/ProfilingCaptureStateReceiptTests.cpp"
+      - "Tests/SimulationTimeStepTests.cpp"
+      - "Tests/FrameTiming/**"
+      - ".github/workflows/frame-timing-validation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frame-timing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-frame-timing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify profiling analyses and production provenance binding
+        run: |
+          python -m py_compile \
+            Scripts/verify_profiling_capture_state.py \
+            Scripts/test_profiling_capture_state.py \
+            Scripts/verify_benchmark_capture_pair.py \
+            Scripts/test_benchmark_capture_pair.py
+          python Scripts/test_frame_timing_analysis.py
+          python Scripts/test_frame_phase_timing_analysis.py
+          python Scripts/test_process_memory_analysis.py
+          python Scripts/test_benchmark_stream_coherence.py
+          python Scripts/test_benchmark_environment.py
+          python Scripts/test_benchmark_run_control.py
+          python Scripts/test_profiling_capture_state.py
+          python Scripts/test_benchmark_capture_pair.py
+
+      - name: Debug and optimized Release profiling capture contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for config in Debug Release; do
+            build="$RUNNER_TEMP/astral-frame-timing-$config"
+            cmake -S Tests/FrameTiming -B "$build" -DCMAKE_BUILD_TYPE="$config"
+            cmake --build "$build" --parallel
+            ctest --test-dir "$build" --output-on-failure --no-tests=error -V
+          done
+
+      - name: AddressSanitizer and UndefinedBehaviorSanitizer profiling capture contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          build="$RUNNER_TEMP/astral-frame-timing-sanitize"
+          cmake -S Tests/FrameTiming -B "$build" \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DASTRAL_FRAME_TIMING_SANITIZERS=ON
+          cmake --build "$build" --parallel
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+            ctest --test-dir "$build" --output-on-failure --no-tests=error -V

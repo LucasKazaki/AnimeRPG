@@ -1,9 +1,14 @@
 #include "Engine/Platform/Win32Application.h"
 
+#include "Engine/Core/BenchmarkRunControl.h"
 #include "Engine/Core/Clock.h"
+#include "Engine/Core/FramePhaseTimingCapture.h"
 #include "Engine/Core/Logger.h"
+#include "Engine/Core/ProfilingCaptureStateReceipt.h"
 #include "Engine/Renderer/Renderer.h"
 
+#include <chrono>
+#include <cstdio>
 #include <string>
 
 namespace {
@@ -157,11 +162,64 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
         return false;
     }
 
-    window_ = CreateWindowExW(0, kWindowClass, L"Astral Engine", WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, nullptr, nullptr, instance, nullptr);
+    constexpr DWORD windowStyle = WS_OVERLAPPEDWINDOW;
+    int outerWidth = 1280;
+    int outerHeight = 720;
+    std::uint32_t requestedClientWidthPx = 0;
+    std::uint32_t requestedClientHeightPx = 0;
+    std::string benchmarkWindowError;
+    const auto requestedClientStatus =
+        Astral::Core::BenchmarkRunControl::RequestedClientAreaFromEnvironment(
+            requestedClientWidthPx, requestedClientHeightPx, benchmarkWindowError);
+    if (requestedClientStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid) {
+        std::fprintf(stderr, "Astral benchmark window configuration rejected: %s\n",
+            benchmarkWindowError.c_str());
+        return false;
+    }
+    if (requestedClientStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Enabled) {
+        RECT requestedClientRect{0, 0,
+            static_cast<LONG>(requestedClientWidthPx),
+            static_cast<LONG>(requestedClientHeightPx)};
+        if (!AdjustWindowRectEx(&requestedClientRect, windowStyle, FALSE, 0)) {
+            std::fprintf(stderr,
+                "Astral benchmark window sizing failed while adjusting the requested client area\n");
+            return false;
+        }
+        const LONG adjustedWidth = requestedClientRect.right - requestedClientRect.left;
+        const LONG adjustedHeight = requestedClientRect.bottom - requestedClientRect.top;
+        if (adjustedWidth <= 0 || adjustedHeight <= 0) {
+            std::fprintf(stderr,
+                "Astral benchmark window sizing produced invalid outer dimensions\n");
+            return false;
+        }
+        outerWidth = static_cast<int>(adjustedWidth);
+        outerHeight = static_cast<int>(adjustedHeight);
+    }
+
+    window_ = CreateWindowExW(0, kWindowClass, L"Astral Engine", windowStyle,
+        CW_USEDEFAULT, CW_USEDEFAULT, outerWidth, outerHeight,
+        nullptr, nullptr, instance, nullptr);
     if (!window_) {
         g_logger.Info("CreateWindowExW failed");
         return false;
+    }
+
+    if (requestedClientStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Enabled) {
+        RECT actualClientRect{};
+        const bool actualClientRectAvailable = GetClientRect(window_, &actualClientRect) != 0;
+        const LONG actualWidth = actualClientRectAvailable
+            ? actualClientRect.right - actualClientRect.left : 0;
+        const LONG actualHeight = actualClientRectAvailable
+            ? actualClientRect.bottom - actualClientRect.top : 0;
+        if (actualWidth <= 0 || actualHeight <= 0
+            || static_cast<std::uint32_t>(actualWidth) != requestedClientWidthPx
+            || static_cast<std::uint32_t>(actualHeight) != requestedClientHeightPx) {
+            std::fprintf(stderr,
+                "Astral benchmark window client area did not match the requested resolution\n");
+            DestroyWindow(window_);
+            window_ = nullptr;
+            return false;
+        }
     }
 
     ShowWindow(window_, showCommand);
@@ -177,14 +235,82 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
 
 int Win32Application::Run() {
     Astral::Core::Clock clock;
+    Astral::Core::BenchmarkRunControl benchmarkRunControl;
+    RECT initialClientRect{};
+    const bool initialClientRectAvailable = GetClientRect(window_, &initialClientRect) != 0;
+    const LONG initialClientWidth = initialClientRectAvailable
+        ? initialClientRect.right - initialClientRect.left : 0;
+    const LONG initialClientHeight = initialClientRectAvailable
+        ? initialClientRect.bottom - initialClientRect.top : 0;
+    const auto initialClientWidthPx = initialClientWidth > 0
+        ? static_cast<std::uint32_t>(initialClientWidth) : 0u;
+    const auto initialClientHeightPx = initialClientHeight > 0
+        ? static_cast<std::uint32_t>(initialClientHeight) : 0u;
+    std::string benchmarkError;
+    const auto benchmarkStatus = benchmarkRunControl.ConfigureFromEnvironment(
+        clock.FixedSimulationHz(), initialClientWidthPx, initialClientHeightPx, benchmarkError);
+    if (benchmarkStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Invalid) {
+        std::fprintf(stderr, "Astral benchmark run-control configuration rejected: %s\n",
+            benchmarkError.c_str());
+        return 2;
+    }
+
+    Astral::Core::FramePhaseTimingCapture phaseTimingCapture;
+    std::string phaseTimingError;
+    const auto phaseTimingStatus = phaseTimingCapture.ConfigureFromEnvironment(phaseTimingError);
+    if (phaseTimingStatus == Astral::Core::FramePhaseTimingEnvironmentStatus::Invalid) {
+        std::fprintf(stderr, "Astral frame phase timing capture configuration rejected: %s\n",
+            phaseTimingError.c_str());
+    }
+
+    std::string captureStateError;
+    const auto captureStateStatus = Astral::Core::ProfilingCaptureStateReceipt::WriteFromEnvironment(
+        benchmarkRunControl,
+        clock.FrameTimingStatus(), clock.FrameTimingConfig(),
+        phaseTimingStatus, phaseTimingCapture.Config(),
+        clock.ProcessMemoryStatus(), clock.ProcessMemoryConfig(),
+        captureStateError);
+    if (captureStateStatus == Astral::Core::ProfilingCaptureStateReceiptStatus::Invalid
+        || (benchmarkRunControl.Enabled()
+            && captureStateStatus != Astral::Core::ProfilingCaptureStateReceiptStatus::Written)) {
+        if (captureStateError.empty()) {
+            captureStateError = "benchmark mode requires ASTRAL_PROFILING_CAPTURE_STATE_JSON";
+        }
+        std::fprintf(stderr, "Astral profiling capture-state receipt rejected: %s\n",
+            captureStateError.c_str());
+        return 7;
+    }
+
     MSG message{};
     double fpsAccumulator = 0.0;
     int frameCount = 0;
+    std::uint64_t phaseFrameIndex = 0;
+    bool benchmarkFrameLimitReached = false;
+    bool benchmarkClientAreaStable = true;
+    using PhaseClock = std::chrono::steady_clock;
+    const auto toMilliseconds = [](PhaseClock::duration duration) {
+        return std::chrono::duration<double, std::milli>(duration).count();
+    };
+    const auto keyDown = [&benchmarkRunControl](int virtualKey) {
+        return !benchmarkRunControl.SuppressLiveInput()
+            && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+    };
 
     while (message.message != WM_QUIT) {
+        PhaseClock::time_point phaseStart{};
+        PhaseClock::time_point afterMessages{};
+        PhaseClock::time_point afterUpdate{};
+        PhaseClock::time_point afterRender{};
+        if (phaseTimingCapture.Enabled()) {
+            phaseStart = PhaseClock::now();
+        }
+
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
             TranslateMessage(&message);
             DispatchMessageW(&message);
+        }
+        if (phaseTimingCapture.Enabled()) {
+            afterMessages = PhaseClock::now();
         }
 
         const float deltaSeconds = clock.Tick();
@@ -199,37 +325,37 @@ int Win32Application::Run() {
             frameCount = 0;
         }
 
-        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
+        if (keyDown(VK_ESCAPE)) {
             PostMessageW(window_, WM_CLOSE, 0, 0);
         }
 
         const float simulationDelta = thoughtCommands_.ScaleDelta(deltaSeconds);
         const Scene::MovementInput input{
-            (GetAsyncKeyState('W') & 0x8000) != 0,
-            (GetAsyncKeyState('S') & 0x8000) != 0,
-            (GetAsyncKeyState('A') & 0x8000) != 0,
-            (GetAsyncKeyState('D') & 0x8000) != 0,
+            keyDown('W'),
+            keyDown('S'),
+            keyDown('A'),
+            keyDown('D'),
         };
         playerController_.Update(input, simulationDelta);
         camera_.Follow(playerController_.TransformState());
         combatSandbox_.AdvanceTime(simulationDelta);
         shadowbladeActions_.AdvanceTime(simulationDelta);
 
-        const bool physicalGuarding = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
+        const bool physicalGuarding = keyDown(VK_LSHIFT);
         const bool effectiveGuarding = physicalGuarding
             || thoughtCommands_.IsCommandGuardActive();
         const bool guardChanged = effectiveGuarding != shadowbladeActions_.IsGuarding();
         thoughtCommands_.ApplyGuardState(physicalGuarding, shadowbladeActions_);
         const bool guarding = shadowbladeActions_.IsGuarding();
 
-        const bool lightAttackDown = (GetAsyncKeyState('J') & 0x8000) != 0;
-        const bool heavyAttackDown = (GetAsyncKeyState('K') & 0x8000) != 0;
-        const bool dashDown = (GetAsyncKeyState('Q') & 0x8000) != 0;
-        const bool fatalStrikeDown = (GetAsyncKeyState('L') & 0x8000) != 0;
-        const bool interactDown = (GetAsyncKeyState('E') & 0x8000) != 0;
+        const bool lightAttackDown = keyDown('J');
+        const bool heavyAttackDown = keyDown('K');
+        const bool dashDown = keyDown('Q');
+        const bool fatalStrikeDown = keyDown('L');
+        const bool interactDown = keyDown('E');
         bool commandDown[6]{};
         for (int index = 0; index < 6; ++index) {
-            commandDown[index] = (GetAsyncKeyState('0' + index) & 0x8000) != 0;
+            commandDown[index] = keyDown('0' + index);
         }
         bool attacked = false;
         bool shadowAction = false;
@@ -303,6 +429,9 @@ int Win32Application::Run() {
                 playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
                 thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
         }
+        if (phaseTimingCapture.Enabled()) {
+            afterUpdate = PhaseClock::now();
+        }
 
         HDC deviceContext = GetDC(window_);
         RECT viewport{};
@@ -312,7 +441,73 @@ int Win32Application::Run() {
             playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
             thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
         ReleaseDC(window_, deviceContext);
+
+        if (benchmarkRunControl.Enabled()) {
+            const LONG clientWidth = viewport.right - viewport.left;
+            const LONG clientHeight = viewport.bottom - viewport.top;
+            if (clientWidth <= 0 || clientHeight <= 0
+                || !benchmarkRunControl.ObserveClientArea(
+                    static_cast<std::uint32_t>(clientWidth),
+                    static_cast<std::uint32_t>(clientHeight))) {
+                benchmarkClientAreaStable = false;
+                break;
+            }
+        }
+
+        if (phaseTimingCapture.Enabled()) {
+            afterRender = PhaseClock::now();
+        }
         Sleep(1);
+
+        if (phaseTimingCapture.Enabled()) {
+            const auto afterWait = PhaseClock::now();
+            phaseTimingCapture.Record(phaseFrameIndex,
+                toMilliseconds(afterMessages - phaseStart),
+                toMilliseconds(afterUpdate - afterMessages),
+                toMilliseconds(afterRender - afterUpdate),
+                toMilliseconds(afterWait - afterRender));
+        }
+        ++phaseFrameIndex;
+
+        if (benchmarkRunControl.Enabled() && benchmarkRunControl.CompleteFrame()) {
+            benchmarkFrameLimitReached = true;
+            break;
+        }
+    }
+
+    bool phaseTimingPublished = true;
+    if (phaseTimingCapture.Enabled()) {
+        std::string error;
+        if (!phaseTimingCapture.Flush(error)) {
+            std::fprintf(stderr, "Astral frame phase timing capture was not published: %s\n",
+                error.c_str());
+            phaseTimingPublished = false;
+        }
+    }
+
+    if (benchmarkRunControl.Enabled()) {
+        if (!benchmarkClientAreaStable) {
+            std::fprintf(stderr,
+                "Astral benchmark client area changed or became invalid during the run\n");
+            return 6;
+        }
+        if (!benchmarkFrameLimitReached) {
+            std::fprintf(stderr,
+                "Astral benchmark ended before the exact warmup plus measured frame limit\n");
+            return 3;
+        }
+        if (!phaseTimingPublished) {
+            std::fprintf(stderr,
+                "Astral benchmark frame limit completed but phase timing publication failed\n");
+            return 4;
+        }
+        std::string error;
+        if (!benchmarkRunControl.FlushCompletion(error)) {
+            std::fprintf(stderr, "Astral benchmark control receipt was not published: %s\n",
+                error.c_str());
+            return 5;
+        }
+        return 0;
     }
 
     return static_cast<int>(message.wParam);
