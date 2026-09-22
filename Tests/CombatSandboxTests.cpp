@@ -213,6 +213,26 @@ void TestComboExpiryPostureRecoveryAndInvalidInputs() {
     for (int step = 0; step < 50; ++step) splitSteps.AdvanceTime(0.01f);
     Check(oneStep.Dummy().posture == splitSteps.Dummy().posture);
 
+    CombatSandbox exactOneStep;
+    CombatSandbox exact30Hz;
+    CombatSandbox exact60Hz;
+    CombatSandbox exact90Hz;
+    exactOneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    exact30Hz.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    exact60Hz.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    exact90Hz.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    exactOneStep.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds + 0.2f);
+    exact30Hz.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    exact60Hz.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    exact90Hz.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    for (int step = 0; step < 6; ++step) exact30Hz.AdvanceTime(1.0f / 30.0f);
+    for (int step = 0; step < 12; ++step) exact60Hz.AdvanceTime(1.0f / 60.0f);
+    for (int step = 0; step < 18; ++step) exact90Hz.AdvanceTime(1.0f / 90.0f);
+    Check(exactOneStep.Dummy().posture == 18);
+    Check(exact30Hz.Dummy().posture == exactOneStep.Dummy().posture);
+    Check(exact60Hz.Dummy().posture == exactOneStep.Dummy().posture);
+    Check(exact90Hz.Dummy().posture == exactOneStep.Dummy().posture);
+
     const float elapsed = recovery.ElapsedSeconds();
     const int posture = recovery.Dummy().posture;
     recovery.AdvanceTime(0.0f);
