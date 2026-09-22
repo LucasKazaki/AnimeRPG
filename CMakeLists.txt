@@ -107,6 +107,13 @@ if(BUILD_TESTING)
     target_include_directories(EditorLayoutTests PRIVATE .)
     astral_add_test(EditorLayoutTests)
 
+    add_executable(EditorRuntimeSmoke Tests/EditorRuntimeSmoke.cpp)
+    target_include_directories(EditorRuntimeSmoke PRIVATE .)
+    target_compile_definitions(EditorRuntimeSmoke PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(EditorRuntimeSmoke PRIVATE user32)
+    astral_add_test(EditorRuntimeSmoke
+        $<TARGET_FILE:AstralEditor> ${CMAKE_SOURCE_DIR})
+
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp
         Engine/Scene/Camera.cpp
