@@ -61,6 +61,7 @@ public:
     void AdvanceTime(float deltaSeconds);
     AttackReport TryAttack(AttackType type, const Math::Vec3& attackerPosition);
     int ApplyDamage(int damage);
+    void RegisterSuccessfulAttackHit();
     bool ConsumeStaggerOpening();
     void ResetTrainingSession();
 
