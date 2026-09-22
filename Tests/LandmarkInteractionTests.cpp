@@ -371,6 +371,17 @@ void TestManualObjectiveActivationPreservesFreeExploration() {
     Expect(interaction.StartObjective()
             && interaction.CurrentObjective() == LandmarkObjectiveStage::DiscoverLincoln,
         "explicit activation starts the objective at its first authored step");
+    Expect(interaction.SetObjectiveActivationMode(LandmarkObjectiveActivationMode::ManualStart)
+            && interaction.ObjectiveActivationMode() == LandmarkObjectiveActivationMode::ManualStart
+            && interaction.ObjectiveActive()
+            && interaction.CurrentObjective() == LandmarkObjectiveStage::DiscoverLincoln,
+        "reapplying the current manual mode is idempotent and preserves an active objective");
+    Expect(!interaction.SetObjectiveActivationMode(
+                static_cast<LandmarkObjectiveActivationMode>(999))
+            && interaction.ObjectiveActivationMode() == LandmarkObjectiveActivationMode::ManualStart
+            && interaction.ObjectiveActive()
+            && interaction.CurrentObjective() == LandmarkObjectiveStage::DiscoverLincoln,
+        "invalid objective activation modes fail closed without mutating active objective state");
     const auto revisitLincoln = interaction.TryInteract(
         {-8.0f, 18.0f, 0.0f}, world, actions);
     Expect(revisitLincoln.result == LandmarkInteractionResult::ObjectiveAdvanced
