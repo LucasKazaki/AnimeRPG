@@ -86,6 +86,7 @@ const wchar_t* InteractionResultName(Astral::Scene::LandmarkInteractionResult re
     case Astral::Scene::LandmarkInteractionResult::OutOfRange: return L"Out of Range";
     case Astral::Scene::LandmarkInteractionResult::Discovered: return L"Discovered";
     case Astral::Scene::LandmarkInteractionResult::AlreadyVisited: return L"Already Visited";
+    case Astral::Scene::LandmarkInteractionResult::ObjectiveAdvanced: return L"Objective Advanced";
     }
     return L"Unknown";
 }
