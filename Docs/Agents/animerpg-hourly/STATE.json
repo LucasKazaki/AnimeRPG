@@ -19,7 +19,7 @@
   "task_packet": "Tasks/GAME-PASS12-DEFENSE-PRACTICE-2026-09-22.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS12.md",
   "pr": 29,
-  "latest_pre_record_candidate": "7172bff237ba98ac97059a86bf332e60904c07e5",
+  "latest_review_repair_checkpoint": "dcdc7fc5354b340254f13992bf84a1d9d9c9025e",
   "final_head": "pending_self_reference_see_pr_29_final_receipt",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -45,14 +45,16 @@
     "post_hit_hint_context": "retain_resolved_attack_blockability_for_recovery_time_guard_or_dodge_guidance",
     "ordinary_timing_hint": "track_consecutive_ordinary_defenses_separately_from_lifetime_perfects",
     "paused_object_ownership": "unrelated_objects_cannot_impersonate_the_owned_paused_link",
+    "exact_review_sha_e23f2f9": "found_current_threat_overwriting_retained_mistake_hint",
+    "mixed_context_hint_repair": "TutorialHint_uses_lastMissedAttackBlockable_while_ControlReminder_uses_current_cue_with_QuickCut_to_RiftBurst_regression",
     "fresh_final_head_review": "pending"
   },
   "verification": {
     "registered_test_target": "ShadowbladeActionsTests_via_existing_astral_add_test",
     "partial_head_9f862_hosted_windows_ci": "passed_run_398_not_final_acceptance",
     "partial_head_9f862_release_manifest": "passed_run_317_not_final_acceptance",
-    "pre_record_head_7172_hosted_windows_ci": "run_403_in_progress_when_receipt_authored",
-    "pre_record_head_7172_release_manifest": "run_322_pending_when_receipt_authored",
+    "reviewed_head_e23f2f9_hosted_windows_ci": "passed_run_405_not_final_after_review_repair",
+    "reviewed_head_e23f2f9_release_manifest": "passed_run_324_not_final_after_review_repair",
     "final_records_head_hosted_windows_ci": "pending_exact_final_head",
     "final_records_head_release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
@@ -66,5 +68,5 @@
     "art_pr_28": "separate color/exposure calibration ownership; no overlap with pass-12 paths",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release and deployment unchanged"
   },
-  "next_action": "Freeze the records head, require exact-head Windows/release gates and a fresh independent Codex review with all material threads resolved, re-read main and PR head immediately before merge, merge with expected-head protection, then record self-referential final head/workflow/review/merge receipts in PR #29 discussion and task result."
+  "next_action": "Freeze this records head, require exact-head Windows/release gates and a fresh independent Codex review with all material threads resolved, re-read main and PR head immediately before merge, merge with expected-head protection, then record self-referential final head/workflow/review/merge receipts in PR #29 discussion and task result."
 }
