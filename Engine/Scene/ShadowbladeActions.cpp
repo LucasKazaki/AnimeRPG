@@ -16,41 +16,74 @@ std::int64_t ShadowbladeActions::DefenseSecondsToMicros(double seconds) {
         seconds * static_cast<double>(DefenseMicrosPerSecond)));
 }
 
-std::int64_t ShadowbladeActions::SaturatingMicrosAdd(std::int64_t left,
-    std::int64_t right) {
-    if (left <= 0) return std::max<std::int64_t>(0, right);
-    if (right <= 0) return left;
-    const std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
-    return left > maximum - right ? maximum : left + right;
+double ShadowbladeActions::FloatHalfUlpSeconds(float seconds) {
+    if (!std::isfinite(seconds) || seconds <= 0.0f) return 0.0;
+    const float next = std::nextafter(seconds, std::numeric_limits<float>::infinity());
+    if (std::isfinite(next)) {
+        return std::max(0.0,
+            (static_cast<double>(next) - static_cast<double>(seconds)) * 0.5);
+    }
+    const float previous = std::nextafter(seconds, 0.0f);
+    return std::max(0.0,
+        (static_cast<double>(seconds) - static_cast<double>(previous)) * 0.5);
+}
+
+std::int64_t ShadowbladeActions::DefenseTimingToleranceMicros(
+    double deadlineUncertaintySeconds) const {
+    constexpr double HalfMicrosecond = 0.5 / static_cast<double>(DefenseMicrosPerSecond);
+    const double uncertaintySeconds = defenseElapsedUncertaintySeconds_
+        + std::max(0.0, deadlineUncertaintySeconds) + HalfMicrosecond;
+    if (!std::isfinite(uncertaintySeconds)) {
+        return std::numeric_limits<std::int64_t>::max();
+    }
+    const double uncertaintyMicros = std::ceil(
+        uncertaintySeconds * static_cast<double>(DefenseMicrosPerSecond));
+    if (uncertaintyMicros >= static_cast<double>(std::numeric_limits<std::int64_t>::max())) {
+        return std::numeric_limits<std::int64_t>::max();
+    }
+    return std::max<std::int64_t>(1, static_cast<std::int64_t>(uncertaintyMicros));
 }
 
 bool ShadowbladeActions::DefenseDeadlineReached(std::int64_t now,
-    std::int64_t deadline) {
+    std::int64_t deadline, std::int64_t toleranceMicros) {
     if (deadline <= 0) return false;
     if (now >= deadline) return true;
-    return deadline - now <= DefenseBoundaryToleranceMicros;
+    return deadline - now <= toleranceMicros;
 }
 
 bool ShadowbladeActions::DefenseWindowContains(std::int64_t remaining,
-    std::int64_t window) {
+    std::int64_t window, std::int64_t toleranceMicros) {
     if (remaining <= window) return true;
-    return remaining - window <= DefenseBoundaryToleranceMicros;
+    return remaining - window <= toleranceMicros;
 }
 
 std::int64_t ShadowbladeActions::CurrentDefenseMicros() const {
     return DefenseSecondsToMicros(defenseElapsedSecondsPrecise_);
 }
 
-std::int64_t ShadowbladeActions::StartDefenseCounterDeadline() {
-    const std::int64_t counterMicros = DefenseSecondsToMicros(
-        DefenseCounterWindowSeconds);
-    std::int64_t now = CurrentDefenseMicros();
-    const std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
-    if (counterMicros > 0 && now > maximum - counterMicros) {
-        defenseElapsedSecondsPrecise_ = 0.0;
-        now = 0;
+void ShadowbladeActions::RebaseDefenseClock() {
+    const std::int64_t now = CurrentDefenseMicros();
+    if (defenseCounterEndMicros_ > 0) {
+        const std::int64_t tolerance = DefenseTimingToleranceMicros(
+            defenseCounterDeadlineUncertaintySeconds_);
+        if (DefenseDeadlineReached(now, defenseCounterEndMicros_, tolerance)) {
+            defenseCounterEndMicros_ = 0;
+            defenseCounterDeadlineUncertaintySeconds_ = 0.0;
+        } else {
+            defenseCounterEndMicros_ -= now;
+            defenseCounterDeadlineUncertaintySeconds_ += defenseElapsedUncertaintySeconds_
+                + 0.5 / static_cast<double>(DefenseMicrosPerSecond);
+        }
     }
-    return SaturatingMicrosAdd(now, counterMicros);
+    defenseElapsedSecondsPrecise_ = 0.0;
+    defenseElapsedUncertaintySeconds_ = 0.0;
+}
+
+std::int64_t ShadowbladeActions::StartDefenseCounterDeadline() {
+    RebaseDefenseClock();
+    defenseCounterDeadlineUncertaintySeconds_ = FloatHalfUlpSeconds(
+        DefenseCounterWindowSeconds);
+    return DefenseSecondsToMicros(DefenseCounterWindowSeconds);
 }
 
 void ShadowbladeActions::AdvanceTime(float deltaSeconds) {
@@ -62,21 +95,41 @@ void ShadowbladeActions::AdvanceTime(float deltaSeconds) {
     fatalStrikeCooldownRemaining_ = std::max(0.0f,
         fatalStrikeCooldownRemaining_ - deltaSeconds);
 
+    if (!incomingAttackActive_ && defenseCounterEndMicros_ <= 0) {
+        defenseElapsedSecondsPrecise_ = 0.0;
+        defenseElapsedUncertaintySeconds_ = 0.0;
+        return;
+    }
+
     defenseElapsedSecondsPrecise_ += static_cast<double>(deltaSeconds);
+    defenseElapsedUncertaintySeconds_ += FloatHalfUlpSeconds(deltaSeconds);
     if (!std::isfinite(defenseElapsedSecondsPrecise_)) {
         defenseElapsedSecondsPrecise_ = static_cast<double>(
             std::numeric_limits<std::int64_t>::max())
             / static_cast<double>(DefenseMicrosPerSecond);
     }
+
     const std::int64_t now = CurrentDefenseMicros();
-    if (defenseCounterEndMicros_ > 0
-        && DefenseDeadlineReached(now, defenseCounterEndMicros_)) {
-        defenseCounterEndMicros_ = 0;
+    if (defenseCounterEndMicros_ > 0) {
+        const std::int64_t counterTolerance = DefenseTimingToleranceMicros(
+            defenseCounterDeadlineUncertaintySeconds_);
+        if (DefenseDeadlineReached(now, defenseCounterEndMicros_, counterTolerance)) {
+            defenseCounterEndMicros_ = 0;
+            defenseCounterDeadlineUncertaintySeconds_ = 0.0;
+        }
     }
 
-    if (incomingAttackActive_
-        && DefenseDeadlineReached(now, incomingAttackEndMicros_)) {
-        ResolveIncomingHit(DefenseResult::Hit);
+    if (incomingAttackActive_) {
+        const std::int64_t attackTolerance = DefenseTimingToleranceMicros(
+            incomingAttackDeadlineUncertaintySeconds_);
+        if (DefenseDeadlineReached(now, incomingAttackEndMicros_, attackTolerance)) {
+            ResolveIncomingHit(DefenseResult::Hit);
+        }
+    }
+
+    if (!incomingAttackActive_ && defenseCounterEndMicros_ <= 0) {
+        defenseElapsedSecondsPrecise_ = 0.0;
+        defenseElapsedUncertaintySeconds_ = 0.0;
     }
 }
 
@@ -179,6 +232,7 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
     }
     if (defenseCounter) {
         defenseCounterEndMicros_ = 0;
+        defenseCounterDeadlineUncertaintySeconds_ = 0.0;
     }
     lastAction_.damageApplied = combatSandbox.ApplyDamage(FatalStrikeDamage);
     if (lastAction_.damageApplied > 0) {
@@ -197,19 +251,10 @@ bool ShadowbladeActions::BeginIncomingAttack(const IncomingAttackDefinition& att
         return false;
     }
 
-    std::int64_t now = CurrentDefenseMicros();
-    const std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
-    if (now > maximum - windupMicros) {
-        const std::int64_t counterRemaining = defenseCounterEndMicros_ > now
-            ? defenseCounterEndMicros_ - now
-            : 0;
-        defenseElapsedSecondsPrecise_ = 0.0;
-        defenseCounterEndMicros_ = counterRemaining;
-        now = 0;
-    }
-
+    RebaseDefenseClock();
     incomingAttack_ = attack;
-    incomingAttackEndMicros_ = now + windupMicros;
+    incomingAttackEndMicros_ = windupMicros;
+    incomingAttackDeadlineUncertaintySeconds_ = FloatHalfUlpSeconds(attack.windupSeconds);
     incomingAttackActive_ = true;
     lastDefense_ = {DefenseResult::ThreatQueued, 0, 0, false,
         static_cast<float>(windupMicros) / static_cast<float>(DefenseMicrosPerSecond)};
@@ -228,22 +273,29 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
         : 0;
     const float remaining = static_cast<float>(remainingMicros)
         / static_cast<float>(DefenseMicrosPerSecond);
+    const float perfectWindowSeconds = PerfectDefenseWindowSeconds();
     const std::int64_t perfectWindowMicros = DefenseSecondsToMicros(
-        static_cast<double>(PerfectDefenseWindowSeconds()));
+        static_cast<double>(perfectWindowSeconds));
+    const std::int64_t perfectTolerance = DefenseTimingToleranceMicros(
+        incomingAttackDeadlineUncertaintySeconds_ + FloatHalfUlpSeconds(perfectWindowSeconds));
 
     if (input == DefenseInput::Dodge) {
+        const std::int64_t dodgeTolerance = DefenseTimingToleranceMicros(
+            incomingAttackDeadlineUncertaintySeconds_ + FloatHalfUlpSeconds(DodgeWindowSeconds));
         if (!DefenseWindowContains(remainingMicros,
-                DefenseSecondsToMicros(DodgeWindowSeconds))) {
+                DefenseSecondsToMicros(DodgeWindowSeconds), dodgeTolerance)) {
             lastDefense_ = {DefenseResult::TooEarly, 0, 0, false, remaining};
             return lastDefense_;
         }
 
         incomingAttackActive_ = false;
         incomingAttackEndMicros_ = 0;
-        if (DefenseWindowContains(remainingMicros, perfectWindowMicros)) {
+        incomingAttackDeadlineUncertaintySeconds_ = 0.0;
+        if (DefenseWindowContains(remainingMicros, perfectWindowMicros, perfectTolerance)) {
             defenseCounterEndMicros_ = StartDefenseCounterDeadline();
             lastDefense_ = {DefenseResult::PerfectDodge, 0, 0, true, remaining};
         } else {
+            RebaseDefenseClock();
             lastDefense_ = {DefenseResult::Evaded, 0, 0, false, remaining};
         }
         return lastDefense_;
@@ -255,7 +307,8 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
 
     incomingAttackActive_ = false;
     incomingAttackEndMicros_ = 0;
-    if (DefenseWindowContains(remainingMicros, perfectWindowMicros)) {
+    incomingAttackDeadlineUncertaintySeconds_ = 0.0;
+    if (DefenseWindowContains(remainingMicros, perfectWindowMicros, perfectTolerance)) {
         defenseCounterEndMicros_ = StartDefenseCounterDeadline();
         lastDefense_ = {DefenseResult::PerfectGuard, 0, 0, true, remaining};
         return lastDefense_;
@@ -266,12 +319,14 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
         guardIntegrity_ = 0;
         const int previousHealth = playerHealth_;
         playerHealth_ = std::max(0, playerHealth_ - incomingAttack_.damage);
+        RebaseDefenseClock();
         lastDefense_ = {DefenseResult::GuardBroken,
             previousHealth - playerHealth_, guardLost, false, remaining};
         return lastDefense_;
     }
 
     guardIntegrity_ -= incomingAttack_.guardDamage;
+    RebaseDefenseClock();
     lastDefense_ = {DefenseResult::Guarded, 0, incomingAttack_.guardDamage, false, remaining};
     return lastDefense_;
 }
@@ -281,8 +336,11 @@ void ShadowbladeActions::ResetDefenseState() {
     guardIntegrity_ = MaximumGuardIntegrity;
     incomingAttackActive_ = false;
     defenseElapsedSecondsPrecise_ = 0.0;
+    defenseElapsedUncertaintySeconds_ = 0.0;
     incomingAttackEndMicros_ = 0;
+    incomingAttackDeadlineUncertaintySeconds_ = 0.0;
     defenseCounterEndMicros_ = 0;
+    defenseCounterDeadlineUncertaintySeconds_ = 0.0;
     defenseTimingPreset_ = DefenseTimingPreset::Standard;
     lastDefense_ = {};
 }
@@ -290,22 +348,26 @@ void ShadowbladeActions::ResetDefenseState() {
 float ShadowbladeActions::IncomingAttackRemaining() const {
     if (!incomingAttackActive_) return 0.0f;
     const std::int64_t now = CurrentDefenseMicros();
-    if (DefenseDeadlineReached(now, incomingAttackEndMicros_)) return 0.0f;
+    const std::int64_t tolerance = DefenseTimingToleranceMicros(
+        incomingAttackDeadlineUncertaintySeconds_);
+    if (DefenseDeadlineReached(now, incomingAttackEndMicros_, tolerance)) return 0.0f;
     const std::int64_t remaining = incomingAttackEndMicros_ - now;
     return static_cast<float>(remaining) / static_cast<float>(DefenseMicrosPerSecond);
 }
 
 bool ShadowbladeActions::HasDefenseCounter() const {
-    return defenseCounterEndMicros_ > 0
-        && !DefenseDeadlineReached(CurrentDefenseMicros(), defenseCounterEndMicros_);
+    if (defenseCounterEndMicros_ <= 0) return false;
+    const std::int64_t tolerance = DefenseTimingToleranceMicros(
+        defenseCounterDeadlineUncertaintySeconds_);
+    return !DefenseDeadlineReached(CurrentDefenseMicros(), defenseCounterEndMicros_, tolerance);
 }
 
 float ShadowbladeActions::DefenseCounterRemaining() const {
+    if (defenseCounterEndMicros_ <= 0) return 0.0f;
     const std::int64_t now = CurrentDefenseMicros();
-    if (defenseCounterEndMicros_ <= 0
-        || DefenseDeadlineReached(now, defenseCounterEndMicros_)) {
-        return 0.0f;
-    }
+    const std::int64_t tolerance = DefenseTimingToleranceMicros(
+        defenseCounterDeadlineUncertaintySeconds_);
+    if (DefenseDeadlineReached(now, defenseCounterEndMicros_, tolerance)) return 0.0f;
     const std::int64_t remaining = defenseCounterEndMicros_ - now;
     return static_cast<float>(remaining) / static_cast<float>(DefenseMicrosPerSecond);
 }
@@ -326,6 +388,8 @@ DefenseReport ShadowbladeActions::ResolveIncomingHit(DefenseResult result) {
     playerHealth_ = std::max(0, playerHealth_ - incomingAttack_.damage);
     incomingAttackActive_ = false;
     incomingAttackEndMicros_ = 0;
+    incomingAttackDeadlineUncertaintySeconds_ = 0.0;
+    RebaseDefenseClock();
     lastDefense_ = {result, previousHealth - playerHealth_, 0, false, 0.0f};
     return lastDefense_;
 }
