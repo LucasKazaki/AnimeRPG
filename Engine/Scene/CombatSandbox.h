@@ -2,6 +2,7 @@
 
 #include "Engine/Math/Math.h"
 
+#include <cstddef>
 #include <cstdint>
 
 namespace Astral::Scene {
@@ -28,6 +29,26 @@ enum class AttackResistance {
 enum class EnemyPhase {
     Normal,
     Pressure,
+};
+
+enum class EnemyAttackPattern {
+    QuickCut,
+    GuardBreaker,
+    RiftBurst,
+};
+
+enum class EnemyAggressionPreset {
+    Relaxed,
+    Standard,
+    Aggressive,
+};
+
+enum class EnemyAttackOutcome {
+    Hit,
+    Guarded,
+    Evaded,
+    PerfectDefense,
+    Interrupted,
 };
 
 enum class TechniqueType {
@@ -57,6 +78,16 @@ struct AttackReport {
     bool staggerTriggered{};
     bool resistanceApplied{};
     bool staggerBonusApplied{};
+    bool defensePunishBonusApplied{};
+};
+
+struct EnemyAttackPlan {
+    EnemyAttackPattern pattern{EnemyAttackPattern::QuickCut};
+    float windupSeconds{0.55f};
+    int damage{18};
+    int guardDamage{20};
+    bool blockable{true};
+    float recoverySeconds{0.85f};
 };
 
 enum class ManaAffinity {
@@ -154,6 +185,12 @@ public:
     static constexpr int ResistantAttackDamageDenominator = 5;
     static constexpr int StaggerDamageNumerator = 5;
     static constexpr int StaggerDamageDenominator = 4;
+    static constexpr int DefensePunishDamageNumerator = 5;
+    static constexpr int DefensePunishDamageDenominator = 4;
+    static constexpr float DefensePunishWindowSeconds = 1.0f;
+    static constexpr float RelaxedEnemyRecoverySeconds = 1.25f;
+    static constexpr float StandardEnemyRecoverySeconds = 0.85f;
+    static constexpr float AggressiveEnemyRecoverySeconds = 0.45f;
     static constexpr double FastChallengeSeconds = 5.0;
     static constexpr double StandardChallengeSeconds = 10.0;
 
@@ -172,6 +209,11 @@ public:
     }
     bool SetTrainingEnemyProfile(TrainingEnemyProfile profile);
     bool SetTrainingTargetMode(TrainingTargetMode mode);
+    bool SetEnemyAggressionPreset(EnemyAggressionPreset preset);
+    bool QueueNextEnemyAttack();
+    bool ResolveEnemyAttack(EnemyAttackOutcome outcome);
+    bool SetBossPracticePhase(EnemyPhase phase);
+    bool ClearBossPracticePhase();
     ComboFinisherReport TryComboFinisher(const Math::Vec3& attackerPosition);
     ManaReactionReport ApplyManaAffinity(ManaAffinity affinity);
     void SetCombatAssistPreset(CombatAssistPreset preset) { assistPreset_ = preset; }
@@ -193,6 +235,13 @@ public:
     TrainingTargetMode TargetMode() const { return targetMode_; }
     EnemyPhase CurrentEnemyPhase() const;
     TrainingEnemyDefinition CurrentEnemyDefinition() const;
+    EnemyAggressionPreset AggressionPreset() const { return enemyAggressionPreset_; }
+    bool HasPendingEnemyAttack() const { return enemyAttackPending_; }
+    const EnemyAttackPlan& PendingEnemyAttack() const { return pendingEnemyAttack_; }
+    float EnemyAttackReadyInSeconds() const;
+    bool DefensePunishOpeningReady() const;
+    bool BossPracticePhaseLocked() const { return bossPracticePhaseLocked_; }
+    EnemyPhase BossPracticePhase() const { return bossPracticePhase_; }
     bool EclipseOpeningReady() const { return eclipseOpening_; }
     int TechniqueChain() const { return techniqueChain_; }
     TechniqueType LastTechniqueType() const { return lastTechniqueType_; }
@@ -209,11 +258,14 @@ private:
     void RegisterTechnique(TechniqueType type, int basePoints);
     int AdjustDirectAttackDamage(AttackType type, int damage,
         bool& resistanceApplied, bool& staggerBonusApplied) const;
+    EnemyAttackPlan BuildEnemyAttackPlan(std::size_t sequenceIndex) const;
+    float EnemyRecoverySeconds() const;
+    void ClearEnemyAttackState();
 
     TrainingDummy dummy_{};
     AttackDefinition lightAttack_{25, 0.4f, 3.5f, 25};
     AttackDefinition heavyAttack_{60, 1.0f, 3.5f, 70};
-    AttackReport lastAttack_{AttackType::Light, AttackResult::Ready, 0, 0, false, false, false};
+    AttackReport lastAttack_{AttackType::Light, AttackResult::Ready, 0, 0, false, false, false, false};
     TrainingStats stats_{};
     double elapsedSecondsPrecise_{};
     double targetDefeatElapsedSeconds_{-1.0};
@@ -231,6 +283,16 @@ private:
     TrainingEnemyProfile enemyProfile_{TrainingEnemyProfile::Standard};
     TrainingTargetMode targetMode_{TrainingTargetMode::Standard};
     CombatAssistPreset assistPreset_{CombatAssistPreset::Standard};
+
+    EnemyAggressionPreset enemyAggressionPreset_{EnemyAggressionPreset::Standard};
+    std::size_t enemyAttackSequenceIndex_{};
+    bool enemyAttackPending_{};
+    EnemyAttackPlan pendingEnemyAttack_{};
+    std::int64_t enemyAttackReadyMicros_{};
+    bool defensePunishOpening_{};
+    std::int64_t defensePunishEndMicros_{};
+    bool bossPracticePhaseLocked_{};
+    EnemyPhase bossPracticePhase_{EnemyPhase::Normal};
 };
 
 } // namespace Astral::Scene
