@@ -2,44 +2,44 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 
 namespace Astral::Scene {
 
 CombatSandbox::CombatSandbox() = default;
 
+std::int64_t CombatSandbox::SecondsToMicros(float seconds) {
+    return static_cast<std::int64_t>(std::llround(
+        static_cast<double>(seconds) * static_cast<double>(MicrosPerSecond)));
+}
+
+std::int64_t CombatSandbox::CurrentMicros() const {
+    return static_cast<std::int64_t>(std::llround(
+        elapsedSecondsPrecise_ * static_cast<double>(MicrosPerSecond)));
+}
+
 void CombatSandbox::AdvanceTime(float deltaSeconds) {
     if (deltaSeconds <= 0.0f || !std::isfinite(deltaSeconds)) return;
 
-    elapsedSeconds_ += deltaSeconds;
-    if (comboCount_ > 0 && elapsedSeconds_ - lastComboHitTime_ > ComboWindowSeconds) {
+    elapsedSecondsPrecise_ += static_cast<double>(deltaSeconds);
+    const std::int64_t now = CurrentMicros();
+
+    if (comboCount_ > 0
+        && now - lastComboHitMicros_ > SecondsToMicros(ComboWindowSeconds)) {
         comboCount_ = 0;
     }
 
-    if (staggerRemaining_ > 0.0f) {
-        staggerRemaining_ = std::max(0.0f, staggerRemaining_ - deltaSeconds);
-        if (staggerRemaining_ == 0.0f) {
+    if (staggerEndMicros_ > 0) {
+        if (now >= staggerEndMicros_) {
+            staggerEndMicros_ = 0;
             dummy_.posture = 0;
             postureAtRecoveryStart_ = 0;
         }
         return;
     }
 
-    timeSincePostureHit_ += static_cast<double>(deltaSeconds);
     if (dummy_.posture > 0) {
-        // Frame deltas arrive as floats, so mathematically equal frame splits can
-        // accumulate a few tens of nanoseconds apart. Quantize the total elapsed
-        // posture timeline once, at microsecond precision, before applying the
-        // integer recovery threshold. This preserves sub-frame precision while
-        // making exact threshold crossings independent of common frame splits.
-        constexpr std::int64_t MicrosPerSecond = 1000000;
-        const std::int64_t elapsedMicros = static_cast<std::int64_t>(std::llround(
-            timeSincePostureHit_ * static_cast<double>(MicrosPerSecond)));
-        const std::int64_t delayMicros = static_cast<std::int64_t>(std::llround(
-            static_cast<double>(PostureRecoveryDelaySeconds)
-                * static_cast<double>(MicrosPerSecond)));
-        const std::int64_t recoveryMicros = std::max<std::int64_t>(
-            0, elapsedMicros - delayMicros);
+        const std::int64_t recoveryMicros = std::max<std::int64_t>(0,
+            now - lastPostureHitMicros_ - SecondsToMicros(PostureRecoveryDelaySeconds));
         const std::int64_t recovered = static_cast<std::int64_t>(std::floor(
             static_cast<double>(PostureRecoveryPerSecond)
                 * static_cast<double>(recoveryMicros)
@@ -56,7 +56,7 @@ AttackReport CombatSandbox::TryAttack(AttackType type, const Math::Vec3& attacke
         lastAttack_.result = AttackResult::TargetDefeated;
         return lastAttack_;
     }
-    if (elapsedSeconds_ < nextAttackTime_) {
+    if (CurrentMicros() < nextAttackMicros_) {
         lastAttack_.result = AttackResult::Cooldown;
         return lastAttack_;
     }
@@ -75,7 +75,7 @@ AttackReport CombatSandbox::TryAttack(AttackType type, const Math::Vec3& attacke
     if (!dummy_.IsDefeated()) {
         lastAttack_.staggerTriggered = ApplyPostureDamage(attack.postureDamage);
     }
-    nextAttackTime_ = elapsedSeconds_ + attack.cooldownSeconds;
+    nextAttackMicros_ = CurrentMicros() + SecondsToMicros(attack.cooldownSeconds);
     return lastAttack_;
 }
 
@@ -91,7 +91,7 @@ int CombatSandbox::ApplyDamage(int damage) {
     }
     if (dummy_.IsDefeated()) {
         dummy_.posture = 0;
-        staggerRemaining_ = 0.0f;
+        staggerEndMicros_ = 0;
         postureAtRecoveryStart_ = 0;
     }
     return applied;
@@ -104,9 +104,9 @@ void CombatSandbox::RegisterSuccessfulAttackHit() {
 bool CombatSandbox::ConsumeStaggerOpening() {
     if (!IsStaggered()) return false;
 
-    staggerRemaining_ = 0.0f;
+    staggerEndMicros_ = 0;
     dummy_.posture = 0;
-    timeSincePostureHit_ = 0.0;
+    lastPostureHitMicros_ = CurrentMicros();
     postureAtRecoveryStart_ = 0;
     return true;
 }
@@ -115,22 +115,38 @@ void CombatSandbox::ResetTrainingSession() {
     dummy_ = TrainingDummy{};
     lastAttack_ = {AttackType::Light, AttackResult::Ready, 0, 0, false};
     stats_ = {};
-    elapsedSeconds_ = 0.0f;
-    nextAttackTime_ = 0.0f;
-    staggerRemaining_ = 0.0f;
-    timeSincePostureHit_ = 0.0;
+    elapsedSecondsPrecise_ = 0.0;
+    nextAttackMicros_ = 0;
+    staggerEndMicros_ = 0;
+    lastPostureHitMicros_ = 0;
     postureAtRecoveryStart_ = 0;
-    lastComboHitTime_ = -1000.0f;
+    lastComboHitMicros_ = -1000000000;
     comboCount_ = 0;
 }
 
+float CombatSandbox::ElapsedSeconds() const {
+    return static_cast<float>(elapsedSecondsPrecise_);
+}
+
 float CombatSandbox::CooldownRemaining() const {
-    return std::max(0.0f, nextAttackTime_ - elapsedSeconds_);
+    const std::int64_t remaining = std::max<std::int64_t>(0,
+        nextAttackMicros_ - CurrentMicros());
+    return static_cast<float>(remaining) / static_cast<float>(MicrosPerSecond);
+}
+
+float CombatSandbox::StaggerRemaining() const {
+    const std::int64_t remaining = std::max<std::int64_t>(0,
+        staggerEndMicros_ - CurrentMicros());
+    return static_cast<float>(remaining) / static_cast<float>(MicrosPerSecond);
+}
+
+bool CombatSandbox::IsStaggered() const {
+    return !dummy_.IsDefeated() && staggerEndMicros_ > CurrentMicros();
 }
 
 float CombatSandbox::TrainingDps() const {
-    return elapsedSeconds_ > 0.0f
-        ? static_cast<float>(stats_.totalDamage) / elapsedSeconds_
+    return elapsedSecondsPrecise_ > 0.0
+        ? static_cast<float>(static_cast<double>(stats_.totalDamage) / elapsedSecondsPrecise_)
         : 0.0f;
 }
 
@@ -142,22 +158,24 @@ bool CombatSandbox::ApplyPostureDamage(int postureDamage) {
     if (postureDamage <= 0 || dummy_.IsDefeated() || IsStaggered()) return false;
 
     dummy_.posture = std::min(dummy_.maximumPosture, dummy_.posture + postureDamage);
-    timeSincePostureHit_ = 0.0;
+    lastPostureHitMicros_ = CurrentMicros();
     postureAtRecoveryStart_ = dummy_.posture;
     if (dummy_.posture >= dummy_.maximumPosture) {
-        staggerRemaining_ = StaggerDurationSeconds;
+        staggerEndMicros_ = CurrentMicros() + SecondsToMicros(StaggerDurationSeconds);
         return true;
     }
     return false;
 }
 
 void CombatSandbox::RegisterComboHit() {
-    if (comboCount_ > 0 && elapsedSeconds_ - lastComboHitTime_ <= ComboWindowSeconds) {
+    const std::int64_t now = CurrentMicros();
+    if (comboCount_ > 0
+        && now - lastComboHitMicros_ <= SecondsToMicros(ComboWindowSeconds)) {
         ++comboCount_;
     } else {
         comboCount_ = 1;
     }
-    lastComboHitTime_ = elapsedSeconds_;
+    lastComboHitMicros_ = now;
     stats_.bestCombo = std::max(stats_.bestCombo, comboCount_);
 }
 
