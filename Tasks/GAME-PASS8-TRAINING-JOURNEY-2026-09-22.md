@@ -7,12 +7,13 @@ Working branch: `game/2026-09-22-training-journey-pass8`
 
 ## Scope
 
-This packet extends the persistent single-protagonist progression foundation and makes the National Mall objective optionally player-started. It does not introduce collectible characters, gacha, party switching, renderer/editor/platform changes, persistence-file formats, networking, dependencies, or deployment.
+This packet extends the persistent single-protagonist progression foundation and makes the National Mall objective optionally player-started. It does not introduce collectible characters, gacha, party switching, renderer/editor changes, persistence-file formats, networking, dependencies, or deployment.
 
 Allowed production paths:
 - `Engine/Scene/CharacterProgression.h`
 - `Engine/Scene/LandmarkInteraction.h`
 - `Engine/Scene/LandmarkInteraction.cpp`
+- `Engine/Platform/Win32Application.cpp`, limited strictly to mapping the new `LandmarkInteractionResult::ObjectiveAdvanced` result to the existing player-visible interaction-status text. This one-line integration repair was admitted after independent review found that the new game-domain result otherwise displayed as `Unknown`. Open engine PR #13 was rechecked and does not modify this file. No other platform behavior is in scope.
 
 Allowed verification/records:
 - `Tests/LandmarkInteractionTests.cpp`
@@ -43,7 +44,7 @@ Research was read on 2026-09-22. Reference mechanics are adapted to one persiste
    - https://relink.granbluefantasy.jp/en/updates
    - https://store.playstation.com/en-us/product/UP5460-PPSA06954_00-GBRELINKWPEXTD02/
 
-6. **QOL-009, opt-in landmark objective activation.** A Genshin player discussion from 2026-01-10 asks world quests not to auto-trigger merely from proximity and proposes a start confirmation. The thread had substantial support but is still community feedback, not proof of universal consensus or a current official defect. Adaptation: the National Mall objective can be configured to `ManualStart`; ordinary exploration and discoveries still work before activation, and already discovered landmarks can be revisited to advance the explicitly started objective without duplicating discovery rewards.
+6. **QOL-009, opt-in landmark objective activation.** A Genshin player discussion from 2026-01-10 asks world quests not to auto-trigger merely from proximity and proposes a start confirmation. Independent August 12-13, 2026 discussions similarly ask for explicit interaction before quests begin. These posts are community feedback, not proof of universal consensus or a current official defect. Adaptation: the National Mall objective can be configured to `ManualStart`; ordinary exploration and discoveries still work before activation, and already discovered landmarks can be revisited to advance the explicitly started objective without duplicating discovery rewards.
    - https://www.reddit.com/r/Genshin_Impact/comments/1q8skhj/its_2026_genshin_should_stop_auto_triggering/
 
 ## Acceptance
@@ -55,9 +56,11 @@ Research was read on 2026-09-22. Reference mechanics are adapted to one persiste
 - Weapon awakening requires max weapon tier, level 15 then 20, bounded material costs, and caps at rank 2.
 - Auto-start landmark behavior remains backward compatible.
 - Manual-start mode permits free discovery without quest progress, begins only after explicit activation, allows a discovered landmark to advance the objective on revisit, and cannot duplicate exploration/objective rewards or reset a progressed objective.
-- The existing registered `LandmarkInteractionTests` target covers the new behavior and repository deterministic checks pass on the exact final head.
+- Reapplying the current objective activation mode is idempotent and cannot cancel an already-started manual objective.
+- A player-visible manual objective revisit reports `Objective Advanced`, not `Unknown`, through the existing runtime title mapper.
+- The existing registered `LandmarkInteractionTests` target covers the game-domain behavior and repository deterministic checks pass on the exact final head.
 - Independent Codex review has no unresolved major finding before merge.
 
 ## Explicit limits
 
-The skill-proficiency domain does not yet receive automatic practice events from native input/combat actions, training plans/readiness have no UI, and progression still lacks a cross-process save format. Manual quest activation is domain behavior, not a rendered confirmation dialog. Native playability is not claimed in this packet.
+The skill-proficiency domain does not yet receive automatic practice events from native input/combat actions, training plans/readiness have no UI, and progression still lacks a cross-process save format. Manual quest activation is domain behavior, not a rendered confirmation dialog. Native playability is not claimed in this packet. The one-line runtime label mapping is an integration repair only and does not claim native interactive verification.
