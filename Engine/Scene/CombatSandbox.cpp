@@ -44,6 +44,10 @@ void CombatSandbox::AdvanceTime(float deltaSeconds) {
         techniqueChain_ = 0;
         lastTechniqueType_ = TechniqueType::None;
     }
+    if (defensePunishOpening_ && now > defensePunishEndMicros_) {
+        defensePunishOpening_ = false;
+        defensePunishEndMicros_ = 0;
+    }
 
     if (staggerEndMicros_ > 0) {
         if (now >= staggerEndMicros_) {
@@ -68,7 +72,7 @@ void CombatSandbox::AdvanceTime(float deltaSeconds) {
 }
 
 AttackReport CombatSandbox::TryAttack(AttackType type, const Math::Vec3& attackerPosition) {
-    lastAttack_ = {type, AttackResult::OutOfRange, 0, comboCount_, false, false, false};
+    lastAttack_ = {type, AttackResult::OutOfRange, 0, comboCount_, false, false, false, false};
     if (dummy_.IsDefeated()) {
         lastAttack_.result = AttackResult::TargetDefeated;
         return lastAttack_;
@@ -87,8 +91,15 @@ AttackReport CombatSandbox::TryAttack(AttackType type, const Math::Vec3& attacke
     }
 
     lastAttack_.result = AttackResult::Hit;
-    const int requestedDamage = AdjustDirectAttackDamage(type, attack.damage,
+    int requestedDamage = AdjustDirectAttackDamage(type, attack.damage,
         lastAttack_.resistanceApplied, lastAttack_.staggerBonusApplied);
+    if (DefensePunishOpeningReady()) {
+        requestedDamage = requestedDamage * DefensePunishDamageNumerator
+            / DefensePunishDamageDenominator;
+        lastAttack_.defensePunishBonusApplied = true;
+        defensePunishOpening_ = false;
+        defensePunishEndMicros_ = 0;
+    }
     lastAttack_.damageApplied = ApplyDamage(requestedDamage);
     RegisterComboHit();
     lastAttack_.comboCount = comboCount_;
@@ -125,6 +136,7 @@ int CombatSandbox::ApplyDamage(int damage) {
         postureAtRecoveryStart_ = 0;
         targetAffinity_ = ManaAffinity::None;
         eclipseOpening_ = false;
+        ClearEnemyAttackState();
     }
     return applied;
 }
@@ -149,7 +161,7 @@ void CombatSandbox::ResetTrainingSession() {
     dummy_.maximumHealth = enemy.maximumHealth;
     dummy_.health = enemy.maximumHealth;
     dummy_.maximumPosture = enemy.maximumPosture;
-    lastAttack_ = {AttackType::Light, AttackResult::Ready, 0, 0, false, false, false};
+    lastAttack_ = {AttackType::Light, AttackResult::Ready, 0, 0, false, false, false, false};
     stats_ = {};
     elapsedSecondsPrecise_ = 0.0;
     targetDefeatElapsedSeconds_ = -1.0;
@@ -164,11 +176,21 @@ void CombatSandbox::ResetTrainingSession() {
     techniqueChain_ = 0;
     lastTechniqueMicros_ = -1000000000;
     lastTechniqueType_ = TechniqueType::None;
+    enemyAttackSequenceIndex_ = 0;
+    enemyAttackPending_ = false;
+    pendingEnemyAttack_ = {};
+    enemyAttackReadyMicros_ = 0;
+    defensePunishOpening_ = false;
+    defensePunishEndMicros_ = 0;
 }
 
 bool CombatSandbox::SetTrainingEnemyProfile(TrainingEnemyProfile profile) {
     if (profile == enemyProfile_) return false;
     enemyProfile_ = profile;
+    if (profile != TrainingEnemyProfile::Boss) {
+        bossPracticePhaseLocked_ = false;
+        bossPracticePhase_ = EnemyPhase::Normal;
+    }
     ResetTrainingSession();
     return true;
 }
@@ -176,6 +198,70 @@ bool CombatSandbox::SetTrainingEnemyProfile(TrainingEnemyProfile profile) {
 bool CombatSandbox::SetTrainingTargetMode(TrainingTargetMode mode) {
     if (mode == targetMode_) return false;
     targetMode_ = mode;
+    ResetTrainingSession();
+    return true;
+}
+
+bool CombatSandbox::SetEnemyAggressionPreset(EnemyAggressionPreset preset) {
+    if (preset != EnemyAggressionPreset::Relaxed
+        && preset != EnemyAggressionPreset::Standard
+        && preset != EnemyAggressionPreset::Aggressive) {
+        return false;
+    }
+    if (preset == enemyAggressionPreset_) return false;
+    enemyAggressionPreset_ = preset;
+    return true;
+}
+
+bool CombatSandbox::QueueNextEnemyAttack() {
+    if (dummy_.IsDefeated() || IsStaggered() || enemyAttackPending_
+        || CurrentMicros() < enemyAttackReadyMicros_) {
+        return false;
+    }
+    pendingEnemyAttack_ = BuildEnemyAttackPlan(enemyAttackSequenceIndex_);
+    ++enemyAttackSequenceIndex_;
+    enemyAttackPending_ = true;
+    return true;
+}
+
+bool CombatSandbox::ResolveEnemyAttack(EnemyAttackOutcome outcome) {
+    if (!enemyAttackPending_) return false;
+    if (outcome != EnemyAttackOutcome::Hit
+        && outcome != EnemyAttackOutcome::Guarded
+        && outcome != EnemyAttackOutcome::Evaded
+        && outcome != EnemyAttackOutcome::PerfectDefense
+        && outcome != EnemyAttackOutcome::Interrupted) {
+        return false;
+    }
+
+    const float recoverySeconds = pendingEnemyAttack_.recoverySeconds;
+    enemyAttackPending_ = false;
+    if (outcome == EnemyAttackOutcome::PerfectDefense) {
+        defensePunishOpening_ = true;
+        defensePunishEndMicros_ =
+            CurrentMicros() + SecondsToMicros(DefensePunishWindowSeconds);
+    }
+    enemyAttackReadyMicros_ =
+        CurrentMicros() + SecondsToMicros(recoverySeconds);
+    return true;
+}
+
+bool CombatSandbox::SetBossPracticePhase(EnemyPhase phase) {
+    if (enemyProfile_ != TrainingEnemyProfile::Boss
+        || (phase != EnemyPhase::Normal && phase != EnemyPhase::Pressure)) {
+        return false;
+    }
+    if (bossPracticePhaseLocked_ && bossPracticePhase_ == phase) return false;
+    bossPracticePhaseLocked_ = true;
+    bossPracticePhase_ = phase;
+    ResetTrainingSession();
+    return true;
+}
+
+bool CombatSandbox::ClearBossPracticePhase() {
+    if (!bossPracticePhaseLocked_) return false;
+    bossPracticePhaseLocked_ = false;
+    bossPracticePhase_ = EnemyPhase::Normal;
     ResetTrainingSession();
     return true;
 }
@@ -257,8 +343,18 @@ float CombatSandbox::StaggerRemaining() const {
     return static_cast<float>(remaining) / static_cast<float>(MicrosPerSecond);
 }
 
+float CombatSandbox::EnemyAttackReadyInSeconds() const {
+    const std::int64_t remaining = std::max<std::int64_t>(
+        0, enemyAttackReadyMicros_ - CurrentMicros());
+    return static_cast<float>(remaining) / static_cast<float>(MicrosPerSecond);
+}
+
 bool CombatSandbox::IsStaggered() const {
     return !dummy_.IsDefeated() && staggerEndMicros_ > CurrentMicros();
+}
+
+bool CombatSandbox::DefensePunishOpeningReady() const {
+    return defensePunishOpening_ && CurrentMicros() <= defensePunishEndMicros_;
 }
 
 bool CombatSandbox::ComboFinisherReady() const {
@@ -276,6 +372,7 @@ EnemyPhase CombatSandbox::CurrentEnemyPhase() const {
         || dummy_.maximumHealth != 320 || dummy_.health <= 0) {
         return EnemyPhase::Normal;
     }
+    if (bossPracticePhaseLocked_) return bossPracticePhase_;
     return dummy_.health * 2 <= dummy_.maximumHealth
         ? EnemyPhase::Pressure
         : EnemyPhase::Normal;
@@ -337,6 +434,10 @@ bool CombatSandbox::ApplyPostureDamage(int postureDamage) {
         staggerEndMicros_ = CurrentMicros() + SecondsToMicros(StaggerDurationSeconds);
         SaturatingIncrement(stats_.staggerCount);
         RegisterTechnique(TechniqueType::Stagger, StaggerTechniquePoints);
+        if (enemyAttackPending_) {
+            enemyAttackPending_ = false;
+            enemyAttackReadyMicros_ = staggerEndMicros_;
+        }
         return true;
     }
     return false;
@@ -388,6 +489,71 @@ int CombatSandbox::AdjustDirectAttackDamage(AttackType type, int damage,
         adjusted = adjusted * StaggerDamageNumerator / StaggerDamageDenominator;
     }
     return adjusted;
+}
+
+EnemyAttackPlan CombatSandbox::BuildEnemyAttackPlan(std::size_t sequenceIndex) const {
+    EnemyAttackPattern pattern = EnemyAttackPattern::QuickCut;
+    switch (enemyProfile_) {
+    case TrainingEnemyProfile::Vanguard:
+        pattern = sequenceIndex % 2 == 0
+            ? EnemyAttackPattern::QuickCut
+            : EnemyAttackPattern::GuardBreaker;
+        break;
+    case TrainingEnemyProfile::Bulwark:
+        pattern = sequenceIndex % 2 == 0
+            ? EnemyAttackPattern::GuardBreaker
+            : EnemyAttackPattern::QuickCut;
+        break;
+    case TrainingEnemyProfile::Boss:
+        if (CurrentEnemyPhase() == EnemyPhase::Pressure) {
+            switch (sequenceIndex % 3) {
+            case 1: pattern = EnemyAttackPattern::RiftBurst; break;
+            case 2: pattern = EnemyAttackPattern::GuardBreaker; break;
+            case 0:
+            default: pattern = EnemyAttackPattern::QuickCut; break;
+            }
+        } else {
+            pattern = sequenceIndex % 2 == 0
+                ? EnemyAttackPattern::QuickCut
+                : EnemyAttackPattern::GuardBreaker;
+        }
+        break;
+    case TrainingEnemyProfile::Standard:
+    default:
+        pattern = EnemyAttackPattern::QuickCut;
+        break;
+    }
+
+    const float baseRecovery = EnemyRecoverySeconds();
+    switch (pattern) {
+    case EnemyAttackPattern::GuardBreaker:
+        return {pattern, 0.90f, 28, 55, true, baseRecovery + 0.15f};
+    case EnemyAttackPattern::RiftBurst:
+        return {pattern, 0.70f, 34, 0, false, baseRecovery + 0.25f};
+    case EnemyAttackPattern::QuickCut:
+    default:
+        return {pattern, 0.55f, 18, 20, true, baseRecovery};
+    }
+}
+
+float CombatSandbox::EnemyRecoverySeconds() const {
+    switch (enemyAggressionPreset_) {
+    case EnemyAggressionPreset::Relaxed:
+        return RelaxedEnemyRecoverySeconds;
+    case EnemyAggressionPreset::Aggressive:
+        return AggressiveEnemyRecoverySeconds;
+    case EnemyAggressionPreset::Standard:
+    default:
+        return StandardEnemyRecoverySeconds;
+    }
+}
+
+void CombatSandbox::ClearEnemyAttackState() {
+    enemyAttackPending_ = false;
+    pendingEnemyAttack_ = {};
+    enemyAttackReadyMicros_ = 0;
+    defensePunishOpening_ = false;
+    defensePunishEndMicros_ = 0;
 }
 
 } // namespace Astral::Scene
