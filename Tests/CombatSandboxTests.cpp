@@ -297,6 +297,114 @@ void TestSplitStableTimingBoundaries() {
     Check(cooldownSplit.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).result
         == AttackResult::Hit);
 }
+
+void TestProfileResistanceAndStaggerVulnerability() {
+    using namespace Astral::Scene;
+
+    CombatSandbox standard;
+    const AttackReport standardLight = standard.TryAttack(AttackType::Light, {});
+    Check(standardLight.damageApplied == 25 && !standardLight.resistanceApplied
+        && !standardLight.staggerBonusApplied);
+
+    CombatSandbox vanguard;
+    Check(vanguard.SetTrainingEnemyProfile(TrainingEnemyProfile::Vanguard));
+    Check(vanguard.CurrentEnemyDefinition().resistance == AttackResistance::Heavy);
+    const AttackReport resistedHeavy = vanguard.TryAttack(AttackType::Heavy, {});
+    Check(resistedHeavy.result == AttackResult::Hit && resistedHeavy.damageApplied == 48
+        && resistedHeavy.resistanceApplied && !resistedHeavy.staggerBonusApplied
+        && resistedHeavy.staggerTriggered && vanguard.IsStaggered());
+    vanguard.AdvanceTime(1.0f);
+    const AttackReport staggeredLight = vanguard.TryAttack(AttackType::Light, {});
+    Check(staggeredLight.result == AttackResult::Hit && staggeredLight.damageApplied == 31
+        && !staggeredLight.resistanceApplied && staggeredLight.staggerBonusApplied
+        && vanguard.Dummy().health == 11);
+
+    CombatSandbox boss;
+    Check(boss.SetTrainingEnemyProfile(TrainingEnemyProfile::Boss));
+    Check(boss.CurrentEnemyDefinition().resistance == AttackResistance::Light);
+    const AttackReport resistedLight = boss.TryAttack(AttackType::Light, {});
+    Check(resistedLight.damageApplied == 20 && resistedLight.resistanceApplied
+        && !resistedLight.staggerBonusApplied);
+}
+
+void TestTechniqueVarietyChain() {
+    using namespace Astral::Scene;
+
+    CombatSandbox repeated;
+    repeated.ApplyManaAffinity(ManaAffinity::Solar);
+    repeated.ApplyManaAffinity(ManaAffinity::Umbral);
+    Check(repeated.TechniqueChain() == 1
+        && repeated.LastTechniqueType() == TechniqueType::Reaction
+        && repeated.Stats().techniqueScore == CombatSandbox::ReactionTechniquePoints);
+    repeated.ApplyManaAffinity(ManaAffinity::Solar);
+    repeated.ApplyManaAffinity(ManaAffinity::Umbral);
+    Check(repeated.TechniqueChain() == 1
+        && repeated.Stats().bestTechniqueChain == 1
+        && repeated.Stats().techniqueScore == CombatSandbox::ReactionTechniquePoints * 2);
+
+    CombatSandbox varied;
+    varied.SetTrainingEnemyProfile(TrainingEnemyProfile::Bulwark);
+    varied.ApplyManaAffinity(ManaAffinity::Solar);
+    varied.ApplyManaAffinity(ManaAffinity::Umbral);
+    varied.TryAttack(AttackType::Heavy, {});
+    varied.AdvanceTime(1.0f);
+    const AttackReport stagger = varied.TryAttack(AttackType::Heavy, {});
+    Check(stagger.staggerTriggered && varied.TechniqueChain() == 2
+        && varied.LastTechniqueType() == TechniqueType::Stagger
+        && varied.Stats().bestTechniqueChain == 2);
+    Check(varied.Stats().techniqueScore
+        == CombatSandbox::ReactionTechniquePoints
+            + CombatSandbox::StaggerTechniquePoints * 2);
+    varied.AdvanceTime(CombatSandbox::TechniqueChainWindowSeconds + 0.01f);
+    Check(varied.TechniqueChain() == 0
+        && varied.LastTechniqueType() == TechniqueType::None
+        && varied.Stats().bestTechniqueChain == 2);
+}
+
+void TestBossPhaseWeaknessAndEndlessPractice() {
+    using namespace Astral::Scene;
+
+    CombatSandbox boss;
+    boss.SetCombatAssistPreset(CombatAssistPreset::Accessible);
+    Check(boss.SetTrainingEnemyProfile(TrainingEnemyProfile::Boss));
+    TrainingEnemyDefinition definition = boss.CurrentEnemyDefinition();
+    Check(boss.Dummy().maximumHealth == 320 && boss.Dummy().maximumPosture == 160
+        && definition.weakness == ManaAffinity::Solar
+        && boss.CurrentEnemyPhase() == EnemyPhase::Normal);
+
+    boss.ApplyManaAffinity(ManaAffinity::Umbral);
+    const ManaReactionReport firstPhase = boss.ApplyManaAffinity(ManaAffinity::Solar);
+    Check(firstPhase.weaknessExploited && firstPhase.bonusDamage == 30
+        && boss.Dummy().health == 290);
+    Check(boss.ApplyDamage(129) == 129 && boss.Dummy().health == 161
+        && boss.CurrentEnemyPhase() == EnemyPhase::Normal);
+    Check(boss.ApplyDamage(1) == 1 && boss.Dummy().health == 160
+        && boss.CurrentEnemyPhase() == EnemyPhase::Pressure
+        && boss.CurrentEnemyDefinition().weakness == ManaAffinity::Umbral);
+    boss.ApplyManaAffinity(ManaAffinity::Solar);
+    const ManaReactionReport secondPhase = boss.ApplyManaAffinity(ManaAffinity::Umbral);
+    Check(secondPhase.weaknessExploited && secondPhase.bonusDamage == 30);
+
+    boss.ResetTrainingSession();
+    Check(boss.Dummy().health == 320 && boss.CurrentEnemyPhase() == EnemyPhase::Normal
+        && boss.CurrentEnemyDefinition().weakness == ManaAffinity::Solar
+        && boss.AssistPreset() == CombatAssistPreset::Accessible);
+
+    Check(boss.SetTrainingTargetMode(TrainingTargetMode::Endless));
+    Check(boss.TargetMode() == TrainingTargetMode::Endless
+        && boss.Dummy().health == 320 && boss.Stats().totalDamage == 0
+        && boss.AssistPreset() == CombatAssistPreset::Accessible);
+    Check(boss.ApplyDamage(999) == 999 && boss.Dummy().health == 320
+        && !boss.Dummy().IsDefeated() && boss.Stats().totalDamage == 999
+        && boss.Stats().peakHit == 999);
+    Check(!boss.SetTrainingTargetMode(TrainingTargetMode::Endless)
+        && boss.Stats().totalDamage == 999);
+    Check(boss.SetTrainingTargetMode(TrainingTargetMode::Standard)
+        && boss.TargetMode() == TrainingTargetMode::Standard
+        && boss.EnemyProfile() == TrainingEnemyProfile::Boss
+        && boss.Dummy().health == 320 && boss.Stats().totalDamage == 0
+        && boss.AssistPreset() == CombatAssistPreset::Accessible);
+}
 }
 
 int main() {
@@ -347,6 +455,9 @@ int main() {
     TestComboStaggerAndTrainingMetrics();
     TestComboExpiryPostureRecoveryAndInvalidInputs();
     TestSplitStableTimingBoundaries();
+    TestProfileResistanceAndStaggerVulnerability();
+    TestTechniqueVarietyChain();
+    TestBossPhaseWeaknessAndEndlessPractice();
     return 0;
 }
 #endif
