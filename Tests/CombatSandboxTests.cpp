@@ -247,6 +247,114 @@ void TestComboExpiryPostureRecoveryAndInvalidInputs() {
         && recovery.Stats().hitCount == before.hitCount
         && recovery.Stats().peakHit == before.peakHit);
 }
+
+void TestEnemyTelegraphPerfectDodgeAndCounter() {
+    using namespace Astral::Scene;
+
+    CombatSandbox sandbox;
+    Check(!sandbox.ScheduleEnemyAttack(0.0f, 40));
+    Check(!sandbox.ScheduleEnemyAttack(-1.0f, 40));
+    Check(!sandbox.ScheduleEnemyAttack(std::numeric_limits<float>::quiet_NaN(), 40));
+    Check(!sandbox.ScheduleEnemyAttack(0.5f, 0));
+    Check(sandbox.ScheduleEnemyAttack(0.5f, 40));
+    Check(!sandbox.ScheduleEnemyAttack(0.5f, 40));
+    Check(sandbox.EnemyAttackActive() && NearlyEqual(sandbox.EnemyAttackRemaining(), 0.5f));
+
+    const auto early = sandbox.TryPerfectDodge();
+    Check(early.result == EnemyAttackResult::TooEarly && sandbox.EnemyAttackActive());
+    sandbox.AdvanceTime(0.3f);
+    const auto dodged = sandbox.TryPerfectDodge();
+    Check(dodged.result == EnemyAttackResult::PerfectDodged && dodged.counterGranted);
+    Check(!sandbox.EnemyAttackActive() && sandbox.Player().health == 100 && sandbox.CounterReady());
+
+    const auto outOfRange = sandbox.TryCounterAttack({-10.0f, 0.0f, 0.0f});
+    Check(outOfRange.result == CounterAttackResult::OutOfRange && sandbox.CounterReady());
+    const auto counter = sandbox.TryCounterAttack({0.0f, 0.0f, 0.0f});
+    Check(counter.result == CounterAttackResult::Activated
+        && counter.damageApplied == CombatSandbox::CounterDamage
+        && sandbox.Dummy().health == 65 && !sandbox.CounterReady());
+    Check(sandbox.TryCounterAttack({0.0f, 0.0f, 0.0f}).result
+        == CounterAttackResult::NotReady);
+
+    Check(sandbox.ScheduleEnemyAttack(0.1f, 40));
+    sandbox.AdvanceTime(0.1f);
+    Check(!sandbox.EnemyAttackActive()
+        && sandbox.LastEnemyAttack().result == EnemyAttackResult::Hit
+        && sandbox.LastEnemyAttack().damageApplied == 40
+        && sandbox.Player().health == 60);
+    Check(sandbox.TryPerfectDodge().result == EnemyAttackResult::NoAttack);
+}
+
+void TestPerfectGuardParry() {
+    using namespace Astral::Scene;
+
+    CombatSandbox sandbox;
+    Check(sandbox.ScheduleEnemyAttack(0.3f, 99));
+    Check(sandbox.TryPerfectGuard().result == EnemyAttackResult::TooEarly);
+    sandbox.AdvanceTime(0.16f);
+    const auto first = sandbox.TryPerfectGuard();
+    Check(first.result == EnemyAttackResult::PerfectGuarded
+        && first.damageApplied == 0 && !first.parryStaggerTriggered);
+    Check(sandbox.Player().health == 100 && sandbox.Dummy().posture == 40);
+
+    Check(sandbox.ScheduleEnemyAttack(0.1f, 99));
+    const auto second = sandbox.TryPerfectGuard();
+    Check(second.result == EnemyAttackResult::PerfectGuarded
+        && second.parryStaggerTriggered && sandbox.IsStaggered());
+    Check(sandbox.Player().health == 100 && sandbox.Dummy().posture == 80);
+    Check(sandbox.TryPerfectGuard().result == EnemyAttackResult::NoAttack);
+}
+
+void TestComboFinisherReadinessAndConsumption() {
+    using namespace Astral::Scene;
+
+    CombatSandbox sandbox;
+    Check(sandbox.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f}).result == AttackResult::Hit);
+    sandbox.AdvanceTime(0.4f);
+    Check(sandbox.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f}).result == AttackResult::Hit);
+    sandbox.AdvanceTime(0.4f);
+    Check(sandbox.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f}).result == AttackResult::Hit);
+    Check(sandbox.ComboCount() == 3 && sandbox.ComboFinisherReady() && sandbox.Dummy().health == 25);
+
+    const auto outOfRange = sandbox.TryComboFinisher({-10.0f, 0.0f, 0.0f});
+    Check(outOfRange.result == ComboFinisherResult::OutOfRange && sandbox.ComboFinisherReady());
+    const auto finisher = sandbox.TryComboFinisher({0.0f, 0.0f, 0.0f});
+    Check(finisher.result == ComboFinisherResult::Activated
+        && finisher.damageApplied == CombatSandbox::ComboFinisherDamage
+        && sandbox.Dummy().IsDefeated() && !sandbox.ComboFinisherReady()
+        && sandbox.ComboCount() == 0);
+    Check(sandbox.TryComboFinisher({0.0f, 0.0f, 0.0f}).result
+        == ComboFinisherResult::NotReady);
+}
+
+void TestManaAffinityReaction() {
+    using namespace Astral::Scene;
+
+    CombatSandbox sandbox;
+    const auto solar = sandbox.ApplyManaAffinity(ManaAffinity::Solar);
+    Check(solar.reaction == ManaReaction::None && solar.bonusDamage == 0
+        && sandbox.TargetAffinity() == ManaAffinity::Solar);
+    const auto solarAgain = sandbox.ApplyManaAffinity(ManaAffinity::Solar);
+    Check(solarAgain.reaction == ManaReaction::None && solarAgain.bonusDamage == 0
+        && sandbox.TargetAffinity() == ManaAffinity::Solar);
+
+    const auto eclipse = sandbox.ApplyManaAffinity(ManaAffinity::Umbral);
+    Check(eclipse.previous == ManaAffinity::Solar && eclipse.applied == ManaAffinity::Umbral
+        && eclipse.reaction == ManaReaction::Eclipse
+        && eclipse.bonusDamage == CombatSandbox::ManaReactionDamage
+        && sandbox.TargetAffinity() == ManaAffinity::None
+        && sandbox.Dummy().health == 100 - CombatSandbox::ManaReactionDamage);
+
+    const int healthBeforeNone = sandbox.Dummy().health;
+    const auto none = sandbox.ApplyManaAffinity(ManaAffinity::None);
+    Check(none.reaction == ManaReaction::None && none.bonusDamage == 0
+        && sandbox.Dummy().health == healthBeforeNone
+        && sandbox.TargetAffinity() == ManaAffinity::None);
+
+    sandbox.ApplyDamage(sandbox.Dummy().health);
+    const auto defeated = sandbox.ApplyManaAffinity(ManaAffinity::Solar);
+    Check(defeated.bonusDamage == 0 && sandbox.TargetAffinity() == ManaAffinity::None);
+}
 }
 
 int main() {
@@ -296,6 +404,10 @@ int main() {
 
     TestComboStaggerAndTrainingMetrics();
     TestComboExpiryPostureRecoveryAndInvalidInputs();
+    TestEnemyTelegraphPerfectDodgeAndCounter();
+    TestPerfectGuardParry();
+    TestComboFinisherReadinessAndConsumption();
+    TestManaAffinityReaction();
     return 0;
 }
 #endif
