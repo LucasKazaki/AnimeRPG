@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "loop_id": "astral-art-hourly-20260922",
+  "observed_main": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
+  "run_date": "2026-09-22",
+  "focus": "art direction v0.1 plus standalone starter materials v2",
+  "delivered": [
+    "proposed art bible v0.1",
+    "four generated 512x512 tileable material families with basecolor/normal/ORM/height",
+    "pinned expected manifest plus deterministic generator, validator and bounded regression tests",
+    "Blender 5.2.2 LTS plus glTF 2.0.1 source/interchange decision record"
+  ],
+  "verification": {
+    "generator": "passed",
+    "exact_regeneration_check": "passed",
+    "validator": "passed: 4 materials, 16 PNGs",
+    "regression_tests": "passed: 5/5",
+    "python_compile": "passed",
+    "archive_roundtrip": "passed as temporary author packaging check",
+    "pinned_manifest_match": "passed",
+    "runtime_render": "not_run_engine_unsupported",
+    "native_windows": "not_run",
+    "independent_art_review": "not_run"
+  },
+  "next_action": "coordinate an engine-owned triangle/UV/tangent/texture calibration path before producing character or bulk environment assets"
+}

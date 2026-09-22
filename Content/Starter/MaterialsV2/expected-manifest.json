@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "generator": "astral-materials-v2-1",
+  "scope": "Original standalone material sources for calibration and future Astral import/render tests.",
+  "provenance": "Procedural standard-library generation; no third-party texture pixels.",
+  "license": "No new public redistribution license granted; preserve repository ownership policy.",
+  "texture_origin": "top_left",
+  "normal_convention": "tangent_space_positive_y",
+  "packing": "ORM: R occlusion, G roughness, B metallic",
+  "resolution": [512, 512],
+  "materials": ["limestone", "concrete", "brushed_steel", "asphalt"],
+  "counts": {"materials": 4, "png_files": 16},
+  "files": [
+    {"path":"limestone/limestone_basecolor.png","bytes":30858,"sha256":"451c6496d8f4fe4cb179a789609cf096de7fa75291546db043d68e634b529be6","kind":"basecolor","width":512,"height":512,"color_space":"srgb","channels":"RGB base color; no directional lighting","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"limestone/limestone_normal.png","bytes":269727,"sha256":"cd94e745e8825d3db5d4f12c54958a50c2e19da8103f8df08811e99380737487","kind":"normal","width":512,"height":512,"color_space":"linear","channels":"RGB tangent-space normal; positive-Y convention","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"limestone/limestone_orm.png","bytes":50621,"sha256":"9683ad1e6678da8dcebb4889d4c910ef8700d946829856571f27cb82ebec057d","kind":"orm","width":512,"height":512,"color_space":"linear","channels":"R=occlusion, G=roughness, B=metallic","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"limestone/limestone_height.png","bytes":121141,"sha256":"1ccabed19eceada4771bb0cd2e7bfb45856420704c17dc5eceedc2a916f03497","kind":"height","width":512,"height":512,"color_space":"linear","channels":"RGB replicated grayscale authoring height","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"concrete/concrete_basecolor.png","bytes":52469,"sha256":"09a2305005600efc57cf87fd9e4e7305a16ef11f067f0a03cadd836099309978","kind":"basecolor","width":512,"height":512,"color_space":"srgb","channels":"RGB base color; no directional lighting","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"concrete/concrete_normal.png","bytes":562522,"sha256":"673a84ad9f021eb831b0a50e3ac87e4b5db896b2ebcb995e9ff3163fac0ae4a3","kind":"normal","width":512,"height":512,"color_space":"linear","channels":"RGB tangent-space normal; positive-Y convention","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"concrete/concrete_orm.png","bytes":82342,"sha256":"39003f543cc8fd355e3a989513505ebeaeb1dca31f484d2b1c4c173f7ab3b9d3","kind":"orm","width":512,"height":512,"color_space":"linear","channels":"R=occlusion, G=roughness, B=metallic","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"concrete/concrete_height.png","bytes":182833,"sha256":"6630a80e4937505c85c5750729ead2f755d5494cfc09ecd8dd877616429d1b96","kind":"height","width":512,"height":512,"color_space":"linear","channels":"RGB replicated grayscale authoring height","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"brushed_steel/brushed_steel_basecolor.png","bytes":3779,"sha256":"25971fe7aff86d92153d58d472255e5ae80589fedefb23792d5ed152eeb6eaca","kind":"basecolor","width":512,"height":512,"color_space":"srgb","channels":"RGB base color; no directional lighting","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"brushed_steel/brushed_steel_normal.png","bytes":60542,"sha256":"13656c537baa7a240a4cd81f040974ad82944a0210132df2e11dcb53934ce2a9","kind":"normal","width":512,"height":512,"color_space":"linear","channels":"RGB tangent-space normal; positive-Y convention","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"brushed_steel/brushed_steel_orm.png","bytes":9189,"sha256":"944e0a5d3adcf6d6943bdb4cbf48b6d670237033d18b68354a06ad8c5ed9dde9","kind":"orm","width":512,"height":512,"color_space":"linear","channels":"R=occlusion, G=roughness, B=metallic","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"brushed_steel/brushed_steel_height.png","bytes":27086,"sha256":"4303a226e769104931e19d3e735d5330884e69a85e47020d3c0189911f86c7c6","kind":"height","width":512,"height":512,"color_space":"linear","channels":"RGB replicated grayscale authoring height","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"asphalt/asphalt_basecolor.png","bytes":81461,"sha256":"9a9fa565a7979de20c0a79735db5d8025ec2ccb1b86c30c86e4f52266ff3f03e","kind":"basecolor","width":512,"height":512,"color_space":"srgb","channels":"RGB base color; no directional lighting","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"asphalt/asphalt_normal.png","bytes":668887,"sha256":"7b7ae65c47c42f1e3267785110722fae3f4681fbf551e61807a3654764a8dc10","kind":"normal","width":512,"height":512,"color_space":"linear","channels":"RGB tangent-space normal; positive-Y convention","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"asphalt/asphalt_orm.png","bytes":105902,"sha256":"920fbe4507afc01c96a8eb68a33f93b160899bc22a8f3cc8c5e8600cc716ff17","kind":"orm","width":512,"height":512,"color_space":"linear","channels":"R=occlusion, G=roughness, B=metallic","tileable":true,"runtime_status":"source_validated_not_imported"},
+    {"path":"asphalt/asphalt_height.png","bytes":229757,"sha256":"bc349c9cc2219d5b4eec32df02d9ca8414ae1f4f87270a6e1c982a60a7678ba0","kind":"height","width":512,"height":512,"color_space":"linear","channels":"RGB replicated grayscale authoring height","tileable":true,"runtime_status":"source_validated_not_imported"}
+  ]
+}
