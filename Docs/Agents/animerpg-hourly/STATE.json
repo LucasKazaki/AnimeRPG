@@ -18,7 +18,7 @@
   "pass": "GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22",
   "task_packet": "Tasks/GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22.md",
   "pr": 27,
-  "latest_implementation_checkpoint_before_final_records": "d493e865f7a4be3d9f571f4bff55482d590475ee",
+  "latest_implementation_checkpoint_before_final_records": "bfd7762ad23d254691bf885e9fb116928514de63",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -34,7 +34,7 @@
     {"id":"GAME-053","title":"Defense outcome round-trip","status":"implemented_registered_test_coverage"},
     {"id":"GAME-054","title":"Automatic impact synchronization","status":"implemented_review_repaired_split_stable_registered_test_coverage"},
     {"id":"GAME-055","title":"Interruption synchronization","status":"implemented_review_repaired_exact_dual_event_identity_registered_test_coverage"},
-    {"id":"GAME-056","title":"Defense drill telemetry and grade","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-056","title":"Defense drill telemetry and grade","status":"implemented_review_repaired_threshold_and_streak_registered_test_coverage"},
     {"id":"QOL-012","title":"Explicit defense timing cue metadata","status":"implemented_review_repaired_backend_metadata_no_rendered_ui"}
   ],
   "review_repairs": {
@@ -44,11 +44,16 @@
     "invalid_delta_reconciliation": "reject_nonfinite_zero_and_negative_delta_before_link_reconciliation",
     "planner_event_identity": "monotonic_successful_queue_generation_survives_reset_and_requeue",
     "impact_overflow": "split_at_impact_then_apply_frame_overflow_to_post_impact_recovery",
-    "all_known_review_threads": "replied_and_resolved_before_final_records",
+    "valid_interruption_tick_forwarding": "cancel_stale_owned_threat_then_advance_ordinary_combat_and_action_clocks_for_positive_finite_delta",
+    "exact_plan_field_regressions": "behavioral_quickcut_damage_guard_damage_blockability_and_riftburst_damage_zero_guard_damage_unblockable_coverage",
+    "grade_coverage": "ordinary_defense_and_interruption_streak_resets_plus_silver_and_below_silver_transitions",
+    "known_review_threads": "final_three_repaired_pending_reply_resolution_and_fresh_exact_head_review",
     "fresh_final_head_review": "pending"
   },
   "verification": {
     "registered_test_target": "ShadowbladeActionsTests_via_existing_astral_add_test",
+    "implementation_checkpoint_hosted_windows_ci": "started_on_bfd7762_pending_or_completed_separately",
+    "implementation_checkpoint_release_manifest": "started_on_bfd7762_pending_or_completed_separately",
     "final_records_head_hosted_windows_ci": "pending_exact_final_head",
     "final_records_head_release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
@@ -59,8 +64,9 @@
     "engine_pr_13": "separate engine/editor/runtime-smoke ownership; pass 11 does not touch its generic paths",
     "art_pr_23": "separate starter-art ownership; no overlap with pass-11 paths",
     "art_pr_26": "separate asymmetric glTF calibration ownership; no overlap with pass-11 paths",
+    "art_pr_28": "separate color/exposure calibration ownership; no overlap with pass-11 paths",
     "combat_sandbox_exception": "only monotonic enemy-planner generation added for independent-review event-identity repair",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies and R0 unchanged"
   },
-  "next_action": "Freeze branch now. Require fresh exact-head Windows/release checks and fresh independent Codex review with no unresolved material findings, re-read main and PR head immediately before merge, then merge with expected-head protection and put self-referential final SHA receipts in the PR discussion."
+  "next_action": "Freeze the final records head. Reply to and resolve the three repaired exact-head review threads, require fresh exact-head Windows/release checks and fresh independent Codex review with no unresolved material findings, re-read main and PR head immediately before merge, then merge with expected-head protection and put self-referential final SHA receipts in the PR discussion."
 }
