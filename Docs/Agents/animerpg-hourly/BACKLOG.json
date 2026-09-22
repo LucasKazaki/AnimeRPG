@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "repository": "LucasKazaki/AnimeRPG",
+  "target_branch": "main",
+  "created": "2026-09-22",
+  "baseline_commit": "771b61ac116dfa4a70d81b53a390f672aaf3bf4e",
+  "phase": "setup_research_only",
+  "per_iteration_target": {
+    "reference_feature_increments": 5,
+    "additional_community_improvements": 1
+  },
+  "counts_at_setup": {
+    "researched_reference": 5,
+    "researched_community": 1,
+    "implemented": 0,
+    "tested_gameplay": 0,
+    "playable": 0,
+    "independently_reviewed": 0,
+    "merged_gameplay": 0
+  },
+  "next_action": "Resolve live ownership and applicable review/CI gates, then admit the smallest dependency-ready GAME-001 implementation packet with regression tests.",
+  "sources": [
+    {
+      "id": "GENSHIN-OFFICIAL",
+      "kind": "official_platform_overview",
+      "url": "https://www.playstation.com/en-us/games/genshin-impact/",
+      "accessed": "2026-09-22",
+      "published": null,
+      "context": "Evergreen feature overview; not a measured gameplay capture."
+    },
+    {
+      "id": "ZZZ-OFFICIAL",
+      "kind": "developer_description",
+      "url": "https://apps.apple.com/us/app/zenless-zone-zero/id1606356401",
+      "accessed": "2026-09-22",
+      "published": null,
+      "context": "Developer description, separate from user reviews on the same page."
+    },
+    {
+      "id": "WUWA-OFFICIAL",
+      "kind": "developer_description",
+      "url": "https://apps.apple.com/us/app/wuthering-waves/id6475033368",
+      "accessed": "2026-09-22",
+      "published": null,
+      "context": "Developer description; exact timing values not provided."
+    },
+    {
+      "id": "GRANBLUE-OFFICIAL",
+      "kind": "official_platform_overview",
+      "url": "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "accessed": "2026-09-22",
+      "published": null,
+      "context": "Secondary comparison: roles, linked attacks, assists/practice; edition must be pinned for tests."
+    },
+    {
+      "id": "WUWA-PLAYER-20250401",
+      "kind": "original_player_review",
+      "url": "https://apps.apple.com/us/app/wuthering-waves/id6475033368",
+      "accessed": "2026-09-22",
+      "published": "2025-04-01",
+      "locator": "Ratings & Reviews: Perfect, for a mobile game",
+      "context": "Requests dialogue responses that acknowledge choices; historical anecdote, not consensus.",
+      "current_resolution": "unverified",
+      "independent_corroboration": false
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-001",
+      "kind": "reference_feature",
+      "title": "Direction-aware bounded dash",
+      "sources": [
+        "GENSHIN-OFFICIAL",
+        "WUWA-OFFICIAL"
+      ],
+      "gap": "Inspected TryDash adds fixed positive Y rather than intended movement direction.",
+      "evidence": [
+        "https://github.com/LucasKazaki/AnimeRPG/blob/771b61ac116dfa4a70d81b53a390f672aaf3bf4e/Engine/Scene/ShadowbladeActions.cpp"
+      ],
+      "adaptation": "Dash in a normalized desired direction with a deterministic neutral-input fallback, preserving world bounds and existing resource/cooldown semantics.",
+      "touchpoints": [
+        "Engine/Scene/ShadowbladeActions.*",
+        "Engine/Scene/PlayerController.*",
+        "Game entry point and matching tests: resolve exact files before editing"
+      ],
+      "dependencies": [
+        "Confirm coordinate/input contract and engine-worker ownership",
+        "Native input acceptance for playable integration"
+      ],
+      "acceptance": [
+        "Cardinal/diagonal distances agree; zero/nonfinite direction is handled safely",
+        "No boundary escape, duplicate cost or cooldown bypass",
+        "Actual input path produces the intended movement"
+      ],
+      "status": "researched",
+      "implementation_commit": null,
+      "test_receipts": [],
+      "native_acceptance": false,
+      "independent_review": null,
+      "merge_sha": null
+    },
+    {
+      "id": "GAME-002",
+      "kind": "reference_feature",
+      "title": "Timed dodge and counter opportunity",
+      "sources": [
+        "WUWA-OFFICIAL",
+        "ZZZ-OFFICIAL"
+      ],
+      "gap": "Inspected dash/guard code has no incoming-hit timing or earned counter state; verify other modules before adding.",
+      "evidence": [
+        "https://github.com/LucasKazaki/AnimeRPG/blob/771b61ac116dfa4a70d81b53a390f672aaf3bf4e/Engine/Scene/ShadowbladeActions.cpp",
+        "https://github.com/LucasKazaki/AnimeRPG/blob/771b61ac116dfa4a70d81b53a390f672aaf3bf4e/Engine/Scene/CombatSandbox.h"
+      ],
+      "adaptation": "An original attack timeline and bounded evasion window grant one earned counter opportunity, not unlimited invulnerability.",
+      "touchpoints": [
+        "Existing combat/Shadowblade modules",
+        "Game-specific enemy attack state and corresponding tests"
+      ],
+      "dependencies": [
+        "Incoming enemy attack and player-damage contract",
+        "Owned input integration and native acceptance"
+      ],
+      "acceptance": [
+        "Early/inside/late timing cases produce distinct correct results",
+        "A hit event cannot be negated or rewarded twice",
+        "Expired counters cannot trigger; event order is deterministic"
+      ],
+      "status": "researched",
+      "implementation_commit": null,
+      "test_receipts": [],
+      "native_acceptance": false,
+      "independent_review": null,
+      "merge_sha": null
+    },
+    {
+      "id": "GAME-003",
+      "kind": "reference_feature",
+      "title": "Stagger and recovery states",
+      "sources": [
+        "ZZZ-OFFICIAL"
+      ],
+      "gap": "Inspected training dummy tracks health only, without posture/stagger.",
+      "evidence": [
+        "https://github.com/LucasKazaki/AnimeRPG/blob/771b61ac116dfa4a70d81b53a390f672aaf3bf4e/Engine/Scene/CombatSandbox.h"
+      ],
+      "adaptation": "Add bounded posture accumulation, a brief vulnerable state and recovery with readable feedback.",
+      "touchpoints": [
+        "CombatSandbox and game-specific enemy rules",
+        "Matching domain tests; HUD integration requires shared-path coordination"
+      ],
+      "dependencies": [
+        "Damage event contract",
+        "Feedback integration acceptance"
+      ],
+      "acceptance": [
+        "Threshold crossing occurs once and values stay bounded",
+        "Defeat overrides stagger; expiry/recovery is deterministic",
+        "No permanent stun lock from duplicated events"
+      ],
+      "status": "researched",
+      "implementation_commit": null,
+      "test_receipts": [],
+      "native_acceptance": false,
+      "independent_review": null,
+      "merge_sha": null
+    },
+    {
+      "id": "GAME-004",
+      "kind": "reference_feature",
+      "title": "Contextual follow-up attack",
+      "sources": [
+        "ZZZ-OFFICIAL",
+        "GRANBLUE-OFFICIAL"
+      ],
+      "gap": "Inspected Fatal Strike is resource/cooldown gated but not linked to an earned vulnerability window.",
+      "evidence": [
+        "https://github.com/LucasKazaki/AnimeRPG/blob/771b61ac116dfa4a70d81b53a390f672aaf3bf4e/Engine/Scene/ShadowbladeActions.cpp"
+      ],
+      "adaptation": "A single-protagonist follow-up consumes one stagger opening; no forced party-switch redesign.",
+      "touchpoints": [
+        "ShadowbladeActions and combat rules",
+        "Matching tests and existing input feedback"
+      ],
+      "dependencies": [
+        "GAME-003",
+        "Independent balance/input review"
+      ],
+      "acceptance": [
+        "Opening is consumed once and expires predictably",
+        "Invalid, defeated or out-of-range targets do not spend resources",
+        "Ordinary attacks remain available under their existing rules"
+      ],
+      "status": "researched",
+      "implementation_commit": null,
+      "test_receipts": [],
+      "native_acceptance": false,
+      "independent_review": null,
+      "merge_sha": null
+    },
+    {
+      "id": "GAME-005",
+      "kind": "reference_feature",
+      "title": "Landmark objective sequence",
+      "sources": [
+        "GENSHIN-OFFICIAL"
+      ],
+      "gap": "Inspected encounter is a small discover-activate-defeat-reward flow, not a reusable objective journal.",
+      "evidence": [
+        "https://github.com/LucasKazaki/AnimeRPG/blob/771b61ac116dfa4a70d81b53a390f672aaf3bf4e/Engine/Scene/LandmarkEncounter.cpp"
+      ],
+      "adaptation": "An original National Mall objective sequence with explicit next-action feedback and idempotent completion.",
+      "touchpoints": [
+        "LandmarkEncounter.*",
+        "LandmarkInteraction.*",
+        "Game-specific objective data and tests"
+      ],
+      "dependencies": [
+        "Agree stable objective IDs and game-data ownership",
+        "Persistence interface before claiming cross-session completion"
+      ],
+      "acceptance": [
+        "Ordered and out-of-order interactions are handled explicitly",
+        "Completion/reward is idempotent across repeated events",
+        "Displayed next objective agrees with authoritative state"
+      ],
+      "status": "researched",
+      "implementation_commit": null,
+      "test_receipts": [],
+      "native_acceptance": false,
+      "independent_review": null,
+      "merge_sha": null
+    },
+    {
+      "id": "QOL-001",
+      "kind": "community_improvement",
+      "title": "Dialogue acknowledges player choices",
+      "sources": [
+        "WUWA-PLAYER-20250401"
+      ],
+      "gap": "No dialogue branching is visible in the inspected combat/landmark modules; search the full live tree before creating a subsystem.",
+      "evidence": [
+        "https://github.com/LucasKazaki/AnimeRPG/blob/771b61ac116dfa4a70d81b53a390f672aaf3bf4e/Engine/Scene/LandmarkEncounter.cpp"
+      ],
+      "adaptation": "A bounded authored conversation gives choice-specific responses, remembers asked questions and cannot regrant quest rewards.",
+      "touchpoints": [
+        "Game-specific dialogue data/state: proposed, not existing",
+        "Objective integration and tests; UI is a coordinated dependency"
+      ],
+      "dependencies": [
+        "Locate any existing dialogue implementation",
+        "GAME-005 for quest-linked outcomes",
+        "Native UI acceptance before claiming a playable conversation"
+      ],
+      "acceptance": [
+        "Two distinct choices reach different appropriate response IDs",
+        "Already-asked questions do not loop unexpectedly",
+        "Repeated/reloaded completion cannot duplicate a reward"
+      ],
+      "sentiment": "Historical single-review request; current comparator resolution and consensus unverified",
+      "status": "researched",
+      "implementation_commit": null,
+      "test_receipts": [],
+      "native_acceptance": false,
+      "independent_review": null,
+      "merge_sha": null
+    }
+  ]
+}
