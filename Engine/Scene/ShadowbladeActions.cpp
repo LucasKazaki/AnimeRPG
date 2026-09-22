@@ -29,7 +29,8 @@ void ShadowbladeActions::SetGuarding(bool guarding) {
         guarding ? ShadowActionResult::Guarding : ShadowActionResult::Ready, 0, {}};
 }
 
-ShadowActionReport ShadowbladeActions::TryDash(const Math::Vec3& position) {
+ShadowActionReport ShadowbladeActions::TryDash(const Math::Vec3& position,
+    const Math::Vec3& direction) {
     lastAction_ = {ShadowActionType::Dash, ShadowActionResult::Ready, 0, position};
     if (guarding_) {
         lastAction_.result = ShadowActionResult::GuardedConflict;
@@ -44,10 +45,25 @@ ShadowActionReport ShadowbladeActions::TryDash(const Math::Vec3& position) {
         return lastAction_;
     }
 
+    float directionX = direction.x;
+    float directionY = direction.y;
+    const float lengthSquared = directionX * directionX + directionY * directionY;
+    if (!std::isfinite(directionX) || !std::isfinite(directionY)
+        || !std::isfinite(lengthSquared) || lengthSquared <= 0.000001f) {
+        directionX = 0.0f;
+        directionY = 1.0f;
+    } else {
+        const float inverseLength = 1.0f / std::sqrt(lengthSquared);
+        directionX *= inverseLength;
+        directionY *= inverseLength;
+    }
+
     resource_ -= DashCost;
     dashCooldownRemaining_ = DashCooldownSeconds;
     lastAction_.result = ShadowActionResult::Activated;
-    lastAction_.dashDestination.y += DashDistance;
+    lastAction_.resourceSpent = DashCost;
+    lastAction_.dashDestination.x += directionX * DashDistance;
+    lastAction_.dashDestination.y += directionY * DashDistance;
     return lastAction_;
 }
 
@@ -66,7 +82,10 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
         lastAction_.result = ShadowActionResult::Cooldown;
         return lastAction_;
     }
-    if (resource_ < FatalStrikeCost) {
+
+    const bool followUp = combatSandbox.IsStaggered();
+    const float resourceCost = followUp ? StaggerFollowUpCost : FatalStrikeCost;
+    if (resource_ < resourceCost) {
         lastAction_.result = ShadowActionResult::InsufficientResource;
         return lastAction_;
     }
@@ -79,10 +98,18 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
         return lastAction_;
     }
 
-    resource_ -= FatalStrikeCost;
+    resource_ -= resourceCost;
     fatalStrikeCooldownRemaining_ = FatalStrikeCooldownSeconds;
     lastAction_.result = ShadowActionResult::Activated;
+    lastAction_.followUp = followUp;
+    lastAction_.resourceSpent = resourceCost;
+    if (followUp) {
+        combatSandbox.ConsumeStaggerOpening();
+    }
     lastAction_.damageApplied = combatSandbox.ApplyDamage(FatalStrikeDamage);
+    if (lastAction_.damageApplied > 0) {
+        combatSandbox.RegisterSuccessfulAttackHit();
+    }
     return lastAction_;
 }
 

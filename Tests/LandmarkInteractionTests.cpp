@@ -64,6 +64,42 @@ void TestBoundedDiscoveryLedgerAndRepeatSafety() {
         "repeat interaction is deterministic and cannot grow the ledger");
 }
 
+void TestOrderedObjectiveGuidanceKeepsFreeDiscovery() {
+    using namespace Astral::Scene;
+    WorldBlockout world;
+    LandmarkInteraction interaction;
+    ShadowbladeActions actions;
+
+    Expect(interaction.ObjectiveProgress() == 0
+            && interaction.CurrentObjective() == LandmarkObjectiveStage::DiscoverLincoln,
+        "objective begins at Lincoln regardless of free exploration");
+
+    const auto monument = interaction.TryInteract({5.0f, 68.0f, 0.0f}, world, actions);
+    Expect(monument.result == LandmarkInteractionResult::Discovered
+            && interaction.IsVisited(LandmarkKind::WashingtonMonument),
+        "out-of-order landmark discovery is retained");
+    Expect(interaction.ObjectiveProgress() == 0
+            && interaction.CurrentObjective() == LandmarkObjectiveStage::DiscoverLincoln,
+        "out-of-order discovery does not skip the missing prerequisite objective");
+
+    const auto lincoln = interaction.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions);
+    Expect(lincoln.result == LandmarkInteractionResult::Discovered
+            && interaction.ObjectiveProgress() == 1
+            && interaction.CurrentObjective() == LandmarkObjectiveStage::DiscoverReflectingPool,
+        "discovering Lincoln advances guidance to the Reflecting Pool");
+
+    const auto pool = interaction.TryInteract({4.0f, 39.0f, 0.0f}, world, actions);
+    Expect(pool.result == LandmarkInteractionResult::Discovered
+            && interaction.ObjectiveProgress() == LandmarkInteraction::LedgerCapacity
+            && interaction.ObjectiveComplete(),
+        "completing the missing ordered prefix counts an already-discovered later landmark");
+
+    const auto repeated = interaction.TryInteract({5.0f, 68.0f, 0.0f}, world, actions);
+    Expect(repeated.result == LandmarkInteractionResult::AlreadyVisited
+            && interaction.ObjectiveComplete(),
+        "repeat interactions cannot regress or over-advance completed objectives");
+}
+
 void TestRewardRoutesThroughResourceRules() {
     using namespace Astral::Scene;
     WorldBlockout world;
@@ -95,6 +131,7 @@ void TestRewardRoutesThroughResourceRules() {
 int main() {
     TestDeterministicProximitySelection();
     TestBoundedDiscoveryLedgerAndRepeatSafety();
+    TestOrderedObjectiveGuidanceKeepsFreeDiscovery();
     TestRewardRoutesThroughResourceRules();
     if (failures != 0) return 1;
     std::cout << "Landmark interaction tests passed\n";

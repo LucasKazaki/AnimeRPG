@@ -28,6 +28,8 @@ struct ShadowActionReport {
     ShadowActionResult result{ShadowActionResult::Ready};
     int damageApplied{};
     Math::Vec3 dashDestination{};
+    bool followUp{};
+    float resourceSpent{};
 };
 
 class ShadowbladeActions {
@@ -38,6 +40,7 @@ public:
     static constexpr float DashCooldownSeconds = 1.0f;
     static constexpr float DashDistance = 6.0f;
     static constexpr float FatalStrikeCost = 50.0f;
+    static constexpr float StaggerFollowUpCost = 30.0f;
     static constexpr float FatalStrikeCooldownSeconds = 2.0f;
     static constexpr float FatalStrikeRange = 3.5f;
     static constexpr int FatalStrikeDamage = 80;
@@ -45,7 +48,8 @@ public:
     void AdvanceTime(float deltaSeconds);
     float RestoreResource(float amount);
     void SetGuarding(bool guarding);
-    ShadowActionReport TryDash(const Math::Vec3& position);
+    ShadowActionReport TryDash(const Math::Vec3& position,
+        const Math::Vec3& direction = {0.0f, 1.0f, 0.0f});
     ShadowActionReport TryFatalStrike(const Math::Vec3& position, CombatSandbox& combatSandbox);
 
     float Resource() const { return resource_; }

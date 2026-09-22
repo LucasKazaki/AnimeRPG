@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 
 #ifdef ASTRAL_RUNTIME_SMOKE
 #include <windows.h>
@@ -150,6 +151,152 @@ bool NearlyEqual(float left, float right) {
 void Check(bool condition) {
     if (!condition) std::abort();
 }
+
+void TestComboStaggerAndTrainingMetrics() {
+    using namespace Astral::Scene;
+
+    CombatSandbox sandbox;
+    Check(sandbox.Stats().totalDamage == 0 && sandbox.Stats().hitCount == 0
+        && sandbox.Stats().peakHit == 0 && sandbox.Stats().bestCombo == 0);
+
+    const AttackReport light = sandbox.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    Check(light.result == AttackResult::Hit && light.comboCount == 1);
+    Check(sandbox.ComboCount() == 1 && sandbox.Dummy().posture == 25);
+    Check(sandbox.Stats().totalDamage == 25 && sandbox.Stats().hitCount == 1
+        && sandbox.Stats().peakHit == 25 && sandbox.Stats().bestCombo == 1);
+
+    sandbox.AdvanceTime(0.4f);
+    const AttackReport heavy = sandbox.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    Check(heavy.result == AttackResult::Hit && heavy.comboCount == 2
+        && heavy.staggerTriggered);
+    Check(sandbox.IsStaggered() && sandbox.Dummy().posture == sandbox.Dummy().maximumPosture);
+    Check(sandbox.Stats().totalDamage == 85 && sandbox.Stats().hitCount == 2
+        && sandbox.Stats().peakHit == 60 && sandbox.Stats().bestCombo == 2);
+
+    sandbox.AdvanceTime(0.5f);
+    Check(sandbox.IsStaggered() && sandbox.StaggerRemaining() > 0.0f);
+    Check(sandbox.ConsumeStaggerOpening());
+    Check(!sandbox.IsStaggered() && sandbox.Dummy().posture == 0);
+    Check(!sandbox.ConsumeStaggerOpening());
+
+    sandbox.ResetTrainingSession();
+    Check(sandbox.Dummy().health == sandbox.Dummy().maximumHealth
+        && sandbox.Dummy().posture == 0 && sandbox.ComboCount() == 0);
+    Check(sandbox.Stats().totalDamage == 0 && sandbox.Stats().hitCount == 0
+        && sandbox.Stats().peakHit == 0 && sandbox.Stats().bestCombo == 0);
+    Check(NearlyEqual(sandbox.ElapsedSeconds(), 0.0f)
+        && NearlyEqual(sandbox.CooldownRemaining(), 0.0f));
+}
+
+void TestComboExpiryPostureRecoveryAndInvalidInputs() {
+    using namespace Astral::Scene;
+
+    CombatSandbox sandbox;
+    sandbox.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    sandbox.AdvanceTime(CombatSandbox::ComboWindowSeconds + 0.01f);
+    Check(sandbox.ComboCount() == 0);
+    Check(sandbox.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f}).comboCount == 1);
+
+    CombatSandbox recovery;
+    recovery.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    recovery.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds - 0.01f);
+    Check(recovery.Dummy().posture == 25);
+    recovery.AdvanceTime(0.04f);
+    Check(recovery.Dummy().posture == 24);
+
+    CombatSandbox oneStep;
+    CombatSandbox splitSteps;
+    oneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    splitSteps.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    oneStep.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds + 0.5f);
+    splitSteps.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    for (int step = 0; step < 50; ++step) splitSteps.AdvanceTime(0.01f);
+    Check(oneStep.Dummy().posture == splitSteps.Dummy().posture);
+
+    CombatSandbox exactOneStep;
+    CombatSandbox exact30Hz;
+    CombatSandbox exact60Hz;
+    CombatSandbox exact90Hz;
+    exactOneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    exact30Hz.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    exact60Hz.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    exact90Hz.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    exactOneStep.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds + 0.2f);
+    exact30Hz.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    exact60Hz.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    exact90Hz.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    for (int step = 0; step < 6; ++step) exact30Hz.AdvanceTime(1.0f / 30.0f);
+    for (int step = 0; step < 12; ++step) exact60Hz.AdvanceTime(1.0f / 60.0f);
+    for (int step = 0; step < 18; ++step) exact90Hz.AdvanceTime(1.0f / 90.0f);
+    Check(exactOneStep.Dummy().posture == 18);
+    Check(exact30Hz.Dummy().posture == exactOneStep.Dummy().posture);
+    Check(exact60Hz.Dummy().posture == exactOneStep.Dummy().posture);
+    Check(exact90Hz.Dummy().posture == exactOneStep.Dummy().posture);
+
+    const float elapsed = recovery.ElapsedSeconds();
+    const int posture = recovery.Dummy().posture;
+    recovery.AdvanceTime(0.0f);
+    recovery.AdvanceTime(-1.0f);
+    recovery.AdvanceTime(std::numeric_limits<float>::quiet_NaN());
+    recovery.AdvanceTime(std::numeric_limits<float>::infinity());
+    Check(NearlyEqual(recovery.ElapsedSeconds(), elapsed) && recovery.Dummy().posture == posture);
+
+    const TrainingStats before = recovery.Stats();
+    Check(recovery.ApplyDamage(0) == 0 && recovery.ApplyDamage(-5) == 0);
+    Check(recovery.Stats().totalDamage == before.totalDamage
+        && recovery.Stats().hitCount == before.hitCount
+        && recovery.Stats().peakHit == before.peakHit);
+}
+
+void TestSplitStableTimingBoundaries() {
+    using namespace Astral::Scene;
+
+    CombatSandbox comboOneStep;
+    CombatSandbox comboSplit;
+    comboOneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    comboSplit.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    comboOneStep.AdvanceTime(CombatSandbox::ComboWindowSeconds);
+    for (int step = 0; step < 7; ++step) {
+        comboSplit.AdvanceTime(CombatSandbox::ComboWindowSeconds / 7.0f);
+    }
+    comboOneStep.RegisterSuccessfulAttackHit();
+    comboSplit.RegisterSuccessfulAttackHit();
+    Check(comboOneStep.ComboCount() == 2 && comboSplit.ComboCount() == 2);
+
+    CombatSandbox staggerOneStep;
+    CombatSandbox staggerSplit;
+    staggerOneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    staggerSplit.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    staggerOneStep.AdvanceTime(0.4f);
+    staggerSplit.AdvanceTime(0.4f);
+    Check(staggerOneStep.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).staggerTriggered);
+    Check(staggerSplit.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).staggerTriggered);
+    staggerOneStep.AdvanceTime(CombatSandbox::StaggerDurationSeconds);
+    for (int step = 0; step < 30; ++step) staggerSplit.AdvanceTime(0.05f);
+    Check(!staggerOneStep.IsStaggered() && !staggerSplit.IsStaggered());
+    Check(staggerOneStep.Dummy().posture == 0 && staggerSplit.Dummy().posture == 0);
+
+    CombatSandbox longRecoveryOneStep;
+    CombatSandbox longRecoverySplit;
+    longRecoveryOneStep.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    longRecoverySplit.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    longRecoveryOneStep.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds + 1.4f);
+    longRecoverySplit.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    for (int step = 0; step < 35; ++step) longRecoverySplit.AdvanceTime(1.0f / 25.0f);
+    Check(longRecoveryOneStep.Dummy().posture == 21);
+    Check(longRecoverySplit.Dummy().posture == longRecoveryOneStep.Dummy().posture);
+
+    CombatSandbox cooldownOneStep;
+    CombatSandbox cooldownSplit;
+    cooldownOneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    cooldownSplit.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    cooldownOneStep.AdvanceTime(0.4f);
+    for (int step = 0; step < 4; ++step) cooldownSplit.AdvanceTime(0.1f);
+    Check(cooldownOneStep.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).result
+        == AttackResult::Hit);
+    Check(cooldownSplit.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).result
+        == AttackResult::Hit);
+}
 }
 
 int main() {
@@ -197,6 +344,9 @@ int main() {
     Check(report.damageApplied == 0);
     Check(cooldownSandbox.Dummy().health == 0);
 
+    TestComboStaggerAndTrainingMetrics();
+    TestComboExpiryPostureRecoveryAndInvalidInputs();
+    TestSplitStableTimingBoundaries();
     return 0;
 }
 #endif
