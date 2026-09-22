@@ -405,6 +405,115 @@ void TestBossPhaseWeaknessAndEndlessPractice() {
         && boss.Dummy().health == 320 && boss.Stats().totalDamage == 0
         && boss.AssistPreset() == CombatAssistPreset::Accessible);
 }
+
+void TestEnemyAttackPatternsAggressionBossPracticeAndPunish() {
+    using namespace Astral::Scene;
+
+    CombatSandbox standard;
+    Check(standard.QueueNextEnemyAttack());
+    const EnemyAttackPlan standardPlan = standard.PendingEnemyAttack();
+    Check(standardPlan.pattern == EnemyAttackPattern::QuickCut
+        && NearlyEqual(standardPlan.windupSeconds, 0.55f)
+        && standardPlan.damage == 18 && standardPlan.guardDamage == 20
+        && standardPlan.blockable);
+    Check(!standard.QueueNextEnemyAttack());
+    Check(standard.ResolveEnemyAttack(EnemyAttackOutcome::Hit));
+    Check(!standard.ResolveEnemyAttack(EnemyAttackOutcome::Hit));
+    Check(!standard.QueueNextEnemyAttack());
+    standard.AdvanceTime(standardPlan.recoverySeconds);
+    Check(standard.QueueNextEnemyAttack());
+
+    CombatSandbox aggression;
+    Check(aggression.SetEnemyAggressionPreset(EnemyAggressionPreset::Relaxed));
+    Check(aggression.QueueNextEnemyAttack());
+    const EnemyAttackPlan relaxedPlan = aggression.PendingEnemyAttack();
+    Check(NearlyEqual(relaxedPlan.recoverySeconds,
+        CombatSandbox::RelaxedEnemyRecoverySeconds));
+    Check(aggression.SetEnemyAggressionPreset(EnemyAggressionPreset::Aggressive));
+    Check(NearlyEqual(aggression.PendingEnemyAttack().recoverySeconds,
+        CombatSandbox::RelaxedEnemyRecoverySeconds));
+    Check(aggression.ResolveEnemyAttack(EnemyAttackOutcome::Guarded));
+    aggression.AdvanceTime(relaxedPlan.recoverySeconds);
+    Check(aggression.QueueNextEnemyAttack());
+    Check(NearlyEqual(aggression.PendingEnemyAttack().recoverySeconds,
+        CombatSandbox::AggressiveEnemyRecoverySeconds));
+    Check(!aggression.SetEnemyAggressionPreset(
+        static_cast<EnemyAggressionPreset>(99)));
+
+    CombatSandbox boss;
+    Check(boss.SetTrainingEnemyProfile(TrainingEnemyProfile::Boss));
+    Check(boss.QueueNextEnemyAttack());
+    const EnemyAttackPlan normalFirst = boss.PendingEnemyAttack();
+    Check(normalFirst.pattern == EnemyAttackPattern::QuickCut);
+    Check(boss.ResolveEnemyAttack(EnemyAttackOutcome::Evaded));
+    boss.AdvanceTime(normalFirst.recoverySeconds);
+    Check(boss.QueueNextEnemyAttack());
+    Check(boss.PendingEnemyAttack().pattern == EnemyAttackPattern::GuardBreaker);
+
+    Check(boss.SetBossPracticePhase(EnemyPhase::Pressure));
+    Check(boss.BossPracticePhaseLocked()
+        && boss.CurrentEnemyPhase() == EnemyPhase::Pressure
+        && boss.Dummy().health == boss.Dummy().maximumHealth
+        && boss.CurrentEnemyDefinition().weakness == ManaAffinity::Umbral);
+    Check(boss.QueueNextEnemyAttack());
+    const EnemyAttackPlan pressureFirst = boss.PendingEnemyAttack();
+    Check(pressureFirst.pattern == EnemyAttackPattern::QuickCut);
+    Check(boss.ResolveEnemyAttack(EnemyAttackOutcome::Evaded));
+    boss.AdvanceTime(pressureFirst.recoverySeconds);
+    Check(boss.QueueNextEnemyAttack());
+    Check(boss.PendingEnemyAttack().pattern == EnemyAttackPattern::RiftBurst
+        && !boss.PendingEnemyAttack().blockable);
+    boss.ResetTrainingSession();
+    Check(boss.CurrentEnemyPhase() == EnemyPhase::Pressure
+        && boss.BossPracticePhaseLocked());
+    Check(!boss.SetBossPracticePhase(static_cast<EnemyPhase>(99)));
+    Check(boss.ClearBossPracticePhase()
+        && boss.CurrentEnemyPhase() == EnemyPhase::Normal
+        && !boss.BossPracticePhaseLocked());
+
+    CombatSandbox bulwark;
+    Check(bulwark.SetTrainingEnemyProfile(TrainingEnemyProfile::Bulwark));
+    Check(bulwark.QueueNextEnemyAttack() && bulwark.HasPendingEnemyAttack());
+    const AttackReport firstHeavy = bulwark.TryAttack(AttackType::Heavy, {});
+    Check(firstHeavy.result == AttackResult::Hit && !firstHeavy.staggerTriggered);
+    bulwark.AdvanceTime(1.0f);
+    const AttackReport secondHeavy = bulwark.TryAttack(AttackType::Heavy, {});
+    Check(secondHeavy.staggerTriggered && bulwark.IsStaggered()
+        && !bulwark.HasPendingEnemyAttack());
+    Check(!bulwark.QueueNextEnemyAttack());
+    bulwark.AdvanceTime(CombatSandbox::StaggerDurationSeconds);
+    Check(!bulwark.IsStaggered() && bulwark.QueueNextEnemyAttack());
+
+    CombatSandbox punish;
+    Check(punish.QueueNextEnemyAttack());
+    Check(punish.ResolveEnemyAttack(EnemyAttackOutcome::PerfectDefense)
+        && punish.DefensePunishOpeningReady());
+    const AttackReport miss = punish.TryAttack(AttackType::Light, {-10.0f, 0.0f, 0.0f});
+    Check(miss.result == AttackResult::OutOfRange && punish.DefensePunishOpeningReady());
+    const AttackReport punishHit = punish.TryAttack(AttackType::Light, {});
+    Check(punishHit.result == AttackResult::Hit && punishHit.defensePunishBonusApplied
+        && punishHit.damageApplied == 31 && !punish.DefensePunishOpeningReady());
+    punish.AdvanceTime(0.4f);
+    const AttackReport ordinary = punish.TryAttack(AttackType::Light, {});
+    Check(ordinary.result == AttackResult::Hit && !ordinary.defensePunishBonusApplied
+        && ordinary.damageApplied == 25);
+
+    CombatSandbox expired;
+    Check(expired.QueueNextEnemyAttack());
+    Check(expired.ResolveEnemyAttack(EnemyAttackOutcome::PerfectDefense));
+    expired.AdvanceTime(CombatSandbox::DefensePunishWindowSeconds + 0.01f);
+    Check(!expired.DefensePunishOpeningReady());
+    const AttackReport afterExpiry = expired.TryAttack(AttackType::Light, {});
+    Check(afterExpiry.damageApplied == 25 && !afterExpiry.defensePunishBonusApplied);
+
+    CombatSandbox invalid;
+    Check(!invalid.SetBossPracticePhase(EnemyPhase::Pressure));
+    Check(!invalid.ClearBossPracticePhase());
+    Check(invalid.QueueNextEnemyAttack());
+    Check(!invalid.ResolveEnemyAttack(static_cast<EnemyAttackOutcome>(99))
+        && invalid.HasPendingEnemyAttack());
+    Check(invalid.ResolveEnemyAttack(EnemyAttackOutcome::Hit));
+}
 }
 
 int main() {
@@ -458,6 +567,7 @@ int main() {
     TestProfileResistanceAndStaggerVulnerability();
     TestTechniqueVarietyChain();
     TestBossPhaseWeaknessAndEndlessPractice();
+    TestEnemyAttackPatternsAggressionBossPracticeAndPunish();
     return 0;
 }
 #endif
