@@ -187,4 +187,8 @@ EditorMessageLoopAction ClassifyEditorMessageResult(int result) {
     return EditorMessageLoopAction::Dispatch;
 }
 
+bool AreRequiredEditorControlsCreated(const EditorControlCreationState& created) {
+    return std::all_of(created.begin(), created.end(), [](bool value) { return value; });
+}
+
 } // namespace Astral::Editor
