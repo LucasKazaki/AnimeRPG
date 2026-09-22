@@ -6,12 +6,14 @@
 #include <limits>
 
 namespace {
+using Astral::Editor::ClassifyEditorMessageResult;
 using Astral::Editor::ComputeEditorLayout;
 using Astral::Editor::ComputeEditorPanelContentLayout;
 using Astral::Editor::ComputeEditorStatusContentLayout;
 using Astral::Editor::ComputeEditorToolbarLayout;
 using Astral::Editor::ComputeEditorViewportClipRect;
 using Astral::Editor::Contains;
+using Astral::Editor::EditorMessageLoopAction;
 using Astral::Editor::EditorRect;
 using Astral::Editor::EditorTool;
 using Astral::Editor::IsEditorToolAvailable;
@@ -207,6 +209,17 @@ int main() {
         "Scale toolbar control must remain disabled until transform editing exists");
     ok &= Expect(!IsEditorToolAvailable(EditorTool::Play),
         "Play toolbar control must remain disabled until play-in-editor exists");
+
+    ok &= Expect(ClassifyEditorMessageResult(1) == EditorMessageLoopAction::Dispatch,
+        "positive GetMessage result must dispatch");
+    ok &= Expect(ClassifyEditorMessageResult(42) == EditorMessageLoopAction::Dispatch,
+        "all positive GetMessage results must dispatch");
+    ok &= Expect(ClassifyEditorMessageResult(0) == EditorMessageLoopAction::Quit,
+        "zero GetMessage result must terminate normally");
+    ok &= Expect(ClassifyEditorMessageResult(-1) == EditorMessageLoopAction::Error,
+        "GetMessage error must not be treated as normal quit");
+    ok &= Expect(ClassifyEditorMessageResult(minInt) == EditorMessageLoopAction::Error,
+        "negative message results must fail closed");
 
     if (!ok) return EXIT_FAILURE;
     std::cout << "EditorLayoutTests: PASS\n";
