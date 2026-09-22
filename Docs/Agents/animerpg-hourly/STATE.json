@@ -16,7 +16,7 @@
   },
   "working_branch": "game/2026-09-22-enemy-patterns-pass10",
   "pass": "GAME-PASS10-ENEMY-PATTERNS-2026-09-22",
-  "pr": null,
+  "pr": 25,
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -50,5 +50,5 @@
     "art_pr_23": "active starter-art work; no overlap with pass-10 paths",
     "shared_engine_paths": "CMake renderer platform editor import animation audio physics workflows dependencies and R0 unchanged"
   },
-  "next_action": "Open one scoped pass-10 PR, freeze the exact head, require hosted Windows/repository checks and independent Codex review, fix any finding without weakening acceptance, then merge with expected-head protection only if all applicable gates are green and verify main afterward."
+  "next_action": "Freeze PR #25 at its exact final head, require hosted Windows/repository checks and independent Codex review, fix any finding without weakening acceptance, then merge with expected-head protection only if all applicable gates are green and verify main afterward."
 }
