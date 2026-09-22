@@ -16,6 +16,11 @@ constexpr DWORD kWindowPollIntervalMs = 50;
 constexpr DWORD kResizePollIntervalMs = 25;
 constexpr DWORD kResizeTimeoutMs = 1500;
 constexpr int kStableWindowSamples = 20;
+constexpr wchar_t kSceneRootInspectorText[] =
+    L"Name: Scene Root\r\nType: Scene\r\n\r\nTransform: n/a\r\n\r\nE11.0 editor fixture";
+constexpr wchar_t kCubeInspectorText[] =
+    L"Name: Cube\r\nType: Primitive placeholder\r\n\r\nPosition: 0, 0.5, 0\r\n"
+    L"Rotation: 0, 0, 0\r\nScale: 1, 1, 1";
 
 struct ProcessWindowCollection {
     DWORD processId{};
@@ -151,16 +156,6 @@ HWND FindControlByText(const std::vector<ChildControl>& controls,
     return nullptr;
 }
 
-HWND FindControlByPrefix(const std::vector<ChildControl>& controls,
-    const wchar_t* className, const std::wstring& prefix) {
-    for (const auto& control : controls) {
-        if (control.className == className && control.text.rfind(prefix, 0) == 0) {
-            return control.handle;
-        }
-    }
-    return nullptr;
-}
-
 bool DirectChildrenContained(HWND window, std::wstring& failure) {
     RECT client{};
     if (!GetClientRect(window, &client)) {
@@ -223,6 +218,25 @@ bool ResizeAndCheck(HWND window, int width, int height, std::wstring& failure) {
 
 bool ReadListboxValue(HWND listbox, UINT message, WPARAM wParam, LRESULT& value) {
     return SendMessageBounded(listbox, message, wParam, 0, value) && value != LB_ERR;
+}
+
+bool ReadListboxText(HWND listbox, int index, std::wstring& text) {
+    LRESULT textLength = LB_ERR;
+    if (!SendMessageBounded(listbox, LB_GETTEXTLEN, static_cast<WPARAM>(index), 0, textLength)
+        || textLength == LB_ERR || textLength < 0 || textLength > 8192) {
+        return false;
+    }
+
+    std::wstring buffer(static_cast<std::size_t>(textLength) + 1, L'\0');
+    LRESULT copied = LB_ERR;
+    if (!SendMessageBounded(listbox, LB_GETTEXT, static_cast<WPARAM>(index),
+            reinterpret_cast<LPARAM>(buffer.data()), copied)
+        || copied == LB_ERR || copied < 0 || copied > textLength) {
+        return false;
+    }
+    buffer.resize(static_cast<std::size_t>(copied));
+    text = std::move(buffer);
+    return true;
 }
 
 bool WindowOwnedByProcess(HWND window, DWORD processId) {
@@ -308,21 +322,27 @@ int wmain(int argc, wchar_t** argv) {
 
             const HWND outliner = GetDlgItem(window, kOutlinerId);
             const HWND assets = GetDlgItem(window, kAssetListId);
-            const HWND inspector = FindControlByPrefix(controls, L"Static", L"Name: Scene Root");
+            const HWND inspector = FindControlByText(controls, L"Static", kSceneRootInspectorText);
             if (pendingStateOk && (!outliner || !assets || !inspector)) {
-                failure = L"required Outliner/assets/Inspector control not found";
+                failure = L"required Outliner/assets/exact Scene Root Inspector control not found";
                 pendingStateOk = false;
             }
 
             LRESULT outlinerCount = LB_ERR;
             LRESULT assetCount = LB_ERR;
             LRESULT selection = LB_ERR;
+            std::wstring sceneRootItem;
+            std::wstring cubeItem;
             if (pendingStateOk
                 && (!ReadListboxValue(outliner, LB_GETCOUNT, 0, outlinerCount)
                     || !ReadListboxValue(assets, LB_GETCOUNT, 0, assetCount)
                     || !ReadListboxValue(outliner, LB_GETCURSEL, 0, selection)
-                    || outlinerCount != 5 || assetCount != 4 || selection != 0)) {
-                failure = L"unexpected initial Outliner/assets state";
+                    || !ReadListboxText(outliner, 0, sceneRootItem)
+                    || !ReadListboxText(outliner, 3, cubeItem)
+                    || outlinerCount != 5 || assetCount != 4 || selection != 0
+                    || sceneRootItem != L"Scene Root" || cubeItem != L"Cube"
+                    || WindowText(inspector) != kSceneRootInspectorText)) {
+                failure = L"unexpected initial Outliner/assets/Inspector fixture state";
                 pendingStateOk = false;
             }
 
@@ -334,8 +354,8 @@ int wmain(int argc, wchar_t** argv) {
                 const bool notified = selected && SendMessageBounded(window, WM_COMMAND,
                     MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
                     reinterpret_cast<LPARAM>(outliner), commandResult);
-                if (!notified || WindowText(inspector).rfind(L"Name: Cube", 0) != 0) {
-                    failure = L"Outliner Cube selection did not update Inspector";
+                if (!notified || WindowText(inspector) != kCubeInspectorText) {
+                    failure = L"Outliner Cube selection did not produce the complete Cube Inspector fixture";
                     pendingStateOk = false;
                 }
             }
@@ -385,7 +405,8 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible process-owned top-level editor window before and after "
-        << L"interaction, 12 required controls, disabled pending tools, Outliner/Inspector "
-        << L"selection sync, bounded asynchronous normal+narrow resizes, and clean exit.\n";
+        << L"interaction, 12 required controls, disabled pending tools, exact Outliner item "
+        << L"identities and complete Inspector fixture text, bounded asynchronous normal+narrow "
+        << L"resizes, and clean exit.\n";
     return 0;
 }
