@@ -3,6 +3,8 @@
 #include "Engine/Math/Math.h"
 #include "Engine/Scene/CombatSandbox.h"
 
+#include <cstdint>
+
 namespace Astral::Scene {
 
 enum class ShadowActionType {
@@ -120,10 +122,33 @@ public:
     int PlayerHealth() const { return playerHealth_; }
     int GuardIntegrity() const { return guardIntegrity_; }
     bool HasIncomingAttack() const { return incomingAttackActive_; }
+    std::uint64_t IncomingAttackGeneration() const { return incomingAttackGeneration_; }
     float IncomingAttackRemaining() const;
     bool HasDefenseCounter() const;
     float DefenseCounterRemaining() const;
     float PerfectDefenseWindowSeconds() const;
+    bool PerfectDefenseWindowOpen() const {
+        if (!incomingAttackActive_) return false;
+        const double now = CurrentDefenseSeconds();
+        const double remaining = incomingAttackEndSeconds_ > now
+            ? incomingAttackEndSeconds_ - now
+            : 0.0;
+        const float windowSeconds = PerfectDefenseWindowSeconds();
+        const double tolerance = DefenseTimingToleranceSeconds(
+            incomingAttackDeadlineUncertaintySeconds_ + FloatHalfUlpSeconds(windowSeconds));
+        return DefenseWindowContains(remaining, static_cast<double>(windowSeconds), tolerance);
+    }
+    bool DodgeWindowOpen() const {
+        if (!incomingAttackActive_) return false;
+        const double now = CurrentDefenseSeconds();
+        const double remaining = incomingAttackEndSeconds_ > now
+            ? incomingAttackEndSeconds_ - now
+            : 0.0;
+        const double tolerance = DefenseTimingToleranceSeconds(
+            incomingAttackDeadlineUncertaintySeconds_ + FloatHalfUlpSeconds(DodgeWindowSeconds));
+        return DefenseWindowContains(
+            remaining, static_cast<double>(DodgeWindowSeconds), tolerance);
+    }
     const DefenseReport& LastDefense() const { return lastDefense_; }
 
 private:
@@ -145,6 +170,7 @@ private:
     int playerHealth_{MaximumPlayerHealth};
     int guardIntegrity_{MaximumGuardIntegrity};
     bool incomingAttackActive_{};
+    std::uint64_t incomingAttackGeneration_{};
     IncomingAttackDefinition incomingAttack_{};
     double defenseElapsedSecondsPrecise_{};
     double defenseElapsedUncertaintySeconds_{};
