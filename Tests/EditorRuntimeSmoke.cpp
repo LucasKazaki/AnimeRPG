@@ -638,12 +638,46 @@ bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) 
     return GetExitCodeProcess(process, &exitCode) != FALSE;
 }
 
-void CleanupProcess(HANDLE process) {
-    const DWORD state = WaitForSingleObject(process, 0);
-    if (state == WAIT_OBJECT_0) return;
-    if (TerminateProcess(process, 2)) {
-        WaitForSingleObject(process, kCleanupTimeoutMs);
+void AppendCleanupFailure(std::wstring& failure, const wchar_t* detail) {
+    if (!failure.empty()) failure += L"; ";
+    failure += detail;
+}
+
+bool CleanupProcess(HANDLE process, DWORD& exitCode, std::wstring& failure) {
+    const DWORD initialState = WaitForSingleObject(process, 0);
+    if (initialState == WAIT_OBJECT_0) {
+        if (!GetExitCodeProcess(process, &exitCode) || exitCode == STILL_ACTIVE) {
+            AppendCleanupFailure(failure,
+                L"owned-process cleanup observed a signaled process but could not verify a terminal exit code");
+            return false;
+        }
+        return true;
     }
+    if (initialState == WAIT_FAILED) {
+        AppendCleanupFailure(failure, L"owned-process cleanup precheck wait failed");
+    } else if (initialState != WAIT_TIMEOUT) {
+        AppendCleanupFailure(failure, L"owned-process cleanup precheck returned an unexpected wait state");
+    }
+
+    if (!TerminateProcess(process, 2)) {
+        AppendCleanupFailure(failure, L"TerminateProcess failed for the owned editor process");
+        return false;
+    }
+
+    const DWORD terminatedState = WaitForSingleObject(process, kCleanupTimeoutMs);
+    if (terminatedState != WAIT_OBJECT_0) {
+        AppendCleanupFailure(failure,
+            terminatedState == WAIT_TIMEOUT
+                ? L"owned editor process did not signal termination before the cleanup deadline"
+                : L"owned editor process cleanup wait failed");
+        return false;
+    }
+    if (!GetExitCodeProcess(process, &exitCode) || exitCode == STILL_ACTIVE) {
+        AppendCleanupFailure(failure,
+            L"owned editor process signaled after TerminateProcess but terminal exit code verification failed");
+        return false;
+    }
+    return true;
 }
 } // namespace
 
@@ -721,7 +755,9 @@ int wmain(int argc, wchar_t** argv) {
         }
     }
 
-    if (!passed) CleanupProcess(process.hProcess);
+    if (!passed) {
+        CleanupProcess(process.hProcess, exitCode, failure);
+    }
     if (!passed && GetExitCodeProcess(process.hProcess, &exitCode) == FALSE) exitCode = 1;
 
     CloseHandle(process.hThread);
