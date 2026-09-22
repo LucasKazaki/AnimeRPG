@@ -692,6 +692,103 @@ void TestCombatDefenseTrainingInterruptionAndGrades() {
             && Near(invalidActions.IncomingAttackRemaining(), remaining),
         "nonfinite coordinator delta preserves telemetry and threat timing");
 }
+
+void TestDefenseTrainingReviewRepairs() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions generations;
+    const std::uint64_t initialGeneration = generations.IncomingAttackGeneration();
+    Expect(!generations.BeginIncomingAttack({std::numeric_limits<float>::quiet_NaN(), 20, 30, true})
+            && generations.IncomingAttackGeneration() == initialGeneration,
+        "invalid incoming attacks do not consume a threat generation");
+    Expect(generations.BeginIncomingAttack({1.0f, 20, 30, true}),
+        "generation test queues its first valid threat");
+    const std::uint64_t firstGeneration = generations.IncomingAttackGeneration();
+    Expect(firstGeneration != initialGeneration,
+        "successful threat queue assigns a new nonzero generation");
+    Expect(!generations.BeginIncomingAttack({1.0f, 20, 30, true})
+            && generations.IncomingAttackGeneration() == firstGeneration,
+        "rejected duplicate threat does not consume another generation");
+    Expect(generations.CancelIncomingAttack(),
+        "generation test can cancel the first valid threat");
+    Expect(generations.BeginIncomingAttack({1.0f, 20, 30, true})
+            && generations.IncomingAttackGeneration() != firstGeneration,
+        "replacement valid threat receives a distinct generation");
+
+    CombatSandbox delayedCombat;
+    ShadowbladeActions delayedActions;
+    CombatDefenseTraining delayedDrill;
+    Expect(delayedDrill.QueueNextAttack(delayedCombat, delayedActions),
+        "delayed interruption setup queues a linked QuickCut");
+    delayedCombat.TryAttack(AttackType::Light, {});
+    Expect(!delayedDrill.AdvanceTime(delayedCombat, delayedActions, 0.4f),
+        "delayed interruption reaches the final part of the windup");
+    const AttackReport delayedHeavy = delayedCombat.TryAttack(AttackType::Heavy, {});
+    Expect(delayedHeavy.staggerTriggered && !delayedCombat.HasPendingEnemyAttack(),
+        "delayed interruption clears the authoritative combat plan");
+    Expect(delayedDrill.AdvanceTime(delayedCombat, delayedActions, 0.2f)
+            && delayedActions.PlayerHealth() == 100
+            && !delayedActions.HasIncomingAttack(),
+        "reconciliation after the former impact time cancels before stale damage can land");
+
+    CombatSandbox replacementCombat;
+    ShadowbladeActions replacementActions;
+    CombatDefenseTraining replacementDrill;
+    Expect(replacementDrill.QueueNextAttack(replacementCombat, replacementActions),
+        "replacement isolation setup queues a linked threat");
+    const std::uint64_t linkedGeneration = replacementActions.IncomingAttackGeneration();
+    Expect(replacementActions.CancelIncomingAttack()
+            && replacementActions.BeginIncomingAttack({1.0f, 7, 3, true})
+            && replacementActions.IncomingAttackGeneration() != linkedGeneration,
+        "standalone replacement threat has a distinct generation");
+    const float replacementRemaining = replacementActions.IncomingAttackRemaining();
+    Expect(replacementDrill.AdvanceTime(replacementCombat, replacementActions, 0.2f)
+            && !replacementCombat.HasPendingEnemyAttack()
+            && replacementActions.HasIncomingAttack()
+            && Near(replacementActions.IncomingAttackRemaining(), replacementRemaining),
+        "coordinator interrupts only its old plan and does not advance or cancel the replacement");
+    Expect(replacementDrill.Stats().interruptions == 1,
+        "replacement isolation records one linked interruption");
+
+    CombatSandbox ownedCombat;
+    ShadowbladeActions ownedActions;
+    CombatDefenseTraining ownershipDrill;
+    Expect(ownershipDrill.QueueNextAttack(ownedCombat, ownedActions),
+        "wrong-object isolation setup queues a linked threat");
+    CombatSandbox unrelatedCombat;
+    ShadowbladeActions unrelatedActions;
+    Expect(unrelatedActions.BeginIncomingAttack({1.0f, 9, 4, true}),
+        "wrong-object isolation setup queues an unrelated standalone threat");
+    const float ownedRemaining = ownedActions.IncomingAttackRemaining();
+    const float unrelatedRemaining = unrelatedActions.IncomingAttackRemaining();
+    Expect(!ownershipDrill.AdvanceTime(ownedCombat, unrelatedActions, 0.2f)
+            && Near(ownedActions.IncomingAttackRemaining(), ownedRemaining)
+            && Near(unrelatedActions.IncomingAttackRemaining(), unrelatedRemaining)
+            && ownedCombat.HasPendingEnemyAttack(),
+        "wrong ShadowbladeActions instance is neither advanced nor synchronized");
+    Expect(!ownershipDrill.AdvanceTime(unrelatedCombat, ownedActions, 0.2f)
+            && Near(ownedActions.IncomingAttackRemaining(), ownedRemaining)
+            && ownedCombat.HasPendingEnemyAttack(),
+        "wrong CombatSandbox instance cannot mutate the owned linked threat");
+    Expect(ownershipDrill.Cue(unrelatedCombat, ownedActions).phase
+            == DefenseTrainingCuePhase::None,
+        "wrong combat object exposes no linked timing cue");
+
+    CombatSandbox boundaryCombat;
+    ShadowbladeActions boundaryActions;
+    CombatDefenseTraining boundaryDrill;
+    Expect(boundaryDrill.QueueNextAttack(boundaryCombat, boundaryActions),
+        "boundary cue setup queues a QuickCut");
+    Expect(!boundaryDrill.AdvanceTime(boundaryCombat, boundaryActions, 0.43f),
+        "0.43 second split keeps QuickCut live at the perfect-window boundary");
+    const DefenseTrainingCue boundaryCue = boundaryDrill.Cue(boundaryCombat, boundaryActions);
+    Expect(boundaryCue.phase == DefenseTrainingCuePhase::PerfectWindow,
+        "cue uses the same tolerance-aware perfect-window boundary as defense input");
+    const DefenseReport boundaryGuard = boundaryDrill.TryDefend(
+        boundaryCombat, boundaryActions, DefenseInput::Guard);
+    Expect(boundaryGuard.result == DefenseResult::PerfectGuard,
+        "guard at the 0.43 second QuickCut boundary agrees with the cue stage");
+}
 }
 
 int main() {
@@ -714,6 +811,7 @@ int main() {
     TestDefenseClockRebasesAfterSaturation();
     TestCombatDefenseTrainingBridgeAndCues();
     TestCombatDefenseTrainingInterruptionAndGrades();
+    TestDefenseTrainingReviewRepairs();
     if (failures != 0) return 1;
     std::cout << "Shadowblade action tests passed\n";
     return 0;
