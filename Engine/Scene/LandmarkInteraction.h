@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Scene/CharacterProgression.h"
+#include "Engine/Scene/LandmarkDialogue.h"
 #include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/WorldBlockout.h"
 
@@ -53,6 +54,12 @@ public:
         const WorldBlockout& world, ShadowbladeActions& shadowbladeActions);
     void SetCharacterProgression(CharacterProgression* progression) { progression_ = progression; }
 
+    DialogueBeat TryDialogueChoice(DialogueTopic topic, DialogueChoice choice) {
+        return dialogue_.Choose(topic, choice, {VisitedCount(), ObjectiveComplete()});
+    }
+    DialogueOutcome CommitDialogueOutcome() { return dialogue_.CommitOutcome(); }
+    const LandmarkDialogue& Dialogue() const { return dialogue_; }
+
     bool SetObjectiveActivationMode(LandmarkObjectiveActivationMode mode);
     bool StartObjective();
     LandmarkObjectiveActivationMode ObjectiveActivationMode() const {
@@ -95,6 +102,7 @@ private:
         LandmarkObjectiveActivationMode::AutoStart};
     bool objectiveStarted_{true};
     CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
+    LandmarkDialogue dialogue_{};
     LandmarkInteractionReport lastReport_{};
 };
 
