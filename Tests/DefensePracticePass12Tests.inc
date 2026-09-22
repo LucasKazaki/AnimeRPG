@@ -242,6 +242,30 @@ void TestDefensePracticePass12() {
         }
     }
 
+    // Keep mistake feedback tied to the actual missed attacks. Current-threat
+    // guidance is separate, so a newly queued attack must not rewrite the hint.
+    CombatSandbox retainedHintCombat;
+    ShadowbladeActions retainedHintActions;
+    CombatDefenseTraining retainedHintDrill;
+    for (int hit = 0; hit < 2; ++hit) {
+        Expect(retainedHintDrill.QueueAttackPattern(retainedHintCombat,
+                retainedHintActions, EnemyAttackPattern::QuickCut),
+            "retained-hint setup queues a blockable missed attack");
+        const EnemyAttackPlan plan = retainedHintCombat.PendingEnemyAttack();
+        Expect(retainedHintDrill.AdvanceTime(
+                retainedHintCombat, retainedHintActions, plan.windupSeconds),
+            "retained-hint setup resolves the blockable missed attack");
+        retainedHintDrill.AdvanceTime(
+            retainedHintCombat, retainedHintActions, plan.recoverySeconds);
+    }
+    Expect(retainedHintDrill.QueueAttackPattern(retainedHintCombat,
+            retainedHintActions, EnemyAttackPattern::RiftBurst)
+            && retainedHintDrill.TutorialHint(retainedHintCombat, retainedHintActions)
+                == DefenseTrainingTutorialHint::GuardBlockable
+            && retainedHintDrill.ControlReminder(retainedHintCombat, retainedHintActions)
+                == DefenseTrainingControlReminder::Dodge,
+        "mistake hint keeps missed blockable context while current unblockable threat recommends dodge");
+
     CombatSandbox timingHintCombat;
     ShadowbladeActions timingHintActions;
     CombatDefenseTraining timingHintDrill;
