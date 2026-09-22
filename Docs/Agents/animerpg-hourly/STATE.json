@@ -79,11 +79,11 @@
   "verification": {
     "focused_design_fixture": "passed_before_initial_branch_packaging",
     "review_regression_fixture": "passed_gcc_cxx17_wall_wextra_werror_exact_8_06_vs_794x0_01_boundary_and_expiry_shape",
-    "repository_regression_tests": "long_split_frame_regression_added",
-    "hosted_windows_ci": "pending_latest_head_after_review_fix",
-    "release_manifest": "pending_latest_head_after_review_fix",
+    "repository_regression_tests": "review_exact_8_06_split_case_and_fractional_60fps_rounding_cases_added",
+    "hosted_windows_ci": "pending_latest_head_after_review_fixes",
+    "release_manifest": "pending_latest_head_after_review_fixes",
     "native_windows_interactive": "not_run_domain_only_packet",
-    "independent_review": "initial_exact_head_review_found_P2_split_drift; absolute_timeline_fix_pushed_and_fresh_exact_head_review_required"
+    "independent_review": "two_P2_timing_findings_on_older_heads_addressed; fresh_exact_head_review_required"
   },
   "review_findings": [
     {
@@ -91,8 +91,15 @@
       "reviewed_head": "2cd538aa60a1252699430ac450c7685c6a3a74b9",
       "severity": "P2",
       "finding": "Repeated float subtraction could move an 8.06 s threat across the 0.12 s perfect-defense boundary differently for one 7.94 s step versus 794 x 0.01 s steps.",
-      "resolution": "Defense timing now uses one accumulated high-precision elapsed clock quantized to integer microseconds at comparison points, with integer-microsecond attack/counter deadlines. This avoids both repeated remaining-time subtraction and per-frame microsecond rounding drift. Direct 8.06/7.94/0.01 boundary and expiry regressions are included."
+      "resolution": "Replaced remaining-time subtraction with an accumulated defense timeline and integer-microsecond deadlines. Added the exact 8.06/7.94/0.01 boundary and expiry regressions."
+    },
+    {
+      "reviewer": "chatgpt-codex-connector[bot]",
+      "reviewed_head": "19fe9ad2ec2039b653221c3982081de0cda724c4",
+      "severity": "P2",
+      "finding": "Quantizing each frame delta independently still allowed fractional-microsecond rounding to diverge between one step and 60 split steps.",
+      "resolution": "The final design quantizes only the accumulated high-precision absolute clock at comparison points. Added direct 1.12001 s guard and 1.00001 s expiry regressions comparing one 1.0 s step with 60 x 1/60 s steps."
     }
   ],
-  "next_action": "Wait for hosted Windows and manifest checks on the final review-fix head, request exact-head Codex re-review, inspect all review threads and the full diff, then merge PR #16 only if every applicable gate passes."
+  "next_action": "Verify hosted Windows and manifest checks on the final head, obtain exact-head Codex re-review with no unresolved findings, inspect the five-file diff, then merge PR #16 only if every applicable gate passes."
 }
