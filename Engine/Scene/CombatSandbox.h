@@ -2,6 +2,8 @@
 
 #include "Engine/Math/Math.h"
 
+#include <cstdint>
+
 namespace Astral::Scene {
 
 enum class AttackType {
@@ -68,15 +70,18 @@ public:
     const TrainingDummy& Dummy() const { return dummy_; }
     const AttackReport& LastAttack() const { return lastAttack_; }
     const TrainingStats& Stats() const { return stats_; }
-    float ElapsedSeconds() const { return elapsedSeconds_; }
+    float ElapsedSeconds() const;
     float CooldownRemaining() const;
-    float StaggerRemaining() const { return staggerRemaining_; }
-    bool IsStaggered() const { return staggerRemaining_ > 0.0f && !dummy_.IsDefeated(); }
+    float StaggerRemaining() const;
+    bool IsStaggered() const;
     int ComboCount() const { return comboCount_; }
     float TrainingDps() const;
     const AttackDefinition& Definition(AttackType type) const;
 
 private:
+    static constexpr std::int64_t MicrosPerSecond = 1000000;
+    static std::int64_t SecondsToMicros(float seconds);
+    std::int64_t CurrentMicros() const;
     bool ApplyPostureDamage(int postureDamage);
     void RegisterComboHit();
 
@@ -85,12 +90,12 @@ private:
     AttackDefinition heavyAttack_{60, 1.0f, 3.5f, 70};
     AttackReport lastAttack_{AttackType::Light, AttackResult::Ready, 0, 0, false};
     TrainingStats stats_{};
-    float elapsedSeconds_{};
-    float nextAttackTime_{};
-    float staggerRemaining_{};
-    double timeSincePostureHit_{};
+    double elapsedSecondsPrecise_{};
+    std::int64_t nextAttackMicros_{};
+    std::int64_t staggerEndMicros_{};
+    std::int64_t lastPostureHitMicros_{};
     int postureAtRecoveryStart_{};
-    float lastComboHitTime_{-1000.0f};
+    std::int64_t lastComboHitMicros_{-1000000000};
     int comboCount_{};
 };
 
