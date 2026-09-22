@@ -27,6 +27,8 @@ constexpr wchar_t kAssetsLabelText[] = L"ASSETS / DEFAULT PRIMITIVES";
 constexpr wchar_t kStatusText[] =
     L"E11.0 editor shell | Outliner selection works | viewport transform tools, undo/redo, "
     L"save/reopen, Play and real asset import pending";
+constexpr std::array<const wchar_t*, 5> kExpectedOutlinerItems{{
+    L"Scene Root", L"Camera", L"Directional Light", L"Cube", L"Floor"}};
 constexpr std::array<const wchar_t*, 4> kExpectedAssetItems{{
     L"Primitive/Cube", L"Primitive/Plane", L"Camera", L"DirectionalLight"}};
 constexpr std::array<const wchar_t*, 4> kExpectedShellStaticTexts{{
@@ -387,18 +389,21 @@ bool ValidateShellState(HWND window, DWORD processId,
             LB_GETCOUNT, 0, assetCount)
         || !ReadValidatedListboxValue(outliner, window, processId, kOutlinerId,
             LB_GETCURSEL, 0, selection)
-        || outlinerCount != 5 || assetCount != 4 || selection != expectedSelection) {
+        || outlinerCount != static_cast<LRESULT>(kExpectedOutlinerItems.size())
+        || assetCount != static_cast<LRESULT>(kExpectedAssetItems.size())
+        || selection != expectedSelection) {
         failure = L"unexpected Outliner/assets count or selection state";
         return false;
     }
 
-    std::wstring sceneRootItem;
-    std::wstring cubeItem;
-    if (!ReadValidatedListboxText(outliner, window, processId, kOutlinerId, 0, sceneRootItem)
-        || !ReadValidatedListboxText(outliner, window, processId, kOutlinerId, 3, cubeItem)
-        || sceneRootItem != L"Scene Root" || cubeItem != L"Cube") {
-        failure = L"unexpected Outliner item identities";
-        return false;
+    for (std::size_t index = 0; index < kExpectedOutlinerItems.size(); ++index) {
+        std::wstring outlinerItem;
+        if (!ReadValidatedListboxText(outliner, window, processId, kOutlinerId,
+                static_cast<int>(index), outlinerItem)
+            || outlinerItem != kExpectedOutlinerItems[index]) {
+            failure = L"unexpected Outliner item identity at row " + std::to_wstring(index);
+            return false;
+        }
     }
 
     for (std::size_t index = 0; index < kExpectedAssetItems.size(); ++index) {
@@ -662,8 +667,8 @@ int wmain(int argc, wchar_t** argv) {
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible process-owned top-level editor window before and after "
         << L"interaction; the original 12 process-owned child HWND identities, disabled pending tools, "
-        << L"shell labels, Outliner/assets identities, and Inspector state were revalidated around every "
-        << L"bounded cross-process read and after both normal+narrow resizes; Cube selection stayed "
+        << L"shell labels, exact Outliner/assets row identities, and Inspector state were revalidated around "
+        << L"every bounded cross-process read and after both normal+narrow resizes; Cube selection stayed "
         << L"synchronized, all direct children remained contained, and shutdown exited cleanly.\n";
     return 0;
 }
