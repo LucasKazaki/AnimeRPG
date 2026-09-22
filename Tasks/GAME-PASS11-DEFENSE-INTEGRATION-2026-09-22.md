@@ -10,6 +10,8 @@ Target: `main`
 Bridge the already-merged pass-10 enemy attack planner into the already-merged Shadowblade incoming-attack/defense state without changing renderer, platform, input, editor, CMake, workflows, dependencies, R0, networking, deployment, release, or another worker's branches. This remains game-domain integration and registered deterministic-test work. Native HUD/input/audio/animation integration is not claimed.
 
 Allowed paths:
+- `Engine/Scene/CombatSandbox.h`
+- `Engine/Scene/CombatSandbox.cpp`
 - `Engine/Scene/ShadowbladeActions.h`
 - `Engine/Scene/ShadowbladeActions.cpp`
 - `Engine/Scene/CombatDefenseTraining.h`
@@ -18,7 +20,7 @@ Allowed paths:
 - `Docs/Agents/animerpg-hourly/STATE.json`
 - `Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS11.md`
 
-`ShadowbladeActions.cpp` is admitted only for the independent-review repair that assigns a generation to each successfully queued incoming threat. No unrelated action/combat behavior may change there.
+`ShadowbladeActions.cpp` is admitted only for the earlier independent-review repair that assigns a generation to each successfully queued incoming threat. `CombatSandbox.h/.cpp` are admitted only for the later independent-review repair that assigns a monotonic generation to each successfully queued enemy-planner event, so a reset/requeue cannot be mistaken for the event this coordinator owns. No unrelated action/combat behavior may change in those files.
 
 ## Five reference-derived increments plus one community increment
 
@@ -36,14 +38,14 @@ Reference: Wuthering Waves documents Extreme Evasion and Dodge Counter; Granblue
 
 ### GAME-054: automatic impact synchronization
 Gap: `ShadowbladeActions::AdvanceTime` can auto-resolve an expired threat, leaving the enemy planner pending unless an external caller manually reconciles it.
-Adaptation: the coordinator advances both existing clocks and closes the matching enemy plan when the existing Shadowblade threat resolves automatically.
-Acceptance: an unattended QuickCut damages the player once, closes the planner event once, records the hit once, and respects planner recovery.
+Adaptation: the coordinator advances both existing clocks and closes the matching enemy plan when the existing Shadowblade threat resolves automatically. If one coordinator tick spans impact plus recovery, resolve at the impact boundary and carry the remaining tick into planner recovery so cadence is invariant to frame splitting.
+Acceptance: an unattended QuickCut damages the player once, closes the planner event once, records the hit once, and respects planner recovery. A single `windup + recovery` tick and equivalent split ticks make the next attack ready at the same time.
 Reference: fast action-RPG telegraph-to-impact combat timing from ZZZ/Wuthering Waves.
 
 ### GAME-055: interruption synchronization
 Gap: pass-10 stagger can clear a queued enemy plan while the separate Shadowblade threat remains active.
 Adaptation: a linked threat is canceled when its authoritative combat plan is interrupted/cleared, so a staggered or defeated enemy cannot land a stale delayed hit.
-Acceptance: after the linked combat plan is interrupted, the corresponding Shadowblade threat is canceled before its clock can reach impact, including delayed reconciliation beyond the former remaining windup. The coordinator must identify the exact `ShadowbladeActions` instance and threat generation it owns so a replacement or unrelated standalone threat is never canceled or synchronized.
+Acceptance: after the linked combat plan is interrupted, the corresponding Shadowblade threat is canceled before its clock can reach impact, including delayed reconciliation beyond the former remaining windup. The coordinator must identify the exact `CombatSandbox` event, exact `ShadowbladeActions` instance, and exact successful threat generation it owns so a reset/requeue, replacement threat, or unrelated standalone threat is never canceled or synchronized as the old event.
 Reference: Granblue Relink documents stun gauges creating attack opportunities; this adapts interruption consistency to the single-protagonist system.
 
 ### GAME-056: defense drill telemetry and grade
@@ -71,11 +73,13 @@ Reference games provide interaction lessons only. No proprietary code, character
 ## Implementation constraints
 
 - Reuse `CombatSandbox`, `EnemyAttackPlan`, `ShadowbladeActions`, and their existing clocks/contracts. Do not create a second combat framework.
-- Coordinator state must identify both the exact linked object instances and the exact successful incoming-threat generation, so it never cancels, advances as linked, or resolves an unrelated standalone replacement.
-- If the authoritative combat plan disappears, cancel the owned Shadowblade threat before advancing its clock.
+- A successful enemy-planner queue receives a monotonic nonzero generation. Rejected queues do not consume a generation, and reset/clear operations do not rewind it.
+- Coordinator state must identify the exact `CombatSandbox` object and planner-event generation plus the exact `ShadowbladeActions` object and successful incoming-threat generation, so it never cancels, advances as linked, or resolves an unrelated replacement.
+- If the authoritative combat event disappears or is replaced, cancel only the owned Shadowblade threat before advancing its clock and leave any replacement planner event untouched.
+- A coordinator tick spanning telegraph impact and planner recovery must split at impact, resolve there, then apply overflow to both existing clocks. Equivalent total elapsed time must not produce a different enemy cadence solely because of frame partitioning.
 - New cancellation may clear only the current incoming threat. It must not heal/reset health/guard, create a counter, or alter unrelated cooldown/resource state.
 - Cue classification must reuse the same half-ULP/timing tolerance semantics as the actual defense acceptance windows.
-- Invalid/nonfinite/nonpositive deltas preserve current subsystem behavior.
+- Invalid/nonfinite/nonpositive deltas preserve current subsystem behavior, including when the authoritative event has already disappeared; reconciliation waits for the next positive finite tick.
 - Counters must saturate or remain within ordinary integer limits; grade arithmetic uses widened values where multiplication is needed.
 - Resetting drill telemetry must not mutate combat/player state.
 
@@ -85,10 +89,13 @@ Extend existing `ShadowbladeActionsTests`, already registered via `astral_add_te
 1. exact enemy-plan mapping and duplicate rejection;
 2. too-early dodge preservation then perfect-defense round-trip;
 3. automatic impact closes both sides exactly once and records damage;
-4. stagger interruption reconciled later than the remaining windup still cancels before player damage;
-5. canceled/replaced threats and wrong `ShadowbladeActions` objects remain unrelated to the coordinator;
-6. cue boundary stages use the same tolerance as immediate `TryDefend`, including the `0.43f` QuickCut boundary, plus unblockable metadata;
-7. telemetry/streak accounting, grade thresholds, reset isolation, and invalid delta stability.
+4. a single tick spanning QuickCut impact plus recovery produces the same next-attack readiness as equivalent split ticks;
+5. stagger interruption reconciled later than the remaining windup still cancels before player damage;
+6. invalid/nonpositive deltas after authoritative interruption remain full no-ops until the next valid coordinator tick;
+7. canceled/replaced Shadowblade threats, wrong `ShadowbladeActions` objects, and reset/requeued CombatSandbox planner events remain unrelated to the coordinator;
+8. successful CombatSandbox planner generations are nonzero, rejected queue attempts do not consume them, and reset/requeue produces a distinct event generation;
+9. cue boundary stages use the same tolerance as immediate `TryDefend`, including the `0.43f` QuickCut boundary, plus unblockable metadata;
+10. telemetry/streak accounting, grade thresholds, reset isolation, and invalid delta stability.
 
 ## Verification commands / gates
 
@@ -106,4 +113,4 @@ This pass does not add rendered telegraphs, new input bindings, audio cues, anim
 
 ## Stop conditions
 
-Do not merge if `main` moves incompatibly, another active worker owns one of the admitted source paths, the final diff expands beyond allowed paths, exact-head hosted checks fail or are missing, independent review reports an unresolved material defect, or the coordinator can produce stale/double hits or mutate unrelated standalone threats in the registered tests. Reconcile and rerun affected gates rather than force-pushing or weakening acceptance.
+Do not merge if `main` moves incompatibly, another active worker owns one of the admitted source paths, the final diff expands beyond allowed paths, exact-head hosted checks fail or are missing, independent review reports an unresolved material defect, or the coordinator can produce stale/double hits, frame-partition-dependent recovery, or mutate unrelated replacement events/threats in the registered tests. Reconcile and rerun affected gates rather than force-pushing or weakening acceptance.
