@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 
 namespace Astral::Editor {
 namespace {
@@ -36,6 +37,14 @@ std::int64_t Right(const EditorRect& rect) {
 
 std::int64_t Bottom(const EditorRect& rect) {
     return Top(rect) + static_cast<std::int64_t>(rect.height);
+}
+
+int SaturatingAdd(int value, int offset) {
+    const std::int64_t sum = static_cast<std::int64_t>(value)
+        + static_cast<std::int64_t>(offset);
+    const std::int64_t minimum = std::numeric_limits<int>::min();
+    const std::int64_t maximum = std::numeric_limits<int>::max();
+    return static_cast<int>(std::clamp(sum, minimum, maximum));
 }
 }
 
@@ -80,12 +89,12 @@ EditorToolbarLayout ComputeEditorToolbarLayout(const EditorRect& toolbar) {
     const int buttonWidth = std::min(kToolbarButtonPreferredWidth,
         std::max(0, (availableWidth - totalGap) / kToolbarButtonCount));
     const int buttonHeight = std::min(kToolbarButtonPreferredHeight, toolbarHeight);
-    const int buttonY = toolbar.y + (toolbarHeight - buttonHeight) / 2;
+    const int buttonY = SaturatingAdd(toolbar.y, (toolbarHeight - buttonHeight) / 2);
 
-    int buttonX = toolbar.x + padding;
+    int buttonX = SaturatingAdd(toolbar.x, padding);
     auto nextButton = [&]() {
         const EditorRect rect{buttonX, buttonY, buttonWidth, buttonHeight};
-        buttonX += buttonWidth + gap;
+        buttonX = SaturatingAdd(buttonX, buttonWidth + gap);
         return rect;
     };
 
@@ -112,13 +121,13 @@ EditorPanelContentLayout ComputeEditorPanelContentLayout(const EditorRect& panel
 
     EditorPanelContentLayout layout{};
     layout.label = {
-        panel.x + horizontalPadding,
-        panel.y + labelTop,
+        SaturatingAdd(panel.x, horizontalPadding),
+        SaturatingAdd(panel.y, labelTop),
         innerWidth,
         labelHeight};
     layout.body = {
-        panel.x + horizontalPadding,
-        panel.y + bodyTop,
+        SaturatingAdd(panel.x, horizontalPadding),
+        SaturatingAdd(panel.y, bodyTop),
         innerWidth,
         std::max(0, bodyRemaining - bottomPadding)};
     return layout;
@@ -130,8 +139,8 @@ EditorRect ComputeEditorStatusContentLayout(const EditorRect& status) {
     const int horizontalPadding = std::min(kStatusHorizontalPadding, statusWidth / 2);
     const int verticalPadding = std::min(kStatusVerticalPadding, statusHeight / 2);
     return {
-        status.x + horizontalPadding,
-        status.y + verticalPadding,
+        SaturatingAdd(status.x, horizontalPadding),
+        SaturatingAdd(status.y, verticalPadding),
         std::max(0, statusWidth - 2 * horizontalPadding),
         std::max(0, statusHeight - 2 * verticalPadding)};
 }
