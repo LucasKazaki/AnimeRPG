@@ -179,6 +179,24 @@ int main() {
     ok &= Expect(!Overlaps(touchingLeft, touchingRight),
         "touching rectangle edges must not become overlap near maximum int coordinates");
 
+    const auto extremeToolbar = ComputeEditorToolbarLayout({maxInt - 2, maxInt - 2, 560, 42});
+    ok &= Expect(extremeToolbar.select.x == maxInt,
+        "toolbar x offset must saturate instead of overflowing near maximum int coordinates");
+    ok &= Expect(extremeToolbar.select.y == maxInt,
+        "toolbar y offset must saturate instead of overflowing near maximum int coordinates");
+    ok &= Expect(extremeToolbar.play.x == maxInt,
+        "toolbar iteration must remain defined after coordinate saturation");
+
+    const auto extremePanel = ComputeEditorPanelContentLayout({maxInt - 2, maxInt - 2, 20, 40});
+    ok &= Expect(extremePanel.label.x == maxInt && extremePanel.label.y == maxInt,
+        "panel label offsets must saturate instead of overflowing");
+    ok &= Expect(extremePanel.body.x == maxInt && extremePanel.body.y == maxInt,
+        "panel body offsets must saturate instead of overflowing");
+
+    const auto extremeStatus = ComputeEditorStatusContentLayout({maxInt - 2, maxInt - 2, 20, 20});
+    ok &= Expect(extremeStatus.x == maxInt && extremeStatus.y == maxInt,
+        "status offsets must saturate instead of overflowing");
+
     ok &= Expect(!IsEditorToolAvailable(EditorTool::Select),
         "Select toolbar control must remain disabled until viewport selection exists");
     ok &= Expect(!IsEditorToolAvailable(EditorTool::Move),
