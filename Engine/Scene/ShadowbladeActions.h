@@ -123,6 +123,8 @@ public:
 private:
     static constexpr std::int64_t DefenseMicrosPerSecond = 1000000;
     static std::int64_t DefenseSecondsToMicros(double seconds);
+    static std::int64_t SaturatingMicrosAdd(std::int64_t left, std::int64_t right);
+    std::int64_t CurrentDefenseMicros() const;
     DefenseReport ResolveIncomingHit(DefenseResult result);
 
     float resource_{MaximumResource};
@@ -135,8 +137,9 @@ private:
     int guardIntegrity_{MaximumGuardIntegrity};
     bool incomingAttackActive_{};
     IncomingAttackDefinition incomingAttack_{};
-    std::int64_t incomingAttackRemainingMicros_{};
-    std::int64_t defenseCounterRemainingMicros_{};
+    double defenseElapsedSecondsPrecise_{};
+    std::int64_t incomingAttackEndMicros_{};
+    std::int64_t defenseCounterEndMicros_{};
     DefenseTimingPreset defenseTimingPreset_{DefenseTimingPreset::Standard};
     DefenseReport lastDefense_{};
 };
