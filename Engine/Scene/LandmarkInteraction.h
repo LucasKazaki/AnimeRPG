@@ -15,6 +15,13 @@ enum class LandmarkInteractionResult {
     AlreadyVisited,
 };
 
+enum class LandmarkObjectiveStage {
+    DiscoverLincoln,
+    DiscoverReflectingPool,
+    DiscoverWashingtonMonument,
+    Complete,
+};
+
 struct LandmarkInteractionReport {
     LandmarkInteractionResult result{LandmarkInteractionResult::None};
     LandmarkKind landmark{LandmarkKind::LincolnMemorial};
@@ -36,6 +43,11 @@ public:
     LandmarkKind SelectedKind() const;
     bool IsVisited(LandmarkKind kind) const;
     std::size_t VisitedCount() const;
+    std::size_t ObjectiveProgress() const;
+    LandmarkObjectiveStage CurrentObjective() const;
+    bool ObjectiveComplete() const {
+        return CurrentObjective() == LandmarkObjectiveStage::Complete;
+    }
     const LandmarkInteractionReport& LastReport() const { return lastReport_; }
 
 private:
