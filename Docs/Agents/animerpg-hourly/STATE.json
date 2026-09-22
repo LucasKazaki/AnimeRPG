@@ -17,7 +17,7 @@
   },
   "working_branch": "game/2026-09-22-dialogue-lore-pass9",
   "pass": "GAME-PASS9-DIALOGUE-LORE-2026-09-22",
-  "pr": null,
+  "pr": 24,
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -51,5 +51,5 @@
     "art_pr_23": "active starter-art documentation/material-source work; no overlap with pass-9 game paths",
     "shared_engine_paths": "CMake renderer platform editor import audio physics and workflows unchanged"
   },
-  "next_action": "Open the scoped PR, require exact-head hosted Windows/release checks and independent Codex review, repair any finding without weakening acceptance, then merge with expected-head protection only if every applicable gate is green and verify main afterward."
+  "next_action": "Freeze PR #24, require exact-head hosted Windows/release checks and independent Codex review, repair any finding without weakening acceptance, then merge with expected-head protection only if every applicable gate is green and verify main afterward."
 }
