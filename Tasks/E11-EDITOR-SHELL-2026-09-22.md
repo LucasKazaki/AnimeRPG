@@ -1,0 +1,122 @@
+# E11.0 Astral Editor shell
+
+Date: 2026-09-22
+
+## Scope
+
+Implement one bounded, non-content editor-tooling slice on top of `64e35980781c875d6f62e798e3bfa17fdc093897` (PR #8). This is not an Unreal/Unity parity claim and does not resume game content. It adds a separate Win32/GDI `AstralEditor` executable without changing `AstralGame`, the production graphics API, dependencies, or engine architecture.
+
+The full E11 contract still depends on E02/E03/E04. This packet only establishes a visible editor frame and deterministic panel layout so later packets can connect real scene ownership, asset identity, save/reopen, gizmos, undo/redo and play-in-editor.
+
+## Primary-source research
+
+Accessed 2026-09-22:
+
+- Epic, Unreal Engine 5.8, Unreal Editor Interface: https://dev.epicgames.com/documentation/unreal-engine/unreal-editor-interface
+  - Relevant minimum concepts: toolbar, level viewport, Outliner, Details panel and Content Drawer/Browser.
+- Epic, Unreal Engine 5.8, Viewport Toolbar: https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar
+  - Relevant minimum concept: Select, Move, Rotate and Scale are executable viewport manipulation modes backed by transform gizmos, not decorative toolbar labels.
+- Epic, Unreal Engine 5.8, Content Browser: https://dev.epicgames.com/documentation/en-us/unreal-engine/content-browser-in-unreal-engine
+  - Relevant minimum concept: project asset browsing/management is a first-class editor surface.
+- Epic, Unreal Engine 5.8, Slate Clipping System: https://dev.epicgames.com/documentation/unreal-engine/using-the-slate-clipping-system-in-unreal-engine
+  - Relevant minimum concept: editor graphics and text are confined to clipping rectangles as panels resize.
+- Unity Manual, Unity 6.0 (6000.0), Position GameObjects: https://docs.unity3d.com/6000.0/Documentation/Manual/PositioningGameObjects.html
+  - Relevant minimum concept: Move, Rotate and Scale tools manipulate selected GameObjects through gizmos or Inspector transform fields.
+- Unity 6.1 Scene view navigation: https://docs.unity3d.com/Manual/SceneViewNavigation.html
+  - Relevant minimum concept: Scene view is the authoring view, distinct from the final Game view.
+- Unity editor interface manual family: https://docs.unity3d.com/Manual/UsingTheEditor.html
+  - Relevant minimum concepts: Hierarchy, Scene view, Inspector, Project window and Play controls.
+- Unity 6.0 UI Toolkit `Overflow`: https://docs.unity3d.com/6000.0/ScriptReference/UIElements.Overflow.html
+  - Relevant minimum concept: hidden overflow clips content outside an element's bounds.
+- Microsoft Win32 GDI `IntersectClipRect`: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-intersectcliprect
+  - Relevant API behavior: intersects the current device-context clipping region with an explicit rectangle.
+- Microsoft Win32 GDI `SaveDC`: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-savedc
+  - Relevant API behavior: saves DC state so a temporary viewport clip can be restored after painting.
+- Microsoft Win32 `CreateWindowExW`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexw
+  - Relevant API behavior: returns `NULL` when window or child-control creation fails.
+- Microsoft Win32 `WM_CREATE`: https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-create
+  - Relevant API behavior: returning `-1` from `WM_CREATE` aborts window creation, destroys the new window, and causes `CreateWindowEx` to return `NULL`.
+
+No proprietary source was copied. The panel arrangement, command-state model, GDI clipping behavior and startup-failure contract are original Astral implementations using Win32 child controls, GDI and dependency-free C++17 code.
+
+## Bounded command-honesty repair
+
+A source audit after the first hosted editor build found that `Select`, `Move`, `Rotate` and `Scale` were enabled Win32 buttons even though `WM_COMMAND` implemented no handlers for them. Only `Play (pending)` was visibly disabled. That made unsupported editor actions look executable.
+
+This repair stays inside the E11.0 shell packet rather than starting the deferred transform/scene-document feature. The editor now has a deterministic `EditorTool` availability contract. All five toolbar actions are disabled and labeled `(pending)` until the corresponding behavior exists. Outliner selection remains the only admitted live selection path. Enabling a tool in a later packet must be accompanied by its behavior and tests rather than changing presentation alone.
+
+## Bounded viewport-paint containment repair
+
+A later source audit found a separate narrow-resize paint defect. The top-level viewport rectangle could be only a few pixels wide or high, while `DrawViewport` still issued axis lines with fixed 10-pixel insets and `TextOutW` calls at fixed `+12/+30` offsets. The panel rectangles themselves were contained, but those GDI draw calls were not clipped to the viewport and could paint into adjacent editor regions during extreme resize.
+
+The repair adds `ComputeEditorViewportClipRect` to the portable layout contract and makes `DrawViewport` save the paint DC, intersect its current clipping region with that viewport rectangle, draw the viewport, then restore the original DC state. Empty or failed clip regions stop viewport painting rather than falling back to unbounded drawing. This does not change the graphics API or make any editor tool available.
+
+## Bounded child-control startup repair
+
+A source audit found that E11.0 returned success from `WM_CREATE` even if one or more required toolbar, Outliner, Inspector, Assets or status child controls failed to create. `CreateWindowExW` reports a failed child creation as `NULL`; continuing startup could therefore leave a partially constructed editor that still looks like a successful process launch.
+
+The repair introduces a deterministic required-control creation state. All 12 E11.0 child controls must exist before the editor populates lists, updates the Inspector, applies tool state or lays out the UI. If any required child is missing, `WM_CREATE` returns `-1`, using the documented Win32 failure path so the parent creation fails closed. This does not attempt to fabricate a native child-control failure during hosted CI; the portable regression exhaustively removes each required slot one at a time, while real Windows creation remains part of native acceptance.
+
+## Allowed paths
+
+- `CMakeLists.txt`
+- `Engine/Editor/EditorLayout.h`
+- `Engine/Editor/EditorLayout.cpp`
+- `Tools/AstralEditorMain.cpp`
+- `Tests/EditorLayoutTests.cpp`
+- `Scripts/test_test_safety.py`
+- `Tasks/E11-EDITOR-SHELL-2026-09-22.md`
+- `Docs/QA/E11-EDITOR-SHELL-2026-09-22.md`
+- `Docs/Research/ENGINE-CAPABILITIES-2026-09-20.md`
+- `Docs/Research/ENGINE-CAPABILITIES.json`
+
+`Scripts/test_test_safety.py` is admitted only if hosted CI demonstrates that its current executable-discovery rule falsely classifies the new non-test editor product target as a CTest target. Any repair must continue requiring every executable declared inside the `BUILD_TESTING` block to use `astral_add_test`; it must not weaken Release assertions, timeouts or runtime-smoke serialization.
+
+## Required behavior
+
+1. Build a separate `AstralEditor` Windows executable using only existing Win32/GDI system libraries.
+2. Show a toolbar, selection-linked Outliner, central procedural viewport, Inspector, asset/default-primitives browser and status area.
+3. Keep not-yet-implemented controls honest. `Select`, `Move`, `Rotate`, `Scale` and `Play` toolbar actions are disabled and labeled pending until their actual viewport/edit/play behavior exists. Outliner selection remains functional. Save/reopen, gizmos, undo/redo, import and real scene mutation remain explicitly pending.
+4. Use only procedural editor fixtures (`Scene Root`, camera, light, cube and floor), not paused game content or production art.
+5. Resize without negative panel geometry, panel overlap, child-control escape, or viewport GDI paint escaping the computed viewport clip region.
+6. Fail editor parent-window creation if any required E11.0 child control fails to create; never continue with a partial toolbar/panel set.
+7. Do not modify `AstralGame`, change GDI, install dependencies or invoke R0.
+
+## Tests and evidence
+
+Portable source check:
+
+```bash
+g++ -std=c++17 -Wall -Wextra -Werror -I. Engine/Editor/EditorLayout.cpp Tests/EditorLayoutTests.cpp -o editor_layout_tests
+./editor_layout_tests
+```
+
+`EditorLayoutTests` must cover panel geometry, child-control containment, the viewport clip rectangle, the command-state contract, message-loop error classification, and fail-closed required-control creation. The required-control test must pass only when all 12 slots are present and fail for each individual missing slot. The viewport clip must equal normal viewport bounds and clamp malformed negative extents to zero. A later packet that enables a toolbar tool must update the corresponding test with actual implementation evidence.
+
+Windows hosted/local gate:
+
+```powershell
+cmake -S . -B ../AnimeRPG-e11-build -G "Visual Studio 17 2022" -A x64
+cmake --build ../AnimeRPG-e11-build --config Debug --parallel
+ctest --test-dir ../AnimeRPG-e11-build -C Debug --output-on-failure -E RuntimeSmoke
+cmake --build ../AnimeRPG-e11-build --config Release --parallel
+ctest --test-dir ../AnimeRPG-e11-build -C Release --output-on-failure -E RuntimeSmoke
+```
+
+Registered local interactive acceptance, still required after hosted compilation:
+
+- Launch `AstralEditor.exe` from the exact candidate SHA.
+- Capture machine/toolchain identity, command line, UTC timestamps, exit status and screenshots.
+- Verify Outliner selection changes Inspector text and selected viewport label.
+- Verify Select/Move/Rotate/Scale/Play are visibly disabled and labeled pending; clicking/tabbing must not imply an implemented transform or Play mode.
+- Resize repeatedly at 800x600, 1280x720, 1440x900, maximized desktop size, and one deliberately short/narrow size if Windows permits it; verify panels and child controls remain contained and viewport grid/axes/text do not bleed into Outliner, Inspector, Assets or status regions.
+- Verify all expected child controls are present in the successful launch. A forced native CreateWindowEx failure is not required for this GUI acceptance because the exhaustive portable control-state regression is the bounded fault-injection evidence for the fail-closed path.
+- Verify `AstralGame` still launches separately and no game-content behavior is changed by this packet.
+
+## Stop and rollback
+
+Stop on deterministic compile/test failure, unexpected change outside allowed paths, or any requirement to change the graphics API/dependency set. Preserve the failing receipt rather than weakening tests. Rollback is branch-only: abandon/revert this packet; it has no data migration and must not alter shared local runtime state.
+
+## Deferred E11 work
+
+Real scene document ownership/serialization, editable transforms and gizmos, asset import/database integration, drag/drop, undo/redo, save/reopen, Play/Stop, docking, menus, logs/console, 2D authoring, accessibility, tutorial/onboarding and starter-project content remain open. Native GUI acceptance and independent review are required before merge approval.

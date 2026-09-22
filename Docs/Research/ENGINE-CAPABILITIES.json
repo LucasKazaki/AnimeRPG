@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "assessed_at": "2026-09-22",
+  "repository": "LucasKazaki/AnimeRPG",
+  "inspected_base": "e12e6c559bf776ffc9c715c809a517f8e02ce5d5",
+  "inspected_engine_tree": "804d643d3b253bd020b7bf6aa3d86c1113ec5d1b",
+  "source_catalog_and_acceptance_contracts": "ENGINE-CAPABILITIES-2026-09-20.md",
+  "scope": "custom C++17 engine-first; no UE migration or paused content restart",
+  "parity_claim": false,
+  "inventory_complete": false,
+  "local_state": "not_observed",
+  "scheduling": {
+    "requested_interval_minutes": 15,
+    "chat_minimum_interval_minutes": 60,
+    "configured_schedule": null,
+    "local_execution_authority": "existing Company Runtime only"
+  },
+  "items": [
+    {"id":"E00","title":"Evidence and recovery safety","repository_status":"partial","source_ids":["UE-QA"],"depends_on":[],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E01","title":"Runtime, jobs and memory","repository_status":"partial","source_ids":["UE-TASKS","UNITY-JOBS"],"depends_on":["E00"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E02","title":"Scene ownership and serialization","repository_status":"partial","source_ids":[],"depends_on":["E00","E01"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E03","title":"Asset pipeline and resources","repository_status":"partial","source_ids":["UE-ASSETS","UNITY-ASSETS"],"depends_on":["E00","E02"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E04","title":"GPU rendering and materials","repository_status":"not_found","source_ids":["UNITY-RENDER"],"depends_on":["E01","E02","E03"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E05","title":"Lighting, shadows and reflections","repository_status":"not_found","source_ids":["UE-LUMEN"],"depends_on":["E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E06","title":"Large worlds and virtualized detail","repository_status":"not_found","source_ids":["UE-WORLD","UE-NANITE"],"depends_on":["E01","E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E07","title":"Animation","repository_status":"not_found","source_ids":["UNITY-ANIMATION"],"depends_on":["E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E08","title":"Physics and collision","repository_status":"not_found","source_ids":["UNITY-PHYSICS"],"depends_on":["E01","E02"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E09","title":"AI and navigation","repository_status":"partial","source_ids":["UE-AI"],"depends_on":["E02","E08"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E10","title":"Audio engine","repository_status":"not_found","source_ids":["UNITY-AUDIO"],"depends_on":["E01","E03"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E11","title":"UI and editor tooling","repository_status":"partial_editor_shell_candidate","source_ids":["UNITY-UI"],"depends_on":["E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E12","title":"Genuine 2D support","repository_status":"partial","source_ids":["UNITY-2D"],"depends_on":["E02","E03","E04","E08"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E13","title":"Networking and multiplayer runtime","repository_status":"not_found","source_ids":["UNITY-NET"],"depends_on":["E01","E02"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E14","title":"Profiling and budgets","repository_status":"partial","source_ids":["UE-PROFILE","UNITY-PROFILE"],"depends_on":["E00","E01"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E15","title":"Packaging and platform acceptance","repository_status":"partial","source_ids":["UE-PACKAGE"],"depends_on":["E00","E03"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E16","title":"Complete feature-catalogue audit","repository_status":"research_pending","source_ids":[],"depends_on":["E00"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E17","title":"Comparative acceptance and soak","repository_status":"blocked","source_ids":["UE-QA","UE-PROFILE","UNITY-PROFILE"],"depends_on":["E00","E01","E02","E03","E04","E05","E06","E07","E08","E09","E10","E11","E12","E13","E14","E15","E16"],"native_evidence":[],"independent_acceptance":false}
+  ],
+  "current_repair": {
+    "id": "E0-ASSET-VALIDATION-2026-09-20",
+    "kind": "existing-engine-bugfix",
+    "status": "sandbox_verified_native_pending",
+    "covered_subrequirement": "bounded wireframe input validation only, not all of E03",
+    "task": "Tasks/E0-ASSET-VALIDATION-2026-09-20.md",
+    "evidence": "Docs/QA/E0-ASSET-VALIDATION-2026-09-20.md"
+  },
+  "active_candidates": [
+    {
+      "id": "E11-EDITOR-SHELL-2026-09-22",
+      "kind": "editor-tooling-slice",
+      "status": "portable_and_hosted_windows_verified_native_gui_pending",
+      "latest_hosted_candidate": "ad34df2827ab63400db131469af90ccf643343f9",
+      "covered_subrequirement": "separate Win32 editor frame with toolbar, Outliner, procedural viewport, Inspector and primitive asset browser; unsupported Select/Move/Rotate/Scale/Play actions stay disabled; toolbar and panel child-control geometry are deterministic and contained within their assigned regions across standard, narrow, short, zero and malformed tested client extents; viewport GDI paint is clipped to the deterministic viewport rectangle during extreme resize; rectangle containment/overlap edges and toolbar/panel/status coordinate offsets avoid signed-int overflow in tested INT_MIN/INT_MAX-adjacent cases by promoting arithmetic before range-clamped conversion; editor message-loop result handling distinguishes dispatch, normal WM_QUIT, and GetMessage error, and fails with a nonzero exit on retrieval error; all 12 required E11 editor child controls must be created before UI initialization continues, and any missing required control causes WM_CREATE to fail closed; no scene mutation or serialization",
+      "task": "Tasks/E11-EDITOR-SHELL-2026-09-22.md",
+      "evidence": "Docs/QA/E11-EDITOR-SHELL-2026-09-22.md"
+    }
+  ],
+  "benchmark_proposals": {
+    "status": "not_approved_not_measured",
+    "initial_resolutions": ["1920x1080", "2560x1440"],
+    "initial_frame_budget_ms": 16.67,
+    "budget_statistic": "p95",
+    "ram_vram_limits": null,
+    "comparison_tolerances": null,
+    "required_soak_hours": 24
+  },
+  "progression_rules": [
+    "No completion from docs, stubs, test counts or green compilation.",
+    "Research one dependency-ready gap, reproduce or specify a failure, then implement one bounded packet.",
+    "Keep native and independent acceptance gates; staged repairs are not auto-merged.",
+    "Record source SHA, commands, exits, versions, files, hashes and deferred local checks.",
+    "No second local scheduler, local process control or publication from this record.",
+    "Advance after acceptance and stop/resume honestly at external gates."
+  ]
+}

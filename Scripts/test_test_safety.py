@@ -25,13 +25,16 @@ def run(*args: str, expected_success: bool = True) -> subprocess.CompletedProces
 
 
 class TestSafety(unittest.TestCase):
-    def test_all_native_targets_use_the_safety_helper(self) -> None:
+    def test_all_native_test_targets_use_the_safety_helper(self) -> None:
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
-        targets = set(re.findall(r"add_executable\((\w+)", cmake)) - {"AstralGame"}
-        guarded = set(re.findall(r"astral_add_test\((\w+)", cmake))
+        marker = "if(BUILD_TESTING)"
+        self.assertIn(marker, cmake)
+        testing_block = cmake.split(marker, 1)[1]
+        targets = set(re.findall(r"add_executable\((\w+)", testing_block))
+        guarded = set(re.findall(r"astral_add_test\((\w+)", testing_block))
         self.assertEqual(targets, guarded)
         self.assertTrue(guarded)
-        self.assertNotRegex(cmake, r"(?m)^\s*add_test\(")
+        self.assertNotRegex(testing_block, r"(?m)^\s*add_test\(")
 
     def test_release_evaluates_assertions_and_serializes_smokes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="astral-test-contract-") as directory:

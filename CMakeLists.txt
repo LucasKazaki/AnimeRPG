@@ -36,6 +36,14 @@ if(MSVC)
     target_link_options(AstralGame PRIVATE "$<$<CONFIG:Release>:/Brepro>")
 endif()
 
+add_executable(AstralEditor WIN32
+    Engine/Editor/EditorLayout.cpp
+    Tools/AstralEditorMain.cpp
+)
+target_include_directories(AstralEditor PRIVATE .)
+target_compile_definitions(AstralEditor PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(AstralEditor PRIVATE user32 gdi32)
+
 include(CTest)
 if(BUILD_TESTING)
     include(cmake/AstralTestSafety.cmake)
@@ -92,6 +100,13 @@ if(BUILD_TESTING)
     target_include_directories(ProfilingCaptureStateReceiptTests PRIVATE .)
     astral_add_test(ProfilingCaptureStateReceiptTests)
 
+    add_executable(EditorLayoutTests
+        Engine/Editor/EditorLayout.cpp
+        Tests/EditorLayoutTests.cpp
+    )
+    target_include_directories(EditorLayoutTests PRIVATE .)
+    astral_add_test(EditorLayoutTests)
+
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp
         Engine/Scene/Camera.cpp
@@ -101,6 +116,13 @@ if(BUILD_TESTING)
     )
     target_include_directories(AstralSceneTests PRIVATE .)
     astral_add_test(AstralSceneTests)
+
+    add_executable(AssetValidationTests
+        Engine/Assets/StaticMesh.cpp
+        Tests/AssetValidationTests.cpp
+    )
+    target_include_directories(AssetValidationTests PRIVATE .)
+    astral_add_test(AssetValidationTests)
 
     add_executable(WorldBlockoutTests
         Engine/Scene/WorldBlockout.cpp
