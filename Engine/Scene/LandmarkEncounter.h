@@ -19,6 +19,8 @@ enum class LandmarkEncounterResult {
     Activated,
     AlreadyStarted,
     Completed,
+    RetryUnavailable,
+    Retried,
 };
 
 struct LandmarkEncounterReport {
@@ -33,14 +35,18 @@ public:
 
     LandmarkEncounterReport TryActivate(const LandmarkInteractionReport& interaction,
         const CombatSandbox& combatSandbox);
+    LandmarkEncounterReport TryRetry(CombatSandbox& combatSandbox,
+        ShadowbladeActions& shadowbladeActions);
     bool Update(const CombatSandbox& combatSandbox, ShadowbladeActions& shadowbladeActions);
 
     LandmarkEncounterState State() const { return state_; }
     const LandmarkEncounterReport& LastReport() const { return lastReport_; }
+    bool RewardGranted() const { return rewardGranted_; }
 
 private:
     LandmarkEncounterState state_{LandmarkEncounterState::Locked};
     LandmarkEncounterReport lastReport_{};
+    bool rewardGranted_{};
 };
 
 } // namespace Astral::Scene
