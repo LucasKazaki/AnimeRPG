@@ -4,6 +4,7 @@
 #include "Engine/Scene/ShadowbladeActions.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
 
@@ -133,6 +134,10 @@ public:
 
     bool AdvanceTime(CombatSandbox& combat, ShadowbladeActions& actions,
         float deltaSeconds) {
+        // Preserve both underlying subsystems' no-op semantics for invalid or
+        // nonpositive time. Reconciliation waits for the next valid tick.
+        if (!(deltaSeconds > 0.0f) || !std::isfinite(deltaSeconds)) return false;
+
         if (!linkedAttackActive_) {
             combat.AdvanceTime(deltaSeconds);
             actions.AdvanceTime(deltaSeconds);
