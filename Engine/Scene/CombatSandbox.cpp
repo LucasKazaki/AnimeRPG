@@ -19,26 +19,22 @@ void CombatSandbox::AdvanceTime(float deltaSeconds) {
         staggerRemaining_ = std::max(0.0f, staggerRemaining_ - deltaSeconds);
         if (staggerRemaining_ == 0.0f) {
             dummy_.posture = 0;
-            postureRecoveryRemainder_ = 0.0f;
+            postureAtRecoveryStart_ = 0;
         }
         return;
     }
 
-    const float previousIdle = timeSincePostureHit_;
-    timeSincePostureHit_ += deltaSeconds;
-    const float previousRecovery = std::max(0.0f,
-        previousIdle - PostureRecoveryDelaySeconds);
-    const float currentRecovery = std::max(0.0f,
-        timeSincePostureHit_ - PostureRecoveryDelaySeconds);
-    const float recoveryDuration = currentRecovery - previousRecovery;
-    if (recoveryDuration > 0.0f && dummy_.posture > 0) {
-        postureRecoveryRemainder_ += PostureRecoveryPerSecond * recoveryDuration;
-        const int recovered = static_cast<int>(std::floor(postureRecoveryRemainder_));
-        if (recovered > 0) {
-            dummy_.posture = std::max(0, dummy_.posture - recovered);
-            postureRecoveryRemainder_ -= static_cast<float>(recovered);
-            if (dummy_.posture == 0) postureRecoveryRemainder_ = 0.0f;
-        }
+    timeSincePostureHit_ += static_cast<double>(deltaSeconds);
+    const double recoveryDuration = std::max(0.0,
+        timeSincePostureHit_ - static_cast<double>(PostureRecoveryDelaySeconds));
+    if (recoveryDuration > 0.0 && dummy_.posture > 0) {
+        const double recoveryAmount = static_cast<double>(PostureRecoveryPerSecond)
+            * recoveryDuration;
+        constexpr double RecoveryBoundaryEpsilon = 1e-6;
+        const int recovered = static_cast<int>(std::floor(
+            recoveryAmount + RecoveryBoundaryEpsilon));
+        dummy_.posture = std::max(0, postureAtRecoveryStart_ - recovered);
+        if (dummy_.posture == 0) postureAtRecoveryStart_ = 0;
     }
 }
 
@@ -84,7 +80,7 @@ int CombatSandbox::ApplyDamage(int damage) {
     if (dummy_.IsDefeated()) {
         dummy_.posture = 0;
         staggerRemaining_ = 0.0f;
-        postureRecoveryRemainder_ = 0.0f;
+        postureAtRecoveryStart_ = 0;
     }
     return applied;
 }
@@ -94,8 +90,8 @@ bool CombatSandbox::ConsumeStaggerOpening() {
 
     staggerRemaining_ = 0.0f;
     dummy_.posture = 0;
-    timeSincePostureHit_ = 0.0f;
-    postureRecoveryRemainder_ = 0.0f;
+    timeSincePostureHit_ = 0.0;
+    postureAtRecoveryStart_ = 0;
     return true;
 }
 
@@ -106,8 +102,8 @@ void CombatSandbox::ResetTrainingSession() {
     elapsedSeconds_ = 0.0f;
     nextAttackTime_ = 0.0f;
     staggerRemaining_ = 0.0f;
-    timeSincePostureHit_ = 0.0f;
-    postureRecoveryRemainder_ = 0.0f;
+    timeSincePostureHit_ = 0.0;
+    postureAtRecoveryStart_ = 0;
     lastComboHitTime_ = -1000.0f;
     comboCount_ = 0;
 }
@@ -130,8 +126,8 @@ bool CombatSandbox::ApplyPostureDamage(int postureDamage) {
     if (postureDamage <= 0 || dummy_.IsDefeated() || IsStaggered()) return false;
 
     dummy_.posture = std::min(dummy_.maximumPosture, dummy_.posture + postureDamage);
-    timeSincePostureHit_ = 0.0f;
-    postureRecoveryRemainder_ = 0.0f;
+    timeSincePostureHit_ = 0.0;
+    postureAtRecoveryStart_ = dummy_.posture;
     if (dummy_.posture >= dummy_.maximumPosture) {
         staggerRemaining_ = StaggerDurationSeconds;
         return true;
