@@ -133,6 +133,9 @@ ComboFinisherReport CombatSandbox::TryComboFinisher(const Math::Vec3& attackerPo
     if (!ComboFinisherReady()) {
         return {ComboFinisherResult::NotReady, 0};
     }
+    if (!std::isfinite(attackerPosition.x) || !std::isfinite(attackerPosition.y)) {
+        return {ComboFinisherResult::OutOfRange, 0};
+    }
 
     const float deltaX = dummy_.position.x - attackerPosition.x;
     const float deltaY = dummy_.position.y - attackerPosition.y;
