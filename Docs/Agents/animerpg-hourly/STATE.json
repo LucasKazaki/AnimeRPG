@@ -3,19 +3,19 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-22",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "71e5eeb9c10bdd2b0860acb4d761334bd2336de3",
+  "last_verified_main_at_pass_start": "7950687e3f9180787957e52394bf13cea49c35bf",
   "last_merged_pass": {
-    "id": "GAME-PASS3-REACTIONS-RETRY-2026-09-22",
-    "pr": 17,
-    "merge_sha": "71e5eeb9c10bdd2b0860acb4d761334bd2336de3",
-    "head_sha": "77c37a4483de9169bdecbd922866f9937e5ca07f",
+    "id": "GAME-PASS4-ENEMY-DEPTH-2026-09-22",
+    "pr": 18,
+    "merge_sha": "7950687e3f9180787957e52394bf13cea49c35bf",
+    "head_sha": "338b7ad374ab824fda5cc8be22a2d49a781bdb59",
     "hosted_windows_ci": "passed",
     "release_manifest": "passed",
-    "independent_review": "completed_no_major_issues_after_two_p2_repairs",
+    "independent_review": "completed_no_major_issues",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-22-enemy-depth-pass4",
-  "pass": "GAME-PASS4-ENEMY-DEPTH-2026-09-22",
+  "working_branch": "game/2026-09-22-mastery-pass5",
+  "pass": "GAME-PASS5-MASTERY-2026-09-22",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -27,34 +27,36 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-017","title":"Weakness-aware training enemies","status":"implemented_domain_behavior"},
-    {"id":"GAME-018","title":"Weakness-sensitive Eclipse","status":"implemented_domain_behavior"},
-    {"id":"GAME-019","title":"Eclipse finisher opening","status":"implemented_domain_behavior"},
-    {"id":"GAME-020","title":"Technique-chain challenge scoring","status":"implemented_domain_behavior"},
-    {"id":"GAME-021","title":"Ordered landmark resonance","status":"implemented_domain_behavior"},
-    {"id":"QOL-005","title":"Training enemy variant selector","status":"implemented_domain_behavior"}
+    {"id":"GAME-022","title":"Attack-profile resistance","status":"implemented_domain_behavior"},
+    {"id":"GAME-023","title":"Stagger vulnerability","status":"implemented_domain_behavior"},
+    {"id":"GAME-024","title":"Technique-variety chaining","status":"implemented_domain_behavior"},
+    {"id":"GAME-025","title":"Boss phase-shifting affinity weakness","status":"implemented_domain_behavior"},
+    {"id":"GAME-026","title":"Endless practice target","status":"implemented_domain_behavior"},
+    {"id":"QOL-006","title":"Boss-grade training profile","status":"implemented_domain_behavior"}
   ],
   "research": {
     "accessed": "2026-09-22",
     "reference_sources": [
-      "https://apps.apple.com/us/app/zenless-zone-zero/id1606356401",
-      "https://www.playstation.com/en-us/games/genshin-impact/",
-      "https://www.playstation.com/en-us/games/wuthering-waves/",
+      "https://store.playstation.com/en-gb/concept/10000896",
+      "https://store.playstation.com/en-us/concept/10010764/",
       "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
-      "https://zenless.hoyoverse.com/fr-fr/news/166073"
+      "https://zenless.hoyoverse.com/en-us/news/165277?catchSpider=1",
+      "https://zenless.hoyoverse.com/en-us/main?catchSpider=1"
     ],
     "community_sources": [
-      "https://www.reddit.com/r/ZenlessZoneZero/comments/1k2qi6u/",
-      "https://www.reddit.com/r/ZenlessZoneZero/comments/1hru9ss/"
+      "https://www.reddit.com/r/ZZZ_Official/comments/1wdtzbh/training_mode/",
+      "https://www.reddit.com/r/ZZZ_Discussion/comments/1r4l7xn/why_cant_we_put_bosses_in_the_training_training/"
     ],
-    "community_limit": "Two historical individual/community discussions requesting broader free-training enemy coverage; not proof of current ZZZ behavior or consensus."
+    "community_limit": "Current September 2026 request plus corroborating February 2026 discussion for boss-grade training coverage; anecdotal community evidence, not consensus or an official roadmap."
   },
   "verification": {
-    "local_checkout_build": "not_run_container_dns_blocked",
+    "focused_gcc": "passed_exact_intended_combat_source_with_minimal_math_fixture",
+    "focused_clang_asan_ubsan": "passed_exact_intended_combat_source_with_minimal_math_fixture",
+    "fixture_limit": "Focused partial-source verification only; hosted full-repository Windows checks are still required.",
     "hosted_windows_ci": "pending_pr_exact_head",
     "release_manifest": "pending_pr_exact_head",
     "native_windows_interactive": "not_run",
     "independent_review": "pending_pr_exact_head"
   },
-  "next_action": "Open pass-4 PR against current main, inspect exact diff, run hosted gates and exact-head independent review, repair findings, and merge only when all applicable gates are green."
+  "next_action": "Open pass-5 PR against current main, inspect exact diff, require hosted Windows and manifest checks plus exact-head Codex review, repair findings, and merge only when all applicable gates are green."
 }
