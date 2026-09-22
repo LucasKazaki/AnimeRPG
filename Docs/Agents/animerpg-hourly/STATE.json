@@ -3,75 +3,84 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-22",
   "target_branch": "main",
-  "baseline_commit": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
-  "working_branch": "game/2026-09-22-combat-exploration-pass1",
-  "pass": "GAME-PASS1-COMBAT-EXPLORATION-2026-09-22",
+  "stack_parent_pr": 14,
+  "stack_parent_required_head_after_latest_fix": "a2cec4c150a071d8694f73ead6aea53ab5b520c7",
+  "working_branch": "game/2026-09-22-defense-retry-pass2",
+  "pass": "GAME-PASS2-DEFENSE-RETRY-2026-09-22",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
-    "increments_with_domain_tests": 6,
+    "increments_with_focused_tests": 6,
     "increments_native_playable_verified": 0,
     "increments_independently_reviewed": 0,
     "increments_merged": 0
   },
   "increments": [
     {
-      "id": "GAME-001",
-      "title": "Direction-aware normalized Shadowblade dash",
+      "id": "GAME-007",
+      "title": "Deterministic enemy attack telegraph and impact",
       "status": "implemented_domain_api",
-      "note": "Cardinal/diagonal normalization and safe neutral/nonfinite fallback are implemented and covered by deterministic tests. Existing Win32 Q and Thought Command call sites still use the one-argument forward fallback, so directional live input integration is intentionally not claimed in this pass."
+      "note": "One scheduled attack owns a positive finite windup and damage value, resolves once, and applies bounded player health damage. No renderer telegraph is claimed."
     },
     {
-      "id": "GAME-006",
-      "title": "Deterministic attack combo tracking",
-      "status": "implemented_live_domain_state",
-      "note": "Successful existing light/heavy attacks update combo/best-combo state; timeout and rejected attempts do not inflate it. No new HUD presentation is claimed."
-    },
-    {
-      "id": "GAME-003",
-      "title": "Posture, stagger, and recovery",
-      "status": "implemented_live_domain_behavior",
-      "note": "Existing light/heavy attacks now apply bounded posture, trigger a finite stagger opening, recover posture after idle delay, and clear stagger on defeat."
-    },
-    {
-      "id": "GAME-004",
-      "title": "Stagger-earned Fatal Strike follow-up",
-      "status": "implemented_live_domain_behavior",
-      "note": "Existing Fatal Strike recognizes an active stagger opening, uses a reduced 30-resource follow-up cost, and consumes that opening only after range/resource checks pass. Damage and cooldown remain unchanged."
-    },
-    {
-      "id": "GAME-005",
-      "title": "Ordered National Mall objective guidance state",
-      "status": "implemented_live_domain_state",
-      "note": "Landmark discovery keeps free exploration but exposes ordered Lincoln -> Reflecting Pool -> Washington Monument progression. Existing UI does not yet present the next objective."
-    },
-    {
-      "id": "QOL-002",
-      "title": "Resettable training-session combat metrics",
+      "id": "GAME-002",
+      "title": "Perfect dodge and earned counter",
       "status": "implemented_domain_api",
-      "note": "CombatSandbox records total damage, hits, peak hit, best combo, and exposes an idempotent session reset. No runtime key/UI is added in this bounded pass, so player-visible reset/metrics are not claimed."
+      "note": "A late-window dodge cancels one scheduled attack and grants one timed counter. Early dodge and out-of-range counter attempts preserve authoritative state."
+    },
+    {
+      "id": "GAME-008",
+      "title": "Perfect guard into posture damage",
+      "status": "implemented_domain_api",
+      "note": "A tighter late guard cancels one scheduled hit and applies bounded target posture damage, reusing pass-one stagger rules."
+    },
+    {
+      "id": "GAME-009",
+      "title": "Solar/Umbral Eclipse reaction",
+      "status": "implemented_domain_api",
+      "note": "Original setting-specific opposing affinities consume each other for bounded Eclipse bonus damage; same-affinity applications do not trigger a reaction."
+    },
+    {
+      "id": "GAME-010",
+      "title": "Earned three-hit combo finisher",
+      "status": "implemented_domain_api",
+      "note": "Three successful shared combo hits arm one finisher; invalid range preserves it and success/timeout/defeat clear it."
+    },
+    {
+      "id": "QOL-003",
+      "title": "Clean Lincoln encounter retry",
+      "status": "implemented_domain_api",
+      "note": "Explicit retry restores transient training/player/Shadowblade state while preserving the one-time reward ledger, so replay cannot farm completion rewards."
     }
   ],
-  "community_source": {
-    "id": "WUWA-PLAYER-20260802-DPS",
-    "url": "https://www.reddit.com/r/WuWaves/comments/1vd8ctk/",
-    "published": "2026-08-02",
+  "research": {
     "accessed": "2026-09-22",
-    "request": "A training target/tool that reports total damage and combat statistics for build and rotation testing.",
-    "evidence_limit": "Original player post and discussion, not a community consensus measurement. Discussion also cautions that training-dummy optimization does not reproduce interruption-heavy real combat."
+    "reference_sources": [
+      "https://store.playstation.com/en-us/concept/10000896/",
+      "https://www.playstation.com/en-us/games/zenless-zone-zero/",
+      "https://www.playstation.com/en-us/games/wuthering-waves/",
+      "https://www.playstation.com/en-us/games/granblue-fantasy-relink/"
+    ],
+    "community_sources": [
+      "https://www.reddit.com/r/Genshin_Impact/comments/s7gnmq/",
+      "https://www.reddit.com/r/Genshin_Impact/comments/1175sfb/",
+      "https://www.reddit.com/r/GenshinImpact/comments/16fjxtf/"
+    ],
+    "community_limit": "Historical retry/cooldown complaints are design input, not proof of a current unresolved Genshin defect."
   },
-  "reference_sources": [
-    "https://www.playstation.com/en-us/games/genshin-impact/",
-    "https://apps.apple.com/us/app/zenless-zone-zero/id1606356401",
-    "https://store.playstation.com/en-us/concept/10010764/",
-    "https://www.playstation.com/en-us/games/granblue-fantasy-relink/"
-  ],
   "verification": {
-    "sandbox_source_fixture": "passed",
-    "hosted_windows_ci": "pending_pr",
+    "focused_linux_cpp17_fixture": "passed for telegraph, perfect dodge/counter, perfect guard, combo finisher, mana reaction, and inherited exact posture boundary; g++ -std=c++17 -Wall -Wextra -Werror",
+    "repository_hosted_windows_ci": "pending stacked PR",
     "native_windows_interactive": "not_run",
-    "independent_review": "pending_pr"
+    "independent_review": "pending stacked PR"
   },
-  "next_action": "Open the bounded PR, verify hosted Windows compile/tests and exact-head independent review, address findings, then merge only if those gates pass. Carry player-visible dash direction, objective HUD, and training reset/metrics presentation into a later coordinated input/UI packet."
+  "parent_pr_14": {
+    "latest_known_head": "a2cec4c150a071d8694f73ead6aea53ab5b520c7",
+    "hosted_windows_ci": "passed",
+    "release_manifest_integrity": "passed",
+    "independent_review": "re-requested after Fatal Strike combo finding was fixed",
+    "merged": false
+  },
+  "next_action": "Open the pass-two stacked PR against the live pass-one branch, obtain hosted Windows checks and exact-head independent review, then retarget to main only after PR #14 is accepted and merged."
 }
