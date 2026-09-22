@@ -1,4 +1,5 @@
 #include "Engine/Scene/ShadowbladeActions.h"
+#include "Engine/Scene/CombatDefenseTraining.h"
 
 #include <cmath>
 #include <iostream>
@@ -506,6 +507,191 @@ void TestDefenseClockRebasesAfterSaturation() {
             && automaticHit.PlayerHealth() == 80,
         "rebased threat still expires once after its requested duration");
 }
+
+void TestCombatDefenseTrainingBridgeAndCues() {
+    using namespace Astral::Scene;
+
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    CombatDefenseTraining drill;
+    Expect(drill.QueueNextAttack(combat, actions),
+        "defense drill links one enemy plan to one Shadowblade threat");
+    const EnemyAttackPlan firstPlan = combat.PendingEnemyAttack();
+    Expect(firstPlan.pattern == EnemyAttackPattern::QuickCut
+            && actions.HasIncomingAttack()
+            && Near(actions.IncomingAttackRemaining(), firstPlan.windupSeconds),
+        "linked threat preserves the enemy plan windup");
+    Expect(!drill.QueueNextAttack(combat, actions),
+        "defense drill rejects duplicate linked threats");
+
+    DefenseTrainingCue cue = drill.Cue(combat, actions);
+    Expect(cue.phase == DefenseTrainingCuePhase::Approach
+            && cue.pattern == EnemyAttackPattern::QuickCut && cue.blockable,
+        "fresh linked threat exposes approach cue metadata");
+
+    const DefenseReport early = drill.TryDefend(combat, actions, DefenseInput::Dodge);
+    Expect(early.result == DefenseResult::TooEarly && combat.HasPendingEnemyAttack()
+            && actions.HasIncomingAttack() && drill.HasLinkedAttack(),
+        "too-early dodge preserves both sides of the linked threat");
+
+    Expect(!drill.AdvanceTime(combat, actions, 0.25f),
+        "advancing inside a windup does not fabricate a resolution");
+    cue = drill.Cue(combat, actions);
+    Expect(cue.phase == DefenseTrainingCuePhase::DodgeWindow
+            && cue.secondsToImpact > ShadowbladeActions::StandardPerfectDefenseWindowSeconds,
+        "cue enters the existing dodge window before the perfect window");
+    Expect(!drill.AdvanceTime(combat, actions, 0.20f),
+        "advancing to the perfect window keeps the threat live");
+    cue = drill.Cue(combat, actions);
+    Expect(cue.phase == DefenseTrainingCuePhase::PerfectWindow,
+        "cue exposes the existing perfect-defense timing boundary");
+
+    const DefenseReport perfect = drill.TryDefend(combat, actions, DefenseInput::Dodge);
+    Expect(perfect.result == DefenseResult::PerfectDodge && !combat.HasPendingEnemyAttack()
+            && !actions.HasIncomingAttack() && !drill.HasLinkedAttack(),
+        "perfect dodge resolves both the Shadowblade threat and enemy plan exactly once");
+    Expect(combat.DefensePunishOpeningReady(),
+        "perfect defense round-trip preserves the combat punish opening");
+    Expect(drill.Stats().attacksQueued == 1 && drill.Stats().defenseInputs == 2
+            && drill.Stats().perfectDefenses == 1
+            && drill.Stats().currentPerfectStreak == 1
+            && drill.Stats().bestPerfectStreak == 1,
+        "defense drill telemetry records early input and one perfect resolution honestly");
+
+    CombatSandbox automaticCombat;
+    ShadowbladeActions automaticActions;
+    CombatDefenseTraining automaticDrill;
+    Expect(automaticDrill.QueueNextAttack(automaticCombat, automaticActions),
+        "automatic-impact drill queues a linked attack");
+    const EnemyAttackPlan automaticPlan = automaticCombat.PendingEnemyAttack();
+    Expect(automaticDrill.AdvanceTime(automaticCombat, automaticActions,
+            automaticPlan.windupSeconds),
+        "coordinator reconciles an automatically expired Shadowblade threat");
+    Expect(!automaticCombat.HasPendingEnemyAttack() && !automaticActions.HasIncomingAttack()
+            && automaticActions.PlayerHealth() == 82
+            && automaticDrill.Stats().hitsTaken == 1
+            && automaticDrill.Stats().damageTaken == 18,
+        "automatic impact damages and records exactly once");
+    automaticDrill.AdvanceTime(automaticCombat, automaticActions, 1.0f);
+    Expect(automaticActions.PlayerHealth() == 82
+            && automaticDrill.Stats().hitsTaken == 1,
+        "post-impact time cannot duplicate player damage or telemetry");
+
+    CombatSandbox bossCombat;
+    ShadowbladeActions bossActions;
+    CombatDefenseTraining bossDrill;
+    Expect(bossCombat.SetTrainingEnemyProfile(TrainingEnemyProfile::Boss)
+            && bossCombat.SetBossPracticePhase(EnemyPhase::Pressure),
+        "boss cue setup selects pressure phase");
+    Expect(bossDrill.QueueNextAttack(bossCombat, bossActions),
+        "pressure drill queues first boss attack");
+    const float firstRecovery = bossCombat.PendingEnemyAttack().recoverySeconds;
+    Expect(bossDrill.TryDefend(bossCombat, bossActions, DefenseInput::Guard).result
+            == DefenseResult::Guarded,
+        "first pressure attack can be resolved to reach the next pattern");
+    bossDrill.AdvanceTime(bossCombat, bossActions, firstRecovery);
+    Expect(bossDrill.QueueNextAttack(bossCombat, bossActions)
+            && bossCombat.PendingEnemyAttack().pattern == EnemyAttackPattern::RiftBurst,
+        "second pressure pattern reaches the unblockable RiftBurst");
+    const DefenseTrainingCue unblockableCue = bossDrill.Cue(bossCombat, bossActions);
+    Expect(unblockableCue.phase == DefenseTrainingCuePhase::Approach
+            && !unblockableCue.blockable
+            && unblockableCue.pattern == EnemyAttackPattern::RiftBurst,
+        "cue metadata exposes an unblockable plan without inventing a copied indicator");
+}
+
+void TestCombatDefenseTrainingInterruptionAndGrades() {
+    using namespace Astral::Scene;
+
+    CombatSandbox interruptedCombat;
+    ShadowbladeActions interruptedActions;
+    CombatDefenseTraining interruptedDrill;
+    Expect(interruptedDrill.QueueNextAttack(interruptedCombat, interruptedActions),
+        "interruption setup queues a linked QuickCut");
+    const AttackReport light = interruptedCombat.TryAttack(AttackType::Light, {});
+    Expect(light.result == AttackResult::Hit && !light.staggerTriggered,
+        "interruption setup light attack builds posture");
+    Expect(!interruptedDrill.AdvanceTime(interruptedCombat, interruptedActions, 0.4f),
+        "linked threat remains live before the follow-up stagger");
+    const AttackReport heavy = interruptedCombat.TryAttack(AttackType::Heavy, {});
+    Expect(heavy.result == AttackResult::Hit && heavy.staggerTriggered
+            && !interruptedCombat.HasPendingEnemyAttack()
+            && interruptedActions.HasIncomingAttack(),
+        "combat stagger interrupts its planner before coordinator reconciliation");
+    Expect(interruptedDrill.AdvanceTime(interruptedCombat, interruptedActions, 0.01f)
+            && !interruptedActions.HasIncomingAttack()
+            && !interruptedDrill.HasLinkedAttack(),
+        "coordinator cancels the stale linked Shadowblade threat after interruption");
+    Expect(interruptedActions.PlayerHealth() == 100
+            && interruptedDrill.Stats().interruptions == 1,
+        "stagger interruption cannot land stale player damage");
+    interruptedDrill.AdvanceTime(interruptedCombat, interruptedActions, 1.0f);
+    Expect(interruptedActions.PlayerHealth() == 100,
+        "canceled linked threat remains canceled after its former impact time");
+
+    CombatSandbox perfectCombat;
+    ShadowbladeActions perfectActions;
+    CombatDefenseTraining perfectDrill;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        Expect(perfectDrill.QueueNextAttack(perfectCombat, perfectActions),
+            "grade drill queues each perfect-defense attempt");
+        const EnemyAttackPlan plan = perfectCombat.PendingEnemyAttack();
+        perfectDrill.AdvanceTime(perfectCombat, perfectActions, 0.45f);
+        const DefenseReport perfect = perfectDrill.TryDefend(
+            perfectCombat, perfectActions, DefenseInput::Dodge);
+        Expect(perfect.result == DefenseResult::PerfectDodge,
+            "grade drill records a clean perfect dodge");
+        if (attempt < 2) {
+            perfectDrill.AdvanceTime(perfectCombat, perfectActions, plan.recoverySeconds);
+        }
+    }
+    Expect(perfectDrill.Grade() == DefenseTrainingGrade::Gold
+            && perfectDrill.Stats().perfectDefenses == 3
+            && perfectDrill.Stats().bestPerfectStreak == 3
+            && perfectDrill.Stats().damageTaken == 0,
+        "three clean perfect resolutions earn deterministic Gold drill grade");
+
+    const int healthBeforeReset = perfectActions.PlayerHealth();
+    const float recoveryBeforeReset = perfectCombat.EnemyAttackReadyInSeconds();
+    perfectDrill.ResetStats();
+    Expect(perfectDrill.Grade() == DefenseTrainingGrade::None
+            && perfectDrill.Stats().attacksQueued == 0
+            && perfectActions.PlayerHealth() == healthBeforeReset
+            && Near(perfectCombat.EnemyAttackReadyInSeconds(), recoveryBeforeReset),
+        "telemetry reset does not mutate player or combat state");
+
+    CombatSandbox hitCombat;
+    ShadowbladeActions hitActions;
+    CombatDefenseTraining hitDrill;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        Expect(hitDrill.QueueNextAttack(hitCombat, hitActions),
+            "damage-grade drill queues each automatic hit");
+        const EnemyAttackPlan plan = hitCombat.PendingEnemyAttack();
+        hitDrill.AdvanceTime(hitCombat, hitActions, plan.windupSeconds);
+        if (attempt < 2) {
+            hitDrill.AdvanceTime(hitCombat, hitActions, plan.recoverySeconds);
+        }
+    }
+    Expect(hitDrill.Grade() == DefenseTrainingGrade::Bronze
+            && hitDrill.Stats().hitsTaken == 3
+            && hitDrill.Stats().damageTaken == 54,
+        "repeated damage produces a lower bounded drill grade");
+
+    CombatSandbox invalidCombat;
+    ShadowbladeActions invalidActions;
+    CombatDefenseTraining invalidDrill;
+    Expect(invalidDrill.QueueNextAttack(invalidCombat, invalidActions),
+        "invalid-delta drill queues a linked attack");
+    const float remaining = invalidActions.IncomingAttackRemaining();
+    const DefenseTrainingStats before = invalidDrill.Stats();
+    Expect(!invalidDrill.AdvanceTime(invalidCombat, invalidActions,
+            std::numeric_limits<float>::quiet_NaN()),
+        "nonfinite coordinator delta does not resolve a linked attack");
+    Expect(invalidDrill.Stats().attacksQueued == before.attacksQueued
+            && invalidDrill.Stats().hitsTaken == before.hitsTaken
+            && Near(invalidActions.IncomingAttackRemaining(), remaining),
+        "nonfinite coordinator delta preserves telemetry and threat timing");
+}
 }
 
 int main() {
@@ -526,6 +712,8 @@ int main() {
     TestLongSixtyHzBoundaryToleranceIsSplitStable();
     TestMinimumThreatAndWindowBoundaryPrecision();
     TestDefenseClockRebasesAfterSaturation();
+    TestCombatDefenseTrainingBridgeAndCues();
+    TestCombatDefenseTrainingInterruptionAndGrades();
     if (failures != 0) return 1;
     std::cout << "Shadowblade action tests passed\n";
     return 0;
