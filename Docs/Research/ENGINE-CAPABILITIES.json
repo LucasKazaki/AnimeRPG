@@ -59,10 +59,10 @@
       "kind": "editor-native-verification-slice",
       "status": "hosted_debug_release_compile_verified_native_runtime_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
-      "latest_code_candidate": "0dc4d44a2ab26d0fd9c7d00012a277453c96e4a1",
-      "latest_hosted_candidate": "210da4bb58b200e6acc6b34173ae3d6c5f9ad80d",
-      "hosted_windows_run": 35690534783,
-      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: process-owned launch, expected top-level class/title, required direct child-control inventory, disabled pending tool state, Outliner and asset-list initial state, Outliner-to-Inspector selection synchronization, child-control containment under normal and narrow/short resize, and bounded clean close; hosted CI compiled the smoke in Debug and Release but did not execute the interactive RuntimeSmoke target",
+      "latest_code_candidate": "ea9fe671a1734d836cc792bb45342b360d96cb04",
+      "latest_hosted_candidate": "ea9fe671a1734d836cc792bb45342b360d96cb04",
+      "hosted_windows_run": 35694592339,
+      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: process-owned launch, exactly one visible process-owned top-level window established by full top-level enumeration, expected class/title, required direct child-control inventory, disabled pending tool state, Outliner and asset-list initial state, Outliner-to-Inspector selection synchronization, child-control containment under normal and narrow/short resize, and bounded clean close; hosted CI compiled the smoke in Debug and Release and passed non-runtime regressions but did not execute the interactive RuntimeSmoke target",
       "task": "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
       "evidence": "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md"
     }
