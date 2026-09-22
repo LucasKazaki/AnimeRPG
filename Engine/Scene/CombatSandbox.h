@@ -114,6 +114,7 @@ public:
     const AttackReport& LastAttack() const { return lastAttack_; }
     const TrainingStats& Stats() const { return stats_; }
     float ElapsedSeconds() const;
+    double ElapsedSecondsPrecise() const { return elapsedSecondsPrecise_; }
     float CooldownRemaining() const;
     float StaggerRemaining() const;
     bool IsStaggered() const;
