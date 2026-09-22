@@ -17,6 +17,14 @@ enum class DefenseTrainingCuePhase {
     PerfectWindow,
 };
 
+enum class DefenseTrainingCueSymbol {
+    None,
+    Observe,
+    Blockable,
+    Unblockable,
+    PerfectTiming,
+};
+
 enum class DefenseTrainingGrade {
     None,
     Bronze,
@@ -24,8 +32,30 @@ enum class DefenseTrainingGrade {
     Gold,
 };
 
+enum class DefenseTrainingGoal {
+    FreePractice,
+    PerfectDefense,
+    GuardDiscipline,
+    DodgeDiscipline,
+};
+
+enum class DefenseTrainingControlReminder {
+    None,
+    Guard,
+    Dodge,
+};
+
+enum class DefenseTrainingTutorialHint {
+    None,
+    ReadTelegraph,
+    GuardBlockable,
+    DodgeUnblockable,
+    AimPerfectTiming,
+};
+
 struct DefenseTrainingCue {
     DefenseTrainingCuePhase phase{DefenseTrainingCuePhase::None};
+    DefenseTrainingCueSymbol symbol{DefenseTrainingCueSymbol::None};
     EnemyAttackPattern pattern{EnemyAttackPattern::QuickCut};
     float secondsToImpact{};
     bool blockable{};
@@ -36,41 +66,44 @@ struct DefenseTrainingStats {
     int defenseInputs{};
     int perfectDefenses{};
     int ordinaryDefenses{};
+    int guardDefenses{};
+    int dodgeDefenses{};
     int hitsTaken{};
     int interruptions{};
     int damageTaken{};
     int currentPerfectStreak{};
     int bestPerfectStreak{};
+    int consecutiveHits{};
+};
+
+struct DefenseTrainingGoalStatus {
+    DefenseTrainingGoal goal{DefenseTrainingGoal::FreePractice};
+    int current{};
+    int target{};
+    bool complete{};
 };
 
 class CombatDefenseTraining {
 public:
+    static constexpr int GoalTarget = 3;
+
     bool QueueNextAttack(CombatSandbox& combat, ShadowbladeActions& actions) {
-        if (linkedAttackActive_ || combat.HasPendingEnemyAttack()
-            || actions.HasIncomingAttack() || actions.PlayerHealth() <= 0) {
-            return false;
-        }
-        if (!combat.QueueNextEnemyAttack()) return false;
+        if (!CanQueue(combat, actions) || !combat.QueueNextEnemyAttack()) return false;
+        return LinkQueuedAttack(combat, actions);
+    }
 
-        const EnemyAttackPlan plan = combat.PendingEnemyAttack();
-        const IncomingAttackDefinition incoming{
-            plan.windupSeconds, plan.damage, plan.guardDamage, plan.blockable};
-        if (!actions.BeginIncomingAttack(incoming)) {
-            combat.ResolveEnemyAttack(EnemyAttackOutcome::Interrupted);
-            return false;
-        }
-
-        linkedAttackActive_ = true;
-        linkedCombat_ = &combat;
-        linkedActions_ = &actions;
-        linkedCombatAttackGeneration_ = combat.EnemyAttackGeneration();
-        linkedAttackGeneration_ = actions.IncomingAttackGeneration();
-        SaturatingIncrement(stats_.attacksQueued);
-        return true;
+    bool QueueAttackPattern(CombatSandbox& combat, ShadowbladeActions& actions,
+        EnemyAttackPattern pattern) {
+        if (!CanQueue(combat, actions) || !combat.QueueEnemyAttackPattern(pattern)) return false;
+        return LinkQueuedAttack(combat, actions);
     }
 
     DefenseReport TryDefend(CombatSandbox& combat, ShadowbladeActions& actions,
         DefenseInput input) {
+        if (paused_) {
+            return {DefenseResult::Paused, 0, 0, false,
+                actions.HasIncomingAttack() ? actions.IncomingAttackRemaining() : 0.0f};
+        }
         if (!linkedAttackActive_) return actions.TryDefend(input);
         if (!OwnsObjects(combat, actions)) return NoLinkedThreatReport();
 
@@ -98,7 +131,8 @@ public:
         const DefenseReport report = actions.TryDefend(input);
         if (report.result != DefenseResult::NoThreat
             && report.result != DefenseResult::InvalidThreat
-            && report.result != DefenseResult::ThreatQueued) {
+            && report.result != DefenseResult::ThreatQueued
+            && report.result != DefenseResult::Paused) {
             SaturatingIncrement(stats_.defenseInputs);
         }
 
@@ -106,28 +140,32 @@ public:
         case DefenseResult::TooEarly:
             return report;
         case DefenseResult::PerfectGuard:
+            ResolveLinked(combat, EnemyAttackOutcome::PerfectDefense, report,
+                ResolutionKind::Perfect, DefenseKind::Guard);
+            return report;
         case DefenseResult::PerfectDodge:
             ResolveLinked(combat, EnemyAttackOutcome::PerfectDefense, report,
-                ResolutionKind::Perfect);
+                ResolutionKind::Perfect, DefenseKind::Dodge);
             return report;
         case DefenseResult::Guarded:
             ResolveLinked(combat, EnemyAttackOutcome::Guarded, report,
-                ResolutionKind::OrdinaryDefense);
+                ResolutionKind::OrdinaryDefense, DefenseKind::Guard);
             return report;
         case DefenseResult::Evaded:
             ResolveLinked(combat, EnemyAttackOutcome::Evaded, report,
-                ResolutionKind::OrdinaryDefense);
+                ResolutionKind::OrdinaryDefense, DefenseKind::Dodge);
             return report;
         case DefenseResult::GuardBroken:
         case DefenseResult::UnblockableHit:
         case DefenseResult::Hit:
             ResolveLinked(combat, EnemyAttackOutcome::Hit, report,
-                ResolutionKind::Hit);
+                ResolutionKind::Hit, DefenseKind::None);
             return report;
         case DefenseResult::None:
         case DefenseResult::ThreatQueued:
         case DefenseResult::NoThreat:
         case DefenseResult::InvalidThreat:
+        case DefenseResult::Paused:
         default:
             return report;
         }
@@ -138,6 +176,7 @@ public:
         // Preserve both underlying subsystems' no-op semantics for invalid or
         // nonpositive time. Reconciliation waits for the next valid tick.
         if (!(deltaSeconds > 0.0f) || !std::isfinite(deltaSeconds)) return false;
+        if (paused_) return false;
 
         if (!linkedAttackActive_) {
             combat.AdvanceTime(deltaSeconds);
@@ -233,13 +272,102 @@ public:
         cue.secondsToImpact = std::max(0.0f, actions.IncomingAttackRemaining());
         if (actions.PerfectDefenseWindowOpen()) {
             cue.phase = DefenseTrainingCuePhase::PerfectWindow;
+            cue.symbol = DefenseTrainingCueSymbol::PerfectTiming;
         } else if (actions.DodgeWindowOpen()) {
             cue.phase = DefenseTrainingCuePhase::DodgeWindow;
+            cue.symbol = plan.blockable
+                ? DefenseTrainingCueSymbol::Blockable
+                : DefenseTrainingCueSymbol::Unblockable;
         } else {
             cue.phase = DefenseTrainingCuePhase::Approach;
+            cue.symbol = plan.blockable
+                ? DefenseTrainingCueSymbol::Blockable
+                : DefenseTrainingCueSymbol::Unblockable;
         }
         return cue;
     }
+
+    DefenseTrainingControlReminder ControlReminder(const CombatSandbox& combat,
+        const ShadowbladeActions& actions) const {
+        const DefenseTrainingCue cue = Cue(combat, actions);
+        if (cue.phase == DefenseTrainingCuePhase::None) {
+            return DefenseTrainingControlReminder::None;
+        }
+        if (!cue.blockable || goal_ == DefenseTrainingGoal::DodgeDiscipline) {
+            return DefenseTrainingControlReminder::Dodge;
+        }
+        return DefenseTrainingControlReminder::Guard;
+    }
+
+    DefenseTrainingTutorialHint TutorialHint(const CombatSandbox& combat,
+        const ShadowbladeActions& actions) const {
+        if (stats_.consecutiveHits >= 2) {
+            const DefenseTrainingCue cue = Cue(combat, actions);
+            if (cue.phase == DefenseTrainingCuePhase::None) {
+                return DefenseTrainingTutorialHint::ReadTelegraph;
+            }
+            return cue.blockable
+                ? DefenseTrainingTutorialHint::GuardBlockable
+                : DefenseTrainingTutorialHint::DodgeUnblockable;
+        }
+        if (stats_.consecutiveHits == 1) {
+            return DefenseTrainingTutorialHint::ReadTelegraph;
+        }
+        const int successful = stats_.perfectDefenses + stats_.ordinaryDefenses;
+        if (successful >= GoalTarget && stats_.perfectDefenses == 0) {
+            return DefenseTrainingTutorialHint::AimPerfectTiming;
+        }
+        return DefenseTrainingTutorialHint::None;
+    }
+
+    bool SetGoal(DefenseTrainingGoal goal) {
+        switch (goal) {
+        case DefenseTrainingGoal::FreePractice:
+        case DefenseTrainingGoal::PerfectDefense:
+        case DefenseTrainingGoal::GuardDiscipline:
+        case DefenseTrainingGoal::DodgeDiscipline:
+            break;
+        default:
+            return false;
+        }
+        if (goal_ == goal) return false;
+        goal_ = goal;
+        return true;
+    }
+
+    DefenseTrainingGoal Goal() const { return goal_; }
+
+    DefenseTrainingGoalStatus GoalStatus() const {
+        DefenseTrainingGoalStatus status{};
+        status.goal = goal_;
+        if (goal_ == DefenseTrainingGoal::FreePractice) return status;
+
+        status.target = GoalTarget;
+        switch (goal_) {
+        case DefenseTrainingGoal::PerfectDefense:
+            status.current = std::min(GoalTarget, stats_.perfectDefenses);
+            break;
+        case DefenseTrainingGoal::GuardDiscipline:
+            status.current = std::min(GoalTarget, stats_.guardDefenses);
+            break;
+        case DefenseTrainingGoal::DodgeDiscipline:
+            status.current = std::min(GoalTarget, stats_.dodgeDefenses);
+            break;
+        case DefenseTrainingGoal::FreePractice:
+        default:
+            break;
+        }
+        status.complete = status.current >= status.target;
+        return status;
+    }
+
+    bool SetPaused(bool paused) {
+        if (paused_ == paused) return false;
+        paused_ = paused;
+        return true;
+    }
+
+    bool Paused() const { return paused_; }
 
     DefenseTrainingGrade Grade() const {
         const std::int64_t resolved = static_cast<std::int64_t>(stats_.perfectDefenses)
@@ -272,8 +400,37 @@ private:
         Hit,
     };
 
+    enum class DefenseKind {
+        None,
+        Guard,
+        Dodge,
+    };
+
     static DefenseReport NoLinkedThreatReport() {
         return {DefenseResult::NoThreat, 0, 0, false, 0.0f};
+    }
+
+    bool CanQueue(const CombatSandbox& combat, const ShadowbladeActions& actions) const {
+        return !paused_ && !linkedAttackActive_ && !combat.HasPendingEnemyAttack()
+            && !actions.HasIncomingAttack() && actions.PlayerHealth() > 0;
+    }
+
+    bool LinkQueuedAttack(CombatSandbox& combat, ShadowbladeActions& actions) {
+        const EnemyAttackPlan plan = combat.PendingEnemyAttack();
+        const IncomingAttackDefinition incoming{
+            plan.windupSeconds, plan.damage, plan.guardDamage, plan.blockable};
+        if (!actions.BeginIncomingAttack(incoming)) {
+            combat.ResolveEnemyAttack(EnemyAttackOutcome::Interrupted);
+            return false;
+        }
+
+        linkedAttackActive_ = true;
+        linkedCombat_ = &combat;
+        linkedActions_ = &actions;
+        linkedCombatAttackGeneration_ = combat.EnemyAttackGeneration();
+        linkedAttackGeneration_ = actions.IncomingAttackGeneration();
+        SaturatingIncrement(stats_.attacksQueued);
+        return true;
     }
 
     bool OwnsObjects(const CombatSandbox& combat,
@@ -317,20 +474,22 @@ private:
     bool ResolveTerminalReport(CombatSandbox& combat, const DefenseReport& report) {
         switch (report.result) {
         case DefenseResult::PerfectGuard:
+            return ResolveLinked(combat, EnemyAttackOutcome::PerfectDefense, report,
+                ResolutionKind::Perfect, DefenseKind::Guard);
         case DefenseResult::PerfectDodge:
             return ResolveLinked(combat, EnemyAttackOutcome::PerfectDefense, report,
-                ResolutionKind::Perfect);
+                ResolutionKind::Perfect, DefenseKind::Dodge);
         case DefenseResult::Guarded:
             return ResolveLinked(combat, EnemyAttackOutcome::Guarded, report,
-                ResolutionKind::OrdinaryDefense);
+                ResolutionKind::OrdinaryDefense, DefenseKind::Guard);
         case DefenseResult::Evaded:
             return ResolveLinked(combat, EnemyAttackOutcome::Evaded, report,
-                ResolutionKind::OrdinaryDefense);
+                ResolutionKind::OrdinaryDefense, DefenseKind::Dodge);
         case DefenseResult::GuardBroken:
         case DefenseResult::UnblockableHit:
         case DefenseResult::Hit:
             return ResolveLinked(combat, EnemyAttackOutcome::Hit, report,
-                ResolutionKind::Hit);
+                ResolutionKind::Hit, DefenseKind::None);
         default:
             return false;
         }
@@ -346,8 +505,17 @@ private:
         value = value > maximum - amount ? maximum : value + amount;
     }
 
+    void RecordSuccessfulDefense(DefenseKind kind) {
+        if (kind == DefenseKind::Guard) {
+            SaturatingIncrement(stats_.guardDefenses);
+        } else if (kind == DefenseKind::Dodge) {
+            SaturatingIncrement(stats_.dodgeDefenses);
+        }
+        stats_.consecutiveHits = 0;
+    }
+
     bool ResolveLinked(CombatSandbox& combat, EnemyAttackOutcome outcome,
-        const DefenseReport& report, ResolutionKind kind) {
+        const DefenseReport& report, ResolutionKind kind, DefenseKind defenseKind) {
         if (!linkedAttackActive_ || linkedCombat_ != &combat
             || !OwnsCombatPlan(combat)) {
             return false;
@@ -360,23 +528,28 @@ private:
             SaturatingIncrement(stats_.currentPerfectStreak);
             stats_.bestPerfectStreak = std::max(
                 stats_.bestPerfectStreak, stats_.currentPerfectStreak);
+            RecordSuccessfulDefense(defenseKind);
         } else if (kind == ResolutionKind::OrdinaryDefense) {
             SaturatingIncrement(stats_.ordinaryDefenses);
             stats_.currentPerfectStreak = 0;
+            RecordSuccessfulDefense(defenseKind);
         } else {
             SaturatingIncrement(stats_.hitsTaken);
             SaturatingAddDamage(stats_.damageTaken, report.damageTaken);
             stats_.currentPerfectStreak = 0;
+            SaturatingIncrement(stats_.consecutiveHits);
         }
         return true;
     }
 
     DefenseTrainingStats stats_{};
+    DefenseTrainingGoal goal_{DefenseTrainingGoal::FreePractice};
     CombatSandbox* linkedCombat_{};
     ShadowbladeActions* linkedActions_{};
     std::uint64_t linkedCombatAttackGeneration_{};
     std::uint64_t linkedAttackGeneration_{};
     bool linkedAttackActive_{};
+    bool paused_{};
 };
 
 } // namespace Astral::Scene
