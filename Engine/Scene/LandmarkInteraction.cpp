@@ -72,6 +72,22 @@ std::size_t LandmarkInteraction::VisitedCount() const {
         + static_cast<std::size_t>(visited_[2]);
 }
 
+std::size_t LandmarkInteraction::ObjectiveProgress() const {
+    if (!visited_[0]) return 0;
+    if (!visited_[1]) return 1;
+    if (!visited_[2]) return 2;
+    return LedgerCapacity;
+}
+
+LandmarkObjectiveStage LandmarkInteraction::CurrentObjective() const {
+    switch (ObjectiveProgress()) {
+    case 0: return LandmarkObjectiveStage::DiscoverLincoln;
+    case 1: return LandmarkObjectiveStage::DiscoverReflectingPool;
+    case 2: return LandmarkObjectiveStage::DiscoverWashingtonMonument;
+    default: return LandmarkObjectiveStage::Complete;
+    }
+}
+
 std::size_t LandmarkInteraction::IndexOf(LandmarkKind kind) {
     switch (kind) {
     case LandmarkKind::LincolnMemorial: return 0;
