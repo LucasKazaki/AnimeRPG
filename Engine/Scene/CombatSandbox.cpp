@@ -274,13 +274,13 @@ TrainingEnemyDefinition CombatSandbox::CurrentEnemyDefinition() const {
     case TrainingEnemyProfile::Vanguard:
         return {90, 60, ManaAffinity::Solar, AttackResistance::Heavy};
     case TrainingEnemyProfile::Bulwark:
-        return {180, 120, ManaAffinity::Umbral, AttackResistance::Light};
+        return {180, 120, ManaAffinity::Umbral, AttackResistance::None};
     case TrainingEnemyProfile::Boss:
         return {320, 160,
             CurrentEnemyPhase() == EnemyPhase::Pressure
                 ? ManaAffinity::Umbral
                 : ManaAffinity::Solar,
-            AttackResistance::None};
+            AttackResistance::Light};
     case TrainingEnemyProfile::Standard:
     default:
         return {100, 80, ManaAffinity::None, AttackResistance::None};
