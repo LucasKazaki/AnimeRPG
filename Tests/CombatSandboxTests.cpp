@@ -201,8 +201,17 @@ void TestComboExpiryPostureRecoveryAndInvalidInputs() {
     recovery.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
     recovery.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds - 0.01f);
     Check(recovery.Dummy().posture == 25);
-    recovery.AdvanceTime(0.02f);
-    Check(recovery.Dummy().posture < 25);
+    recovery.AdvanceTime(0.04f);
+    Check(recovery.Dummy().posture == 24);
+
+    CombatSandbox oneStep;
+    CombatSandbox splitSteps;
+    oneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    splitSteps.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    oneStep.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds + 0.5f);
+    splitSteps.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    for (int step = 0; step < 50; ++step) splitSteps.AdvanceTime(0.01f);
+    Check(oneStep.Dummy().posture == splitSteps.Dummy().posture);
 
     const float elapsed = recovery.ElapsedSeconds();
     const int posture = recovery.Dummy().posture;
