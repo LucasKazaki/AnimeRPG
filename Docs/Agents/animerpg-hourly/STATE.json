@@ -8,13 +8,14 @@
     "pr": 14,
     "head": "f445f156acf7ed2899f93a34191782aa357ad0d1",
     "merge_sha": "a14aef5c484705567adac741809f7f4eebb4cbde",
-    "hosted_windows_ci": "passed_run_213",
-    "release_manifest": "passed_run_150",
+    "hosted_windows_ci": "passed",
+    "release_manifest": "passed",
     "independent_review": "completed_no_new_findings",
     "native_playable": false
   },
   "working_branch": "game/2026-09-22-defense-pass2-v2",
   "pass": "GAME-PASS2-DEFENSE-TIMING-2026-09-22",
+  "candidate_code_head_before_state_receipt": "3c25dc89c9bb13d81a5e5466647dd060c8fd0af8",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -33,32 +34,38 @@
     {"id":"QOL-003","title":"Forgiving perfect-defense timing preset","status":"implemented_domain_setting","note":"Standard remains default at 0.12 s; optional forgiving preset uses 0.20 s without altering damage, resource, enemy timing, or dodge reach."}
   ],
   "community_source": {
-    "id": "GRANBLUE-PLAYER-20240220-PERFECT-GUARD",
+    "id": "GRANBLUE-PLAYER-PERFECT-GUARD",
     "url": "https://steamcommunity.com/app/881020/discussions/0/7198511214976169414/",
     "published": "2024-02-20",
     "accessed": "2026-09-22",
     "request": "A way to make the satisfying but very tight Perfect Guard timing more lenient.",
-    "evidence_limit": "Historical discussion, not consensus and not proof the current game retains the same timing. A separate 2024-02-03 thread contains both criticism of strict/reward-light early Perfect Guard and counterexamples describing useful endgame Perfect Guard builds."
+    "corroboration": [
+      "https://www.reddit.com/r/GranblueFantasyRelink/comments/1ri45fu/help_with_getting_the_timing_down_for_perfect/",
+      "https://www.reddit.com/r/GranblueFantasyRelink/comments/1uzyzug/i_think_i_locked_in_and_blacked_out/"
+    ],
+    "evidence_limit": "Historical and individual community discussions, not consensus and not proof the current game retains the same timing. The implementation therefore keeps Standard unchanged and makes the wider window opt-in."
   },
   "reference_sources": [
-    "https://apps.apple.com/sg/app/zenless-zone-zero/id1606356401",
-    "https://apps.apple.com/us/app/wuthering-waves/id6475033368",
-    "https://steamcommunity.com/app/881020/discussions/0/4208119548512183204/",
-    "https://steamcommunity.com/app/881020/discussions/0/565913463540536527/"
+    "https://www.playstation.com/en-us/games/zenless-zone-zero/",
+    "https://www.playstation.com/en-us/games/wuthering-waves/",
+    "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+    "https://www.playstation.com/en-us/games/genshin-impact/"
   ],
   "verification": {
     "focused_design_fixture": "passed_before_initial_branch_packaging",
-    "repository_regression_tests": "exact 8.06/7.94/794x0.01, fractional 60fps, ordinary 122x60Hz deadline, and saturated-clock rebase regressions committed",
-    "hosted_windows_ci": "run_230_failed_debug_tests_on_100us_tolerance_head; corrected_to_2us_and_fresh_exact_head_required",
-    "release_manifest": "run_166_passed_on_100us_tolerance_head; fresh_exact_head_required_after_correction",
+    "repository_regression_tests": "includes 8.06/7.94/794x0.01, fractional 60fps, 122-frame and 3842-frame 60Hz deadlines, 1us minimum threat, 0.120001s non-perfect guard, counter pre-expiry, and large-idle-clock rebase regressions",
+    "hosted_windows_ci": "fresh_exact_head_required_after_interval_timing_fix",
+    "release_manifest": "fresh_exact_head_required_after_interval_timing_fix",
     "native_windows_interactive": "not_run_domain_only_packet",
-    "independent_review": "four_P2_timing_or_overflow_findings_on_older_heads_addressed; fresh_exact_head_review_required"
+    "independent_review": "fresh_exact_head_review_required_after_interval_timing_fix"
   },
   "review_findings": [
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"2cd538aa60a1252699430ac450c7685c6a3a74b9","severity":"P2","finding":"Repeated float subtraction could move an 8.06 s threat across the 0.12 s perfect-defense boundary differently for one 7.94 s step versus 794 x 0.01 s steps.","resolution":"Replaced remaining-time subtraction with an accumulated defense timeline and integer-microsecond deadlines. Added the exact 8.06/7.94/0.01 boundary and expiry regressions."},
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"19fe9ad2ec2039b653221c3982081de0cda724c4","severity":"P2","finding":"Quantizing each frame delta independently still allowed fractional-microsecond rounding to diverge between one step and 60 split steps.","resolution":"Quantize only the accumulated absolute clock at comparison points and retain the direct fractional 60 Hz guard/expiry regressions."},
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"83d403afdf5befdce29471d2314447f2d263c0c9","severity":"P2","finding":"A 122-frame 60 Hz sequence could finish one microsecond before the equivalent one-step boundary because the caller supplies rounded float durations.","resolution":"Added a canonical comparison tolerance and the exact 122 x 1/60 regression. Initial 100 us tolerance was too broad and failed the intentional 10 us guard-boundary regression in hosted Debug tests, so the final tolerance is 2 us, enough for the observed 1 us split drift without erasing that distinction."},
-    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"83d403afdf5befdce29471d2314447f2d263c0c9","severity":"P2","finding":"After a very large finite AdvanceTime saturated the defense clock, newly queued deadlines also saturated and could become instantaneous or unusable.","resolution":"Before scheduling a threat that cannot fit in the remaining int64 timeline, rebase the idle defense clock while preserving any representable counter remainder. Counter deadlines also rebase if needed. Added a 1e13-second saturation regression verifying a fresh one-second threat remains ordinary at time zero and expires once after one second."}
+    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"2cd538aa60a1252699430ac450c7685c6a3a74b9","severity":"P2","finding":"Repeated float subtraction could move equivalent split timing across perfect-defense and expiry boundaries.","resolution":"Reworked timing away from repeatedly subtracting float remaining time and added direct split regressions."},
+    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"19fe9ad2ec2039b653221c3982081de0cda724c4","severity":"P2","finding":"Per-frame integer microsecond rounding still diverged for fractional frame durations.","resolution":"Moved comparison timing to an accumulated high-precision relative clock."},
+    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"83d403afdf5befdce29471d2314447f2d263c0c9","severity":"P2","finding":"A 122-frame 60Hz sequence exposed final rounding drift, and very large clocks could make newly queued deadlines unusable.","resolution":"Added explicit split-boundary normalization, idle/rebase behavior, and saturation regression coverage."},
+    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"0b06bedd8da5601d7a5a924755ca4f442da0a664","severity":"P1","finding":"A fixed 100us tolerance expired threats early and widened the perfect window materially.","resolution":"Removed broad fixed tolerances; subsequent work replaced fixed microsecond tolerances entirely."},
+    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"64f9ba33aed9594d8f156d8272d2585a4a2f6cc3","severity":"P2","finding":"A fixed 2us tolerance failed longer 3842-frame splits, and a large nonsaturating absolute clock could stall short newly queued timers.","resolution":"Accumulated float-input uncertainty and cleared/rebased idle relative timing instead of carrying a large absolute clock."},
+    {"reviewer":"chatgpt-codex-connector[bot]","reviewed_head":"89d1ebc60b87a11c81a334f49b80fd57ec759a36","severity":"P2","finding":"Integer-microsecond quantization plus an inclusive minimum tolerance consumed a 1us threat immediately, expired a counter early, and widened a 0.120001s guard into the standard perfect window.","resolution":"Removed integer-microsecond deadline/tolerance quantization. Current code compares relative double-second timing directly with only accumulated half-ULP uncertainty from float inputs, with direct 1us threat, 0.120001s guard, counter pre-expiry, and 3842-frame regressions."}
   ],
-  "next_action": "Verify fresh hosted Windows and manifest checks on the final 2 us tolerance head, obtain exact-head Codex re-review with no unresolved findings, inspect the five-file diff, then merge PR #16 only if every applicable gate passes."
+  "next_action": "Require fresh hosted Windows and release-manifest checks plus exact-head independent Codex review on the final state-receipt head; inspect the five-file diff and merge PR #16 only if no current finding remains."
 }
