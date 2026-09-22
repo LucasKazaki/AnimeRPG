@@ -72,6 +72,12 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
 }
 
 bool LandmarkInteraction::SetObjectiveActivationMode(LandmarkObjectiveActivationMode mode) {
+    if (mode != LandmarkObjectiveActivationMode::AutoStart
+        && mode != LandmarkObjectiveActivationMode::ManualStart) {
+        return false;
+    }
+    if (mode == objectiveActivationMode_) return true;
+
     const bool objectiveHistory = std::any_of(objectiveVisited_.begin(), objectiveVisited_.end(),
         [](bool visited) { return visited; });
     if (objectiveHistory || objectiveCompletionRewardGranted_
