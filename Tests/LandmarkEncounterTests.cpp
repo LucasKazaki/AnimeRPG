@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <limits>
 
 namespace {
 int failures = 0;
@@ -141,6 +142,11 @@ void TestComboFinisherAndAccessibleAssistPreset() {
     Expect(outOfRange.result == ComboFinisherResult::OutOfRange
             && standard.ComboFinisherReady(),
         "out-of-range finisher preserves the earned opening");
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    const auto invalidPosition = standard.TryComboFinisher({nan, 0.0f, 0.0f});
+    Expect(invalidPosition.result == ComboFinisherResult::OutOfRange
+            && standard.ComboFinisherReady() && standard.ComboCount() == 3,
+        "nonfinite finisher position cannot activate or consume the earned opening");
     const auto finisher = standard.TryComboFinisher({0.0f, 0.0f, 0.0f});
     Expect(finisher.result == ComboFinisherResult::Activated
             && finisher.damageApplied == 25 && standard.Dummy().IsDefeated(),
@@ -262,6 +268,40 @@ void TestEncounterGradesAndCleanRetry() {
         "mid-speed clear receives deterministic Silver timing grade");
 }
 
+void TestEncounterGradePrecisionAtCutoffs() {
+    using namespace Astral::Scene;
+
+    CombatSandbox exactGoldCombat;
+    ShadowbladeActions exactGoldActions;
+    LandmarkEncounter exactGoldEncounter;
+    exactGoldEncounter.TryActivate(Discovery(LandmarkKind::LincolnMemorial), exactGoldCombat);
+    exactGoldCombat.AdvanceTime(3.0f);
+    exactGoldCombat.ApplyDamage(exactGoldCombat.Dummy().maximumHealth);
+    Expect(exactGoldEncounter.Update(exactGoldCombat, exactGoldActions)
+            && exactGoldEncounter.LastReport().grade == EncounterGrade::Gold,
+        "an exact three-second clear remains Gold");
+
+    CombatSandbox steppedGoldCombat;
+    ShadowbladeActions steppedGoldActions;
+    LandmarkEncounter steppedGoldEncounter;
+    steppedGoldEncounter.TryActivate(Discovery(LandmarkKind::LincolnMemorial), steppedGoldCombat);
+    for (int step = 0; step < 30; ++step) steppedGoldCombat.AdvanceTime(0.1f);
+    steppedGoldCombat.ApplyDamage(steppedGoldCombat.Dummy().maximumHealth);
+    Expect(steppedGoldEncounter.Update(steppedGoldCombat, steppedGoldActions)
+            && steppedGoldEncounter.LastReport().grade == EncounterGrade::Silver,
+        "accumulated frame time just above three seconds cannot be rounded back into Gold");
+
+    CombatSandbox steppedSilverCombat;
+    ShadowbladeActions steppedSilverActions;
+    LandmarkEncounter steppedSilverEncounter;
+    steppedSilverEncounter.TryActivate(Discovery(LandmarkKind::LincolnMemorial), steppedSilverCombat);
+    for (int step = 0; step < 60; ++step) steppedSilverCombat.AdvanceTime(0.1f);
+    steppedSilverCombat.ApplyDamage(steppedSilverCombat.Dummy().maximumHealth);
+    Expect(steppedSilverEncounter.Update(steppedSilverCombat, steppedSilverActions)
+            && steppedSilverEncounter.LastReport().grade == EncounterGrade::Bronze,
+        "accumulated frame time just above six seconds cannot be rounded back into Silver");
+}
+
 } // namespace
 
 int main() {
@@ -271,6 +311,7 @@ int main() {
     TestComboFinisherAndAccessibleAssistPreset();
     TestObjectiveCompletionRewardIsOneShot();
     TestEncounterGradesAndCleanRetry();
+    TestEncounterGradePrecisionAtCutoffs();
     if (failures != 0) return 1;
     std::cout << "Landmark encounter tests passed\n";
     return 0;
