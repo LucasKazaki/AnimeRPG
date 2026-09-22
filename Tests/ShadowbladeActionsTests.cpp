@@ -427,6 +427,61 @@ void TestSixtyHzBoundaryToleranceIsSplitStable() {
         "60 Hz split and single-step expiry apply the same one-time hit");
 }
 
+void TestLongSixtyHzBoundaryToleranceIsSplitStable() {
+    using namespace Astral::Scene;
+
+    const float frame = 1.0f / 60.0f;
+    const float windup = frame * 3842.0f;
+    ShadowbladeActions oneStep;
+    ShadowbladeActions split;
+    Expect(oneStep.BeginIncomingAttack({windup, 20, 30, true})
+            && split.BeginIncomingAttack({windup, 20, 30, true}),
+        "long 60 Hz boundary threats queue");
+    oneStep.AdvanceTime(windup);
+    for (int step = 0; step < 3842; ++step) split.AdvanceTime(frame);
+    Expect(!oneStep.HasIncomingAttack() && !split.HasIncomingAttack(),
+        "long 60 Hz split and one-step timing reach the same deadline");
+    Expect(oneStep.LastDefense().result == DefenseResult::Hit
+            && split.LastDefense().result == DefenseResult::Hit,
+        "long 60 Hz split and one-step timing resolve the same hit");
+}
+
+void TestMinimumThreatAndWindowBoundaryPrecision() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions tinyThreat;
+    Expect(tinyThreat.BeginIncomingAttack({0.000001f, 20, 30, true}),
+        "one-microsecond threat is accepted");
+    Expect(tinyThreat.HasIncomingAttack() && tinyThreat.IncomingAttackRemaining() > 0.0f,
+        "one-microsecond threat retains positive time immediately after queueing");
+    tinyThreat.AdvanceTime(0.0000001f);
+    Expect(tinyThreat.HasIncomingAttack(),
+        "sub-microsecond progress does not consume a one-microsecond threat early");
+    tinyThreat.AdvanceTime(0.0000009f);
+    Expect(!tinyThreat.HasIncomingAttack() && tinyThreat.LastDefense().result == DefenseResult::Hit,
+        "one-microsecond threat resolves once its full duration elapses");
+
+    ShadowbladeActions outsidePerfectWindow;
+    Expect(outsidePerfectWindow.BeginIncomingAttack({0.120001f, 20, 30, true}),
+        "just-outside-perfect-window threat queues");
+    const DefenseReport ordinaryGuard = outsidePerfectWindow.TryDefend(DefenseInput::Guard);
+    Expect(ordinaryGuard.result == DefenseResult::Guarded && !ordinaryGuard.counterGranted,
+        "one-microsecond-outside guard remains ordinary instead of becoming perfect");
+
+    ShadowbladeActions counter;
+    Expect(counter.BeginIncomingAttack({0.10f, 20, 30, true}),
+        "counter-boundary setup threat queues");
+    Expect(counter.TryDefend(DefenseInput::Dodge).result == DefenseResult::PerfectDodge
+            && counter.HasDefenseCounter(),
+        "counter-boundary setup grants a counter");
+    counter.AdvanceTime(ShadowbladeActions::DefenseCounterWindowSeconds - 0.000001f);
+    Expect(counter.HasDefenseCounter(),
+        "defense counter remains active one microsecond before its requested expiry");
+    counter.AdvanceTime(0.000002f);
+    Expect(!counter.HasDefenseCounter(),
+        "defense counter expires after crossing its requested boundary");
+}
+
 void TestDefenseClockRebasesAfterSaturation() {
     using namespace Astral::Scene;
 
@@ -468,6 +523,8 @@ int main() {
     TestDefenseCounterExpiryIsSplitStable();
     TestIncomingAttackTimingIsSplitStable();
     TestSixtyHzBoundaryToleranceIsSplitStable();
+    TestLongSixtyHzBoundaryToleranceIsSplitStable();
+    TestMinimumThreatAndWindowBoundaryPrecision();
     TestDefenseClockRebasesAfterSaturation();
     if (failures != 0) return 1;
     std::cout << "Shadowblade action tests passed\n";
