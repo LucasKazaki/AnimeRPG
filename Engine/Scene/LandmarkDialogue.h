@@ -109,12 +109,12 @@ public:
                 if (beat.clueUnlocked) beat.response = EvidenceResponse(topic, context);
             }
         } else if (choice != DialogueChoice::EndConversation) {
-            const int previousTrust = trust_;
-            trust_ = ClampTrust(trust_ + TrustDelta(choice));
-            beat.trustDelta = trust_ - previousTrust;
             discussed_[topicIndex] = true;
             beat.loreUnlocked = UnlockLoreForTopic(topic);
             beat.clueUnlocked = UnlockClueFor(topic, choice, context);
+            const int previousTrust = trust_;
+            trust_ = ClampTrust(trust_ + TrustDelta(choice));
+            beat.trustDelta = trust_ - previousTrust;
         }
 
         PushHistory(beat);
@@ -406,6 +406,14 @@ constexpr bool LandmarkDialogueContract() {
     if (!repeated.repeatedTopic || repeated.response != DialogueResponse::AlreadyDiscussed
         || repeated.trustDelta != 0 || story.Trust() != LandmarkDialogue::MaximumTrust)
         return false;
+
+    LandmarkDialogue trustGate;
+    const DialogueBeat earlyCrypt = trustGate.Choose(
+        DialogueTopic::ShadowCrypt, DialogueChoice::ShareEvidence, {3, true});
+    if (earlyCrypt.response != DialogueResponse::ShadowCryptBrief
+        || earlyCrypt.clueUnlocked
+        || trustGate.HasClue(DialogueClue::CryptSigil)
+        || trustGate.Trust() != 1) return false;
 
     LandmarkDialogue delayedEvidence;
     delayedEvidence.Choose(DialogueTopic::RiftTheory, DialogueChoice::AskDirectly, {0, false});
