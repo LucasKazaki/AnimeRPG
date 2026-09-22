@@ -252,6 +252,15 @@ bool WindowOwnedByProcess(HWND window, DWORD processId) {
     return ownerProcessId == processId;
 }
 
+bool DirectControlOwnedByProcessAndParent(HWND control, HWND parent, DWORD processId,
+    int expectedControlId) {
+    if (!WindowOwnedByProcess(parent, processId)
+        || !WindowOwnedByProcess(control, processId)) {
+        return false;
+    }
+    return GetParent(control) == parent && GetDlgItem(parent, expectedControlId) == control;
+}
+
 bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) {
     if (!WindowOwnedByProcess(window, processId)) return false;
     if (!PostMessageW(window, WM_CLOSE, 0, 0)) return false;
@@ -355,14 +364,23 @@ int wmain(int argc, wchar_t** argv) {
             if (pendingStateOk) {
                 LRESULT newSelection = LB_ERR;
                 LRESULT commandResult = 0;
-                const bool selected = ReadListboxValue(outliner, LB_SETCURSEL, 3, newSelection)
-                    && newSelection == 3;
-                const bool notified = selected && SendMessageBounded(window, WM_COMMAND,
-                    MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
-                    reinterpret_cast<LPARAM>(outliner), commandResult);
+                const bool selectionTargetValid = DirectControlOwnedByProcessAndParent(
+                    outliner, window, process.dwProcessId, kOutlinerId);
+                const bool selected = selectionTargetValid
+                    && SendMessageBounded(outliner, LB_SETCURSEL, 3, 0, newSelection)
+                    && newSelection != LB_ERR;
+                const bool notificationTargetValid = selected
+                    && DirectControlOwnedByProcessAndParent(
+                        outliner, window, process.dwProcessId, kOutlinerId);
+                const bool notified = notificationTargetValid
+                    && SendMessageBounded(window, WM_COMMAND,
+                        MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
+                        reinterpret_cast<LPARAM>(outliner), commandResult);
                 LRESULT confirmedSelection = LB_ERR;
                 std::wstring confirmedItem;
                 const bool synchronized = notified
+                    && DirectControlOwnedByProcessAndParent(
+                        outliner, window, process.dwProcessId, kOutlinerId)
                     && ReadListboxValue(outliner, LB_GETCURSEL, 0, confirmedSelection)
                     && confirmedSelection == 3
                     && ReadListboxText(outliner, static_cast<int>(confirmedSelection), confirmedItem)
@@ -423,7 +441,7 @@ int wmain(int argc, wchar_t** argv) {
         << L"Observed one stable visible process-owned top-level editor window before and after "
         << L"interaction, 12 required controls, disabled pending tools, exact Outliner item "
         << L"identities and complete Inspector fixture text with post-notification selection "
-        << L"synchronization, ownership-checked bounded asynchronous normal+narrow resizes, and "
-        << L"clean exit.\n";
+        << L"ownership+synchronization, ownership-checked bounded asynchronous normal+narrow "
+        << L"resizes, and clean exit.\n";
     return 0;
 }
