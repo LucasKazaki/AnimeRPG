@@ -31,6 +31,9 @@ constexpr std::array<const wchar_t*, 4> kExpectedAssetItems{{
     L"Primitive/Cube", L"Primitive/Plane", L"Camera", L"DirectionalLight"}};
 constexpr std::array<const wchar_t*, 4> kExpectedShellStaticTexts{{
     kOutlinerLabelText, kInspectorLabelText, kAssetsLabelText, kStatusText}};
+constexpr std::array<const wchar_t*, 5> kPendingButtons{{
+    L"Select (pending)", L"Move (pending)", L"Rotate (pending)", L"Scale (pending)",
+    L"Play (pending)"}};
 
 struct ProcessWindowCollection {
     DWORD processId{};
@@ -40,13 +43,140 @@ struct ProcessWindowCollection {
 struct ChildControl {
     HWND handle{};
     std::wstring className;
-    std::wstring text;
 };
 
 struct ChildCollection {
     HWND parent{};
+    DWORD processId{};
     std::vector<ChildControl> controls;
 };
+
+bool WindowOwnedByProcess(HWND window, DWORD processId) {
+    if (!window) return false;
+    DWORD ownerProcessId = 0;
+    if (GetWindowThreadProcessId(window, &ownerProcessId) == 0) return false;
+    return ownerProcessId == processId;
+}
+
+std::wstring ClassName(HWND window) {
+    wchar_t buffer[128]{};
+    if (GetClassNameW(window, buffer, 128) <= 0) return {};
+    return buffer;
+}
+
+bool DirectVisibleChildOwnedByProcessAndParent(HWND control, HWND parent, DWORD processId,
+    const wchar_t* expectedClassName) {
+    if (!WindowOwnedByProcess(parent, processId)
+        || !WindowOwnedByProcess(control, processId)) {
+        return false;
+    }
+    return GetParent(control) == parent
+        && ClassName(control) == expectedClassName
+        && IsWindowVisible(control);
+}
+
+bool DirectVisibleControlOwnedByProcessAndParent(HWND control, HWND parent, DWORD processId,
+    int expectedControlId, const wchar_t* expectedClassName) {
+    return DirectVisibleChildOwnedByProcessAndParent(
+               control, parent, processId, expectedClassName)
+        && GetDlgItem(parent, expectedControlId) == control;
+}
+
+bool SendMessageBounded(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
+    LRESULT& result) {
+    DWORD_PTR rawResult = 0;
+    const LRESULT sent = SendMessageTimeoutW(window, message, wParam, lParam,
+        SMTO_ABORTIFHUNG | SMTO_ERRORONEXIT, kMessageTimeoutMs, &rawResult);
+    if (sent == 0) return false;
+    result = static_cast<LRESULT>(rawResult);
+    return true;
+}
+
+bool ReadOwnedWindowText(HWND window, DWORD processId, std::wstring& text) {
+    if (!WindowOwnedByProcess(window, processId)) return false;
+    LRESULT textLength = 0;
+    if (!SendMessageBounded(window, WM_GETTEXTLENGTH, 0, 0, textLength)
+        || textLength < 0 || textLength > 8192) {
+        return false;
+    }
+
+    std::wstring buffer(static_cast<std::size_t>(textLength) + 1, L'\0');
+    if (!WindowOwnedByProcess(window, processId)) return false;
+    LRESULT copied = 0;
+    if (!SendMessageBounded(window, WM_GETTEXT, buffer.size(),
+            reinterpret_cast<LPARAM>(buffer.data()), copied)
+        || copied < 0 || copied > textLength) {
+        return false;
+    }
+    buffer.resize(static_cast<std::size_t>(copied));
+    text = std::move(buffer);
+    return true;
+}
+
+bool ReadValidatedChildText(HWND control, HWND parent, DWORD processId,
+    const wchar_t* expectedClassName, std::wstring& text) {
+    if (!DirectVisibleChildOwnedByProcessAndParent(
+            control, parent, processId, expectedClassName)) {
+        return false;
+    }
+    LRESULT textLength = 0;
+    if (!SendMessageBounded(control, WM_GETTEXTLENGTH, 0, 0, textLength)
+        || textLength < 0 || textLength > 8192) {
+        return false;
+    }
+
+    std::wstring buffer(static_cast<std::size_t>(textLength) + 1, L'\0');
+    if (!DirectVisibleChildOwnedByProcessAndParent(
+            control, parent, processId, expectedClassName)) {
+        return false;
+    }
+    LRESULT copied = 0;
+    if (!SendMessageBounded(control, WM_GETTEXT, buffer.size(),
+            reinterpret_cast<LPARAM>(buffer.data()), copied)
+        || copied < 0 || copied > textLength) {
+        return false;
+    }
+    buffer.resize(static_cast<std::size_t>(copied));
+    text = std::move(buffer);
+    return true;
+}
+
+bool ReadValidatedListboxValue(HWND listbox, HWND parent, DWORD processId, int controlId,
+    UINT message, WPARAM wParam, LRESULT& value) {
+    if (!DirectVisibleControlOwnedByProcessAndParent(
+            listbox, parent, processId, controlId, L"ListBox")) {
+        return false;
+    }
+    return SendMessageBounded(listbox, message, wParam, 0, value) && value != LB_ERR;
+}
+
+bool ReadValidatedListboxText(HWND listbox, HWND parent, DWORD processId, int controlId,
+    int index, std::wstring& text) {
+    if (!DirectVisibleControlOwnedByProcessAndParent(
+            listbox, parent, processId, controlId, L"ListBox")) {
+        return false;
+    }
+    LRESULT textLength = LB_ERR;
+    if (!SendMessageBounded(listbox, LB_GETTEXTLEN, static_cast<WPARAM>(index), 0, textLength)
+        || textLength == LB_ERR || textLength < 0 || textLength > 8192) {
+        return false;
+    }
+
+    std::wstring buffer(static_cast<std::size_t>(textLength) + 1, L'\0');
+    if (!DirectVisibleControlOwnedByProcessAndParent(
+            listbox, parent, processId, controlId, L"ListBox")) {
+        return false;
+    }
+    LRESULT copied = LB_ERR;
+    if (!SendMessageBounded(listbox, LB_GETTEXT, static_cast<WPARAM>(index),
+            reinterpret_cast<LPARAM>(buffer.data()), copied)
+        || copied == LB_ERR || copied < 0 || copied > textLength) {
+        return false;
+    }
+    buffer.resize(static_cast<std::size_t>(copied));
+    text = std::move(buffer);
+    return true;
+}
 
 BOOL CALLBACK CollectVisibleProcessWindow(HWND window, LPARAM parameter) {
     auto& collection = *reinterpret_cast<ProcessWindowCollection*>(parameter);
@@ -102,50 +232,17 @@ bool RevalidateStableSingleWindow(DWORD processId, HWND expectedWindow,
     return observed != nullptr && observed == expectedWindow;
 }
 
-std::wstring ClassName(HWND window) {
-    wchar_t buffer[128]{};
-    if (GetClassNameW(window, buffer, 128) <= 0) return {};
-    return buffer;
-}
-
-bool SendMessageBounded(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
-    LRESULT& result) {
-    DWORD_PTR rawResult = 0;
-    const LRESULT sent = SendMessageTimeoutW(window, message, wParam, lParam,
-        SMTO_ABORTIFHUNG | SMTO_ERRORONEXIT, kMessageTimeoutMs, &rawResult);
-    if (sent == 0) return false;
-    result = static_cast<LRESULT>(rawResult);
-    return true;
-}
-
-std::wstring WindowText(HWND window) {
-    LRESULT textLength = 0;
-    if (!SendMessageBounded(window, WM_GETTEXTLENGTH, 0, 0, textLength) || textLength < 0
-        || textLength > 8192) {
-        return {};
-    }
-
-    std::wstring text(static_cast<std::size_t>(textLength) + 1, L'\0');
-    LRESULT copied = 0;
-    if (!SendMessageBounded(window, WM_GETTEXT, text.size(),
-            reinterpret_cast<LPARAM>(text.data()), copied)
-        || copied < 0) {
-        return {};
-    }
-    text.resize(static_cast<std::size_t>(copied));
-    return text;
-}
-
 BOOL CALLBACK CollectDirectChild(HWND child, LPARAM parameter) {
     auto& collection = *reinterpret_cast<ChildCollection*>(parameter);
-    if (GetParent(child) == collection.parent) {
-        collection.controls.push_back({child, ClassName(child), WindowText(child)});
+    if (GetParent(child) == collection.parent
+        && WindowOwnedByProcess(child, collection.processId)) {
+        collection.controls.push_back({child, ClassName(child)});
     }
     return TRUE;
 }
 
-std::vector<ChildControl> DirectChildren(HWND window) {
-    ChildCollection collection{window, {}};
+std::vector<ChildControl> DirectChildren(HWND window, DWORD processId) {
+    ChildCollection collection{window, processId, {}};
     EnumChildWindows(window, CollectDirectChild, reinterpret_cast<LPARAM>(&collection));
     return collection.controls;
 }
@@ -158,28 +255,155 @@ int CountClass(const std::vector<ChildControl>& controls, const wchar_t* classNa
     return count;
 }
 
-HWND FindControlByText(const std::vector<ChildControl>& controls,
-    const wchar_t* className, const std::wstring& exactText) {
+HWND FindDirectVisibleChildByText(const std::vector<ChildControl>& controls, HWND parent,
+    DWORD processId, const wchar_t* className, const std::wstring& exactText) {
     for (const auto& control : controls) {
-        if (control.className == className && control.text == exactText) return control.handle;
+        if (control.className != className) continue;
+        std::wstring text;
+        if (ReadValidatedChildText(control.handle, parent, processId, className, text)
+            && text == exactText) {
+            return control.handle;
+        }
     }
     return nullptr;
 }
 
-bool DirectChildrenContained(HWND window, std::wstring& failure) {
+bool ValidateShellState(HWND window, DWORD processId, const wchar_t* expectedInspectorText,
+    int expectedSelection, std::wstring& failure) {
+    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)) {
+        failure = L"editor top-level ownership or visibility changed";
+        return false;
+    }
+    if (ClassName(window) != L"AstralEditorWindow") {
+        failure = L"unexpected editor window class";
+        return false;
+    }
+    std::wstring title;
+    if (!ReadOwnedWindowText(window, processId, title) || title != L"Astral Editor 0.1") {
+        failure = L"unexpected editor title";
+        return false;
+    }
+
+    const auto controls = DirectChildren(window, processId);
+    if (controls.size() != 12) {
+        failure = L"expected 12 direct process-owned controls, observed "
+            + std::to_wstring(controls.size());
+        return false;
+    }
+    if (CountClass(controls, L"Button") != 5
+        || CountClass(controls, L"ListBox") != 2
+        || CountClass(controls, L"Static") != 5) {
+        failure = L"unexpected child-control class counts";
+        return false;
+    }
+
+    for (const wchar_t* caption : kPendingButtons) {
+        const HWND button = FindDirectVisibleChildByText(
+            controls, window, processId, L"Button", caption);
+        if (!button || !DirectVisibleChildOwnedByProcessAndParent(
+                button, window, processId, L"Button")
+            || IsWindowEnabled(button)) {
+            failure = L"pending tool is missing, hidden, replaced, relabeled, or enabled: "
+                + std::wstring(caption);
+            return false;
+        }
+    }
+
+    for (const wchar_t* expectedText : kExpectedShellStaticTexts) {
+        const HWND staticControl = FindDirectVisibleChildByText(
+            controls, window, processId, L"Static", expectedText);
+        if (!staticControl || !DirectVisibleChildOwnedByProcessAndParent(
+                staticControl, window, processId, L"Static")) {
+            failure = L"required shell static is missing, hidden, replaced, or mislabeled: "
+                + std::wstring(expectedText);
+            return false;
+        }
+    }
+
+    const HWND inspector = FindDirectVisibleChildByText(
+        controls, window, processId, L"Static", expectedInspectorText);
+    if (!inspector || !DirectVisibleChildOwnedByProcessAndParent(
+            inspector, window, processId, L"Static")) {
+        failure = L"Inspector is missing, hidden, replaced, or has unexpected text";
+        return false;
+    }
+
+    const HWND outliner = GetDlgItem(window, kOutlinerId);
+    const HWND assets = GetDlgItem(window, kAssetListId);
+    if (!DirectVisibleControlOwnedByProcessAndParent(
+            outliner, window, processId, kOutlinerId, L"ListBox")
+        || !DirectVisibleControlOwnedByProcessAndParent(
+            assets, window, processId, kAssetListId, L"ListBox")) {
+        failure = L"required Outliner/assets surface identity, ownership, parent, class, ID, or visibility is invalid";
+        return false;
+    }
+
+    LRESULT outlinerCount = LB_ERR;
+    LRESULT assetCount = LB_ERR;
+    LRESULT selection = LB_ERR;
+    if (!ReadValidatedListboxValue(outliner, window, processId, kOutlinerId,
+            LB_GETCOUNT, 0, outlinerCount)
+        || !ReadValidatedListboxValue(assets, window, processId, kAssetListId,
+            LB_GETCOUNT, 0, assetCount)
+        || !ReadValidatedListboxValue(outliner, window, processId, kOutlinerId,
+            LB_GETCURSEL, 0, selection)
+        || outlinerCount != 5 || assetCount != 4 || selection != expectedSelection) {
+        failure = L"unexpected Outliner/assets count or selection state";
+        return false;
+    }
+
+    std::wstring sceneRootItem;
+    std::wstring cubeItem;
+    if (!ReadValidatedListboxText(outliner, window, processId, kOutlinerId, 0, sceneRootItem)
+        || !ReadValidatedListboxText(outliner, window, processId, kOutlinerId, 3, cubeItem)
+        || sceneRootItem != L"Scene Root" || cubeItem != L"Cube") {
+        failure = L"unexpected Outliner item identities";
+        return false;
+    }
+
+    for (std::size_t index = 0; index < kExpectedAssetItems.size(); ++index) {
+        std::wstring assetItem;
+        if (!ReadValidatedListboxText(assets, window, processId, kAssetListId,
+                static_cast<int>(index), assetItem)
+            || assetItem != kExpectedAssetItems[index]) {
+            failure = L"unexpected asset item identity at row " + std::to_wstring(index);
+            return false;
+        }
+    }
+
+    std::wstring inspectorText;
+    if (!ReadValidatedChildText(inspector, window, processId, L"Static", inspectorText)
+        || inspectorText != expectedInspectorText) {
+        failure = L"Inspector fixture changed during validated read";
+        return false;
+    }
+    return true;
+}
+
+bool DirectChildrenContained(HWND window, DWORD processId, std::wstring& failure) {
+    if (!WindowOwnedByProcess(window, processId)) {
+        failure = L"editor top-level ownership changed before containment check";
+        return false;
+    }
     RECT client{};
     if (!GetClientRect(window, &client)) {
         failure = L"GetClientRect failed";
         return false;
     }
 
-    const auto controls = DirectChildren(window);
+    const auto controls = DirectChildren(window, processId);
     if (controls.size() != 12) {
-        failure = L"expected 12 direct controls, observed " + std::to_wstring(controls.size());
+        failure = L"expected 12 direct process-owned controls during containment, observed "
+            + std::to_wstring(controls.size());
         return false;
     }
 
     for (const auto& control : controls) {
+        if (!DirectVisibleChildOwnedByProcessAndParent(
+                control.handle, window, processId, control.className.c_str())) {
+            failure = L"child identity, ownership, parent, class, or visibility changed during containment";
+            return false;
+        }
         RECT rect{};
         if (!GetWindowRect(control.handle, &rect)) {
             failure = L"GetWindowRect failed for " + control.className;
@@ -190,20 +414,19 @@ bool DirectChildrenContained(HWND window, std::wstring& failure) {
         if (points[0].x < client.left || points[0].y < client.top
             || points[1].x > client.right || points[1].y > client.bottom
             || points[1].x < points[0].x || points[1].y < points[0].y) {
-            failure = L"child outside client: " + control.className + L" text='" + control.text
-                + L"' child=" + std::to_wstring(points[0].x) + L","
-                + std::to_wstring(points[0].y) + L".." + std::to_wstring(points[1].x) + L","
-                + std::to_wstring(points[1].y) + L" client=" + std::to_wstring(client.right)
-                + L"x" + std::to_wstring(client.bottom);
+            failure = L"child outside client: " + control.className
+                + L" child=" + std::to_wstring(points[0].x) + L"," + std::to_wstring(points[0].y)
+                + L".." + std::to_wstring(points[1].x) + L"," + std::to_wstring(points[1].y)
+                + L" client=" + std::to_wstring(client.right) + L"x"
+                + std::to_wstring(client.bottom);
             return false;
         }
     }
     return true;
 }
 
-bool WindowOwnedByProcess(HWND window, DWORD processId);
-
-bool ResizeAndCheck(HWND window, DWORD processId, int width, int height, std::wstring& failure) {
+bool ResizeAndCheck(HWND window, DWORD processId, int width, int height,
+    const wchar_t* expectedInspectorText, int expectedSelection, std::wstring& failure) {
     if (!WindowOwnedByProcess(window, processId)) {
         failure = L"editor HWND is no longer owned by launched process before resize";
         return false;
@@ -216,13 +439,19 @@ bool ResizeAndCheck(HWND window, DWORD processId, int width, int height, std::ws
 
     const ULONGLONG deadline = GetTickCount64() + kResizeTimeoutMs;
     while (true) {
+        if (!WindowOwnedByProcess(window, processId)) {
+            failure = L"editor HWND ownership changed while waiting for asynchronous resize";
+            return false;
+        }
         RECT rect{};
         if (!GetWindowRect(window, &rect)) {
             failure = L"GetWindowRect failed while waiting for asynchronous resize";
             return false;
         }
         if (rect.right - rect.left == width && rect.bottom - rect.top == height) {
-            return DirectChildrenContained(window, failure);
+            if (!DirectChildrenContained(window, processId, failure)) return false;
+            return ValidateShellState(
+                window, processId, expectedInspectorText, expectedSelection, failure);
         }
         if (GetTickCount64() >= deadline) {
             failure = L"asynchronous resize did not complete within deadline";
@@ -232,52 +461,40 @@ bool ResizeAndCheck(HWND window, DWORD processId, int width, int height, std::ws
     }
 }
 
-bool ReadListboxValue(HWND listbox, UINT message, WPARAM wParam, LRESULT& value) {
-    return SendMessageBounded(listbox, message, wParam, 0, value) && value != LB_ERR;
-}
-
-bool ReadListboxText(HWND listbox, int index, std::wstring& text) {
-    LRESULT textLength = LB_ERR;
-    if (!SendMessageBounded(listbox, LB_GETTEXTLEN, static_cast<WPARAM>(index), 0, textLength)
-        || textLength == LB_ERR || textLength < 0 || textLength > 8192) {
+bool SelectCubeAndNotify(HWND window, DWORD processId, std::wstring& failure) {
+    if (!WindowOwnedByProcess(window, processId)) {
+        failure = L"editor top-level ownership changed before selection";
+        return false;
+    }
+    const HWND outliner = GetDlgItem(window, kOutlinerId);
+    if (!DirectVisibleControlOwnedByProcessAndParent(
+            outliner, window, processId, kOutlinerId, L"ListBox")) {
+        failure = L"Outliner target is invalid before selection";
         return false;
     }
 
-    std::wstring buffer(static_cast<std::size_t>(textLength) + 1, L'\0');
-    LRESULT copied = LB_ERR;
-    if (!SendMessageBounded(listbox, LB_GETTEXT, static_cast<WPARAM>(index),
-            reinterpret_cast<LPARAM>(buffer.data()), copied)
-        || copied == LB_ERR || copied < 0 || copied > textLength) {
+    LRESULT newSelection = LB_ERR;
+    if (!SendMessageBounded(outliner, LB_SETCURSEL, 3, 0, newSelection)
+        || newSelection == LB_ERR) {
+        failure = L"failed to select Cube in Outliner";
         return false;
     }
-    buffer.resize(static_cast<std::size_t>(copied));
-    text = std::move(buffer);
-    return true;
-}
 
-bool WindowOwnedByProcess(HWND window, DWORD processId) {
-    if (!window) return false;
-    DWORD ownerProcessId = 0;
-    if (GetWindowThreadProcessId(window, &ownerProcessId) == 0) return false;
-    return ownerProcessId == processId;
-}
-
-bool DirectVisibleChildOwnedByProcessAndParent(HWND control, HWND parent, DWORD processId,
-    const wchar_t* expectedClassName) {
-    if (!WindowOwnedByProcess(parent, processId)
-        || !WindowOwnedByProcess(control, processId)) {
+    if (!DirectVisibleControlOwnedByProcessAndParent(
+            outliner, window, processId, kOutlinerId, L"ListBox")
+        || !WindowOwnedByProcess(window, processId)) {
+        failure = L"Outliner/editor identity changed before selection notification";
         return false;
     }
-    return GetParent(control) == parent
-        && ClassName(control) == expectedClassName
-        && IsWindowVisible(control);
-}
+    LRESULT commandResult = 0;
+    if (!SendMessageBounded(window, WM_COMMAND,
+            MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
+            reinterpret_cast<LPARAM>(outliner), commandResult)) {
+        failure = L"bounded Outliner selection notification failed";
+        return false;
+    }
 
-bool DirectVisibleControlOwnedByProcessAndParent(HWND control, HWND parent, DWORD processId,
-    int expectedControlId, const wchar_t* expectedClassName) {
-    return DirectVisibleChildOwnedByProcessAndParent(
-               control, parent, processId, expectedClassName)
-        && GetDlgItem(parent, expectedControlId) == control;
+    return ValidateShellState(window, processId, kCubeInspectorText, 3, failure);
 }
 
 bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) {
@@ -328,149 +545,36 @@ int wmain(int argc, wchar_t** argv) {
             failure = L"expected one stable visible process-owned top-level window, observed "
                 + std::to_wstring(visibleTopLevelCount);
         }
-    } else if (ClassName(window) != L"AstralEditorWindow") {
-        failure = L"unexpected editor window class: " + ClassName(window);
-    } else if (WindowText(window) != L"Astral Editor 0.1") {
-        failure = L"unexpected editor title: " + WindowText(window);
+    } else if (!ValidateShellState(
+                   window, process.dwProcessId, kSceneRootInspectorText, 0, failure)) {
+        // failure set by validator.
+    } else if (!SelectCubeAndNotify(window, process.dwProcessId, failure)) {
+        // failure set by selector/validator.
+    } else if (!ResizeAndCheck(window, process.dwProcessId, 800, 600,
+                   kCubeInspectorText, 3, failure)) {
+        // failure set by resize validator.
+    } else if (!ResizeAndCheck(window, process.dwProcessId, 420, 260,
+                   kCubeInspectorText, 3, failure)) {
+        // failure set by resize validator.
     } else {
-        const auto controls = DirectChildren(window);
-        if (controls.size() != 12) {
-            failure = L"expected 12 direct controls, observed " + std::to_wstring(controls.size());
-        } else if (CountClass(controls, L"Button") != 5
-            || CountClass(controls, L"ListBox") != 2
-            || CountClass(controls, L"Static") != 5) {
-            failure = L"unexpected child-control class counts";
+        int finalVisibleTopLevelCount = 0;
+        bool finalTopLevelEnumerationFailed = false;
+        if (!RevalidateStableSingleWindow(process.dwProcessId, window,
+                finalVisibleTopLevelCount, finalTopLevelEnumerationFailed)) {
+            if (finalTopLevelEnumerationFailed) {
+                failure = L"EnumWindows failed during final editor-window revalidation";
+            } else {
+                failure = L"editor did not remain one stable visible process-owned top-level window; observed "
+                    + std::to_wstring(finalVisibleTopLevelCount);
+            }
+        } else if (!ValidateShellState(
+                       window, process.dwProcessId, kCubeInspectorText, 3, failure)) {
+            // failure set by validator.
+        } else if (CloseEditor(window, process.dwProcessId, process.hProcess, exitCode)
+            && exitCode == 0) {
+            passed = true;
         } else {
-            const std::array<std::wstring, 5> pendingButtons{{
-                L"Select (pending)", L"Move (pending)", L"Rotate (pending)",
-                L"Scale (pending)", L"Play (pending)"}};
-            bool pendingStateOk = true;
-            for (const auto& caption : pendingButtons) {
-                const HWND button = FindControlByText(controls, L"Button", caption);
-                if (!button || !IsWindowVisible(button) || IsWindowEnabled(button)) {
-                    pendingStateOk = false;
-                    failure = L"pending tool is missing, hidden, or enabled: " + caption;
-                    break;
-                }
-            }
-
-            const HWND outliner = GetDlgItem(window, kOutlinerId);
-            const HWND assets = GetDlgItem(window, kAssetListId);
-            const HWND inspector = FindControlByText(controls, L"Static", kSceneRootInspectorText);
-            if (pendingStateOk) {
-                for (const wchar_t* expectedText : kExpectedShellStaticTexts) {
-                    const HWND staticControl = FindControlByText(controls, L"Static", expectedText);
-                    if (!staticControl || !IsWindowVisible(staticControl)) {
-                        failure = L"required shell static is missing, hidden, or mislabeled: "
-                            + std::wstring(expectedText);
-                        pendingStateOk = false;
-                        break;
-                    }
-                }
-            }
-            if (pendingStateOk
-                && (!DirectVisibleControlOwnedByProcessAndParent(
-                        outliner, window, process.dwProcessId, kOutlinerId, L"ListBox")
-                    || !DirectVisibleControlOwnedByProcessAndParent(
-                        assets, window, process.dwProcessId, kAssetListId, L"ListBox")
-                    || !DirectVisibleChildOwnedByProcessAndParent(
-                        inspector, window, process.dwProcessId, L"Static"))) {
-                failure = L"required Outliner/assets/Inspector surface identity, ownership, parent, class, or visibility is invalid";
-                pendingStateOk = false;
-            }
-
-            LRESULT outlinerCount = LB_ERR;
-            LRESULT assetCount = LB_ERR;
-            LRESULT selection = LB_ERR;
-            std::wstring sceneRootItem;
-            std::wstring cubeItem;
-            bool assetItemsMatch = true;
-            if (pendingStateOk) {
-                for (std::size_t index = 0; index < kExpectedAssetItems.size(); ++index) {
-                    std::wstring assetItem;
-                    if (!ReadListboxText(assets, static_cast<int>(index), assetItem)
-                        || assetItem != kExpectedAssetItems[index]) {
-                        assetItemsMatch = false;
-                        break;
-                    }
-                }
-            }
-            if (pendingStateOk
-                && (!ReadListboxValue(outliner, LB_GETCOUNT, 0, outlinerCount)
-                    || !ReadListboxValue(assets, LB_GETCOUNT, 0, assetCount)
-                    || !ReadListboxValue(outliner, LB_GETCURSEL, 0, selection)
-                    || !ReadListboxText(outliner, 0, sceneRootItem)
-                    || !ReadListboxText(outliner, 3, cubeItem)
-                    || outlinerCount != 5 || assetCount != 4 || !assetItemsMatch || selection != 0
-                    || sceneRootItem != L"Scene Root" || cubeItem != L"Cube"
-                    || WindowText(inspector) != kSceneRootInspectorText)) {
-                failure = L"unexpected initial Outliner/assets/Inspector fixture state";
-                pendingStateOk = false;
-            }
-
-            if (pendingStateOk) {
-                LRESULT newSelection = LB_ERR;
-                LRESULT commandResult = 0;
-                const bool selectionTargetValid = DirectVisibleControlOwnedByProcessAndParent(
-                    outliner, window, process.dwProcessId, kOutlinerId, L"ListBox");
-                const bool selected = selectionTargetValid
-                    && SendMessageBounded(outliner, LB_SETCURSEL, 3, 0, newSelection)
-                    && newSelection != LB_ERR;
-                const bool notificationTargetValid = selected
-                    && DirectVisibleControlOwnedByProcessAndParent(
-                        outliner, window, process.dwProcessId, kOutlinerId, L"ListBox");
-                const bool notified = notificationTargetValid
-                    && SendMessageBounded(window, WM_COMMAND,
-                        MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
-                        reinterpret_cast<LPARAM>(outliner), commandResult);
-                LRESULT confirmedSelection = LB_ERR;
-                std::wstring confirmedItem;
-                const bool synchronized = notified
-                    && DirectVisibleControlOwnedByProcessAndParent(
-                        outliner, window, process.dwProcessId, kOutlinerId, L"ListBox")
-                    && DirectVisibleChildOwnedByProcessAndParent(
-                        inspector, window, process.dwProcessId, L"Static")
-                    && ReadListboxValue(outliner, LB_GETCURSEL, 0, confirmedSelection)
-                    && confirmedSelection == 3
-                    && ReadListboxText(outliner, static_cast<int>(confirmedSelection), confirmedItem)
-                    && confirmedItem == L"Cube"
-                    && WindowText(inspector) == kCubeInspectorText;
-                if (!synchronized) {
-                    failure = L"Outliner Cube selection and Inspector fixture did not remain synchronized after notification";
-                    pendingStateOk = false;
-                }
-            }
-
-            if (pendingStateOk
-                && !ResizeAndCheck(window, process.dwProcessId, 800, 600, failure)) {
-                pendingStateOk = false;
-            }
-            if (pendingStateOk
-                && !ResizeAndCheck(window, process.dwProcessId, 420, 260, failure)) {
-                pendingStateOk = false;
-            }
-
-            int finalVisibleTopLevelCount = 0;
-            bool finalTopLevelEnumerationFailed = false;
-            if (pendingStateOk
-                && !RevalidateStableSingleWindow(process.dwProcessId, window,
-                    finalVisibleTopLevelCount, finalTopLevelEnumerationFailed)) {
-                if (finalTopLevelEnumerationFailed) {
-                    failure = L"EnumWindows failed during final editor-window revalidation";
-                } else {
-                    failure = L"editor did not remain one stable visible process-owned top-level "
-                        L"window; observed " + std::to_wstring(finalVisibleTopLevelCount);
-                }
-                pendingStateOk = false;
-            }
-
-            if (pendingStateOk
-                && CloseEditor(window, process.dwProcessId, process.hProcess, exitCode)
-                && exitCode == 0) {
-                passed = true;
-            } else if (pendingStateOk) {
-                failure = L"editor did not close cleanly with exit code 0";
-            }
+            failure = L"editor did not close cleanly with exit code 0";
         }
     }
 
@@ -488,9 +592,9 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible process-owned top-level editor window before and after "
-        << L"interaction, 12 required controls, disabled pending tools, exact shell labels/status, "
-        << L"exact visible process-owned Outliner/assets surfaces, exact item identities and complete "
-        << L"Inspector fixture text with post-notification selection ownership+synchronization, "
-        << L"ownership-checked bounded asynchronous normal+narrow resizes, and clean exit.\n";
+        << L"interaction; exact process-owned child inventory, disabled pending tools, shell labels, "
+        << L"Outliner/assets identities, and Inspector state were revalidated around every bounded "
+        << L"cross-process read and after both normal+narrow resizes; Cube selection stayed synchronized, "
+        << L"all direct children remained contained, and shutdown exited cleanly.\n";
     return 0;
 }
