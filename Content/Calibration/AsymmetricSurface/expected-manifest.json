@@ -1,0 +1,13 @@
+{
+  "files": [
+    {
+      "bytes": 6681,
+      "path": "asymmetric_surface.gltf",
+      "sha256": "fb99014c48c9b19a63cdc96dbc383098bae5fcc884a8192a3fc5285b0e704f6d"
+    }
+  ],
+  "generator": "astral-calibration-gltf-2",
+  "intent": "Source-only glTF 2.0 calibration fixture for future Astral solid-mesh/texture import validation.",
+  "runtime_status": "source_validated_not_imported",
+  "schema_version": 1
+}
