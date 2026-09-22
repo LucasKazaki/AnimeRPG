@@ -4,9 +4,9 @@
   "updated": "2026-09-22",
   "items": [
     {"id":"ART-001","title":"Original art bible v0.1","status":"delivered_proposed","dependency":"Lucas visual approval before production lock","next_acceptance":"review palette, class silhouettes, material and VFX rules"},
-    {"id":"ART-002","title":"Standalone starter materials v2","status":"source_validated_not_imported","dependency":"texture/material renderer and import contract","next_acceptance":"render tiled neutral-light material sphere and measure memory/mips"},
-    {"id":"ART-003","title":"Triangle/UV/tangent calibration asset path","status":"blocked_engine_dependency","dependency":"engine worker chooses/implements supported solid mesh and texture path","next_acceptance":"asymmetric cube survives import with correct axes, UVs, normals and tangents"},
-    {"id":"ART-004","title":"Blender 5.2.2 LTS source workflow","status":"planned","dependency":"local tool availability plus ART-003","next_acceptance":"one reproducible prop source/export/import round trip"},
+    {"id":"ART-002","title":"Standalone starter materials v2","status":"source_validated_pending_integration","dependency":"PR #23 integration plus texture/material renderer and import contract","next_acceptance":"render tiled neutral-light material sphere and measure memory/mips"},
+    {"id":"ART-003","title":"Triangle/UV/tangent calibration asset path","status":"source_validated_engine_import_pending","dependency":"engine worker chooses/implements supported solid mesh and texture path","next_acceptance":"generated asymmetric glTF survives actual Astral import with correct axes, UVs, winding, materials, normals and tangents"},
+    {"id":"ART-004","title":"Blender 5.2.2 LTS source workflow","status":"planned","dependency":"local tool availability plus ART-003 importer path","next_acceptance":"one reproducible Blender source/export/import round trip against ART-003 contract"},
     {"id":"ART-005","title":"Original rigged protagonist base","status":"planned","dependency":"accepted skeleton/skinning/animation import contract","next_acceptance":"male/female proportion variants deform cleanly on one gameplay skeleton"},
     {"id":"ART-006","title":"National Mall authored material family","status":"planned","dependency":"ART-002 runtime proof and geographic/reference ledger","next_acceptance":"licensed/reference-backed limestone, paving, asphalt, metal and vegetation set"}
   ]
