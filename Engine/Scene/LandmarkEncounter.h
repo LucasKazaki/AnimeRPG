@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Scene/CombatSandbox.h"
+#include "Engine/Scene/EncounterChallenge.h"
 #include "Engine/Scene/LandmarkInteraction.h"
 #include "Engine/Scene/ShadowbladeActions.h"
 
@@ -35,6 +36,7 @@ struct LandmarkEncounterReport {
     float rewardApplied{};
     EncounterGrade grade{EncounterGrade::None};
     float completionSeconds{};
+    EncounterChallengeResult challenge{};
 };
 
 class LandmarkEncounter {
@@ -49,18 +51,26 @@ public:
     bool Update(const CombatSandbox& combatSandbox, ShadowbladeActions& shadowbladeActions);
     LandmarkEncounterReport Retry(CombatSandbox& combatSandbox,
         ShadowbladeActions& shadowbladeActions);
+    void ConfigureChallenge(EncounterChallengeDifficulty difficulty,
+        EncounterTacticalFocus focus,
+        EncounterScoringMode scoringMode = EncounterScoringMode::Balanced) {
+        challengeTracker_.Configure(difficulty, focus, scoringMode);
+    }
 
     LandmarkEncounterState State() const { return state_; }
     bool CompletionRewardGranted() const { return completionRewardGranted_; }
     const LandmarkEncounterReport& LastReport() const { return lastReport_; }
+    const EncounterChallengeTracker& ChallengeTracker() const { return challengeTracker_; }
 
 private:
     static EncounterGrade GradeForSeconds(double seconds);
+    static EncounterTimeGrade ChallengeTimeGrade(EncounterGrade grade);
 
     LandmarkEncounterState state_{LandmarkEncounterState::Locked};
     LandmarkEncounterReport lastReport_{};
     double activationElapsedSeconds_{};
     bool completionRewardGranted_{};
+    EncounterChallengeTracker challengeTracker_{};
 };
 
 } // namespace Astral::Scene
