@@ -59,10 +59,10 @@
       "kind": "editor-native-verification-slice",
       "status": "hosted_debug_release_compile_verified_native_runtime_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
-      "latest_code_candidate": "d5ab193d9f424e226390ab03a1938bc6ddc295a9",
-      "latest_hosted_candidate": "d5ab193d9f424e226390ab03a1938bc6ddc295a9",
-      "hosted_windows_run": 35699003778,
-      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: process-owned launch, one visible process-owned top-level window must remain the same HWND for 20 consecutive 50 ms observations at startup and again after editor interactions, expected class/title, required direct child-control inventory, disabled pending tool state, Outliner and asset-list initial state, Outliner-to-Inspector selection synchronization, child-control containment after bounded asynchronous normal and narrow/short resizes using SWP_ASYNCWINDOWPOS, ownership revalidation immediately before the single WM_CLOSE post, and failure cleanup through only the retained launched-process handle with no second HWND close post; hosted CI compiled the smoke in Debug and Release and passed non-runtime regressions but did not execute the interactive RuntimeSmoke target",
+      "latest_code_candidate": "ec9ea8c4d7f6f02c85e52809625bd14c40b93d35",
+      "latest_hosted_candidate": "ec9ea8c4d7f6f02c85e52809625bd14c40b93d35",
+      "hosted_windows_run": 35704622430,
+      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: process-owned launch, one visible process-owned top-level window must remain the same HWND for 20 consecutive 50 ms observations at startup and again after editor interactions, expected class/title, required direct child-control inventory, disabled pending tool state, bounded LB_GETTEXTLEN/LB_GETTEXT verification that Outliner index 0 is Scene Root and index 3 is Cube, exact complete Inspector fixture text for both Scene Root and Cube selection states, child-control containment after bounded asynchronous normal and narrow/short resizes using SWP_ASYNCWINDOWPOS, ownership revalidation immediately before the single WM_CLOSE post, and failure cleanup through only the retained launched-process handle with no second HWND close post; hosted CI compiled the smoke in Debug and Release and passed non-runtime regressions but did not execute the interactive RuntimeSmoke target",
       "task": "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
       "evidence": "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md"
     }
