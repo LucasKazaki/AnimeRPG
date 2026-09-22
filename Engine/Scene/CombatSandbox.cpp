@@ -19,6 +19,7 @@ void CombatSandbox::AdvanceTime(float deltaSeconds) {
         staggerRemaining_ = std::max(0.0f, staggerRemaining_ - deltaSeconds);
         if (staggerRemaining_ == 0.0f) {
             dummy_.posture = 0;
+            postureRecoveryRemainder_ = 0.0f;
         }
         return;
     }
@@ -31,9 +32,13 @@ void CombatSandbox::AdvanceTime(float deltaSeconds) {
         timeSincePostureHit_ - PostureRecoveryDelaySeconds);
     const float recoveryDuration = currentRecovery - previousRecovery;
     if (recoveryDuration > 0.0f && dummy_.posture > 0) {
-        const int recovered = static_cast<int>(
-            std::ceil(PostureRecoveryPerSecond * recoveryDuration));
-        dummy_.posture = std::max(0, dummy_.posture - recovered);
+        postureRecoveryRemainder_ += PostureRecoveryPerSecond * recoveryDuration;
+        const int recovered = static_cast<int>(std::floor(postureRecoveryRemainder_));
+        if (recovered > 0) {
+            dummy_.posture = std::max(0, dummy_.posture - recovered);
+            postureRecoveryRemainder_ -= static_cast<float>(recovered);
+            if (dummy_.posture == 0) postureRecoveryRemainder_ = 0.0f;
+        }
     }
 }
 
@@ -79,6 +84,7 @@ int CombatSandbox::ApplyDamage(int damage) {
     if (dummy_.IsDefeated()) {
         dummy_.posture = 0;
         staggerRemaining_ = 0.0f;
+        postureRecoveryRemainder_ = 0.0f;
     }
     return applied;
 }
@@ -89,6 +95,7 @@ bool CombatSandbox::ConsumeStaggerOpening() {
     staggerRemaining_ = 0.0f;
     dummy_.posture = 0;
     timeSincePostureHit_ = 0.0f;
+    postureRecoveryRemainder_ = 0.0f;
     return true;
 }
 
@@ -100,6 +107,7 @@ void CombatSandbox::ResetTrainingSession() {
     nextAttackTime_ = 0.0f;
     staggerRemaining_ = 0.0f;
     timeSincePostureHit_ = 0.0f;
+    postureRecoveryRemainder_ = 0.0f;
     lastComboHitTime_ = -1000.0f;
     comboCount_ = 0;
 }
@@ -123,6 +131,7 @@ bool CombatSandbox::ApplyPostureDamage(int postureDamage) {
 
     dummy_.posture = std::min(dummy_.maximumPosture, dummy_.posture + postureDamage);
     timeSincePostureHit_ = 0.0f;
+    postureRecoveryRemainder_ = 0.0f;
     if (dummy_.posture >= dummy_.maximumPosture) {
         staggerRemaining_ = StaggerDurationSeconds;
         return true;
