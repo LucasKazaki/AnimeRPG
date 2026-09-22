@@ -7,6 +7,7 @@ on:
       - "main"
     paths:
       - "CMakeLists.txt"
+      - "cmake/**"
       - "Engine/**"
       - "Game/**"
       - "Tests/**"
@@ -15,6 +16,7 @@ on:
   pull_request:
     paths:
       - "CMakeLists.txt"
+      - "cmake/**"
       - "Engine/**"
       - "Game/**"
       - "Tests/**"
@@ -38,41 +40,52 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Set external build root
+        shell: pwsh
+        run: |
+          "BUILD_ROOT=$env:RUNNER_TEMP/AstralEngine-build" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Parse R0 recovery runner
         run: python -m py_compile Scripts/invoke_r0_release_candidate.py
 
+      - name: Verify Release assertion and CTest safety contracts
+        run: python Scripts/test_test_safety.py
+
       - name: Configure Visual Studio 2022 x64
-        run: cmake -S . -B build-ci -G "Visual Studio 17 2022" -A x64
+        run: cmake -S . -B "$env:BUILD_ROOT" -G "Visual Studio 17 2022" -A x64
 
       - name: Build Debug
-        run: cmake --build build-ci --config Debug --parallel
+        run: cmake --build "$env:BUILD_ROOT" --config Debug --parallel
 
       - name: Run deterministic Debug tests
-        run: ctest --test-dir build-ci -C Debug --output-on-failure -E "RuntimeSmoke"
+        run: ctest --test-dir "$env:BUILD_ROOT" -C Debug --output-on-failure -E "RuntimeSmoke" --no-tests=error
 
       - name: Build Release
-        run: cmake --build build-ci --config Release --parallel
+        run: cmake --build "$env:BUILD_ROOT" --config Release --parallel
 
       - name: Run deterministic Release tests
-        run: ctest --test-dir build-ci -C Release --output-on-failure -E "RuntimeSmoke"
+        run: ctest --test-dir "$env:BUILD_ROOT" -C Release --output-on-failure -E "RuntimeSmoke" --no-tests=error
 
       - name: Run static milestone verifiers
         shell: pwsh
         run: |
-          python Scripts/verify_milestone1.py
-          python Scripts/verify_milestone2.py
-          python Scripts/verify_milestone3.py
+          foreach ($script in @("Scripts/verify_milestone1.py", "Scripts/verify_milestone2.py", "Scripts/verify_milestone3.py")) {
+            python $script
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Confirm clean tracked tree
         shell: pwsh
         run: |
           git diff --check
-          if (git status --porcelain --untracked-files=no) {
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $changes = git status --porcelain --untracked-files=no
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($changes) {
             Write-Error "Tracked files changed during CI."
-            git status --short
             exit 1
           }
 
-# Native Win32 RuntimeSmoke tests intentionally remain a local Windows-host gate.
-# Hosted runners can compile those executables, but they are not treated as a
-# trustworthy interactive desktop for SendInput, window discovery, and GDI capture.
+# RuntimeSmoke executables are compiled, but hosted CI is not interactive proof.
+# Use one local interactive Windows desktop for their execution. RUN_SERIAL
+# prevents overlap only within a single CTest invocation, not across processes.
