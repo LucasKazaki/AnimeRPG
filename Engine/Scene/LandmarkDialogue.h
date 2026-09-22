@@ -103,9 +103,15 @@ public:
         beat.response = ResolveResponse(topic, choice, context, repeated);
         if (beat.response == DialogueResponse::Invalid) return beat;
 
-        if (!repeated && choice != DialogueChoice::EndConversation) {
-            beat.trustDelta = TrustDelta(choice);
-            trust_ = ClampTrust(trust_ + beat.trustDelta);
+        if (repeated) {
+            if (choice == DialogueChoice::ShareEvidence) {
+                beat.clueUnlocked = UnlockClueFor(topic, choice, context);
+                if (beat.clueUnlocked) beat.response = EvidenceResponse(topic, context);
+            }
+        } else if (choice != DialogueChoice::EndConversation) {
+            const int previousTrust = trust_;
+            trust_ = ClampTrust(trust_ + TrustDelta(choice));
+            beat.trustDelta = trust_ - previousTrust;
             discussed_[topicIndex] = true;
             beat.loreUnlocked = UnlockLoreForTopic(topic);
             beat.clueUnlocked = UnlockClueFor(topic, choice, context);
@@ -270,6 +276,32 @@ private:
         return DialogueResponse::Invalid;
     }
 
+    constexpr DialogueResponse EvidenceResponse(DialogueTopic topic,
+        LandmarkDialogueContext context) const {
+        switch (topic) {
+        case DialogueTopic::RiftTheory:
+            return context.visitedLandmarks >= 2
+                ? DialogueResponse::RiftEvidenceAcknowledged
+                : DialogueResponse::AlreadyDiscussed;
+        case DialogueTopic::LandmarkHistory:
+            return context.objectiveComplete
+                ? DialogueResponse::MonumentPatternConfirmed
+                : DialogueResponse::AlreadyDiscussed;
+        case DialogueTopic::ShadowCrypt:
+            return trust_ >= 1
+                ? DialogueResponse::CryptSigilConfirmed
+                : DialogueResponse::AlreadyDiscussed;
+        case DialogueTopic::ManaReactor:
+            return HasClue(DialogueClue::CoolingAnomaly)
+                ? DialogueResponse::CoolingTraceConfirmed
+                : DialogueResponse::AlreadyDiscussed;
+        case DialogueTopic::CivilianSafety:
+        case DialogueTopic::Count:
+            return DialogueResponse::AlreadyDiscussed;
+        }
+        return DialogueResponse::AlreadyDiscussed;
+    }
+
     constexpr bool UnlockLoreForTopic(DialogueTopic topic) {
         LoreEntry entry = LoreEntry::NationalMallResonance;
         switch (topic) {
@@ -374,6 +406,16 @@ constexpr bool LandmarkDialogueContract() {
     if (!repeated.repeatedTopic || repeated.response != DialogueResponse::AlreadyDiscussed
         || repeated.trustDelta != 0 || story.Trust() != LandmarkDialogue::MaximumTrust)
         return false;
+
+    LandmarkDialogue delayedEvidence;
+    delayedEvidence.Choose(DialogueTopic::RiftTheory, DialogueChoice::AskDirectly, {0, false});
+    const DialogueBeat delayedRift = delayedEvidence.Choose(
+        DialogueTopic::RiftTheory, DialogueChoice::ShareEvidence, {2, false});
+    if (!delayedRift.repeatedTopic
+        || delayedRift.response != DialogueResponse::RiftEvidenceAcknowledged
+        || !delayedRift.clueUnlocked
+        || delayedRift.trustDelta != 0
+        || delayedEvidence.Trust() != 0) return false;
 
     LandmarkDialogue pursuit;
     pursuit.Choose(DialogueTopic::RiftTheory, DialogueChoice::ShareEvidence, {2, false});
