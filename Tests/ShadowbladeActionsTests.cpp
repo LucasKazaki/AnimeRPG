@@ -25,7 +25,9 @@ void TestDashCostCooldownAndRegenerationCap() {
         "dash activates when ready");
     Expect(Near(activated.dashDestination.x, 2.0f)
             && Near(activated.dashDestination.y, 10.0f),
-        "dash moves a deterministic forward distance");
+        "neutral dash direction preserves deterministic forward fallback");
+    Expect(Near(activated.resourceSpent, Astral::Scene::ShadowbladeActions::DashCost),
+        "dash report records its resource spend");
     Expect(Near(actions.Resource(), 75.0f), "dash consumes its defined resource cost");
     Expect(Near(actions.DashCooldownRemaining(), 1.0f), "dash starts its cooldown");
 
@@ -40,6 +42,36 @@ void TestDashCostCooldownAndRegenerationCap() {
     actions.AdvanceTime(100.0f);
     Expect(Near(actions.Resource(), 100.0f), "resource regeneration respects the cap");
     Expect(Near(actions.DashCooldownRemaining(), 0.0f), "cooldown clamps at zero");
+}
+
+void TestDirectionalDashNormalizationAndFallback() {
+    using Astral::Math::Vec3;
+    using Astral::Scene::ShadowActionResult;
+    using Astral::Scene::ShadowbladeActions;
+
+    ShadowbladeActions cardinal;
+    const auto right = cardinal.TryDash({2.0f, 4.0f, 0.0f}, {1.0f, 0.0f, 0.0f});
+    Expect(right.result == ShadowActionResult::Activated
+            && Near(right.dashDestination.x, 8.0f)
+            && Near(right.dashDestination.y, 4.0f),
+        "cardinal dash follows the requested direction");
+
+    ShadowbladeActions diagonal;
+    const auto diagonalReport = diagonal.TryDash({}, {1.0f, 1.0f, 0.0f});
+    const float diagonalDistance = std::sqrt(
+        diagonalReport.dashDestination.x * diagonalReport.dashDestination.x
+        + diagonalReport.dashDestination.y * diagonalReport.dashDestination.y);
+    Expect(diagonalReport.result == ShadowActionResult::Activated
+            && Near(diagonalDistance, ShadowbladeActions::DashDistance),
+        "diagonal dash is normalized to the same distance as cardinal movement");
+
+    ShadowbladeActions invalid;
+    const float infinity = std::numeric_limits<float>::infinity();
+    const auto fallback = invalid.TryDash({1.0f, 2.0f, 0.0f}, {infinity, 1.0f, 0.0f});
+    Expect(fallback.result == ShadowActionResult::Activated
+            && Near(fallback.dashDestination.x, 1.0f)
+            && Near(fallback.dashDestination.y, 8.0f),
+        "nonfinite dash direction safely falls back to deterministic forward movement");
 }
 
 void TestInvalidDeltaDoesNotMutateState() {
@@ -68,6 +100,8 @@ void TestFatalStrikeRangeDamageAndCooldown() {
     const auto hit = actions.TryFatalStrike({0.0f, 0.0f, 0.0f}, combat);
     Expect(hit.result == Astral::Scene::ShadowActionResult::Activated,
         "fatal strike activates in range");
+    Expect(!hit.followUp && Near(hit.resourceSpent, Astral::Scene::ShadowbladeActions::FatalStrikeCost),
+        "ordinary fatal strike keeps its normal resource cost");
     Expect(hit.damageApplied == 80 && combat.Dummy().health == 20,
         "fatal strike applies distinct high damage through combat domain");
     Expect(Near(actions.Resource(), 50.0f), "fatal strike consumes its defined cost");
@@ -85,6 +119,35 @@ void TestFatalStrikeRangeDamageAndCooldown() {
     const auto defeated = actions.TryFatalStrike({0.0f, 0.0f, 0.0f}, combat);
     Expect(defeated.result == Astral::Scene::ShadowActionResult::TargetDefeated,
         "fatal strike rejects a defeated target");
+}
+
+void TestStaggerFollowUpCostAndConsumption() {
+    using namespace Astral::Scene;
+
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    combat.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    combat.AdvanceTime(0.4f);
+    const auto heavy = combat.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    Expect(heavy.staggerTriggered && combat.IsStaggered(),
+        "light-heavy sequence creates one stagger opening");
+
+    const float resourceBeforeRangeCheck = actions.Resource();
+    const auto outOfRange = actions.TryFatalStrike({-10.0f, 0.0f, 0.0f}, combat);
+    Expect(outOfRange.result == ShadowActionResult::OutOfRange && combat.IsStaggered(),
+        "out-of-range follow-up attempt preserves the earned stagger opening");
+    Expect(Near(actions.Resource(), resourceBeforeRangeCheck),
+        "out-of-range follow-up attempt spends no resource");
+
+    const auto followUp = actions.TryFatalStrike({0.0f, 0.0f, 0.0f}, combat);
+    Expect(followUp.result == ShadowActionResult::Activated && followUp.followUp,
+        "fatal strike recognizes a stagger follow-up");
+    Expect(Near(followUp.resourceSpent, ShadowbladeActions::StaggerFollowUpCost)
+            && Near(actions.Resource(), 70.0f),
+        "stagger follow-up uses the reduced earned-opening cost");
+    Expect(!combat.IsStaggered(), "successful follow-up consumes the stagger opening exactly once");
+    Expect(followUp.damageApplied == 15 && combat.Dummy().IsDefeated(),
+        "follow-up damage remains capped to target health");
 }
 
 void TestGuardConflicts() {
@@ -132,8 +195,10 @@ void TestInsufficientResourceRejection() {
 
 int main() {
     TestDashCostCooldownAndRegenerationCap();
+    TestDirectionalDashNormalizationAndFallback();
     TestInvalidDeltaDoesNotMutateState();
     TestFatalStrikeRangeDamageAndCooldown();
+    TestStaggerFollowUpCostAndConsumption();
     TestGuardConflicts();
     TestInsufficientResourceRejection();
     if (failures != 0) return 1;
