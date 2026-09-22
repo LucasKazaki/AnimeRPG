@@ -60,16 +60,40 @@ public:
         }
 
         linkedAttackActive_ = true;
+        linkedCombat_ = &combat;
+        linkedActions_ = &actions;
+        linkedAttackGeneration_ = actions.IncomingAttackGeneration();
         SaturatingIncrement(stats_.attacksQueued);
         return true;
     }
 
     DefenseReport TryDefend(CombatSandbox& combat, ShadowbladeActions& actions,
         DefenseInput input) {
-        const bool linkedBefore = linkedAttackActive_;
-        const DefenseReport report = actions.TryDefend(input);
-        if (!linkedBefore) return report;
+        if (!linkedAttackActive_) return actions.TryDefend(input);
+        if (!OwnsObjects(combat, actions)) return NoLinkedThreatReport();
 
+        if (!combat.HasPendingEnemyAttack()) {
+            if (OwnsGeneration(actions) && actions.HasIncomingAttack()) {
+                actions.CancelIncomingAttack();
+            }
+            InterruptLinked(combat, false);
+            return NoLinkedThreatReport();
+        }
+
+        if (!OwnsGeneration(actions)) {
+            InterruptLinked(combat, true);
+            return NoLinkedThreatReport();
+        }
+
+        if (!actions.HasIncomingAttack()) {
+            const DefenseReport report = actions.LastDefense();
+            if (!ResolveTerminalReport(combat, report)) {
+                InterruptLinked(combat, true);
+            }
+            return report;
+        }
+
+        const DefenseReport report = actions.TryDefend(input);
         if (report.result != DefenseResult::NoThreat
             && report.result != DefenseResult::InvalidThreat
             && report.result != DefenseResult::ThreatQueued) {
@@ -109,47 +133,57 @@ public:
 
     bool AdvanceTime(CombatSandbox& combat, ShadowbladeActions& actions,
         float deltaSeconds) {
-        combat.AdvanceTime(deltaSeconds);
-        actions.AdvanceTime(deltaSeconds);
-        if (!linkedAttackActive_) return false;
+        if (!linkedAttackActive_) {
+            combat.AdvanceTime(deltaSeconds);
+            actions.AdvanceTime(deltaSeconds);
+            return false;
+        }
+        if (!OwnsObjects(combat, actions)) return false;
 
+        // Reconcile an authoritative interruption before advancing the linked
+        // Shadowblade clock. A delayed coordinator tick must never resurrect a
+        // staggered/defeated enemy's already-cleared attack as stale damage.
         if (!combat.HasPendingEnemyAttack()) {
-            if (actions.HasIncomingAttack()) actions.CancelIncomingAttack();
-            linkedAttackActive_ = false;
-            SaturatingIncrement(stats_.interruptions);
-            stats_.currentPerfectStreak = 0;
-            return true;
+            if (OwnsGeneration(actions) && actions.HasIncomingAttack()) {
+                actions.CancelIncomingAttack();
+            }
+            return InterruptLinked(combat, false);
         }
 
+        // If the owned threat was canceled/replaced outside this coordinator,
+        // close only the old combat plan. Never advance or cancel the replacement.
+        if (!OwnsGeneration(actions)) {
+            return InterruptLinked(combat, true);
+        }
+
+        if (!actions.HasIncomingAttack()) {
+            const DefenseReport report = actions.LastDefense();
+            if (ResolveTerminalReport(combat, report)) return true;
+            return InterruptLinked(combat, true);
+        }
+
+        combat.AdvanceTime(deltaSeconds);
+        if (!combat.HasPendingEnemyAttack()) {
+            if (OwnsGeneration(actions) && actions.HasIncomingAttack()) {
+                actions.CancelIncomingAttack();
+            }
+            return InterruptLinked(combat, false);
+        }
+
+        actions.AdvanceTime(deltaSeconds);
         if (actions.HasIncomingAttack()) return false;
 
         const DefenseReport report = actions.LastDefense();
-        switch (report.result) {
-        case DefenseResult::PerfectGuard:
-        case DefenseResult::PerfectDodge:
-            return ResolveLinked(combat, EnemyAttackOutcome::PerfectDefense, report,
-                ResolutionKind::Perfect);
-        case DefenseResult::Guarded:
-            return ResolveLinked(combat, EnemyAttackOutcome::Guarded, report,
-                ResolutionKind::OrdinaryDefense);
-        case DefenseResult::Evaded:
-            return ResolveLinked(combat, EnemyAttackOutcome::Evaded, report,
-                ResolutionKind::OrdinaryDefense);
-        case DefenseResult::GuardBroken:
-        case DefenseResult::UnblockableHit:
-        case DefenseResult::Hit:
-            return ResolveLinked(combat, EnemyAttackOutcome::Hit, report,
-                ResolutionKind::Hit);
-        default:
-            return false;
-        }
+        if (ResolveTerminalReport(combat, report)) return true;
+        return InterruptLinked(combat, true);
     }
 
     DefenseTrainingCue Cue(const CombatSandbox& combat,
         const ShadowbladeActions& actions) const {
         DefenseTrainingCue cue{};
-        if (!linkedAttackActive_ || !combat.HasPendingEnemyAttack()
-            || !actions.HasIncomingAttack()) {
+        if (!linkedAttackActive_ || !OwnsObjects(combat, actions)
+            || !combat.HasPendingEnemyAttack() || !actions.HasIncomingAttack()
+            || !OwnsGeneration(actions)) {
             return cue;
         }
 
@@ -157,9 +191,9 @@ public:
         cue.pattern = plan.pattern;
         cue.blockable = plan.blockable;
         cue.secondsToImpact = std::max(0.0f, actions.IncomingAttackRemaining());
-        if (cue.secondsToImpact <= actions.PerfectDefenseWindowSeconds()) {
+        if (actions.PerfectDefenseWindowOpen()) {
             cue.phase = DefenseTrainingCuePhase::PerfectWindow;
-        } else if (cue.secondsToImpact <= ShadowbladeActions::DodgeWindowSeconds) {
+        } else if (actions.DodgeWindowOpen()) {
             cue.phase = DefenseTrainingCuePhase::DodgeWindow;
         } else {
             cue.phase = DefenseTrainingCuePhase::Approach;
@@ -198,6 +232,62 @@ private:
         Hit,
     };
 
+    static DefenseReport NoLinkedThreatReport() {
+        return {DefenseResult::NoThreat, 0, 0, false, 0.0f};
+    }
+
+    bool OwnsObjects(const CombatSandbox& combat,
+        const ShadowbladeActions& actions) const {
+        return linkedAttackActive_ && linkedCombat_ == &combat && linkedActions_ == &actions;
+    }
+
+    bool OwnsGeneration(const ShadowbladeActions& actions) const {
+        return linkedAttackActive_ && linkedActions_ == &actions
+            && linkedAttackGeneration_ != 0
+            && actions.IncomingAttackGeneration() == linkedAttackGeneration_;
+    }
+
+    void ClearLink() {
+        linkedAttackActive_ = false;
+        linkedCombat_ = nullptr;
+        linkedActions_ = nullptr;
+        linkedAttackGeneration_ = 0;
+    }
+
+    bool InterruptLinked(CombatSandbox& combat, bool resolvePlanner) {
+        if (!linkedAttackActive_ || linkedCombat_ != &combat) return false;
+        if (resolvePlanner && combat.HasPendingEnemyAttack()
+            && !combat.ResolveEnemyAttack(EnemyAttackOutcome::Interrupted)) {
+            return false;
+        }
+        ClearLink();
+        SaturatingIncrement(stats_.interruptions);
+        stats_.currentPerfectStreak = 0;
+        return true;
+    }
+
+    bool ResolveTerminalReport(CombatSandbox& combat, const DefenseReport& report) {
+        switch (report.result) {
+        case DefenseResult::PerfectGuard:
+        case DefenseResult::PerfectDodge:
+            return ResolveLinked(combat, EnemyAttackOutcome::PerfectDefense, report,
+                ResolutionKind::Perfect);
+        case DefenseResult::Guarded:
+            return ResolveLinked(combat, EnemyAttackOutcome::Guarded, report,
+                ResolutionKind::OrdinaryDefense);
+        case DefenseResult::Evaded:
+            return ResolveLinked(combat, EnemyAttackOutcome::Evaded, report,
+                ResolutionKind::OrdinaryDefense);
+        case DefenseResult::GuardBroken:
+        case DefenseResult::UnblockableHit:
+        case DefenseResult::Hit:
+            return ResolveLinked(combat, EnemyAttackOutcome::Hit, report,
+                ResolutionKind::Hit);
+        default:
+            return false;
+        }
+    }
+
     static void SaturatingIncrement(int& value) {
         if (value < std::numeric_limits<int>::max()) ++value;
     }
@@ -210,10 +300,13 @@ private:
 
     bool ResolveLinked(CombatSandbox& combat, EnemyAttackOutcome outcome,
         const DefenseReport& report, ResolutionKind kind) {
-        if (!linkedAttackActive_ || !combat.HasPendingEnemyAttack()) return false;
+        if (!linkedAttackActive_ || linkedCombat_ != &combat
+            || !combat.HasPendingEnemyAttack()) {
+            return false;
+        }
         if (!combat.ResolveEnemyAttack(outcome)) return false;
 
-        linkedAttackActive_ = false;
+        ClearLink();
         if (kind == ResolutionKind::Perfect) {
             SaturatingIncrement(stats_.perfectDefenses);
             SaturatingIncrement(stats_.currentPerfectStreak);
@@ -231,6 +324,9 @@ private:
     }
 
     DefenseTrainingStats stats_{};
+    CombatSandbox* linkedCombat_{};
+    ShadowbladeActions* linkedActions_{};
+    std::uint64_t linkedAttackGeneration_{};
     bool linkedAttackActive_{};
 };
 
