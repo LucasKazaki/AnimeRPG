@@ -220,6 +220,8 @@ bool CombatSandbox::QueueNextEnemyAttack() {
     }
     pendingEnemyAttack_ = BuildEnemyAttackPlan(enemyAttackSequenceIndex_);
     ++enemyAttackSequenceIndex_;
+    ++enemyAttackGeneration_;
+    if (enemyAttackGeneration_ == 0) ++enemyAttackGeneration_;
     enemyAttackPending_ = true;
     return true;
 }

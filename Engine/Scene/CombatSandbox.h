@@ -238,6 +238,7 @@ public:
     EnemyAggressionPreset AggressionPreset() const { return enemyAggressionPreset_; }
     bool HasPendingEnemyAttack() const { return enemyAttackPending_; }
     const EnemyAttackPlan& PendingEnemyAttack() const { return pendingEnemyAttack_; }
+    std::uint64_t EnemyAttackGeneration() const { return enemyAttackGeneration_; }
     float EnemyAttackReadyInSeconds() const;
     bool DefensePunishOpeningReady() const;
     bool BossPracticePhaseLocked() const { return bossPracticePhaseLocked_; }
@@ -286,6 +287,7 @@ private:
 
     EnemyAggressionPreset enemyAggressionPreset_{EnemyAggressionPreset::Standard};
     std::size_t enemyAttackSequenceIndex_{};
+    std::uint64_t enemyAttackGeneration_{};
     bool enemyAttackPending_{};
     EnemyAttackPlan pendingEnemyAttack_{};
     std::int64_t enemyAttackReadyMicros_{};

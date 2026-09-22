@@ -1,4 +1,5 @@
 #include "Engine/Scene/ShadowbladeActions.h"
+#include "Engine/Scene/CombatDefenseTraining.h"
 
 #include <cmath>
 #include <iostream>
@@ -506,6 +507,507 @@ void TestDefenseClockRebasesAfterSaturation() {
             && automaticHit.PlayerHealth() == 80,
         "rebased threat still expires once after its requested duration");
 }
+
+void TestCombatDefenseTrainingBridgeAndCues() {
+    using namespace Astral::Scene;
+
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    CombatDefenseTraining drill;
+    Expect(drill.QueueNextAttack(combat, actions),
+        "defense drill links one enemy plan to one Shadowblade threat");
+    const EnemyAttackPlan firstPlan = combat.PendingEnemyAttack();
+    Expect(firstPlan.pattern == EnemyAttackPattern::QuickCut
+            && actions.HasIncomingAttack()
+            && Near(actions.IncomingAttackRemaining(), firstPlan.windupSeconds),
+        "linked threat preserves the enemy plan windup");
+    Expect(!drill.QueueNextAttack(combat, actions),
+        "defense drill rejects duplicate linked threats");
+
+    DefenseTrainingCue cue = drill.Cue(combat, actions);
+    Expect(cue.phase == DefenseTrainingCuePhase::Approach
+            && cue.pattern == EnemyAttackPattern::QuickCut && cue.blockable,
+        "fresh linked threat exposes approach cue metadata");
+
+    const DefenseReport early = drill.TryDefend(combat, actions, DefenseInput::Dodge);
+    Expect(early.result == DefenseResult::TooEarly && combat.HasPendingEnemyAttack()
+            && actions.HasIncomingAttack() && drill.HasLinkedAttack(),
+        "too-early dodge preserves both sides of the linked threat");
+
+    Expect(!drill.AdvanceTime(combat, actions, 0.25f),
+        "advancing inside a windup does not fabricate a resolution");
+    cue = drill.Cue(combat, actions);
+    Expect(cue.phase == DefenseTrainingCuePhase::DodgeWindow
+            && cue.secondsToImpact > ShadowbladeActions::StandardPerfectDefenseWindowSeconds,
+        "cue enters the existing dodge window before the perfect window");
+    Expect(!drill.AdvanceTime(combat, actions, 0.20f),
+        "advancing to the perfect window keeps the threat live");
+    cue = drill.Cue(combat, actions);
+    Expect(cue.phase == DefenseTrainingCuePhase::PerfectWindow,
+        "cue exposes the existing perfect-defense timing boundary");
+
+    const DefenseReport perfect = drill.TryDefend(combat, actions, DefenseInput::Dodge);
+    Expect(perfect.result == DefenseResult::PerfectDodge && !combat.HasPendingEnemyAttack()
+            && !actions.HasIncomingAttack() && !drill.HasLinkedAttack(),
+        "perfect dodge resolves both the Shadowblade threat and enemy plan exactly once");
+    Expect(combat.DefensePunishOpeningReady(),
+        "perfect defense round-trip preserves the combat punish opening");
+    Expect(drill.Stats().attacksQueued == 1 && drill.Stats().defenseInputs == 2
+            && drill.Stats().perfectDefenses == 1
+            && drill.Stats().currentPerfectStreak == 1
+            && drill.Stats().bestPerfectStreak == 1,
+        "defense drill telemetry records early input and one perfect resolution honestly");
+
+    CombatSandbox automaticCombat;
+    ShadowbladeActions automaticActions;
+    CombatDefenseTraining automaticDrill;
+    Expect(automaticDrill.QueueNextAttack(automaticCombat, automaticActions),
+        "automatic-impact drill queues a linked attack");
+    const EnemyAttackPlan automaticPlan = automaticCombat.PendingEnemyAttack();
+    Expect(automaticDrill.AdvanceTime(automaticCombat, automaticActions,
+            automaticPlan.windupSeconds),
+        "coordinator reconciles an automatically expired Shadowblade threat");
+    Expect(!automaticCombat.HasPendingEnemyAttack() && !automaticActions.HasIncomingAttack()
+            && automaticActions.PlayerHealth() == 82
+            && automaticDrill.Stats().hitsTaken == 1
+            && automaticDrill.Stats().damageTaken == 18,
+        "automatic impact proves linked QuickCut damage is copied and applied exactly once");
+    automaticDrill.AdvanceTime(automaticCombat, automaticActions, 1.0f);
+    Expect(automaticActions.PlayerHealth() == 82
+            && automaticDrill.Stats().hitsTaken == 1,
+        "post-impact time cannot duplicate player damage or telemetry");
+
+    CombatSandbox bossCombat;
+    ShadowbladeActions bossActions;
+    CombatDefenseTraining bossDrill;
+    Expect(bossCombat.SetTrainingEnemyProfile(TrainingEnemyProfile::Boss)
+            && bossCombat.SetBossPracticePhase(EnemyPhase::Pressure),
+        "boss cue setup selects pressure phase");
+    Expect(bossDrill.QueueNextAttack(bossCombat, bossActions),
+        "pressure drill queues first boss attack");
+    const float firstRecovery = bossCombat.PendingEnemyAttack().recoverySeconds;
+    const DefenseReport firstBossGuard =
+        bossDrill.TryDefend(bossCombat, bossActions, DefenseInput::Guard);
+    Expect(firstBossGuard.result == DefenseResult::Guarded
+            && bossActions.PlayerHealth() == 100
+            && bossActions.GuardIntegrity() == 80,
+        "linked QuickCut copies blockability and 20 guard damage into Shadowblade defense");
+    bossDrill.AdvanceTime(bossCombat, bossActions, firstRecovery);
+    Expect(bossDrill.QueueNextAttack(bossCombat, bossActions)
+            && bossCombat.PendingEnemyAttack().pattern == EnemyAttackPattern::RiftBurst,
+        "second pressure pattern reaches the unblockable RiftBurst");
+    const DefenseTrainingCue unblockableCue = bossDrill.Cue(bossCombat, bossActions);
+    Expect(unblockableCue.phase == DefenseTrainingCuePhase::Approach
+            && !unblockableCue.blockable
+            && unblockableCue.pattern == EnemyAttackPattern::RiftBurst,
+        "cue metadata exposes an unblockable plan without inventing a copied indicator");
+    const int guardBeforeBurst = bossActions.GuardIntegrity();
+    const DefenseReport burstGuard =
+        bossDrill.TryDefend(bossCombat, bossActions, DefenseInput::Guard);
+    Expect(burstGuard.result == DefenseResult::UnblockableHit
+            && burstGuard.damageTaken == 34
+            && bossActions.PlayerHealth() == 66
+            && bossActions.GuardIntegrity() == guardBeforeBurst,
+        "linked RiftBurst copies unblockable state and 34 damage without guard damage");
+}
+
+void TestCombatDefenseTrainingInterruptionAndGrades() {
+    using namespace Astral::Scene;
+
+    CombatSandbox interruptedCombat;
+    ShadowbladeActions interruptedActions;
+    CombatDefenseTraining interruptedDrill;
+    Expect(interruptedDrill.QueueNextAttack(interruptedCombat, interruptedActions),
+        "interruption setup queues a linked QuickCut");
+    const AttackReport light = interruptedCombat.TryAttack(AttackType::Light, {});
+    Expect(light.result == AttackResult::Hit && !light.staggerTriggered,
+        "interruption setup light attack builds posture");
+    Expect(!interruptedDrill.AdvanceTime(interruptedCombat, interruptedActions, 0.4f),
+        "linked threat remains live before the follow-up stagger");
+    const AttackReport heavy = interruptedCombat.TryAttack(AttackType::Heavy, {});
+    Expect(heavy.result == AttackResult::Hit && heavy.staggerTriggered
+            && !interruptedCombat.HasPendingEnemyAttack()
+            && interruptedActions.HasIncomingAttack(),
+        "combat stagger interrupts its planner before coordinator reconciliation");
+    Expect(interruptedDrill.AdvanceTime(interruptedCombat, interruptedActions, 0.01f)
+            && !interruptedActions.HasIncomingAttack()
+            && !interruptedDrill.HasLinkedAttack(),
+        "coordinator cancels the stale linked Shadowblade threat after interruption");
+    Expect(interruptedActions.PlayerHealth() == 100
+            && interruptedDrill.Stats().interruptions == 1,
+        "stagger interruption cannot land stale player damage");
+    interruptedDrill.AdvanceTime(interruptedCombat, interruptedActions, 1.0f);
+    Expect(interruptedActions.PlayerHealth() == 100,
+        "canceled linked threat remains canceled after its former impact time");
+
+    CombatSandbox perfectCombat;
+    ShadowbladeActions perfectActions;
+    CombatDefenseTraining perfectDrill;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        Expect(perfectDrill.QueueNextAttack(perfectCombat, perfectActions),
+            "grade drill queues each perfect-defense attempt");
+        const EnemyAttackPlan plan = perfectCombat.PendingEnemyAttack();
+        perfectDrill.AdvanceTime(perfectCombat, perfectActions, 0.45f);
+        const DefenseReport perfect = perfectDrill.TryDefend(
+            perfectCombat, perfectActions, DefenseInput::Dodge);
+        Expect(perfect.result == DefenseResult::PerfectDodge,
+            "grade drill records a clean perfect dodge");
+        if (attempt < 2) {
+            perfectDrill.AdvanceTime(perfectCombat, perfectActions, plan.recoverySeconds);
+        }
+    }
+    Expect(perfectDrill.Grade() == DefenseTrainingGrade::Gold
+            && perfectDrill.Stats().perfectDefenses == 3
+            && perfectDrill.Stats().bestPerfectStreak == 3
+            && perfectDrill.Stats().damageTaken == 0,
+        "three clean perfect resolutions earn deterministic Gold drill grade");
+
+    const int healthBeforeReset = perfectActions.PlayerHealth();
+    const float recoveryBeforeReset = perfectCombat.EnemyAttackReadyInSeconds();
+    perfectDrill.ResetStats();
+    Expect(perfectDrill.Grade() == DefenseTrainingGrade::None
+            && perfectDrill.Stats().attacksQueued == 0
+            && perfectActions.PlayerHealth() == healthBeforeReset
+            && Near(perfectCombat.EnemyAttackReadyInSeconds(), recoveryBeforeReset),
+        "telemetry reset does not mutate player or combat state");
+
+    CombatSandbox silverCombat;
+    ShadowbladeActions silverActions;
+    CombatDefenseTraining silverDrill;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        Expect(silverDrill.QueueNextAttack(silverCombat, silverActions),
+            "Silver-grade drill queues each attempt");
+        const EnemyAttackPlan plan = silverCombat.PendingEnemyAttack();
+        if (attempt == 0) {
+            silverDrill.AdvanceTime(silverCombat, silverActions, 0.45f);
+            Expect(silverDrill.TryDefend(silverCombat, silverActions,
+                    DefenseInput::Dodge).result == DefenseResult::PerfectDodge,
+                "Silver-grade setup begins with one perfect defense");
+        } else {
+            Expect(silverDrill.TryDefend(silverCombat, silverActions,
+                    DefenseInput::Guard).result == DefenseResult::Guarded,
+                "Silver-grade setup records an ordinary defense");
+        }
+        if (attempt < 2) {
+            silverDrill.AdvanceTime(silverCombat, silverActions, plan.recoverySeconds);
+        }
+    }
+    Expect(silverDrill.Grade() == DefenseTrainingGrade::Silver
+            && silverDrill.Stats().perfectDefenses == 1
+            && silverDrill.Stats().ordinaryDefenses == 2
+            && silverDrill.Stats().currentPerfectStreak == 0
+            && silverDrill.Stats().bestPerfectStreak == 1
+            && silverDrill.Stats().damageTaken == 0,
+        "ordinary defenses reset the live perfect streak and place a mixed clean run in Silver");
+
+    CombatSandbox belowSilverCombat;
+    ShadowbladeActions belowSilverActions;
+    CombatDefenseTraining belowSilverDrill;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        Expect(belowSilverDrill.QueueNextAttack(belowSilverCombat, belowSilverActions),
+            "below-Silver drill queues each attempt");
+        const EnemyAttackPlan plan = belowSilverCombat.PendingEnemyAttack();
+        if (attempt == 0) {
+            Expect(belowSilverDrill.TryDefend(belowSilverCombat, belowSilverActions,
+                    DefenseInput::Guard).result == DefenseResult::Guarded,
+                "below-Silver setup records one successful ordinary defense");
+        } else {
+            Expect(belowSilverDrill.AdvanceTime(belowSilverCombat, belowSilverActions,
+                    plan.windupSeconds),
+                "below-Silver setup records one automatic hit");
+        }
+        if (attempt < 2) {
+            belowSilverDrill.AdvanceTime(
+                belowSilverCombat, belowSilverActions, plan.recoverySeconds);
+        }
+    }
+    Expect(belowSilverDrill.Grade() == DefenseTrainingGrade::Bronze
+            && belowSilverDrill.Stats().ordinaryDefenses == 1
+            && belowSilverDrill.Stats().hitsTaken == 2
+            && belowSilverDrill.Stats().damageTaken == 36,
+        "two hits move a three-resolution run below the Silver threshold deterministically");
+
+    CombatSandbox interruptionStreakCombat;
+    ShadowbladeActions interruptionStreakActions;
+    CombatDefenseTraining interruptionStreakDrill;
+    Expect(interruptionStreakDrill.QueueNextAttack(
+            interruptionStreakCombat, interruptionStreakActions),
+        "interruption streak setup queues a perfect-defense attempt");
+    const EnemyAttackPlan perfectPlan = interruptionStreakCombat.PendingEnemyAttack();
+    interruptionStreakDrill.AdvanceTime(
+        interruptionStreakCombat, interruptionStreakActions, 0.45f);
+    Expect(interruptionStreakDrill.TryDefend(interruptionStreakCombat,
+            interruptionStreakActions, DefenseInput::Dodge).result
+            == DefenseResult::PerfectDodge
+            && interruptionStreakDrill.Stats().currentPerfectStreak == 1,
+        "interruption streak setup establishes one live perfect streak");
+    interruptionStreakDrill.AdvanceTime(interruptionStreakCombat,
+        interruptionStreakActions, perfectPlan.recoverySeconds);
+    Expect(interruptionStreakDrill.QueueNextAttack(
+            interruptionStreakCombat, interruptionStreakActions),
+        "interruption streak setup queues the attack to be interrupted");
+    interruptionStreakCombat.TryAttack(AttackType::Light, {});
+    interruptionStreakDrill.AdvanceTime(
+        interruptionStreakCombat, interruptionStreakActions, 0.4f);
+    const AttackReport interruptionHeavy =
+        interruptionStreakCombat.TryAttack(AttackType::Heavy, {});
+    Expect(interruptionHeavy.staggerTriggered
+            && interruptionStreakDrill.AdvanceTime(interruptionStreakCombat,
+                interruptionStreakActions, 0.01f)
+            && interruptionStreakDrill.Stats().interruptions == 1
+            && interruptionStreakDrill.Stats().currentPerfectStreak == 0
+            && interruptionStreakDrill.Stats().bestPerfectStreak == 1,
+        "an authoritative interruption resets the current perfect streak without erasing its best");
+
+    CombatSandbox hitCombat;
+    ShadowbladeActions hitActions;
+    CombatDefenseTraining hitDrill;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        Expect(hitDrill.QueueNextAttack(hitCombat, hitActions),
+            "damage-grade drill queues each automatic hit");
+        const EnemyAttackPlan plan = hitCombat.PendingEnemyAttack();
+        hitDrill.AdvanceTime(hitCombat, hitActions, plan.windupSeconds);
+        if (attempt < 2) {
+            hitDrill.AdvanceTime(hitCombat, hitActions, plan.recoverySeconds);
+        }
+    }
+    Expect(hitDrill.Grade() == DefenseTrainingGrade::Bronze
+            && hitDrill.Stats().hitsTaken == 3
+            && hitDrill.Stats().damageTaken == 54,
+        "repeated damage produces a lower bounded drill grade");
+
+    CombatSandbox invalidCombat;
+    ShadowbladeActions invalidActions;
+    CombatDefenseTraining invalidDrill;
+    Expect(invalidDrill.QueueNextAttack(invalidCombat, invalidActions),
+        "invalid-delta drill queues a linked attack");
+    const float remaining = invalidActions.IncomingAttackRemaining();
+    const DefenseTrainingStats before = invalidDrill.Stats();
+    Expect(!invalidDrill.AdvanceTime(invalidCombat, invalidActions,
+            std::numeric_limits<float>::quiet_NaN()),
+        "nonfinite coordinator delta does not resolve a linked attack");
+    Expect(invalidDrill.Stats().attacksQueued == before.attacksQueued
+            && invalidDrill.Stats().hitsTaken == before.hitsTaken
+            && Near(invalidActions.IncomingAttackRemaining(), remaining),
+        "nonfinite coordinator delta preserves telemetry and threat timing");
+}
+
+void TestDefenseTrainingReviewRepairs() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions generations;
+    const std::uint64_t initialGeneration = generations.IncomingAttackGeneration();
+    Expect(!generations.BeginIncomingAttack({std::numeric_limits<float>::quiet_NaN(), 20, 30, true})
+            && generations.IncomingAttackGeneration() == initialGeneration,
+        "invalid incoming attacks do not consume a threat generation");
+    Expect(generations.BeginIncomingAttack({1.0f, 20, 30, true}),
+        "generation test queues its first valid threat");
+    const std::uint64_t firstGeneration = generations.IncomingAttackGeneration();
+    Expect(firstGeneration != initialGeneration,
+        "successful threat queue assigns a new nonzero generation");
+    Expect(!generations.BeginIncomingAttack({1.0f, 20, 30, true})
+            && generations.IncomingAttackGeneration() == firstGeneration,
+        "rejected duplicate threat does not consume another generation");
+    Expect(generations.CancelIncomingAttack(),
+        "generation test can cancel the first valid threat");
+    Expect(generations.BeginIncomingAttack({1.0f, 20, 30, true})
+            && generations.IncomingAttackGeneration() != firstGeneration,
+        "replacement valid threat receives a distinct generation");
+
+    CombatSandbox delayedCombat;
+    ShadowbladeActions delayedActions;
+    CombatDefenseTraining delayedDrill;
+    Expect(delayedDrill.QueueNextAttack(delayedCombat, delayedActions),
+        "delayed interruption setup queues a linked QuickCut");
+    delayedCombat.TryAttack(AttackType::Light, {});
+    Expect(!delayedDrill.AdvanceTime(delayedCombat, delayedActions, 0.4f),
+        "delayed interruption reaches the final part of the windup");
+    const AttackReport delayedHeavy = delayedCombat.TryAttack(AttackType::Heavy, {});
+    Expect(delayedHeavy.staggerTriggered && !delayedCombat.HasPendingEnemyAttack(),
+        "delayed interruption clears the authoritative combat plan");
+    Expect(delayedDrill.AdvanceTime(delayedCombat, delayedActions, 0.2f)
+            && delayedActions.PlayerHealth() == 100
+            && !delayedActions.HasIncomingAttack(),
+        "reconciliation after the former impact time cancels before stale damage can land");
+
+    CombatSandbox replacementCombat;
+    ShadowbladeActions replacementActions;
+    CombatDefenseTraining replacementDrill;
+    Expect(replacementDrill.QueueNextAttack(replacementCombat, replacementActions),
+        "replacement isolation setup queues a linked threat");
+    const std::uint64_t linkedGeneration = replacementActions.IncomingAttackGeneration();
+    Expect(replacementActions.CancelIncomingAttack()
+            && replacementActions.BeginIncomingAttack({1.0f, 7, 3, true})
+            && replacementActions.IncomingAttackGeneration() != linkedGeneration,
+        "standalone replacement threat has a distinct generation");
+    const float replacementRemaining = replacementActions.IncomingAttackRemaining();
+    Expect(replacementDrill.AdvanceTime(replacementCombat, replacementActions, 0.2f)
+            && !replacementCombat.HasPendingEnemyAttack()
+            && replacementActions.HasIncomingAttack()
+            && Near(replacementActions.IncomingAttackRemaining(), replacementRemaining),
+        "coordinator interrupts only its old plan and does not advance or cancel the replacement");
+    Expect(replacementDrill.Stats().interruptions == 1,
+        "replacement isolation records one linked interruption");
+
+    CombatSandbox ownedCombat;
+    ShadowbladeActions ownedActions;
+    CombatDefenseTraining ownershipDrill;
+    Expect(ownershipDrill.QueueNextAttack(ownedCombat, ownedActions),
+        "wrong-object isolation setup queues a linked threat");
+    CombatSandbox unrelatedCombat;
+    ShadowbladeActions unrelatedActions;
+    Expect(unrelatedActions.BeginIncomingAttack({1.0f, 9, 4, true}),
+        "wrong-object isolation setup queues an unrelated standalone threat");
+    const float ownedRemaining = ownedActions.IncomingAttackRemaining();
+    const float unrelatedRemaining = unrelatedActions.IncomingAttackRemaining();
+    Expect(!ownershipDrill.AdvanceTime(ownedCombat, unrelatedActions, 0.2f)
+            && Near(ownedActions.IncomingAttackRemaining(), ownedRemaining)
+            && Near(unrelatedActions.IncomingAttackRemaining(), unrelatedRemaining)
+            && ownedCombat.HasPendingEnemyAttack(),
+        "wrong ShadowbladeActions instance is neither advanced nor synchronized");
+    Expect(!ownershipDrill.AdvanceTime(unrelatedCombat, ownedActions, 0.2f)
+            && Near(ownedActions.IncomingAttackRemaining(), ownedRemaining)
+            && ownedCombat.HasPendingEnemyAttack(),
+        "wrong CombatSandbox instance cannot mutate the owned linked threat");
+    Expect(ownershipDrill.Cue(unrelatedCombat, ownedActions).phase
+            == DefenseTrainingCuePhase::None,
+        "wrong combat object exposes no linked timing cue");
+
+    CombatSandbox boundaryCombat;
+    ShadowbladeActions boundaryActions;
+    CombatDefenseTraining boundaryDrill;
+    Expect(boundaryDrill.QueueNextAttack(boundaryCombat, boundaryActions),
+        "boundary cue setup queues a QuickCut");
+    Expect(!boundaryDrill.AdvanceTime(boundaryCombat, boundaryActions, 0.43f),
+        "0.43 second split keeps QuickCut live at the perfect-window boundary");
+    const DefenseTrainingCue boundaryCue = boundaryDrill.Cue(boundaryCombat, boundaryActions);
+    Expect(boundaryCue.phase == DefenseTrainingCuePhase::PerfectWindow,
+        "cue uses the same tolerance-aware perfect-window boundary as defense input");
+    const DefenseReport boundaryGuard = boundaryDrill.TryDefend(
+        boundaryCombat, boundaryActions, DefenseInput::Guard);
+    Expect(boundaryGuard.result == DefenseResult::PerfectGuard,
+        "guard at the 0.43 second QuickCut boundary agrees with the cue stage");
+
+    CombatSandbox plannerGenerations;
+    const std::uint64_t plannerInitial = plannerGenerations.EnemyAttackGeneration();
+    Expect(plannerGenerations.QueueNextEnemyAttack(),
+        "planner-generation test queues its first event");
+    const std::uint64_t plannerFirst = plannerGenerations.EnemyAttackGeneration();
+    Expect(plannerFirst != 0 && plannerFirst != plannerInitial,
+        "successful planner queue receives a new nonzero generation");
+    Expect(!plannerGenerations.QueueNextEnemyAttack()
+            && plannerGenerations.EnemyAttackGeneration() == plannerFirst,
+        "rejected duplicate planner queue does not consume a generation");
+    plannerGenerations.ResetTrainingSession();
+    Expect(plannerGenerations.QueueNextEnemyAttack()
+            && plannerGenerations.EnemyAttackGeneration() != plannerFirst,
+        "reset and requeue receives a distinct planner event generation");
+
+    CombatSandbox replacementPlanCombat;
+    ShadowbladeActions replacementPlanActions;
+    CombatDefenseTraining replacementPlanDrill;
+    Expect(replacementPlanDrill.QueueNextAttack(replacementPlanCombat, replacementPlanActions),
+        "planner-replacement setup queues a linked event");
+    const std::uint64_t oldPlannerGeneration = replacementPlanCombat.EnemyAttackGeneration();
+    Expect(replacementPlanCombat.SetTrainingEnemyProfile(TrainingEnemyProfile::Vanguard)
+            && replacementPlanCombat.QueueNextEnemyAttack()
+            && replacementPlanCombat.EnemyAttackGeneration() != oldPlannerGeneration,
+        "profile reset plus direct queue creates a replacement planner event");
+    const std::uint64_t replacementPlannerGeneration =
+        replacementPlanCombat.EnemyAttackGeneration();
+    Expect(replacementPlanDrill.AdvanceTime(
+            replacementPlanCombat, replacementPlanActions, 0.2f)
+            && !replacementPlanDrill.HasLinkedAttack()
+            && replacementPlanCombat.HasPendingEnemyAttack()
+            && replacementPlanCombat.EnemyAttackGeneration() == replacementPlannerGeneration
+            && !replacementPlanActions.HasIncomingAttack()
+            && replacementPlanActions.PlayerHealth() == 100,
+        "old link cancellation preserves the reset/requeued planner event exactly");
+    Expect(replacementPlanDrill.Stats().interruptions == 1,
+        "planner replacement records one interruption without consuming the replacement");
+
+    CombatSandbox longTickCombat;
+    ShadowbladeActions longTickActions;
+    CombatDefenseTraining longTickDrill;
+    Expect(longTickDrill.QueueNextAttack(longTickCombat, longTickActions),
+        "long-tick cadence setup queues a QuickCut");
+    const EnemyAttackPlan longTickPlan = longTickCombat.PendingEnemyAttack();
+    Expect(longTickDrill.AdvanceTime(longTickCombat, longTickActions,
+            longTickPlan.windupSeconds + longTickPlan.recoverySeconds),
+        "one long tick resolves the attack and carries overflow through recovery");
+    Expect(!longTickCombat.HasPendingEnemyAttack()
+            && Near(longTickCombat.EnemyAttackReadyInSeconds(), 0.0f)
+            && longTickActions.PlayerHealth() == 82
+            && longTickDrill.QueueNextAttack(longTickCombat, longTickActions),
+        "windup-plus-recovery long tick makes the next attack ready immediately");
+
+    CombatSandbox splitTickCombat;
+    ShadowbladeActions splitTickActions;
+    CombatDefenseTraining splitTickDrill;
+    Expect(splitTickDrill.QueueNextAttack(splitTickCombat, splitTickActions),
+        "split-tick cadence setup queues a QuickCut");
+    const EnemyAttackPlan splitTickPlan = splitTickCombat.PendingEnemyAttack();
+    Expect(splitTickDrill.AdvanceTime(splitTickCombat, splitTickActions,
+            splitTickPlan.windupSeconds),
+        "split cadence resolves at the impact boundary");
+    Expect(!splitTickDrill.AdvanceTime(splitTickCombat, splitTickActions,
+            splitTickPlan.recoverySeconds)
+            && Near(splitTickCombat.EnemyAttackReadyInSeconds(), 0.0f)
+            && splitTickActions.PlayerHealth() == 82
+            && splitTickDrill.QueueNextAttack(splitTickCombat, splitTickActions),
+        "equivalent split ticks produce identical next-attack readiness");
+
+    CombatSandbox invalidInterruptedCombat;
+    ShadowbladeActions invalidInterruptedActions;
+    CombatDefenseTraining invalidInterruptedDrill;
+    Expect(invalidInterruptedActions.TryDash({}).result == ShadowActionResult::Activated,
+        "valid-tick forwarding setup starts an unrelated Shadowblade cooldown");
+    Expect(invalidInterruptedDrill.QueueNextAttack(
+            invalidInterruptedCombat, invalidInterruptedActions),
+        "invalid-after-interruption setup queues a linked threat");
+    invalidInterruptedCombat.TryAttack(AttackType::Light, {});
+    invalidInterruptedDrill.AdvanceTime(
+        invalidInterruptedCombat, invalidInterruptedActions, 0.4f);
+    const AttackReport invalidInterruptedHeavy =
+        invalidInterruptedCombat.TryAttack(AttackType::Heavy, {});
+    Expect(invalidInterruptedHeavy.staggerTriggered
+            && !invalidInterruptedCombat.HasPendingEnemyAttack()
+            && invalidInterruptedDrill.HasLinkedAttack(),
+        "authoritative planner disappears before invalid-delta reconciliation");
+    const float invalidInterruptedRemaining =
+        invalidInterruptedActions.IncomingAttackRemaining();
+    const int interruptionsBeforeInvalid =
+        invalidInterruptedDrill.Stats().interruptions;
+    Expect(!invalidInterruptedDrill.AdvanceTime(
+            invalidInterruptedCombat, invalidInterruptedActions, 0.0f)
+            && !invalidInterruptedDrill.AdvanceTime(
+                invalidInterruptedCombat, invalidInterruptedActions, -1.0f)
+            && !invalidInterruptedDrill.AdvanceTime(invalidInterruptedCombat,
+                invalidInterruptedActions, std::numeric_limits<float>::quiet_NaN())
+            && invalidInterruptedDrill.HasLinkedAttack()
+            && invalidInterruptedActions.HasIncomingAttack()
+            && Near(invalidInterruptedActions.IncomingAttackRemaining(),
+                invalidInterruptedRemaining)
+            && invalidInterruptedDrill.Stats().interruptions
+                == interruptionsBeforeInvalid,
+        "invalid deltas remain no-ops even after the authoritative plan disappears");
+    const float staggerBeforeValid = invalidInterruptedCombat.StaggerRemaining();
+    const float dashCooldownBeforeValid =
+        invalidInterruptedActions.DashCooldownRemaining();
+    const float resourceBeforeValid = invalidInterruptedActions.Resource();
+    Expect(invalidInterruptedDrill.AdvanceTime(
+            invalidInterruptedCombat, invalidInterruptedActions, 0.01f)
+            && !invalidInterruptedDrill.HasLinkedAttack()
+            && !invalidInterruptedActions.HasIncomingAttack()
+            && invalidInterruptedActions.PlayerHealth() == 100
+            && invalidInterruptedDrill.Stats().interruptions
+                == interruptionsBeforeInvalid + 1,
+        "next positive finite tick performs the deferred interruption safely");
+    Expect(invalidInterruptedCombat.StaggerRemaining() < staggerBeforeValid
+            && invalidInterruptedActions.DashCooldownRemaining() < dashCooldownBeforeValid
+            && invalidInterruptedActions.Resource() > resourceBeforeValid,
+        "valid interruption reconciliation still forwards the frame to ordinary combat/action clocks");
+}
 }
 
 int main() {
@@ -526,6 +1028,9 @@ int main() {
     TestLongSixtyHzBoundaryToleranceIsSplitStable();
     TestMinimumThreatAndWindowBoundaryPrecision();
     TestDefenseClockRebasesAfterSaturation();
+    TestCombatDefenseTrainingBridgeAndCues();
+    TestCombatDefenseTrainingInterruptionAndGrades();
+    TestDefenseTrainingReviewRepairs();
     if (failures != 0) return 1;
     std::cout << "Shadowblade action tests passed\n";
     return 0;
