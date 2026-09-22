@@ -34,6 +34,24 @@ struct AttackReport {
     bool staggerTriggered{};
 };
 
+enum class ManaAffinity {
+    None,
+    Solar,
+    Umbral,
+};
+
+enum class TrainingEnemyProfile {
+    Standard,
+    Vanguard,
+    Bulwark,
+};
+
+struct TrainingEnemyDefinition {
+    int maximumHealth{100};
+    int maximumPosture{80};
+    ManaAffinity weakness{ManaAffinity::None};
+};
+
 struct TrainingDummy {
     Math::Vec3 position{3.0f, 0.0f, 0.0f};
     int maximumHealth{100};
@@ -49,6 +67,11 @@ struct TrainingStats {
     int hitCount{};
     int peakHit{};
     int bestCombo{};
+    int reactionCount{};
+    int finisherCount{};
+    int staggerCount{};
+    int techniqueScore{};
+    int bestTechniqueChain{};
 };
 
 enum class ComboFinisherResult {
@@ -61,12 +84,7 @@ enum class ComboFinisherResult {
 struct ComboFinisherReport {
     ComboFinisherResult result{ComboFinisherResult::NotReady};
     int damageApplied{};
-};
-
-enum class ManaAffinity {
-    None,
-    Solar,
-    Umbral,
+    bool eclipseFollowUp{};
 };
 
 enum class ManaReaction {
@@ -80,6 +98,7 @@ struct ManaReactionReport {
     ManaAffinity remaining{ManaAffinity::None};
     ManaReaction reaction{ManaReaction::None};
     int bonusDamage{};
+    bool weaknessExploited{};
 };
 
 enum class CombatAssistPreset {
@@ -97,6 +116,15 @@ public:
     static constexpr int AccessibleComboFinisherHits = 2;
     static constexpr int ComboFinisherDamage = 45;
     static constexpr int EclipseReactionDamage = 20;
+    static constexpr int WeaknessReactionBonusDamage = 10;
+    static constexpr int EclipseFinisherBonusDamage = 20;
+    static constexpr float TechniqueChainWindowSeconds = 2.0f;
+    static constexpr int MaximumTechniqueChain = 4;
+    static constexpr int ReactionTechniquePoints = 20;
+    static constexpr int StaggerTechniquePoints = 15;
+    static constexpr int FinisherTechniquePoints = 25;
+    static constexpr double FastChallengeSeconds = 5.0;
+    static constexpr double StandardChallengeSeconds = 10.0;
 
     CombatSandbox();
 
@@ -106,6 +134,7 @@ public:
     void RegisterSuccessfulAttackHit();
     bool ConsumeStaggerOpening();
     void ResetTrainingSession();
+    bool SetTrainingEnemyProfile(TrainingEnemyProfile profile);
     ComboFinisherReport TryComboFinisher(const Math::Vec3& attackerPosition);
     ManaReactionReport ApplyManaAffinity(ManaAffinity affinity);
     void SetCombatAssistPreset(CombatAssistPreset preset) { assistPreset_ = preset; }
@@ -123,6 +152,11 @@ public:
     int ComboFinisherRequiredHits() const;
     ManaAffinity TargetAffinity() const { return targetAffinity_; }
     CombatAssistPreset AssistPreset() const { return assistPreset_; }
+    TrainingEnemyProfile EnemyProfile() const { return enemyProfile_; }
+    TrainingEnemyDefinition CurrentEnemyDefinition() const;
+    bool EclipseOpeningReady() const { return eclipseOpening_; }
+    int TechniqueChain() const { return techniqueChain_; }
+    int TrainingChallengeScore() const;
     float TrainingDps() const;
     const AttackDefinition& Definition(AttackType type) const;
 
@@ -132,6 +166,7 @@ private:
     std::int64_t CurrentMicros() const;
     bool ApplyPostureDamage(int postureDamage);
     void RegisterComboHit();
+    void RegisterTechnique(int basePoints);
 
     TrainingDummy dummy_{};
     AttackDefinition lightAttack_{25, 0.4f, 3.5f, 25};
@@ -139,6 +174,7 @@ private:
     AttackReport lastAttack_{AttackType::Light, AttackResult::Ready, 0, 0, false};
     TrainingStats stats_{};
     double elapsedSecondsPrecise_{};
+    double targetDefeatElapsedSeconds_{-1.0};
     std::int64_t nextAttackMicros_{};
     std::int64_t staggerEndMicros_{};
     std::int64_t lastPostureHitMicros_{};
@@ -146,6 +182,10 @@ private:
     std::int64_t lastComboHitMicros_{-1000000000};
     int comboCount_{};
     ManaAffinity targetAffinity_{ManaAffinity::None};
+    bool eclipseOpening_{};
+    int techniqueChain_{};
+    std::int64_t lastTechniqueMicros_{-1000000000};
+    TrainingEnemyProfile enemyProfile_{TrainingEnemyProfile::Standard};
     CombatAssistPreset assistPreset_{CombatAssistPreset::Standard};
 };
 
