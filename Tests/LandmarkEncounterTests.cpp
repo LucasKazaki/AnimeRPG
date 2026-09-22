@@ -106,8 +106,9 @@ void TestManaReactionStateAndReset() {
     Expect(eclipse.previous == ManaAffinity::Solar
             && eclipse.applied == ManaAffinity::Umbral
             && eclipse.reaction == ManaReaction::Eclipse
-            && eclipse.bonusDamage == CombatSandbox::EclipseReactionDamage,
-        "opposing affinities trigger one bounded Eclipse reaction");
+            && eclipse.bonusDamage == CombatSandbox::EclipseReactionDamage
+            && !eclipse.weaknessExploited,
+        "opposing affinities trigger one bounded Eclipse reaction on the neutral target");
     Expect(combat.TargetAffinity() == ManaAffinity::None
             && combat.Dummy().health == 100 - CombatSandbox::EclipseReactionDamage,
         "Eclipse consumes the primed affinity and applies its bounded damage");
@@ -198,6 +199,9 @@ void TestObjectiveCompletionRewardIsOneShot() {
             LandmarkInteraction::LincolnReward + LandmarkInteraction::ObjectiveCompletionReward)
             && Near(actions.Resource(), ShadowbladeActions::MaximumResource),
         "final discovery applies Lincoln plus one-time objective completion reward through caps");
+    Expect(!interaction.OrderedSequenceIntact()
+            && !interaction.OrderedResonanceRewardGranted(),
+        "free out-of-order discovery completes normally without the ordered resonance bonus");
 
     const auto repeated =
         interaction.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions);
@@ -302,6 +306,174 @@ void TestEncounterGradePrecisionAtCutoffs() {
         "accumulated frame time just above six seconds cannot be rounded back into Silver");
 }
 
+void TestTrainingEnemyProfilesAndVariantSelector() {
+    using namespace Astral::Scene;
+
+    CombatSandbox combat;
+    const TrainingEnemyDefinition standard = combat.CurrentEnemyDefinition();
+    Expect(combat.EnemyProfile() == TrainingEnemyProfile::Standard
+            && standard.maximumHealth == 100 && standard.maximumPosture == 80
+            && standard.weakness == ManaAffinity::None,
+        "default training profile preserves the original neutral target");
+
+    combat.SetCombatAssistPreset(CombatAssistPreset::Accessible);
+    combat.ApplyDamage(25);
+    Expect(!combat.SetTrainingEnemyProfile(TrainingEnemyProfile::Standard)
+            && combat.Dummy().health == 75 && combat.Stats().totalDamage == 25,
+        "selecting the already-active profile is idempotent and does not erase the attempt");
+
+    Expect(combat.SetTrainingEnemyProfile(TrainingEnemyProfile::Bulwark),
+        "training can switch to the Bulwark enemy profile");
+    const TrainingEnemyDefinition bulwark = combat.CurrentEnemyDefinition();
+    Expect(bulwark.maximumHealth == 180 && bulwark.maximumPosture == 120
+            && bulwark.weakness == ManaAffinity::Umbral,
+        "Bulwark exposes distinct health, posture, and affinity weakness data");
+    Expect(combat.Dummy().health == 180 && combat.Dummy().maximumPosture == 120
+            && combat.Stats().totalDamage == 0 && combat.TargetAffinity() == ManaAffinity::None,
+        "changing training enemy starts a clean transient combat attempt");
+    Expect(combat.AssistPreset() == CombatAssistPreset::Accessible,
+        "enemy selection preserves the player's combat-assist preference");
+
+    combat.ApplyManaAffinity(ManaAffinity::Solar);
+    Expect(combat.SetTrainingEnemyProfile(TrainingEnemyProfile::Vanguard),
+        "training can switch again to the Vanguard profile");
+    const TrainingEnemyDefinition vanguard = combat.CurrentEnemyDefinition();
+    Expect(vanguard.maximumHealth == 90 && vanguard.maximumPosture == 60
+            && vanguard.weakness == ManaAffinity::Solar
+            && combat.Dummy().health == 90 && combat.TargetAffinity() == ManaAffinity::None,
+        "Vanguard applies its own bounded stats and clears prior target-affinity state");
+}
+
+void TestWeaknessReactionAndEclipseFinisherOpening() {
+    using namespace Astral::Scene;
+
+    CombatSandbox combat;
+    combat.SetTrainingEnemyProfile(TrainingEnemyProfile::Bulwark);
+    combat.ApplyManaAffinity(ManaAffinity::Solar);
+    const ManaReactionReport eclipse = combat.ApplyManaAffinity(ManaAffinity::Umbral);
+    Expect(eclipse.reaction == ManaReaction::Eclipse && eclipse.weaknessExploited
+            && eclipse.bonusDamage
+                == CombatSandbox::EclipseReactionDamage + CombatSandbox::WeaknessReactionBonusDamage,
+        "applying the Bulwark weakness as the second affinity strengthens Eclipse once");
+    Expect(combat.Dummy().health == 150 && combat.EclipseOpeningReady()
+            && combat.Stats().reactionCount == 1 && combat.TechniqueChain() == 1
+            && combat.Stats().techniqueScore == CombatSandbox::ReactionTechniquePoints,
+        "successful Eclipse creates one follow-up opening and one technique event");
+
+    for (int hit = 0; hit < CombatSandbox::StandardComboFinisherHits; ++hit) {
+        Expect(combat.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f}).result
+                == AttackResult::Hit,
+            "Eclipse follow-up setup keeps ordinary light attacks available");
+        if (hit + 1 < CombatSandbox::StandardComboFinisherHits) combat.AdvanceTime(0.4f);
+    }
+    Expect(combat.ComboFinisherReady() && combat.EclipseOpeningReady(),
+        "earned combo finisher and Eclipse opening can coexist");
+
+    const ComboFinisherReport rejected = combat.TryComboFinisher({-10.0f, 0.0f, 0.0f});
+    Expect(rejected.result == ComboFinisherResult::OutOfRange
+            && combat.ComboFinisherReady() && combat.EclipseOpeningReady(),
+        "invalid Eclipse follow-up attempt preserves both earned openings");
+
+    const ComboFinisherReport followUp = combat.TryComboFinisher({0.0f, 0.0f, 0.0f});
+    Expect(followUp.result == ComboFinisherResult::Activated && followUp.eclipseFollowUp
+            && followUp.damageApplied
+                == CombatSandbox::ComboFinisherDamage + CombatSandbox::EclipseFinisherBonusDamage,
+        "valid Eclipse follow-up adds its bounded finisher bonus");
+    Expect(combat.Dummy().health == 10 && !combat.EclipseOpeningReady()
+            && combat.Stats().finisherCount == 1 && combat.TechniqueChain() == 2
+            && combat.Stats().techniqueScore
+                == CombatSandbox::ReactionTechniquePoints
+                    + CombatSandbox::FinisherTechniquePoints * 2,
+        "successful Eclipse finisher consumes the opening and extends technique scoring once");
+
+    CombatSandbox nonWeak;
+    nonWeak.SetTrainingEnemyProfile(TrainingEnemyProfile::Vanguard);
+    nonWeak.ApplyManaAffinity(ManaAffinity::Solar);
+    const ManaReactionReport ordinary = nonWeak.ApplyManaAffinity(ManaAffinity::Umbral);
+    Expect(ordinary.reaction == ManaReaction::Eclipse && !ordinary.weaknessExploited
+            && ordinary.bonusDamage == CombatSandbox::EclipseReactionDamage,
+        "opposing affinity still reacts without a weakness bonus when the applied affinity mismatches");
+}
+
+void TestTechniqueChainChallengeScoreAndTimeout() {
+    using namespace Astral::Scene;
+
+    CombatSandbox combat;
+    combat.SetTrainingEnemyProfile(TrainingEnemyProfile::Bulwark);
+    combat.ApplyManaAffinity(ManaAffinity::Solar);
+    combat.ApplyManaAffinity(ManaAffinity::Umbral);
+    Expect(combat.TechniqueChain() == 1
+            && combat.Stats().techniqueScore == CombatSandbox::ReactionTechniquePoints,
+        "first combat technique starts a one-step technique chain");
+
+    combat.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    combat.AdvanceTime(1.0f);
+    const AttackReport stagger = combat.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    Expect(stagger.staggerTriggered && combat.TechniqueChain() == 2
+            && combat.Stats().staggerCount == 1
+            && combat.Stats().bestTechniqueChain == 2,
+        "stagger inside the chain window extends the technique chain exactly once");
+    Expect(combat.Stats().techniqueScore
+            == CombatSandbox::ReactionTechniquePoints
+                + CombatSandbox::StaggerTechniquePoints * 2,
+        "technique points use the bounded current-chain multiplier");
+    Expect(combat.Stats().totalDamage == 150 && combat.TrainingChallengeScore() == 250,
+        "fast challenge score combines damage, technique score, and the fast-clear coefficient");
+
+    combat.AdvanceTime(CombatSandbox::TechniqueChainWindowSeconds + 0.01f);
+    Expect(combat.TechniqueChain() == 0 && combat.Stats().bestTechniqueChain == 2,
+        "inactive technique chain expires without erasing the best-chain record");
+    combat.ApplyDamage(30);
+    const int frozenScore = combat.TrainingChallengeScore();
+    Expect(combat.Dummy().IsDefeated() && frozenScore == 287,
+        "defeat freezes a fast-clear challenge score using bounded integer scoring");
+    combat.AdvanceTime(100.0f);
+    Expect(combat.TrainingChallengeScore() == frozenScore,
+        "post-defeat idle time cannot reduce an already-earned challenge score");
+}
+
+void TestOrderedLandmarkResonanceBonus() {
+    using namespace Astral::Scene;
+
+    WorldBlockout world;
+    LandmarkInteraction interaction;
+    ShadowbladeActions actions;
+    actions.TryDash({});
+    actions.AdvanceTime(1.0f);
+    actions.TryDash({});
+    actions.AdvanceTime(1.0f);
+    actions.TryDash({});
+    Expect(Near(actions.Resource(), 55.0f),
+        "ordered resonance setup creates enough missing resource to observe all rewards");
+
+    const auto lincoln = interaction.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions);
+    Expect(lincoln.result == LandmarkInteractionResult::Discovered
+            && interaction.OrderedSequenceIntact()
+            && interaction.OrderedDiscoveryProgress() == 1
+            && Near(lincoln.rewardApplied, LandmarkInteraction::LincolnReward),
+        "Lincoln first advances the intended resonance discovery order");
+    const auto pool = interaction.TryInteract({4.0f, 39.0f, 0.0f}, world, actions);
+    Expect(pool.result == LandmarkInteractionResult::Discovered
+            && interaction.OrderedDiscoveryProgress() == 2,
+        "Reflecting Pool second preserves the resonance sequence");
+    const auto monument = interaction.TryInteract({5.0f, 68.0f, 0.0f}, world, actions);
+    Expect(monument.result == LandmarkInteractionResult::Discovered
+            && interaction.ObjectiveComplete()
+            && interaction.OrderedDiscoveryProgress() == LandmarkInteraction::LedgerCapacity
+            && interaction.OrderedResonanceRewardGranted(),
+        "Washington Monument third completes the optional ordered resonance sequence");
+    Expect(Near(monument.rewardApplied,
+            LandmarkInteraction::ObjectiveCompletionReward
+                + LandmarkInteraction::OrderedResonanceReward)
+            && Near(actions.Resource(), ShadowbladeActions::MaximumResource),
+        "ordered completion grants its extra bounded reward through the existing resource cap");
+
+    const auto repeated = interaction.TryInteract({5.0f, 68.0f, 0.0f}, world, actions);
+    Expect(repeated.result == LandmarkInteractionResult::AlreadyVisited
+            && Near(repeated.rewardApplied, 0.0f),
+        "ordered resonance reward cannot be farmed by repeated landmark interaction");
+}
+
 } // namespace
 
 int main() {
@@ -312,6 +484,10 @@ int main() {
     TestObjectiveCompletionRewardIsOneShot();
     TestEncounterGradesAndCleanRetry();
     TestEncounterGradePrecisionAtCutoffs();
+    TestTrainingEnemyProfilesAndVariantSelector();
+    TestWeaknessReactionAndEclipseFinisherOpening();
+    TestTechniqueChainChallengeScoreAndTimeout();
+    TestOrderedLandmarkResonanceBonus();
     if (failures != 0) return 1;
     std::cout << "Landmark encounter tests passed\n";
     return 0;

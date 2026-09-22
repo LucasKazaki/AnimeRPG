@@ -27,6 +27,10 @@ void CombatSandbox::AdvanceTime(float deltaSeconds) {
         && now - lastComboHitMicros_ > SecondsToMicros(ComboWindowSeconds)) {
         comboCount_ = 0;
     }
+    if (techniqueChain_ > 0
+        && now - lastTechniqueMicros_ > SecondsToMicros(TechniqueChainWindowSeconds)) {
+        techniqueChain_ = 0;
+    }
 
     if (staggerEndMicros_ > 0) {
         if (now >= staggerEndMicros_) {
@@ -64,7 +68,8 @@ AttackReport CombatSandbox::TryAttack(AttackType type, const Math::Vec3& attacke
     const AttackDefinition& attack = Definition(type);
     const float deltaX = dummy_.position.x - attackerPosition.x;
     const float deltaY = dummy_.position.y - attackerPosition.y;
-    if (deltaX * deltaX + deltaY * deltaY > attack.range * attack.range) {
+    if (!std::isfinite(deltaX) || !std::isfinite(deltaY)
+        || deltaX * deltaX + deltaY * deltaY > attack.range * attack.range) {
         return lastAttack_;
     }
 
@@ -90,10 +95,14 @@ int CombatSandbox::ApplyDamage(int damage) {
         stats_.peakHit = std::max(stats_.peakHit, applied);
     }
     if (dummy_.IsDefeated()) {
+        if (targetDefeatElapsedSeconds_ < 0.0) {
+            targetDefeatElapsedSeconds_ = elapsedSecondsPrecise_;
+        }
         dummy_.posture = 0;
         staggerEndMicros_ = 0;
         postureAtRecoveryStart_ = 0;
         targetAffinity_ = ManaAffinity::None;
+        eclipseOpening_ = false;
     }
     return applied;
 }
@@ -113,10 +122,15 @@ bool CombatSandbox::ConsumeStaggerOpening() {
 }
 
 void CombatSandbox::ResetTrainingSession() {
+    const TrainingEnemyDefinition enemy = CurrentEnemyDefinition();
     dummy_ = TrainingDummy{};
+    dummy_.maximumHealth = enemy.maximumHealth;
+    dummy_.health = enemy.maximumHealth;
+    dummy_.maximumPosture = enemy.maximumPosture;
     lastAttack_ = {AttackType::Light, AttackResult::Ready, 0, 0, false};
     stats_ = {};
     elapsedSecondsPrecise_ = 0.0;
+    targetDefeatElapsedSeconds_ = -1.0;
     nextAttackMicros_ = 0;
     staggerEndMicros_ = 0;
     lastPostureHitMicros_ = 0;
@@ -124,33 +138,52 @@ void CombatSandbox::ResetTrainingSession() {
     lastComboHitMicros_ = -1000000000;
     comboCount_ = 0;
     targetAffinity_ = ManaAffinity::None;
+    eclipseOpening_ = false;
+    techniqueChain_ = 0;
+    lastTechniqueMicros_ = -1000000000;
+}
+
+bool CombatSandbox::SetTrainingEnemyProfile(TrainingEnemyProfile profile) {
+    if (profile == enemyProfile_) return false;
+    enemyProfile_ = profile;
+    ResetTrainingSession();
+    return true;
 }
 
 ComboFinisherReport CombatSandbox::TryComboFinisher(const Math::Vec3& attackerPosition) {
     if (dummy_.IsDefeated()) {
-        return {ComboFinisherResult::TargetDefeated, 0};
+        return {ComboFinisherResult::TargetDefeated, 0, false};
     }
     if (!ComboFinisherReady()) {
-        return {ComboFinisherResult::NotReady, 0};
+        return {ComboFinisherResult::NotReady, 0, false};
     }
     if (!std::isfinite(attackerPosition.x) || !std::isfinite(attackerPosition.y)) {
-        return {ComboFinisherResult::OutOfRange, 0};
+        return {ComboFinisherResult::OutOfRange, 0, false};
     }
 
     const float deltaX = dummy_.position.x - attackerPosition.x;
     const float deltaY = dummy_.position.y - attackerPosition.y;
     if (deltaX * deltaX + deltaY * deltaY > lightAttack_.range * lightAttack_.range) {
-        return {ComboFinisherResult::OutOfRange, 0};
+        return {ComboFinisherResult::OutOfRange, 0, false};
     }
 
-    const int applied = ApplyDamage(ComboFinisherDamage);
+    const bool eclipseFollowUp = eclipseOpening_;
+    const int requestedDamage = ComboFinisherDamage
+        + (eclipseFollowUp ? EclipseFinisherBonusDamage : 0);
+    const int applied = ApplyDamage(requestedDamage);
+    if (applied > 0) {
+        ++stats_.finisherCount;
+        RegisterTechnique(FinisherTechniquePoints);
+    }
     comboCount_ = 0;
     lastComboHitMicros_ = -1000000000;
-    return {ComboFinisherResult::Activated, applied};
+    eclipseOpening_ = false;
+    return {ComboFinisherResult::Activated, applied, eclipseFollowUp};
 }
 
 ManaReactionReport CombatSandbox::ApplyManaAffinity(ManaAffinity affinity) {
-    ManaReactionReport report{affinity, targetAffinity_, targetAffinity_, ManaReaction::None, 0};
+    ManaReactionReport report{
+        affinity, targetAffinity_, targetAffinity_, ManaReaction::None, 0, false};
     if (affinity == ManaAffinity::None || dummy_.IsDefeated()) {
         return report;
     }
@@ -161,10 +194,20 @@ ManaReactionReport CombatSandbox::ApplyManaAffinity(ManaAffinity affinity) {
         return report;
     }
 
+    const TrainingEnemyDefinition enemy = CurrentEnemyDefinition();
+    report.weaknessExploited = enemy.weakness != ManaAffinity::None
+        && affinity == enemy.weakness;
+    const int requestedDamage = EclipseReactionDamage
+        + (report.weaknessExploited ? WeaknessReactionBonusDamage : 0);
     targetAffinity_ = ManaAffinity::None;
     report.remaining = ManaAffinity::None;
     report.reaction = ManaReaction::Eclipse;
-    report.bonusDamage = ApplyDamage(EclipseReactionDamage);
+    report.bonusDamage = ApplyDamage(requestedDamage);
+    if (report.bonusDamage > 0) {
+        ++stats_.reactionCount;
+        RegisterTechnique(ReactionTechniquePoints);
+        if (!dummy_.IsDefeated()) eclipseOpening_ = true;
+    }
     return report;
 }
 
@@ -198,6 +241,34 @@ int CombatSandbox::ComboFinisherRequiredHits() const {
         : StandardComboFinisherHits;
 }
 
+TrainingEnemyDefinition CombatSandbox::CurrentEnemyDefinition() const {
+    switch (enemyProfile_) {
+    case TrainingEnemyProfile::Vanguard:
+        return {90, 60, ManaAffinity::Solar};
+    case TrainingEnemyProfile::Bulwark:
+        return {180, 120, ManaAffinity::Umbral};
+    case TrainingEnemyProfile::Standard:
+    default:
+        return {100, 80, ManaAffinity::None};
+    }
+}
+
+int CombatSandbox::TrainingChallengeScore() const {
+    const int baseScore = stats_.totalDamage + stats_.techniqueScore;
+    if (baseScore <= 0) return 0;
+
+    const double effectiveSeconds = targetDefeatElapsedSeconds_ >= 0.0
+        ? targetDefeatElapsedSeconds_
+        : elapsedSecondsPrecise_;
+    if (effectiveSeconds <= FastChallengeSeconds) {
+        return baseScore * 5 / 4;
+    }
+    if (effectiveSeconds <= StandardChallengeSeconds) {
+        return baseScore;
+    }
+    return baseScore * 3 / 4;
+}
+
 float CombatSandbox::TrainingDps() const {
     return elapsedSecondsPrecise_ > 0.0
         ? static_cast<float>(static_cast<double>(stats_.totalDamage) / elapsedSecondsPrecise_)
@@ -216,6 +287,8 @@ bool CombatSandbox::ApplyPostureDamage(int postureDamage) {
     postureAtRecoveryStart_ = dummy_.posture;
     if (dummy_.posture >= dummy_.maximumPosture) {
         staggerEndMicros_ = CurrentMicros() + SecondsToMicros(StaggerDurationSeconds);
+        ++stats_.staggerCount;
+        RegisterTechnique(StaggerTechniquePoints);
         return true;
     }
     return false;
@@ -231,6 +304,21 @@ void CombatSandbox::RegisterComboHit() {
     }
     lastComboHitMicros_ = now;
     stats_.bestCombo = std::max(stats_.bestCombo, comboCount_);
+}
+
+void CombatSandbox::RegisterTechnique(int basePoints) {
+    if (basePoints <= 0) return;
+
+    const std::int64_t now = CurrentMicros();
+    if (techniqueChain_ > 0
+        && now - lastTechniqueMicros_ <= SecondsToMicros(TechniqueChainWindowSeconds)) {
+        techniqueChain_ = std::min(MaximumTechniqueChain, techniqueChain_ + 1);
+    } else {
+        techniqueChain_ = 1;
+    }
+    lastTechniqueMicros_ = now;
+    stats_.bestTechniqueChain = std::max(stats_.bestTechniqueChain, techniqueChain_);
+    stats_.techniqueScore += basePoints * techniqueChain_;
 }
 
 } // namespace Astral::Scene

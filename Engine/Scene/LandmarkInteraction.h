@@ -33,6 +33,7 @@ public:
     static constexpr float ProximityRadius = 3.0f;
     static constexpr float LincolnReward = 20.0f;
     static constexpr float ObjectiveCompletionReward = 15.0f;
+    static constexpr float OrderedResonanceReward = 10.0f;
     static constexpr std::size_t LedgerCapacity = 3;
 
     bool UpdateSelection(const Math::Vec3& playerPosition, const WorldBlockout& world);
@@ -52,6 +53,9 @@ public:
     bool ObjectiveCompletionRewardGranted() const {
         return objectiveCompletionRewardGranted_;
     }
+    std::size_t OrderedDiscoveryProgress() const { return orderedDiscoveryProgress_; }
+    bool OrderedSequenceIntact() const { return orderedSequenceIntact_; }
+    bool OrderedResonanceRewardGranted() const { return orderedResonanceRewardGranted_; }
     const LandmarkInteractionReport& LastReport() const { return lastReport_; }
 
 private:
@@ -60,6 +64,9 @@ private:
     std::array<bool, LedgerCapacity> visited_{};
     std::size_t selectedIndex_{LedgerCapacity};
     bool objectiveCompletionRewardGranted_{};
+    std::size_t orderedDiscoveryProgress_{};
+    bool orderedSequenceIntact_{true};
+    bool orderedResonanceRewardGranted_{};
     LandmarkInteractionReport lastReport_{};
 };
 
