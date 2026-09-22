@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 namespace {
 using Astral::Editor::ComputeEditorLayout;
@@ -153,6 +154,30 @@ int main() {
         "zero-height asset panel should collapse its label");
     ok &= Expect(shortAssetsContent.body.height == 0,
         "zero-height asset panel should collapse its body");
+
+    const int maxInt = std::numeric_limits<int>::max();
+    const int minInt = std::numeric_limits<int>::min();
+    const EditorRect highOuter{maxInt - 4, maxInt - 4, 10, 10};
+    const EditorRect highInner{maxInt - 3, maxInt - 3, 2, 2};
+    const EditorRect highOutside{maxInt, maxInt, 10, 10};
+    ok &= Expect(Contains(highOuter, highInner),
+        "containment must remain defined when rectangle edges exceed int range");
+    ok &= Expect(!Contains(highOuter, highOutside),
+        "overflow-safe containment must reject an inner rectangle extending beyond outer bounds");
+    ok &= Expect(Overlaps(highOuter, highInner),
+        "overlap must remain defined when rectangle edges exceed int range");
+
+    const EditorRect lowOuter{minInt, minInt, 10, 10};
+    const EditorRect lowInner{minInt + 1, minInt + 1, 2, 2};
+    ok &= Expect(Contains(lowOuter, lowInner),
+        "containment must remain defined near minimum int coordinates");
+    ok &= Expect(Overlaps(lowOuter, lowInner),
+        "overlap must remain defined near minimum int coordinates");
+
+    const EditorRect touchingLeft{maxInt - 10, 0, 5, 5};
+    const EditorRect touchingRight{maxInt - 5, 0, 5, 5};
+    ok &= Expect(!Overlaps(touchingLeft, touchingRight),
+        "touching rectangle edges must not become overlap near maximum int coordinates");
 
     ok &= Expect(!IsEditorToolAvailable(EditorTool::Select),
         "Select toolbar control must remain disabled until viewport selection exists");

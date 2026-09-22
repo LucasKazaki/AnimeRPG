@@ -1,6 +1,7 @@
 #include "Engine/Editor/EditorLayout.h"
 
 #include <algorithm>
+#include <cstdint>
 
 namespace Astral::Editor {
 namespace {
@@ -20,6 +21,22 @@ constexpr int kPanelBodyTop = 28;
 constexpr int kPanelBottomPadding = 8;
 constexpr int kStatusHorizontalPadding = 8;
 constexpr int kStatusVerticalPadding = 3;
+
+std::int64_t Left(const EditorRect& rect) {
+    return static_cast<std::int64_t>(rect.x);
+}
+
+std::int64_t Top(const EditorRect& rect) {
+    return static_cast<std::int64_t>(rect.y);
+}
+
+std::int64_t Right(const EditorRect& rect) {
+    return Left(rect) + static_cast<std::int64_t>(rect.width);
+}
+
+std::int64_t Bottom(const EditorRect& rect) {
+    return Top(rect) + static_cast<std::int64_t>(rect.height);
+}
 }
 
 EditorLayout ComputeEditorLayout(int clientWidth, int clientHeight) {
@@ -131,17 +148,16 @@ bool Contains(const EditorRect& outer, const EditorRect& inner) {
     if (inner.width < 0 || inner.height < 0 || outer.width < 0 || outer.height < 0) {
         return false;
     }
-    return inner.x >= outer.x && inner.y >= outer.y
-        && inner.x + inner.width <= outer.x + outer.width
-        && inner.y + inner.height <= outer.y + outer.height;
+    return Left(inner) >= Left(outer) && Top(inner) >= Top(outer)
+        && Right(inner) <= Right(outer) && Bottom(inner) <= Bottom(outer);
 }
 
 bool Overlaps(const EditorRect& a, const EditorRect& b) {
     if (a.width <= 0 || a.height <= 0 || b.width <= 0 || b.height <= 0) {
         return false;
     }
-    return a.x < b.x + b.width && a.x + a.width > b.x
-        && a.y < b.y + b.height && a.y + a.height > b.y;
+    return Left(a) < Right(b) && Right(a) > Left(b)
+        && Top(a) < Bottom(b) && Bottom(a) > Top(b);
 }
 
 bool IsEditorToolAvailable(EditorTool tool) {
