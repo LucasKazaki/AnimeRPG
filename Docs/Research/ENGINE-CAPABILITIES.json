@@ -58,32 +58,38 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "interactive_enabled_state_hardened_hosted_verified_independent_review_pending_native_runtime_pending",
+      "status": "review_findings_repaired_hosted_verified_final_review_pending_native_runtime_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_observed_main_revision": "b3a2b1bf8f2b0c356d5b352006c48cb86532426b",
-      "code_candidate": "9543ec4b022d2bd2249eb8560a2912d0606c0d5f",
-      "runtime_smoke_blob": "63ae08458f6c277b184ce1d4ab1543cb8be5d92e",
+      "code_candidate": "006fabd386cd47937b5ce6f7eca627d6960d1c1f",
+      "runtime_smoke_blob": "ab0957df75fee0129797f7fff6a7fab6c871d30c",
       "editor_source_blob": "5142e632a79c89d0d0ce3efe87e752456f802185",
-      "portable_contract_fixture_sha256": "546a88fc599be0a54a69e6fa5e288b67fb6980b9052708e29196425101b38a13",
+      "portable_contract_fixture_sha256": "469803e6556d87fc3f5139e0145cd7133aed1d9b9eda5e3b0f9e224464372bc9",
       "hosted": {
-        "windows_run": 35785913785,
-        "windows_job": 106942555966,
+        "windows_run": 35787602365,
+        "windows_job": 106948082419,
         "windows_status": "completed_success",
-        "profiling_run": 35785913791,
+        "profiling_run": 35787602447,
         "profiling_status": "completed_success",
-        "release_manifest_run": 35785913903,
+        "release_manifest_run": 35787602218,
         "release_manifest_status": "completed_success",
         "runtime_smoke_executed_by_hosted_ctest": false
       },
       "independent_review": {
-        "prior_clean_reviewed_tree": "bad411c9cfc1c7a3b6ec7038fee1b188f53130f2",
-        "applies_to_current_code_candidate": false,
-        "current_status": "fresh_review_required"
+        "reviewed_tree_with_findings": "e1b3b5a64c21fb47aba5980b66493b4795010580",
+        "findings": [
+          "require the Outliner LBS_NOTIFY style before relying on LBN_SELCHANGE behavior",
+          "bind semantic Static HWNDs so shell captions/body text cannot exchange roles and still pass"
+        ],
+        "repair_candidate": "006fabd386cd47937b5ce6f7eca627d6960d1c1f",
+        "current_status": "fresh_final_head_review_required"
       },
-      "covered_subrequirement": "Native Windows editor smoke contract for one stable visible and enabled process-owned top-level editor; original 12 child HWND/class continuity; five exact visible disabled pending tools; enabled Outliner and Assets list-box interaction surfaces; exact five ordered Outliner rows and four ordered asset rows; exact Scene Root/Cube Inspector fixtures; bounded Cube selection notification; bounded 800x600 and 420x260 asynchronous resizes preserving enabled/visible state, ownership, containment and complete shell state; bounded process-owned shutdown. Portable enabled-state mutation fixture passed GCC and Clang ASan+UBSan. Hosted compilation/deterministic checks passed. Native interactive RuntimeSmoke and final independent acceptance remain pending.",
+      "covered_subrequirement": "Native Windows editor smoke contract for one stable visible/enabled process-owned top-level editor; original 12 child HWND/class continuity; five distinct bound semantic Static HWNDs with role-specific text; five exact visible disabled pending tools; enabled Outliner and Assets list-box interaction surfaces; Outliner LBS_NOTIFY style preserved around selection/notification; exact five ordered Outliner rows and four ordered asset rows; exact Scene Root/Cube Inspector fixtures; bounded Cube selection notification; bounded 800x600 and 420x260 asynchronous resizes preserving enabled/visible state, ownership, containment and complete shell state; bounded process-owned shutdown. Portable notification/semantic-swap mutation fixture passed GCC and Clang ASan+UBSan. Hosted compilation/deterministic checks passed. Native interactive RuntimeSmoke and final independent acceptance remain pending.",
       "research": [
+        {"source":"Microsoft Learn LBN_SELCHANGE","url":"https://learn.microsoft.com/en-us/windows/win32/controls/lbn-selchange","accessed":"2026-09-22","applicability":"user-driven selection notification requires LBS_NOTIFY"},
+        {"source":"Microsoft Learn List Box Styles","url":"https://learn.microsoft.com/en-us/windows/win32/controls/list-box-styles","accessed":"2026-09-22","applicability":"LBS_NOTIFY semantics"},
+        {"source":"Microsoft Learn GetWindowLongW","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowlongw","accessed":"2026-09-22","applicability":"GWL_STYLE retrieves live window styles"},
         {"source":"Microsoft Learn IsWindowEnabled","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-iswindowenabled","accessed":"2026-09-22","applicability":"enabled child window required for normal mouse/keyboard input"},
-        {"source":"Microsoft Learn EnableWindow","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enablewindow","accessed":"2026-09-22","applicability":"disabled controls cannot receive focus/user access"},
         {"source":"Epic UE 5.8 Outliner","url":"https://dev.epicgames.com/documentation/unreal-engine/outliner-in-unreal-engine","accessed":"2026-09-22","applicability":"interactive hierarchical selection/modification workflow only"},
         {"source":"Epic UE 5.8 Selecting Actors","url":"https://dev.epicgames.com/documentation/unreal-engine/selecting-actors-in-unreal-engine","accessed":"2026-09-22","applicability":"Outliner/viewport user selection synchronization only"},
         {"source":"Unity 6.0 Hierarchy","url":"https://docs.unity3d.com/6000.0/Documentation/Manual/hierarchy-window.html","accessed":"2026-09-22","applicability":"scene-object management surface comparison only"}
