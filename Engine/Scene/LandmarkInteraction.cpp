@@ -47,6 +47,15 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
         return lastReport_;
     }
 
+    const std::size_t discoveryIndex = IndexOf(kind);
+    if (orderedSequenceIntact_) {
+        if (discoveryIndex == orderedDiscoveryProgress_) {
+            ++orderedDiscoveryProgress_;
+        } else {
+            orderedSequenceIntact_ = false;
+        }
+    }
+
     visited_[selectedIndex_] = true;
     float reward = 0.0f;
     if (kind == LandmarkKind::LincolnMemorial) {
@@ -55,6 +64,12 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
     if (ObjectiveComplete() && !objectiveCompletionRewardGranted_) {
         objectiveCompletionRewardGranted_ = true;
         reward += shadowbladeActions.RestoreResource(ObjectiveCompletionReward);
+    }
+    if (ObjectiveComplete() && orderedSequenceIntact_
+        && orderedDiscoveryProgress_ == LedgerCapacity
+        && !orderedResonanceRewardGranted_) {
+        orderedResonanceRewardGranted_ = true;
+        reward += shadowbladeActions.RestoreResource(OrderedResonanceReward);
     }
     lastReport_ = {LandmarkInteractionResult::Discovered, kind, reward};
     return lastReport_;
