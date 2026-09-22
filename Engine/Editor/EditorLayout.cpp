@@ -119,6 +119,14 @@ EditorRect ComputeEditorStatusContentLayout(const EditorRect& status) {
         std::max(0, statusHeight - 2 * verticalPadding)};
 }
 
+EditorRect ComputeEditorViewportClipRect(const EditorRect& viewport) {
+    return {
+        viewport.x,
+        viewport.y,
+        std::max(0, viewport.width),
+        std::max(0, viewport.height)};
+}
+
 bool Contains(const EditorRect& outer, const EditorRect& inner) {
     if (inner.width < 0 || inner.height < 0 || outer.width < 0 || outer.height < 0) {
         return false;
