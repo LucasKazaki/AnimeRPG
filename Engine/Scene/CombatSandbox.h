@@ -4,117 +4,22 @@
 
 namespace Astral::Scene {
 
-enum class AttackType {
-    Light,
-    Heavy,
-};
-
-enum class AttackResult {
-    Ready,
-    Hit,
-    Cooldown,
-    OutOfRange,
-    TargetDefeated,
-};
-
-struct AttackDefinition {
-    int damage{};
-    float cooldownSeconds{};
-    float range{};
-    int postureDamage{};
-};
-
-struct AttackReport {
-    AttackType type{AttackType::Light};
-    AttackResult result{AttackResult::OutOfRange};
-    int damageApplied{};
-    int comboCount{};
-    bool staggerTriggered{};
-};
-
-struct TrainingDummy {
-    Math::Vec3 position{3.0f, 0.0f, 0.0f};
-    int maximumHealth{100};
-    int health{100};
-    int maximumPosture{80};
-    int posture{};
-
-    bool IsDefeated() const { return health == 0; }
-};
-
-struct PlayerCombatState {
-    int maximumHealth{100};
-    int health{100};
-
-    bool IsDefeated() const { return health == 0; }
-};
-
-struct TrainingStats {
-    int totalDamage{};
-    int hitCount{};
-    int peakHit{};
-    int bestCombo{};
-};
-
-enum class EnemyAttackResult {
-    None,
-    Scheduled,
-    TooEarly,
-    PerfectDodged,
-    PerfectGuarded,
-    Hit,
-    NoAttack,
-};
-
-struct EnemyAttackReport {
-    EnemyAttackResult result{EnemyAttackResult::None};
-    int damageApplied{};
-    bool counterGranted{};
-    bool parryStaggerTriggered{};
-};
-
-enum class CounterAttackResult {
-    NotReady,
-    OutOfRange,
-    TargetDefeated,
-    Activated,
-};
-
-struct CounterAttackReport {
-    CounterAttackResult result{CounterAttackResult::NotReady};
-    int damageApplied{};
-};
-
-enum class ComboFinisherResult {
-    NotReady,
-    OutOfRange,
-    TargetDefeated,
-    Activated,
-};
-
-struct ComboFinisherReport {
-    ComboFinisherResult result{ComboFinisherResult::NotReady};
-    int damageApplied{};
-};
-
-enum class ManaAffinity {
-    None,
-    Solar,
-    Umbral,
-};
-
-enum class ManaReaction {
-    None,
-    Eclipse,
-};
-
-struct ManaReactionReport {
-    ManaAffinity applied{ManaAffinity::None};
-    ManaAffinity previous{ManaAffinity::None};
-    ManaAffinity remaining{ManaAffinity::None};
-    ManaReaction reaction{ManaReaction::None};
-    int bonusDamage{};
-};
+enum class AttackType { Light, Heavy };
+enum class AttackResult { Ready, Hit, Cooldown, OutOfRange, TargetDefeated };
+struct AttackDefinition { int damage{}; float cooldownSeconds{}; float range{}; int postureDamage{}; };
+struct AttackReport { AttackType type{AttackType::Light}; AttackResult result{AttackResult::OutOfRange}; int damageApplied{}; int comboCount{}; bool staggerTriggered{}; };
+struct TrainingDummy { Math::Vec3 position{3.0f, 0.0f, 0.0f}; int maximumHealth{100}; int health{100}; int maximumPosture{80}; int posture{}; bool IsDefeated() const { return health == 0; } };
+struct PlayerCombatState { int maximumHealth{100}; int health{100}; bool IsDefeated() const { return health == 0; } };
+struct TrainingStats { int totalDamage{}; int hitCount{}; int peakHit{}; int bestCombo{}; };
+enum class EnemyAttackResult { None, Scheduled, TooEarly, PerfectDodged, PerfectGuarded, Hit, NoAttack };
+struct EnemyAttackReport { EnemyAttackResult result{EnemyAttackResult::None}; int damageApplied{}; bool counterGranted{}; bool parryStaggerTriggered{}; };
+enum class CounterAttackResult { NotReady, OutOfRange, TargetDefeated, Activated };
+struct CounterAttackReport { CounterAttackResult result{CounterAttackResult::NotReady}; int damageApplied{}; };
+enum class ComboFinisherResult { NotReady, OutOfRange, TargetDefeated, Activated };
+struct ComboFinisherReport { ComboFinisherResult result{ComboFinisherResult::NotReady}; int damageApplied{}; };
+enum class ManaAffinity { None, Solar, Umbral };
+enum class ManaReaction { None, Eclipse };
+struct ManaReactionReport { ManaAffinity applied{ManaAffinity::None}; ManaAffinity previous{ManaAffinity::None}; ManaAffinity remaining{ManaAffinity::None}; ManaReaction reaction{ManaReaction::None}; int bonusDamage{}; };
 
 class CombatSandbox {
 public:
@@ -134,13 +39,12 @@ public:
     static constexpr int ManaReactionDamage = 12;
 
     CombatSandbox();
-
     void AdvanceTime(float deltaSeconds);
     AttackReport TryAttack(AttackType type, const Math::Vec3& attackerPosition);
     int ApplyDamage(int damage);
+    void RegisterSuccessfulAttackHit();
     bool ConsumeStaggerOpening();
     void ResetTrainingSession();
-
     bool ScheduleEnemyAttack(float windupSeconds, int damage);
     EnemyAttackReport TryPerfectDodge();
     EnemyAttackReport TryPerfectGuard();
@@ -160,13 +64,9 @@ public:
     int ComboCount() const { return comboCount_; }
     bool ComboFinisherReady() const { return comboFinisherReady_; }
     bool CounterReady() const { return counterWindowRemaining_ > 0.0; }
-    float CounterWindowRemaining() const {
-        return static_cast<float>(counterWindowRemaining_);
-    }
+    float CounterWindowRemaining() const { return static_cast<float>(counterWindowRemaining_); }
     bool EnemyAttackActive() const { return enemyAttackActive_; }
-    float EnemyAttackRemaining() const {
-        return static_cast<float>(enemyAttackRemaining_);
-    }
+    float EnemyAttackRemaining() const { return static_cast<float>(enemyAttackRemaining_); }
     ManaAffinity TargetAffinity() const { return targetAffinity_; }
     float TrainingDps() const;
     const AttackDefinition& Definition(AttackType type) const;
