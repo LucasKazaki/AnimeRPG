@@ -21,6 +21,8 @@ constexpr wchar_t kSceneRootInspectorText[] =
 constexpr wchar_t kCubeInspectorText[] =
     L"Name: Cube\r\nType: Primitive placeholder\r\n\r\nPosition: 0, 0.5, 0\r\n"
     L"Rotation: 0, 0, 0\r\nScale: 1, 1, 1";
+constexpr std::array<const wchar_t*, 4> kExpectedAssetItems{{
+    L"Primitive/Cube", L"Primitive/Plane", L"Camera", L"DirectionalLight"}};
 
 struct ProcessWindowCollection {
     DWORD processId{};
@@ -348,13 +350,24 @@ int wmain(int argc, wchar_t** argv) {
             LRESULT selection = LB_ERR;
             std::wstring sceneRootItem;
             std::wstring cubeItem;
+            bool assetItemsMatch = true;
+            if (pendingStateOk) {
+                for (std::size_t index = 0; index < kExpectedAssetItems.size(); ++index) {
+                    std::wstring assetItem;
+                    if (!ReadListboxText(assets, static_cast<int>(index), assetItem)
+                        || assetItem != kExpectedAssetItems[index]) {
+                        assetItemsMatch = false;
+                        break;
+                    }
+                }
+            }
             if (pendingStateOk
                 && (!ReadListboxValue(outliner, LB_GETCOUNT, 0, outlinerCount)
                     || !ReadListboxValue(assets, LB_GETCOUNT, 0, assetCount)
                     || !ReadListboxValue(outliner, LB_GETCURSEL, 0, selection)
                     || !ReadListboxText(outliner, 0, sceneRootItem)
                     || !ReadListboxText(outliner, 3, cubeItem)
-                    || outlinerCount != 5 || assetCount != 4 || selection != 0
+                    || outlinerCount != 5 || assetCount != 4 || !assetItemsMatch || selection != 0
                     || sceneRootItem != L"Scene Root" || cubeItem != L"Cube"
                     || WindowText(inspector) != kSceneRootInspectorText)) {
                 failure = L"unexpected initial Outliner/assets/Inspector fixture state";
@@ -439,8 +452,8 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible process-owned top-level editor window before and after "
-        << L"interaction, 12 required controls, disabled pending tools, exact Outliner item "
-        << L"identities and complete Inspector fixture text with post-notification selection "
+        << L"interaction, 12 required controls, disabled pending tools, exact Outliner and asset "
+        << L"item identities and complete Inspector fixture text with post-notification selection "
         << L"ownership+synchronization, ownership-checked bounded asynchronous normal+narrow "
         << L"resizes, and clean exit.\n";
     return 0;
