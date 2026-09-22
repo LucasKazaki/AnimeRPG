@@ -59,8 +59,8 @@ Behavioral/API references only. No proprietary engine source, artwork, assets or
   - Applicability: Epic identifies separate, named editor surfaces including the Level Viewport, Outliner, Details panel and Content Drawer. Identity of the shell surfaces is part of the observable editor contract, not merely their count.
 - Epic Games, Unreal Engine 5.8, Outliner: https://dev.epicgames.com/documentation/unreal-engine/outliner-in-unreal-engine
   - Applicability: the Outliner is an identifiable hierarchical editor panel used for selection.
-- Unity Manual, Unity editor interface / Hierarchy and Inspector concepts: https://docs.unity3d.com/Manual/UsingTheEditor.html
-  - Applicability: Unity likewise presents distinct named Hierarchy, Scene, Inspector and Project surfaces rather than interchangeable anonymous controls.
+- Unity Manual, editor interface / Hierarchy and Inspector concepts: https://docs.unity3d.com/Manual/UsingTheEditor.html
+  - Applicability: Unity likewise presents distinct named Hierarchy, Scene, Inspector and Project surfaces rather than interchangeable anonymous controls. This is a behavioral reference, not a copied implementation.
 - Microsoft `WM_GETTEXT`: https://learn.microsoft.com/windows/win32/winmsg/wm-gettext
   - Applicability: text static controls return their text through the existing bounded `WindowText` helper; list-box rows continue to use the dedicated LB_GETTEXT path.
 
@@ -90,11 +90,15 @@ Hosted exact-code evidence for `625e744e8c20bdb5c768e643e6cbaf4113808212`:
 
 Hosted deterministic CTest intentionally excludes every `RuntimeSmoke`, so none of these hosted results is native GUI execution evidence.
 
-A fresh independent Codex code review was requested for exact code head `625e744e8c20bdb5c768e643e6cbaf4113808212`. Until it completes, the older independent review of `c8e0bd2e3952f7b77a3f9701cf69af8544f39620` is stale for the latest code and must not be counted as current acceptance.
+## Independent review state
+
+Codex completed an independent review of exact code head `625e744e8c20bdb5c768e643e6cbaf4113808212` at `2026-09-22T14:31:35Z`. No new runtime-code finding was produced. The review found one P2 evidence defect instead: the QA receipt still named the superseded `40d2e3f...` / `49391f9...` implementation. That stale receipt was repaired in evidence commit `6d8f47ed9cb369337c1c585ea83821304e01316c` with QA blob `5c40ad84fbc8c27e3e78720551ff33bd6ffe03ef` and task blob `359fadc388ca9a52a60e42535d693e02b9933c53`.
+
+Codex then reviewed reconciliation head `bc6ad8f620d573f90cb24317d20e0a0ec3a5c433` and completed at `2026-09-22T14:38:51Z`. That review found one remaining P2 evidence-consistency defect: the repaired QA/task receipts still described the already-completed `625e744...` review as running. This task update fixes that statement. A final independent evidence recheck of the post-fix head remains required; native runtime acceptance remains separate and pending.
 
 ## Registered-local handoff
 
-Run the exact reviewed code candidate on one owned interactive Windows desktop using external build output:
+Run exact code candidate `625e744e8c20bdb5c768e643e6cbaf4113808212` on one owned interactive Windows desktop using external build output:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -112,4 +116,4 @@ Stop on unexpected edits outside the allowed paths, stale ownership, a failing i
 
 E11 remains partial. `native_evidence` remains empty and `independent_acceptance` remains false. Do not start dependent scene-document, transform-gizmo, undo/redo or save/reopen implementation based on hosted compilation alone. Issue #7 remains separate and open; do not invoke the historical R0 runner.
 
-Single next useful action: complete the fresh independent review of exact code head `625e744...`, then run Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with retained receipts/screenshots.
+Single next useful action: independently recheck the repaired evidence head for receipt consistency; after that evidence check is clean, run Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with retained receipts/screenshots.
