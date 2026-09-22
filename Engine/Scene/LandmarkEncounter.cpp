@@ -44,7 +44,7 @@ std::int64_t EncounterCombatScore(const TrainingStats& current,
 } // namespace
 
 LandmarkEncounterReport LandmarkEncounter::TryActivate(
-    const LandmarkInteractionReport& interaction, const CombatSandbox& combatSandbox) {
+    const LandmarkInteractionReport& interaction, CombatSandbox& combatSandbox) {
     if (state_ != LandmarkEncounterState::Locked) {
         return {LandmarkEncounterResult::AlreadyStarted, 0.0f};
     }
@@ -58,6 +58,9 @@ LandmarkEncounterReport LandmarkEncounter::TryActivate(
         return lastReport_;
     }
 
+    if (challengeTracker_.Enabled()) {
+        combatSandbox.ResetTechniqueChain();
+    }
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
     activationTrainingStats_ = combatSandbox.Stats();
