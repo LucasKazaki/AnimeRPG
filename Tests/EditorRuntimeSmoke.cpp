@@ -51,7 +51,7 @@ HWND WaitForWindow(DWORD processId) {
 
 std::wstring ClassName(HWND window) {
     wchar_t buffer[128]{};
-    if (GetClassNameW(window, buffer, static_cast<int>(std::size(buffer))) <= 0) return {};
+    if (GetClassNameW(window, buffer, 128) <= 0) return {};
     return buffer;
 }
 
