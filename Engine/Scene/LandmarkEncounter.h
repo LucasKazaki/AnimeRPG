@@ -41,8 +41,8 @@ class LandmarkEncounter {
 public:
     static constexpr LandmarkKind EncounterLandmark = LandmarkKind::LincolnMemorial;
     static constexpr float CompletionReward = 30.0f;
-    static constexpr float GoldTimeSeconds = 3.0f;
-    static constexpr float SilverTimeSeconds = 6.0f;
+    static constexpr double GoldTimeSeconds = 3.0;
+    static constexpr double SilverTimeSeconds = 6.0;
 
     LandmarkEncounterReport TryActivate(const LandmarkInteractionReport& interaction,
         const CombatSandbox& combatSandbox);
@@ -55,11 +55,11 @@ public:
     const LandmarkEncounterReport& LastReport() const { return lastReport_; }
 
 private:
-    static EncounterGrade GradeForSeconds(float seconds);
+    static EncounterGrade GradeForSeconds(double seconds);
 
     LandmarkEncounterState state_{LandmarkEncounterState::Locked};
     LandmarkEncounterReport lastReport_{};
-    float activationElapsedSeconds_{};
+    double activationElapsedSeconds_{};
     bool completionRewardGranted_{};
 };
 
