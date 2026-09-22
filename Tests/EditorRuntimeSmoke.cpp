@@ -15,6 +15,7 @@ constexpr DWORD kCleanupTimeoutMs = 2000;
 constexpr DWORD kWindowPollIntervalMs = 50;
 constexpr DWORD kResizePollIntervalMs = 25;
 constexpr DWORD kResizeTimeoutMs = 1500;
+constexpr ULONGLONG kWorkBudgetMs = 135000;
 constexpr int kStableWindowSamples = 20;
 constexpr wchar_t kSceneRootInspectorText[] =
     L"Name: Scene Root\r\nType: Scene\r\n\r\nTransform: n/a\r\n\r\nE11.0 editor fixture";
@@ -34,6 +35,20 @@ constexpr std::array<const wchar_t*, 4> kExpectedAssetItems{{
 constexpr std::array<const wchar_t*, 5> kPendingButtons{{
     L"Select (pending)", L"Move (pending)", L"Rotate (pending)", L"Scale (pending)",
     L"Play (pending)"}};
+
+ULONGLONG gWorkDeadlineTick = 0;
+
+DWORD RemainingWorkBudget(DWORD requestedMs) {
+    if (gWorkDeadlineTick == 0) return requestedMs;
+    const ULONGLONG now = GetTickCount64();
+    if (now >= gWorkDeadlineTick) return 0;
+    const ULONGLONG remaining = gWorkDeadlineTick - now;
+    return remaining < requestedMs ? static_cast<DWORD>(remaining) : requestedMs;
+}
+
+bool WorkBudgetExpired() {
+    return gWorkDeadlineTick != 0 && GetTickCount64() >= gWorkDeadlineTick;
+}
 
 struct ProcessWindowCollection {
     DWORD processId{};
@@ -109,9 +124,11 @@ bool ValidatedControlHasStyle(HWND control, HWND parent, DWORD processId,
 
 bool SendMessageBounded(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
     LRESULT& result) {
+    const DWORD timeoutMs = RemainingWorkBudget(kMessageTimeoutMs);
+    if (timeoutMs == 0) return false;
     DWORD_PTR rawResult = 0;
     const LRESULT sent = SendMessageTimeoutW(window, message, wParam, lParam,
-        SMTO_ABORTIFHUNG | SMTO_ERRORONEXIT, kMessageTimeoutMs, &rawResult);
+        SMTO_ABORTIFHUNG | SMTO_ERRORONEXIT, timeoutMs, &rawResult);
     if (sent == 0) return false;
     result = static_cast<LRESULT>(rawResult);
     return true;
@@ -228,6 +245,7 @@ HWND WaitForStableSingleWindow(DWORD processId, int& observedCount, bool& enumer
     HWND candidate = nullptr;
     int stableSamples = 0;
     for (int attempt = 0; attempt < 100; ++attempt) {
+        if (WorkBudgetExpired()) return nullptr;
         std::vector<HWND> windows;
         if (!VisibleProcessWindows(processId, windows)) {
             enumerationFailed = true;
@@ -246,7 +264,9 @@ HWND WaitForStableSingleWindow(DWORD processId, int& observedCount, bool& enumer
             candidate = nullptr;
             stableSamples = 0;
         }
-        Sleep(kWindowPollIntervalMs);
+        const DWORD sleepMs = RemainingWorkBudget(kWindowPollIntervalMs);
+        if (sleepMs == 0) return nullptr;
+        Sleep(sleepMs);
     }
     return nullptr;
 }
@@ -543,6 +563,10 @@ bool ResizeAndCheck(HWND window, DWORD processId,
     const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
     int width, int height, const wchar_t* expectedInspectorText,
     int expectedSelection, std::wstring& failure) {
+    if (WorkBudgetExpired()) {
+        failure = L"internal runtime work budget exhausted before resize";
+        return false;
+    }
     if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
         || !IsWindowEnabled(window)) {
         failure = L"editor HWND ownership, visibility, or enabled state changed before resize";
@@ -560,6 +584,10 @@ bool ResizeAndCheck(HWND window, DWORD processId,
 
     const ULONGLONG deadline = GetTickCount64() + kResizeTimeoutMs;
     while (true) {
+        if (WorkBudgetExpired()) {
+            failure = L"internal runtime work budget exhausted while waiting for asynchronous resize";
+            return false;
+        }
         if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
             || !IsWindowEnabled(window)) {
             failure = L"editor HWND ownership, visibility, or enabled state changed while waiting for asynchronous resize";
@@ -579,13 +607,22 @@ bool ResizeAndCheck(HWND window, DWORD processId,
             failure = L"asynchronous resize did not complete within deadline";
             return false;
         }
-        Sleep(kResizePollIntervalMs);
+        const DWORD sleepMs = RemainingWorkBudget(kResizePollIntervalMs);
+        if (sleepMs == 0) {
+            failure = L"internal runtime work budget exhausted while waiting for asynchronous resize";
+            return false;
+        }
+        Sleep(sleepMs);
     }
 }
 
 bool SelectCubeAndNotify(HWND window, DWORD processId,
     const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
     std::wstring& failure) {
+    if (WorkBudgetExpired()) {
+        failure = L"internal runtime work budget exhausted before selection";
+        return false;
+    }
     if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
         || !IsWindowEnabled(window)) {
         failure = L"editor top-level ownership, visibility, or enabled state changed before selection";
@@ -632,6 +669,7 @@ bool SelectCubeAndNotify(HWND window, DWORD processId,
 }
 
 bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) {
+    if (WorkBudgetExpired()) return false;
     if (!WindowOwnedByProcess(window, processId)) return false;
     if (!PostMessageW(window, WM_CLOSE, 0, 0)) return false;
     if (WaitForSingleObject(process, kProcessExitTimeoutMs) != WAIT_OBJECT_0) return false;
@@ -695,6 +733,7 @@ int wmain(int argc, wchar_t** argv) {
         std::cerr << "EDITOR AUTOMATED NATIVE RUNTIME SMOKE: FAIL (launch)\n";
         return 1;
     }
+    gWorkDeadlineTick = GetTickCount64() + kWorkBudgetMs;
 
     HWND window = nullptr;
     bool passed = false;
@@ -703,13 +742,24 @@ int wmain(int argc, wchar_t** argv) {
     std::vector<ChildControl> initialControls;
     ShellStaticHandles statics{};
 
-    WaitForInputIdle(process.hProcess, 5000);
+    const DWORD inputIdleTimeoutMs = RemainingWorkBudget(5000);
+    if (inputIdleTimeoutMs == 0) {
+        failure = L"internal runtime work budget exhausted before input-idle wait";
+    } else {
+        WaitForInputIdle(process.hProcess, inputIdleTimeoutMs);
+    }
     int visibleTopLevelCount = 0;
     bool topLevelEnumerationFailed = false;
-    window = WaitForStableSingleWindow(
-        process.dwProcessId, visibleTopLevelCount, topLevelEnumerationFailed);
-    if (!window) {
-        if (topLevelEnumerationFailed) {
+    if (failure.empty()) {
+        window = WaitForStableSingleWindow(
+            process.dwProcessId, visibleTopLevelCount, topLevelEnumerationFailed);
+    }
+    if (!failure.empty()) {
+        // failure set before top-level discovery.
+    } else if (!window) {
+        if (WorkBudgetExpired()) {
+            failure = L"internal runtime work budget exhausted while locating the editor top-level window";
+        } else if (topLevelEnumerationFailed) {
             failure = L"EnumWindows failed while locating the editor top-level window";
         } else {
             failure = L"expected one stable visible process-owned top-level window, observed "
@@ -738,7 +788,9 @@ int wmain(int argc, wchar_t** argv) {
         bool finalTopLevelEnumerationFailed = false;
         if (!RevalidateStableSingleWindow(process.dwProcessId, window,
                 finalVisibleTopLevelCount, finalTopLevelEnumerationFailed)) {
-            if (finalTopLevelEnumerationFailed) {
+            if (WorkBudgetExpired()) {
+                failure = L"internal runtime work budget exhausted during final editor-window revalidation";
+            } else if (finalTopLevelEnumerationFailed) {
                 failure = L"EnumWindows failed during final editor-window revalidation";
             } else {
                 failure = L"editor did not remain one stable visible process-owned top-level window; observed "
@@ -751,11 +803,17 @@ int wmain(int argc, wchar_t** argv) {
             && exitCode == 0) {
             passed = true;
         } else {
-            failure = L"editor did not close cleanly with exit code 0";
+            failure = WorkBudgetExpired()
+                ? L"internal runtime work budget exhausted before clean editor shutdown"
+                : L"editor did not close cleanly with exit code 0";
         }
     }
 
     if (!passed) {
+        if (WorkBudgetExpired()) {
+            AppendCleanupFailure(failure,
+                L"135-second internal work budget exhausted; cleanup margin reserved before CTest's 180-second timeout");
+        }
         CleanupProcess(process.hProcess, exitCode, failure);
     }
     if (!passed && GetExitCodeProcess(process.hProcess, &exitCode) == FALSE) exitCode = 1;
