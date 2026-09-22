@@ -35,36 +35,21 @@
     {"id":"GAME-031","title":"Per-difficulty first-clear reward","status":"implemented_domain_behavior"},
     {"id":"QOL-007","title":"Technique-first scoring mode","status":"implemented_domain_behavior"}
   ],
-  "research": {
-    "accessed": "2026-09-22",
-    "reference_sources": [
-      "https://zenless.hoyoverse.com/m/zh-tw/news/166073",
-      "https://zenless.hoyoverse.com/m/en-us/news/165921",
-      "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
-      "https://relink.granbluefantasy.jp/en/products",
-      "https://store.playstation.com/en-fi/concept/10000896"
-    ],
-    "community_sources": [
-      "https://www.reddit.com/r/ZZZ_Official/comments/1solaxz/what_changes_would_you_make_to_endgame/",
-      "https://www.reddit.com/r/ZZZ_Official/comments/1r8ts9k/endgame_increasing_enemy_hp_pools/"
-    ],
-    "community_limit": "Current 2026 player discussions criticize HP inflation and ask for more emphasis on boss skill/mechanics; anecdotal feedback rather than consensus or developer intent."
-  },
   "verification": {
     "focused_gcc": "passed_challenge_rules_and_boundary_tests",
     "focused_clang_asan_ubsan": "initial_overflow_found_then_fixed_and_passed",
     "review_repairs": [
-      "P1 fixed by moving pass-6 challenge regressions into registered LandmarkInteractionTests without touching CMake; unregistered duplicate removed",
-      "P2 fixed with stricter Apex 2-goal=None, 3-goal=Bronze, 4-goal=Silver unless Gold time, plus registered boundary coverage"
+      "P1 fixed by moving challenge regressions into registered LandmarkInteractionTests and removing the unregistered duplicate",
+      "P2 fixed with stricter Apex 2-goal=None, 3-goal=Bronze, 4-goal=Silver unless Gold time, plus registered boundary coverage",
+      "P2 integration gap fixed by adding configured LandmarkEncounter reward tests covering retry persistence, requested/applied reward accounting, and full resource-cap behavior"
     ],
-    "hosted_test_registration": "pass6_challenge_cases_are_now_executed_by_registered_LandmarkInteractionTests",
-    "hosted_windows_ci": "pending_exact_final_head_after_review_repairs",
-    "release_manifest": "pending_exact_final_head_after_review_repairs",
+    "hosted_windows_ci": "pending_exact_final_head_after_integration_test_fix",
+    "release_manifest": "pending_exact_final_head_after_integration_test_fix",
     "native_windows_interactive": "not_run",
-    "independent_review": "requested_exact_final_head_after_review_repairs"
+    "independent_review": "pending_exact_final_head_after_integration_test_fix"
   },
   "coordination": {
     "engine_pr_13": "active; owns CMakeLists.txt and editor runtime-smoke files; pass 6 does not touch those paths"
   },
-  "next_action": "Verify exact final head Windows/manifest workflows and fresh Codex review, re-read main and the final diff, then merge PR 20 with expected-head protection only if all gates pass."
+  "next_action": "Verify exact final head Windows/manifest workflows and fresh Codex review after configured encounter reward integration coverage, re-read main and final diff, then merge PR 20 with expected-head protection only if all gates pass."
 }
