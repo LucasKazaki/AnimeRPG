@@ -2,7 +2,8 @@
 
 Owner: `animerpg-game-hourly`. Phase: documentation and research setup only.
 Research baseline: `771b61ac116dfa4a70d81b53a390f672aaf3bf4e`.
-Integration baseline after concurrent PR #6 merge: `8df6d2fc3814564c39049bb154361205f0f00309`.
+Integration baseline after concurrent engine merges: `d4bb31f2702ebec84d30ff2eab29fcf0bd527301`.
+PR #6 integration was first observed at `8df6d2fc3814564c39049bb154361205f0f00309`.
 Authority: Lucas's September 22 request for a separate hourly game worker and explicit follow-up to push/merge this cycle into main.
 
 ## Allowed paths
@@ -11,6 +12,7 @@ Authority: Lucas's September 22 request for a separate hourly game worker and ex
 - `GAME_DEVELOPMENT_CONTROL.md`: append the same dated operator update, preserving engine acceptance requirements and eliminating the otherwise contradictory blanket pause.
 - `Docs/Agents/ANIMERPG-HOURLY.md`: operating/research/merge contract.
 - `Docs/Agents/animerpg-hourly/BACKLOG.json`: five reference candidates plus one separate sourced community request.
+- `Docs/Agents/animerpg-hourly/validate_setup.py`: read-only, standard-library setup validator requested by independent review.
 - `Tasks/GAME-HOURLY-SETUP-2026-09-22.md`: this packet.
 
 No Engine/Game/Tests source, CMake, CI, runtime databases, other task records, art archives, dependencies, or other worker branches may be changed in this packet. It does not admit an implementation packet or satisfy gameplay acceptance. The engine worker's own scope is unchanged.
@@ -26,6 +28,31 @@ Use a dedicated branch based on the live main revision; reconcile if main moved.
 The setup sandbox could not clone GitHub because DNS resolution failed. Connected GitHub file reads were available. Structural validation of authored operating files is not a full repository build. No product compiler, native Windows/GPU test, performance measurement, or independent gameplay review is claimed.
 
 Stop after verified documentation merge or a real merge/check blocker. Put actual validation commands/results, head/merge SHA and final readback in the PR/task receipt; do not invent a self-referential merge hash inside this commit. Rollback is a scoped revert of this setup through a PR, preserving unrelated subsequent changes.
+
+## Reproduce the setup checks
+
+Use a clean checkout of this PR's **final setup head**, not an arbitrary later
+game-development revision. The zero-implementation assertions deliberately
+validate this historical setup, not future feature progress. No network, write,
+reset, engine build or local-runtime action is performed by the validator.
+From that checkout, run these commands in PowerShell or a POSIX shell:
+
+```text
+python Docs/Agents/animerpg-hourly/validate_setup.py --scope-base d4bb31f2702ebec84d30ff2eab29fcf0bd527301 --scope-head HEAD
+git diff --check d4bb31f2702ebec84d30ff2eab29fcf0bd527301...HEAD
+```
+
+Expected: 13 setup checks pass, validator exits 0, and diff check exits 0.
+The validator resolves explicit commits, requires the base to be an ancestor,
+checks the exact six-path allowlist/no deletion, compares LF-normalized authored file bytes
+to Git blobs (allowing normal Windows CRLF checkouts) at the supplied head, verifies preserved pre-update control-file
+hashes, and checks the source/feature/dependency/acceptance/authority records.
+It does not fetch source URLs, prove gameplay behavior, or replace independent
+review/native acceptance. Every Git subprocess has a 20-second timeout.
+Missing files/commits or malformed JSON fail rather than producing a pass.
+Record the actual final candidate SHA in the PR receipt; the commit cannot
+contain its own SHA. For a sandbox partial-source fixture, supply its recorded
+synthetic base/head instead and label that evidence separately from repo CI.
 
 ## Continuation
 

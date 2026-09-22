@@ -1,0 +1,44 @@
+name: Asset loader portability and sanitizers
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Engine/Assets/**'
+      - 'Engine/Math/**'
+      - 'Tests/AssetValidationTests.cpp'
+      - 'Tests/AssetValidation/**'
+      - '.github/workflows/asset-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Engine/Assets/**'
+      - 'Engine/Math/**'
+      - 'Tests/AssetValidationTests.cpp'
+      - 'Tests/AssetValidation/**'
+      - '.github/workflows/asset-validation.yml'
+permissions:
+  contents: read
+concurrency:
+  group: asset-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  portable-loader:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Debug, Release, and sanitizer checks of the actual asset loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          for config in Debug Release; do
+            build="$RUNNER_TEMP/astral-asset-$config"
+            cmake -S Tests/AssetValidation -B "$build" -DCMAKE_BUILD_TYPE="$config"
+            cmake --build "$build" --parallel
+            ctest --test-dir "$build" --output-on-failure --no-tests=error -V
+          done
+          build="$RUNNER_TEMP/astral-asset-sanitize"
+          cmake -S Tests/AssetValidation -B "$build" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DASTRAL_ASSET_SANITIZERS=ON
+          cmake --build "$build" --parallel
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 ctest --test-dir "$build" --output-on-failure --no-tests=error -V
+# No engine install, graphics context, local PC, or self-hosted runner is used.

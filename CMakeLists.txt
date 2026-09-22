@@ -44,6 +44,13 @@ if(BUILD_TESTING)
     target_include_directories(AstralSceneTests PRIVATE .)
     astral_add_test(AstralSceneTests)
 
+    add_executable(AssetValidationTests
+        Engine/Assets/StaticMesh.cpp
+        Tests/AssetValidationTests.cpp
+    )
+    target_include_directories(AssetValidationTests PRIVATE .)
+    astral_add_test(AssetValidationTests)
+
     add_executable(WorldBlockoutTests
         Engine/Scene/WorldBlockout.cpp
         Tests/WorldBlockoutTests.cpp
