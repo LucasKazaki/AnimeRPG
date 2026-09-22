@@ -17,7 +17,7 @@
   "working_branch": "game/2026-09-22-defense-integration-pass11",
   "pass": "GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22",
   "task_packet": "Tasks/GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22.md",
-  "pr": null,
+  "pr": 27,
   "implementation_head_before_records": "0cbe23a65f202026ed98bed9e7b5e2403b8a9e82",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -52,5 +52,5 @@
     "art_pr_26": "active asymmetric glTF calibration work; no overlap with pass-11 paths",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies and R0 unchanged"
   },
-  "next_action": "Create the scoped PR from the frozen pass-11 records head, require exact-head hosted Windows/release checks and independent Codex review, repair any material finding without weakening tests, then merge with expected-head protection only if all gates are green and verify main afterward."
+  "next_action": "Freeze PR #27 at this records head, require exact-head hosted Windows/release checks and independent Codex review, repair any material finding without weakening tests, then merge with expected-head protection only if all gates are green and verify main afterward."
 }
