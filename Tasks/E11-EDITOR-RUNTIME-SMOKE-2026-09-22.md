@@ -7,6 +7,7 @@ Add and harden one native Windows runtime-smoke test for the already-integrated 
 Baseline: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1` (`main` when admitted).
 Owned branch: `engine/2026-09-22-editor-runtime-smoke`.
 Current code candidate: `40d2e3fe2b42ff9177be5c88b36e1711506f6f8b`.
+Code-reviewed evidence head: `c8e0bd2e3952f7b77a3f9701cf69af8544f39620`.
 Local execution authority remains the existing Company Runtime only. The GitHub coordinator does not claim a registered local worktree or desktop session.
 
 Allowed implementation paths:
@@ -30,6 +31,8 @@ Behavioral/API references only. No Epic, Unity, or Microsoft source/assets are c
 
 - Epic Games, Unreal Engine 5.8, Content Browser: https://dev.epicgames.com/documentation/en-us/unreal-engine/content-browser-in-unreal-engine
   - Applicability: the Content Browser is the editor surface for viewing, organizing, finding, and working with project assets. Astral's asset browser is currently only a fixed procedural fixture, so the smoke should at least prove the identities it claims to expose rather than merely count rows.
+- Epic Games, Unreal Engine 5.8, Unreal Editor Interface: https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-editor-interface
+  - Applicability: the Level Viewport, Outliner and Details panel represent one selected Actor state. Astral's current packet verifies Outliner and Inspector state and leaves human-visible viewport confirmation to the native acceptance run.
 - Unity Manual, Unity 6.0, Project window reference: https://docs.unity3d.com/6000.0/Documentation/Manual/ProjectView.html
   - Applicability: the Project window is the primary surface for locating project assets and displays individual asset identities/types. Astral's four placeholder entries are a much smaller verification fixture, not feature parity.
 - Microsoft `LB_GETTEXT`: https://learn.microsoft.com/windows/win32/controls/lb-gettext
@@ -41,7 +44,7 @@ Behavioral/API references only. No Epic, Unity, or Microsoft source/assets are c
 - Microsoft `SendMessageTimeoutW`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw
 - Microsoft `SetWindowPos`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowpos
 
-## Current bounded finding: asset-browser count was not identity evidence
+## Current bounded finding
 
 At prior head `387285c3542a43356a39961ede906fd6cbf9458a`, `EditorRuntimeSmoke` required `assetCount == 4` but never read the four asset rows. A fixture with four wrong or reordered labels could therefore satisfy the asset-browser assertion. The integrated editor currently inserts these exact procedural placeholders in order:
 
@@ -84,15 +87,27 @@ sha256sum /tmp/e11_asset_identity_fixture.cpp
 
 Both compiler/run paths exited 0 and printed `asset identity contract fixture: PASS`.
 
-Hosted Windows evidence for exact code candidate `40d2e3fe2b42ff9177be5c88b36e1711506f6f8b`:
+Hosted Windows evidence for exact code-reviewed evidence head `c8e0bd2e3952f7b77a3f9701cf69af8544f39620`:
 
-- Windows Server 2022 run `35726708407`, job `106742016089`: success. Safety contracts, VS2022 x64 configure, MSVC Debug build/tests, MSVC Release build/tests, dependency/prerequisite checks, static milestone verifiers, and clean-tree verification all passed.
-- Profiling capture portability run `35726708416`: success.
-- Release manifest integrity run `35726708369`: success.
+- Windows Server 2022 run `35727159651`, job `106743549477`: success. Safety contracts, VS2022 x64 configure, MSVC Debug build/tests, MSVC Release build/tests, dependency/prerequisite checks, static milestone verifiers, and clean-tree verification all passed.
+- Profiling capture portability run `35727159588`: success.
+- Release manifest integrity run `35727159769`: success.
 
 The workflow's R0-related steps parsed the runner and exercised safety-contract tests only. The historical R0 runner itself was not executed. Hosted deterministic tests intentionally excluded every `RuntimeSmoke`, so these receipts establish compilation and non-runtime regressions, not native GUI acceptance.
 
-Registered-local native execution, on one owned interactive Windows desktop, remains:
+## Independent review
+
+Codex completed a fresh independent review of exact head `c8e0bd2e3952f7b77a3f9701cf69af8544f39620` at `2026-09-22T12:33:45Z`. The review summary records completion for commit `c8e0bd2`, no new inline findings were created, and the Codex bot added a `+1` reaction immediately afterward. This closes the code-review-only gate for that exact implementation/evidence head.
+
+It does **not** set E11 `independent_acceptance` to true. Native Debug/Release runtime execution, human-visible viewport/panel confirmation and the required machine/toolchain/GPU receipts remain absent. Later documentation-only evidence commits do not change `Tests/EditorRuntimeSmoke.cpp`; if the implementation changes again, fresh independent review is required.
+
+## Current integration state
+
+`main` advanced independently to `f68e0917b38a0b4780d94a409874bb94df818163` on 2026-09-22 after separate game-worker merges. Compare from that `main` to code-reviewed E11 head `c8e0bd2...` is `diverged`, 28 commits ahead and 82 behind, with this PR still limited to its five packet-owned paths. PR #13 currently reports non-mergeable against current `main`; do not rebase, force-push, merge, or absorb unrelated game work in this packet. Exact integration evidence must be re-established after native acceptance and before any eventual merge decision.
+
+## Registered-local native execution
+
+On one owned interactive Windows desktop:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -102,7 +117,7 @@ cmake --build ../AnimeRPG-e11-runtime-build --config Release --parallel
 ctest --test-dir ../AnimeRPG-e11-runtime-build -C Release --output-on-failure -R "^EditorRuntimeSmoke$" --no-tests=error
 ```
 
-Retain source SHA, machine identity, Windows version, MSVC/CMake versions, GPU/driver identity, exact commands, stdout/stderr, exit codes, UTC timestamps, and screenshots of the normal and narrow/short editor states. Human-visible acceptance should also confirm the four asset-browser labels, Cube selection synchronization, and panel containment.
+Retain source SHA, machine identity, Windows version, MSVC/CMake versions, GPU/driver identity, exact commands, stdout/stderr, exit codes, UTC timestamps, and screenshots of the normal and narrow/short editor states. Human-visible acceptance must confirm the four asset-browser labels, Cube selection synchronization across Outliner, Inspector and viewport, and panel containment.
 
 ## Stop and rollback
 
@@ -110,4 +125,4 @@ Stop at the first deterministic build/test failure introduced by this packet and
 
 Rollback is deletion of this packet's new test/task/QA files and capability-map entry plus the corresponding `CMakeLists.txt` registration on the owned branch only. Do not rewrite history or alter `main`.
 
-The single next useful action is registered-local Debug and Release `EditorRuntimeSmoke` execution on the exact final head with the required receipts/screenshots, followed by fresh independent review of that exact head. Dependent scene-document, transform-gizmo, save/reopen, and undo/redo work remains gated on that acceptance.
+The single next useful action is registered-local Debug and Release `EditorRuntimeSmoke` execution on the code-reviewed implementation with the required receipts/screenshots. Dependent scene-document, transform-gizmo, save/reopen, and undo/redo work remains gated on that native acceptance.
