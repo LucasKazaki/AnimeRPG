@@ -32,3 +32,11 @@ No deletion, dependency or plugin installation, external API calls, networking c
 
 ## Review and merge
 All implementation occurs in a dedicated worktree and branch. Lucas approves merges and architecture changes. Codex or another independent reviewer reviews diffs without editing unless explicitly assigned a separate fix packet.
+
+## September 22, 2026: separate hourly GAME worker authorization
+
+Lucas explicitly requested an hourly AnimeRPG game worker, separate from the hourly Astral Engine worker, researching and implementing five reference-game improvements plus one new community-requested improvement per pass. He additionally instructed this cycle to push and merge into `main` in this repository.
+
+For that worker only, [the operating contract](Docs/Agents/ANIMERPG-HOURLY.md) records standing push/merge approval and dependency-ready parallel game work. This supersedes older blanket game-content-pause and per-merge-human-approval wording within that scope. It does not waive independent implementation review, applicable tests, native acceptance, dependency/architecture approvals, or repository protections. An unresolved gate blocks dependent work, not unrelated independently verifiable game work. Documentation-only operating records are not product implementation and require content/structural validation and applicable checks, not fabricated gameplay acceptance.
+
+Do not broaden this authorization to the engine worker, its unreviewed PR stack, unrelated repositories, local execution, deployment, or release. Keep the original rules above for all other work. Use the [game backlog](Docs/Agents/animerpg-hourly/BACKLOG.json) and a scoped task packet; verify live ownership before changing gameplay files that happen to reside under `Engine/Scene`.
