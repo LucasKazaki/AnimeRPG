@@ -9,6 +9,7 @@ Baseline admitted from `main`: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`.
 Latest independently moving `main` observed this pass: `b3a2b1bf8f2b0c356d5b352006c48cb86532426b`. Do not rebase, merge, force-push, or absorb unrelated game-worker work in this packet.
 Current code candidate: `0d2524c5e22035e3bf3a0f762e57616f896a9f57`.
 Current smoke blob: `c493cb962f86a054e0e2a60dcd934ef4610196fd`.
+Latest exact hosted evidence head before this evidence-only reconciliation: `988186b917a3b9e547224ffb1d6618c607490fbb`.
 Integrated editor source fixture blob: `Tools/AstralEditorMain.cpp` `5142e632a79c89d0d0ce3efe87e752456f802185`; that production editor file is not owned by this packet and was not modified.
 
 Allowed paths only:
@@ -23,12 +24,12 @@ One active writer only. Stop on unexpected edits outside these paths, stale owne
 
 ## Selected gap and implementation
 
-The prior exact-head independent review was clean, but source inspection found a reproducible false-pass gap in the current acceptance test. `AstralEditor` creates five fixed Outliner rows in this order: `Scene Root`, `Camera`, `Directional Light`, `Cube`, `Floor`. The smoke required count 5 but only verified rows 0 and 3. Therefore renamed or reordered rows 1, 2, or 4 could pass while the editor's scene-object surface no longer represented the integrated fixture.
+Source inspection found a reproducible false-pass gap in the acceptance test. `AstralEditor` creates five fixed Outliner rows in this order: `Scene Root`, `Camera`, `Directional Light`, `Cube`, `Floor`. The earlier smoke required count 5 but only verified rows 0 and 3. Renamed or reordered rows 1, 2, or 4 could therefore pass while the editor's scene-object surface no longer represented the integrated fixture.
 
 Code candidate `0d2524c5e22035e3bf3a0f762e57616f896a9f57` repairs that gap without changing the production editor:
 
 - adds one exact five-row `kExpectedOutlinerItems` fixture matching the integrated editor source;
-- derives the expected Outliner and Assets counts from their fixture arrays;
+- derives expected Outliner and Assets counts from their fixture arrays;
 - reads every Outliner row through the existing bounded, PID/parent/class/visibility/control-ID-revalidated list-box path;
 - requires rows 0 through 4 to equal `Scene Root`, `Camera`, `Directional Light`, `Cube`, `Floor` in order;
 - keeps all existing handle-continuity, selection, Inspector, asset-row, resize, timeout, cleanup, Release-assertion, and exclusive-desktop requirements unchanged.
@@ -39,12 +40,13 @@ No proprietary engine source was copied and no dependency was imported.
 
 Primary behavioral references:
 
-- Epic Games, Unreal Engine 5.8, Unreal Editor Interface: https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-editor-interface
-- Epic Games, Unreal Engine 5.8, Selecting Actors: https://dev.epicgames.com/documentation/en-us/unreal-engine/selecting-actors-in-unreal-engine
+- Epic Games, Unreal Engine 5.8, Unreal Editor Interface: https://dev.epicgames.com/documentation/unreal-engine/unreal-editor-interface
+- Epic Games, Unreal Engine 5.8, Outliner: https://dev.epicgames.com/documentation/unreal-engine/outliner-in-unreal-engine
+- Epic Games, Unreal Engine 5.8, Selecting Actors: https://dev.epicgames.com/documentation/unreal-engine/selecting-actors-in-unreal-engine
 - Unity Technologies, Unity 6.0, Hierarchy window: https://docs.unity3d.com/6000.0/Documentation/Manual/hierarchy-window.html
-- Unity Technologies, Unity 6.0, Inspect items: https://docs.unity3d.com/6000.0/Documentation/Manual/Inspector.html
+- Unity Technologies, Unity 6.0, Inspector: https://docs.unity3d.com/6000.0/Documentation/Manual/Inspector.html
 
-Epic documents the Outliner as a hierarchical tree of level content and synchronized selection with the viewport/Details workflow. Unity documents the Hierarchy as the scene-object management surface and the Inspector as reflecting the selected object. Applicability here is behavioral only: an editor-shell smoke should prove the identities of all objects in the fixed test scene rather than accept count plus two sentinel rows. These public docs do not grant permission to copy proprietary source or make an engine-parity claim.
+Epic documents the Outliner as the level's hierarchical object surface and synchronizes selection among Outliner, Viewport and Details. Unity documents the Hierarchy as the scene-object management surface and the Inspector as selected-object state. Applicability here is behavioral only: a fixed editor-shell acceptance fixture must prove all of its object identities, not merely a row count plus sentinels. These public references do not grant permission to copy proprietary source and do not establish engine parity.
 
 ## Portable reproduction
 
@@ -63,7 +65,7 @@ ASAN_OPTIONS=detect_leaks=1 /mnt/data/e11_outliner_identity_fixture_san
 sha256sum /mnt/data/e11_outliner_identity_fixture.cpp
 ```
 
-Results: GCC warning-clean compile/execution PASS; Clang ASan+UBSan warning-clean compile/execution PASS; no sanitizer finding. This is a source-logic fixture, not native Win32 execution.
+Results: GCC warning-clean compile/execution PASS; Clang ASan+UBSan warning-clean compile/execution PASS; no sanitizer finding. This is source-logic evidence, not native Win32 execution.
 
 ## Acceptance contract
 
@@ -73,10 +75,10 @@ The smoke may report PASS only when all of the following remain true:
 2. Top-level class/title are exact, and the original twelve direct process-owned child HWND/class identities remain unchanged.
 3. Five pending toolbar buttons retain exact labels, visibility and disabled state.
 4. Shell statics, status text, Inspector fixture, Outliner/Assets identities and control IDs remain exact.
-5. Outliner has exactly five rows and every row is exact and ordered: `Scene Root`, `Camera`, `Directional Light`, `Cube`, `Floor`.
+5. Outliner has exactly five exact ordered rows: `Scene Root`, `Camera`, `Directional Light`, `Cube`, `Floor`.
 6. Assets has exactly four exact ordered rows: `Primitive/Cube`, `Primitive/Plane`, `Camera`, `DirectionalLight`.
 7. Cube selection plus bounded `LBN_SELCHANGE` preserves row 3 selection, exact Cube Inspector state, and the original shell-control handles.
-8. Bounded asynchronous 800x600 and 420x260 resize checks preserve ownership, the original controls, containment, complete shell state, and the exact row fixtures.
+8. Bounded asynchronous 800x600 and 420x260 resize checks preserve ownership, the original controls, containment, complete shell state, and exact row fixtures.
 9. Shutdown revalidates ownership, posts one `WM_CLOSE`, obtains exit code 0 within the bounded wait, and failure cleanup can terminate only the retained child process handle.
 10. Cross-process synchronous messages remain bounded with `SendMessageTimeoutW`; `EditorRuntimeSmoke` remains registered through `astral_add_test`, `RUN_SERIAL`, and the existing CTest timeout.
 
@@ -84,17 +86,17 @@ Never weaken an acceptance check to make the gate green.
 
 ## Verification state
 
-The code write was verified from GitHub commit diff: commit `0d2524c5e22035e3bf3a0f762e57616f896a9f57` changes only `Tests/EditorRuntimeSmoke.cpp` and contains the complete-five-row repair described above.
+The code write was verified from GitHub history: candidate `0d2524c5e22035e3bf3a0f762e57616f896a9f57` changed only `Tests/EditorRuntimeSmoke.cpp` for the complete-five-row repair. Its profiling run `35773477112` and release-manifest run `35773476964` passed. Its Windows run `35773476962` was cancelled after a newer evidence head superseded it, so no pass is claimed for that cancelled run.
 
-Hosted workflows triggered for exact code candidate `0d2524c5...`:
+Exact evidence head `988186b917a3b9e547224ffb1d6618c607490fbb`, containing the same smoke blob `c493cb962f86a054e0e2a60dcd934ef4610196fd`, then completed all hosted workflows successfully:
 
-- Profiling capture portability run `35773477112`: `completed/success`.
-- Windows build and deterministic tests run `35773476962`: in progress at the latest observation; no result claimed yet.
-- Release manifest integrity run `35773476964`: in progress at the latest observation; no result claimed yet.
+- Windows build and deterministic tests run `35773676765`: `completed/success`;
+- profiling capture portability run `35773676786`: `completed/success`;
+- release manifest integrity run `35773676793`: `completed/success`.
 
-Hosted deterministic CTest intentionally excludes every `RuntimeSmoke`, so even a future green Windows run is compilation/non-runtime evidence, not native editor GUI execution.
+Hosted deterministic CTest intentionally excludes every `RuntimeSmoke`, so these results prove compile and deterministic non-runtime regression status only. They do not establish native editor GUI execution.
 
-The prior independent Codex review applies to the superseded exact tree `75727914e37f3c16628607c9b7bb232949359dbe`. Because this pass changes smoke code, a fresh independent review of the final evidence head is required. Same-author inspection is not independent acceptance.
+The prior clean independent Codex review applies to superseded tree `75727914e37f3c16628607c9b7bb232949359dbe`. Because `0d2524c5...` changes smoke code, a fresh independent review of the final evidence tree is required. Same-author inspection is not independent acceptance.
 
 ## Registered-local handoff
 
@@ -114,4 +116,4 @@ Retain exact source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driv
 
 E11 remains partial. `native_evidence` remains empty and final independent acceptance remains false. Do not begin dependent scene-document, gizmo, undo/redo, save/reopen, or other editor feature work based on hosted compilation alone. Issue #7 remains separate and open; do not invoke the historical R0 runner.
 
-Single next useful action: finish exact-head hosted verification and fresh independent review for this complete-Outliner candidate, then run Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with retained receipts/screenshots.
+Single next useful action: independently review the final evidence head for this complete-Outliner candidate, then execute Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with retained receipts/screenshots.
