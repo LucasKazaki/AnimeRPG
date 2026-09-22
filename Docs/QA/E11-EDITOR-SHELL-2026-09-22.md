@@ -142,3 +142,46 @@ Release should then be built/tested with the same retained receipt set. GUI/nati
 ## Next useful action
 
 Run the registered-local interactive editor acceptance above and preserve screenshots/receipts. If that passes, the next bounded E11/E02 packet should connect the editor to a small versioned scene-document model with editable transforms plus save/reopen and undo/redo tests. Do not implement gizmos or drag/drop on ad-hoc game state before that ownership/serialization contract exists.
+
+## 2026-09-22 bounded coordinate-offset overflow repair
+
+A later source audit found one more deterministic E11 geometry defect after the `Contains`/`Overlaps` edge calculations had already been promoted to `int64_t`. The layout generators themselves still evaluated signed-`int` coordinate offsets such as `toolbar.x + padding`, `toolbar.y + verticalOffset`, `panel.x + horizontalPadding`, `panel.y + bodyTop`, and repeated toolbar-button advancement. A disposable pre-fix UBSan reproduction against `EditorLayout.cpp` blob `471798b9816b48a9bdfa195bdd80c56acfa19f01` called the layout helpers with an origin near `INT_MAX` and failed with:
+
+```text
+runtime error: signed integer overflow: 2147483645 + 8 cannot be represented in type 'int'
+```
+
+Primary upstream reference, accessed 2026-09-22: Clang `UndefinedBehaviorSanitizer`, https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html. It explicitly identifies signed integer overflow as undefined behavior detected by UBSan and documents `-fsanitize=undefined`. Current Epic UE 5.8 editor references were also rechecked at https://dev.epicgames.com/documentation/unreal-engine/unreal-editor-interface and https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar to keep this repair scoped to the active editor-tooling packet. These are behavior/upstream references only; no external source or dependency was imported.
+
+The fix adds an internal `SaturatingAdd(int, int)` helper that promotes both operands to `std::int64_t`, clamps the sum to the representable `int` range, and only then converts back to `int`. The toolbar, panel-content, and status-content offset calculations now use that helper. Normal client-layout behavior is unchanged. The regression tests add `INT_MAX`-adjacent toolbar, panel, and status origins and require defined saturated results instead of wraparound/UB.
+
+Exact implementation sequence:
+
+- `ac57d43b0ead0f6f3a3ee4562b19456e034240d9`: implementation change in `Engine/Editor/EditorLayout.cpp`.
+- `c2f57053153c9dcc63e8db4af43a84a23960daf0`: test follow-up and exact hosted code candidate.
+- Published `EditorLayout.cpp` blob: `6696ee65131980f37cbf698e780c2188f699945d`.
+- Published `EditorLayoutTests.cpp` blob: `d78dcd1dec79c9296af389bbe112f0c1dbe3140a`.
+
+A disposable partial fixture containing the exact modified sources passed each of these checks before publication:
+
+```text
+g++ -std=c++17 -Wall -Wextra -Werror -I/tmp/e11 \
+  /tmp/e11/Engine/Editor/EditorLayout.cpp /tmp/e11/Tests/EditorLayoutTests.cpp \
+  -o /tmp/e11/editor_layout_gcc && /tmp/e11/editor_layout_gcc
+
+clang++ -std=c++17 -O2 -Wall -Wextra -Werror -I/tmp/e11 \
+  /tmp/e11/Engine/Editor/EditorLayout.cpp /tmp/e11/Tests/EditorLayoutTests.cpp \
+  -o /tmp/e11/editor_layout_release && /tmp/e11/editor_layout_release
+
+clang++ -std=c++17 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
+  -fno-sanitize-recover=undefined -I/tmp/e11 \
+  /tmp/e11/Engine/Editor/EditorLayout.cpp /tmp/e11/Tests/EditorLayoutTests.cpp \
+  -o /tmp/e11/editor_layout_san
+ASAN_OPTIONS=detect_leaks=1 /tmp/e11/editor_layout_san
+```
+
+All three passed with exit 0 and `EditorLayoutTests: PASS`. A later attempt to re-download the already-published blobs directly from `raw.githubusercontent.com` inside the container failed at DNS resolution and was not treated as additional evidence. The connector re-read the published files at exact candidate `c2f5705...` and confirmed the expected blob IDs above.
+
+Hosted Windows Server 2022 workflow run `35679288804`, job `106592495400`, completed successfully for exact candidate `c2f57053153c9dcc63e8db4af43a84a23960daf0`. Test-safety contracts, VS2022 x64 configure, MSVC Debug build/tests, MSVC Release build/tests, static milestone verifiers, and clean tracked-tree verification all passed. The workflow only parsed `Scripts/invoke_r0_release_candidate.py`; it did not invoke R0.
+
+This repair does not establish native interactive GUI acceptance. The registered local handoff remains the E11 launch/selection/resize/separate-game checks above, now using `c2f57053153c9dcc63e8db4af43a84a23960daf0` as the latest hosted code candidate unless a later evidence-only descendant is proven not to change code. Independent acceptance remains required. The single next useful action is still that registered-local interactive receipt plus independent review; scene documents, transform editing, save/reopen, undo/redo, and gizmos remain deferred until the active E11 gate is accepted.
