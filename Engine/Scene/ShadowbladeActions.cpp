@@ -7,7 +7,6 @@ namespace Astral::Scene {
 
 void ShadowbladeActions::AdvanceTime(float deltaSeconds) {
     if (deltaSeconds <= 0.0f || !std::isfinite(deltaSeconds)) return;
-
     resource_ = std::min(MaximumResource,
         resource_ + ResourceRegenerationPerSecond * deltaSeconds);
     dashCooldownRemaining_ = std::max(0.0f, dashCooldownRemaining_ - deltaSeconds);
@@ -40,18 +39,9 @@ void ShadowbladeActions::ResetForEncounter() {
 ShadowActionReport ShadowbladeActions::TryDash(const Math::Vec3& position,
     const Math::Vec3& direction) {
     lastAction_ = {ShadowActionType::Dash, ShadowActionResult::Ready, 0, position};
-    if (guarding_) {
-        lastAction_.result = ShadowActionResult::GuardedConflict;
-        return lastAction_;
-    }
-    if (dashCooldownRemaining_ > 0.0f) {
-        lastAction_.result = ShadowActionResult::Cooldown;
-        return lastAction_;
-    }
-    if (resource_ < DashCost) {
-        lastAction_.result = ShadowActionResult::InsufficientResource;
-        return lastAction_;
-    }
+    if (guarding_) { lastAction_.result = ShadowActionResult::GuardedConflict; return lastAction_; }
+    if (dashCooldownRemaining_ > 0.0f) { lastAction_.result = ShadowActionResult::Cooldown; return lastAction_; }
+    if (resource_ < DashCost) { lastAction_.result = ShadowActionResult::InsufficientResource; return lastAction_; }
 
     float directionX = direction.x;
     float directionY = direction.y;
@@ -78,25 +68,13 @@ ShadowActionReport ShadowbladeActions::TryDash(const Math::Vec3& position,
 ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position,
     CombatSandbox& combatSandbox) {
     lastAction_ = {ShadowActionType::FatalStrike, ShadowActionResult::Ready, 0, position};
-    if (guarding_) {
-        lastAction_.result = ShadowActionResult::GuardedConflict;
-        return lastAction_;
-    }
-    if (combatSandbox.Dummy().IsDefeated()) {
-        lastAction_.result = ShadowActionResult::TargetDefeated;
-        return lastAction_;
-    }
-    if (fatalStrikeCooldownRemaining_ > 0.0f) {
-        lastAction_.result = ShadowActionResult::Cooldown;
-        return lastAction_;
-    }
+    if (guarding_) { lastAction_.result = ShadowActionResult::GuardedConflict; return lastAction_; }
+    if (combatSandbox.Dummy().IsDefeated()) { lastAction_.result = ShadowActionResult::TargetDefeated; return lastAction_; }
+    if (fatalStrikeCooldownRemaining_ > 0.0f) { lastAction_.result = ShadowActionResult::Cooldown; return lastAction_; }
 
     const bool followUp = combatSandbox.IsStaggered();
     const float resourceCost = followUp ? StaggerFollowUpCost : FatalStrikeCost;
-    if (resource_ < resourceCost) {
-        lastAction_.result = ShadowActionResult::InsufficientResource;
-        return lastAction_;
-    }
+    if (resource_ < resourceCost) { lastAction_.result = ShadowActionResult::InsufficientResource; return lastAction_; }
 
     const Math::Vec3 target = combatSandbox.Dummy().position;
     const float deltaX = target.x - position.x;
@@ -111,10 +89,9 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
     lastAction_.result = ShadowActionResult::Activated;
     lastAction_.followUp = followUp;
     lastAction_.resourceSpent = resourceCost;
-    if (followUp) {
-        combatSandbox.ConsumeStaggerOpening();
-    }
+    if (followUp) combatSandbox.ConsumeStaggerOpening();
     lastAction_.damageApplied = combatSandbox.ApplyDamage(FatalStrikeDamage);
+    if (lastAction_.damageApplied > 0) combatSandbox.RegisterSuccessfulAttackHit();
     return lastAction_;
 }
 
