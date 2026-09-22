@@ -78,12 +78,11 @@
   ],
   "verification": {
     "focused_design_fixture": "passed_before_initial_branch_packaging",
-    "review_regression_fixture": "passed_gcc_cxx17_wall_wextra_werror_exact_8_06_vs_794x0_01_boundary_and_expiry_shape",
-    "repository_regression_tests": "review_exact_8_06_split_case_and_fractional_60fps_rounding_cases_added",
-    "hosted_windows_ci": "pending_latest_head_after_review_fixes",
-    "release_manifest": "pending_latest_head_after_review_fixes",
+    "repository_regression_tests": "exact 8.06/7.94/794x0.01, fractional 60fps, ordinary 122x60Hz deadline, and saturated-clock rebase regressions committed",
+    "hosted_windows_ci": "pending_final_head_after_review_repairs",
+    "release_manifest": "pending_final_head_after_review_repairs",
     "native_windows_interactive": "not_run_domain_only_packet",
-    "independent_review": "two_P2_timing_findings_on_older_heads_addressed; fresh_exact_head_review_required"
+    "independent_review": "four_P2_timing_or_overflow_findings_on_older_heads_addressed; fresh_exact_head_review_required"
   },
   "review_findings": [
     {
@@ -98,7 +97,21 @@
       "reviewed_head": "19fe9ad2ec2039b653221c3982081de0cda724c4",
       "severity": "P2",
       "finding": "Quantizing each frame delta independently still allowed fractional-microsecond rounding to diverge between one step and 60 split steps.",
-      "resolution": "The final design quantizes only the accumulated high-precision absolute clock at comparison points. Added direct 1.12001 s guard and 1.00001 s expiry regressions comparing one 1.0 s step with 60 x 1/60 s steps."
+      "resolution": "Quantize only the accumulated absolute clock at comparison points and retain the direct fractional 60 Hz guard/expiry regressions."
+    },
+    {
+      "reviewer": "chatgpt-codex-connector[bot]",
+      "reviewed_head": "83d403afdf5befdce29471d2314447f2d263c0c9",
+      "severity": "P2",
+      "finding": "A 122-frame 60 Hz sequence could finish one microsecond before the equivalent one-step boundary because the caller supplies rounded float durations.",
+      "resolution": "Added a 100-microsecond canonical comparison tolerance, applied consistently to attack expiry, counter expiry, dodge/perfect windows, and remaining-time queries. Added the exact 122 x 1/60 regression."
+    },
+    {
+      "reviewer": "chatgpt-codex-connector[bot]",
+      "reviewed_head": "83d403afdf5befdce29471d2314447f2d263c0c9",
+      "severity": "P2",
+      "finding": "After a very large finite AdvanceTime saturated the defense clock, newly queued deadlines also saturated and could become instantaneous or unusable.",
+      "resolution": "Before scheduling a threat that cannot fit in the remaining int64 timeline, rebase the idle defense clock while preserving any representable counter remainder. Counter deadlines also rebase if needed. Added a 1e13-second saturation regression verifying a fresh one-second threat remains ordinary at time zero and expires once after one second."
     }
   ],
   "next_action": "Verify hosted Windows and manifest checks on the final head, obtain exact-head Codex re-review with no unresolved findings, inspect the five-file diff, then merge PR #16 only if every applicable gate passes."
