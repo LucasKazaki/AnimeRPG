@@ -165,7 +165,11 @@ public:
     void RegisterSuccessfulAttackHit();
     bool ConsumeStaggerOpening();
     void ResetTrainingSession();
-    void ResetTechniqueChain();
+    void ResetTechniqueChain() {
+        techniqueChain_ = 0;
+        lastTechniqueMicros_ = -1000000000;
+        lastTechniqueType_ = TechniqueType::None;
+    }
     bool SetTrainingEnemyProfile(TrainingEnemyProfile profile);
     bool SetTrainingTargetMode(TrainingTargetMode mode);
     ComboFinisherReport TryComboFinisher(const Math::Vec3& attackerPosition);
