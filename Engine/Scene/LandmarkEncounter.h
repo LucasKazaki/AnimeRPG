@@ -47,7 +47,7 @@ public:
     static constexpr double SilverTimeSeconds = 6.0;
 
     LandmarkEncounterReport TryActivate(const LandmarkInteractionReport& interaction,
-        const CombatSandbox& combatSandbox);
+        CombatSandbox& combatSandbox);
     bool Update(const CombatSandbox& combatSandbox, ShadowbladeActions& shadowbladeActions);
     LandmarkEncounterReport Retry(CombatSandbox& combatSandbox,
         ShadowbladeActions& shadowbladeActions);
