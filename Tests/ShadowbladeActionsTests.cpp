@@ -406,6 +406,51 @@ void TestIncomingAttackTimingIsSplitStable() {
             && fractionalSplitExpiry.LastDefense().result == DefenseResult::Hit,
         "fractional equivalent elapsed time crosses expiry identically");
 }
+
+void TestSixtyHzBoundaryToleranceIsSplitStable() {
+    using namespace Astral::Scene;
+
+    const float frame = 1.0f / 60.0f;
+    const float windup = frame * 122.0f;
+    ShadowbladeActions oneStep;
+    ShadowbladeActions split;
+    Expect(oneStep.BeginIncomingAttack({windup, 20, 30, true})
+            && split.BeginIncomingAttack({windup, 20, 30, true}),
+        "60 Hz boundary threats queue");
+    oneStep.AdvanceTime(windup);
+    for (int step = 0; step < 122; ++step) split.AdvanceTime(frame);
+    Expect(!oneStep.HasIncomingAttack() && !split.HasIncomingAttack(),
+        "ordinary 60 Hz frame splitting reaches the same attack deadline");
+    Expect(oneStep.LastDefense().result == DefenseResult::Hit
+            && split.LastDefense().result == DefenseResult::Hit
+            && oneStep.PlayerHealth() == 80 && split.PlayerHealth() == 80,
+        "60 Hz split and single-step expiry apply the same one-time hit");
+}
+
+void TestDefenseClockRebasesAfterSaturation() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions guarded;
+    guarded.AdvanceTime(1.0e13f);
+    Expect(guarded.BeginIncomingAttack({1.0f, 20, 30, true}),
+        "valid threat can be queued after the defense clock reaches saturation");
+    Expect(Near(guarded.IncomingAttackRemaining(), 1.0f),
+        "rebased threat keeps its full requested windup");
+    const DefenseReport immediateGuard = guarded.TryDefend(DefenseInput::Guard);
+    Expect(immediateGuard.result == DefenseResult::Guarded
+            && !immediateGuard.counterGranted && guarded.GuardIntegrity() == 70,
+        "rebased one-second threat is not misclassified as an immediate perfect guard");
+
+    ShadowbladeActions automaticHit;
+    automaticHit.AdvanceTime(1.0e13f);
+    Expect(automaticHit.BeginIncomingAttack({1.0f, 20, 30, true}),
+        "automatic-hit threat queues after saturation");
+    automaticHit.AdvanceTime(1.0f);
+    Expect(!automaticHit.HasIncomingAttack()
+            && automaticHit.LastDefense().result == DefenseResult::Hit
+            && automaticHit.PlayerHealth() == 80,
+        "rebased threat still expires once after its requested duration");
+}
 }
 
 int main() {
@@ -422,6 +467,8 @@ int main() {
     TestPerfectGuardTimingPresetAndAutomaticHit();
     TestDefenseCounterExpiryIsSplitStable();
     TestIncomingAttackTimingIsSplitStable();
+    TestSixtyHzBoundaryToleranceIsSplitStable();
+    TestDefenseClockRebasesAfterSaturation();
     if (failures != 0) return 1;
     std::cout << "Shadowblade action tests passed\n";
     return 0;
