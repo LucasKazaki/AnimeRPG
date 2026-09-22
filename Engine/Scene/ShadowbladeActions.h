@@ -48,6 +48,7 @@ public:
     void AdvanceTime(float deltaSeconds);
     float RestoreResource(float amount);
     void SetGuarding(bool guarding);
+    void ResetForEncounter();
     ShadowActionReport TryDash(const Math::Vec3& position,
         const Math::Vec3& direction = {0.0f, 1.0f, 0.0f});
     ShadowActionReport TryFatalStrike(const Math::Vec3& position, CombatSandbox& combatSandbox);
