@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace Astral::Scene {
 
@@ -25,15 +26,26 @@ void CombatSandbox::AdvanceTime(float deltaSeconds) {
     }
 
     timeSincePostureHit_ += static_cast<double>(deltaSeconds);
-    const double recoveryDuration = std::max(0.0,
-        timeSincePostureHit_ - static_cast<double>(PostureRecoveryDelaySeconds));
-    if (recoveryDuration > 0.0 && dummy_.posture > 0) {
-        const double recoveryAmount = static_cast<double>(PostureRecoveryPerSecond)
-            * recoveryDuration;
-        constexpr double RecoveryBoundaryEpsilon = 1e-6;
-        const int recovered = static_cast<int>(std::floor(
-            recoveryAmount + RecoveryBoundaryEpsilon));
-        dummy_.posture = std::max(0, postureAtRecoveryStart_ - recovered);
+    if (dummy_.posture > 0) {
+        // Frame deltas arrive as floats, so mathematically equal frame splits can
+        // accumulate a few tens of nanoseconds apart. Quantize the total elapsed
+        // posture timeline once, at microsecond precision, before applying the
+        // integer recovery threshold. This preserves sub-frame precision while
+        // making exact threshold crossings independent of common frame splits.
+        constexpr std::int64_t MicrosPerSecond = 1000000;
+        const std::int64_t elapsedMicros = static_cast<std::int64_t>(std::llround(
+            timeSincePostureHit_ * static_cast<double>(MicrosPerSecond)));
+        const std::int64_t delayMicros = static_cast<std::int64_t>(std::llround(
+            static_cast<double>(PostureRecoveryDelaySeconds)
+                * static_cast<double>(MicrosPerSecond)));
+        const std::int64_t recoveryMicros = std::max<std::int64_t>(
+            0, elapsedMicros - delayMicros);
+        const std::int64_t recovered = static_cast<std::int64_t>(std::floor(
+            static_cast<double>(PostureRecoveryPerSecond)
+                * static_cast<double>(recoveryMicros)
+                / static_cast<double>(MicrosPerSecond)));
+        dummy_.posture = std::max(0,
+            postureAtRecoveryStart_ - static_cast<int>(recovered));
         if (dummy_.posture == 0) postureAtRecoveryStart_ = 0;
     }
 }
