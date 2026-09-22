@@ -107,6 +107,9 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
         combatSandbox.ConsumeStaggerOpening();
     }
     lastAction_.damageApplied = combatSandbox.ApplyDamage(FatalStrikeDamage);
+    if (lastAction_.damageApplied > 0) {
+        combatSandbox.RegisterSuccessfulAttackHit();
+    }
     return lastAction_;
 }
 
