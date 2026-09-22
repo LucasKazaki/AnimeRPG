@@ -181,4 +181,10 @@ bool IsEditorToolAvailable(EditorTool tool) {
     return false;
 }
 
+EditorMessageLoopAction ClassifyEditorMessageResult(int result) {
+    if (result < 0) return EditorMessageLoopAction::Error;
+    if (result == 0) return EditorMessageLoopAction::Quit;
+    return EditorMessageLoopAction::Dispatch;
+}
+
 } // namespace Astral::Editor
