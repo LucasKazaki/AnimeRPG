@@ -31,8 +31,6 @@ constexpr std::array<const wchar_t*, 5> kExpectedOutlinerItems{{
     L"Scene Root", L"Camera", L"Directional Light", L"Cube", L"Floor"}};
 constexpr std::array<const wchar_t*, 4> kExpectedAssetItems{{
     L"Primitive/Cube", L"Primitive/Plane", L"Camera", L"DirectionalLight"}};
-constexpr std::array<const wchar_t*, 4> kExpectedShellStaticTexts{{
-    kOutlinerLabelText, kInspectorLabelText, kAssetsLabelText, kStatusText}};
 constexpr std::array<const wchar_t*, 5> kPendingButtons{{
     L"Select (pending)", L"Move (pending)", L"Rotate (pending)", L"Scale (pending)",
     L"Play (pending)"}};
@@ -51,6 +49,14 @@ struct ChildCollection {
     HWND parent{};
     DWORD processId{};
     std::vector<ChildControl> controls;
+};
+
+struct ShellStaticHandles {
+    HWND outlinerLabel{};
+    HWND inspectorLabel{};
+    HWND inspector{};
+    HWND assetsLabel{};
+    HWND status{};
 };
 
 bool WindowOwnedByProcess(HWND window, DWORD processId) {
@@ -83,6 +89,22 @@ bool DirectVisibleControlOwnedByProcessAndParent(HWND control, HWND parent, DWOR
                control, parent, processId, expectedClassName)
         && GetDlgItem(parent, expectedControlId) == control
         && IsWindowEnabled(control);
+}
+
+bool ValidatedControlHasStyle(HWND control, HWND parent, DWORD processId,
+    int expectedControlId, const wchar_t* expectedClassName, LONG_PTR requiredStyle) {
+    if (!DirectVisibleControlOwnedByProcessAndParent(
+            control, parent, processId, expectedControlId, expectedClassName)) {
+        return false;
+    }
+    SetLastError(ERROR_SUCCESS);
+    const LONG_PTR style = GetWindowLongPtrW(control, GWL_STYLE);
+    if (style == 0 && GetLastError() != ERROR_SUCCESS) return false;
+    if (!DirectVisibleControlOwnedByProcessAndParent(
+            control, parent, processId, expectedControlId, expectedClassName)) {
+        return false;
+    }
+    return (style & requiredStyle) == requiredStyle;
 }
 
 bool SendMessageBounded(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
@@ -306,9 +328,51 @@ HWND FindDirectVisibleChildByText(const std::vector<ChildControl>& controls, HWN
     return nullptr;
 }
 
+bool CaptureInitialStaticHandles(const std::vector<ChildControl>& controls, HWND parent,
+    DWORD processId, ShellStaticHandles& statics, std::wstring& failure) {
+    statics.outlinerLabel = FindDirectVisibleChildByText(
+        controls, parent, processId, L"Static", kOutlinerLabelText);
+    statics.inspectorLabel = FindDirectVisibleChildByText(
+        controls, parent, processId, L"Static", kInspectorLabelText);
+    statics.inspector = FindDirectVisibleChildByText(
+        controls, parent, processId, L"Static", kSceneRootInspectorText);
+    statics.assetsLabel = FindDirectVisibleChildByText(
+        controls, parent, processId, L"Static", kAssetsLabelText);
+    statics.status = FindDirectVisibleChildByText(
+        controls, parent, processId, L"Static", kStatusText);
+
+    const std::array<HWND, 5> handles{{
+        statics.outlinerLabel, statics.inspectorLabel, statics.inspector,
+        statics.assetsLabel, statics.status}};
+    for (std::size_t i = 0; i < handles.size(); ++i) {
+        if (!handles[i]) {
+            failure = L"failed to bind every initial semantic Static control";
+            return false;
+        }
+        for (std::size_t j = i + 1; j < handles.size(); ++j) {
+            if (handles[i] == handles[j]) {
+                failure = L"initial semantic Static controls are not unique HWNDs";
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool ValidateBoundStaticText(HWND control, HWND parent, DWORD processId,
+    const wchar_t* expectedText, const wchar_t* semanticName, std::wstring& failure) {
+    std::wstring observed;
+    if (!ReadValidatedChildText(control, parent, processId, L"Static", observed)
+        || observed != expectedText) {
+        failure = L"semantic Static changed identity/text: " + std::wstring(semanticName);
+        return false;
+    }
+    return true;
+}
+
 bool ValidateShellState(HWND window, DWORD processId,
-    const std::vector<ChildControl>& initialControls, const wchar_t* expectedInspectorText,
-    int expectedSelection, std::wstring& failure) {
+    const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
+    const wchar_t* expectedInspectorText, int expectedSelection, std::wstring& failure) {
     if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
         || !IsWindowEnabled(window)) {
         failure = L"editor top-level ownership, visibility, or enabled state changed";
@@ -353,22 +417,16 @@ bool ValidateShellState(HWND window, DWORD processId,
         }
     }
 
-    for (const wchar_t* expectedText : kExpectedShellStaticTexts) {
-        const HWND staticControl = FindDirectVisibleChildByText(
-            controls, window, processId, L"Static", expectedText);
-        if (!staticControl || !DirectVisibleChildOwnedByProcessAndParent(
-                staticControl, window, processId, L"Static")) {
-            failure = L"required shell static is missing, hidden, replaced, or mislabeled: "
-                + std::wstring(expectedText);
-            return false;
-        }
-    }
-
-    const HWND inspector = FindDirectVisibleChildByText(
-        controls, window, processId, L"Static", expectedInspectorText);
-    if (!inspector || !DirectVisibleChildOwnedByProcessAndParent(
-            inspector, window, processId, L"Static")) {
-        failure = L"Inspector is missing, hidden, replaced, or has unexpected text";
+    if (!ValidateBoundStaticText(statics.outlinerLabel, window, processId,
+            kOutlinerLabelText, L"Outliner label", failure)
+        || !ValidateBoundStaticText(statics.inspectorLabel, window, processId,
+            kInspectorLabelText, L"Inspector label", failure)
+        || !ValidateBoundStaticText(statics.assetsLabel, window, processId,
+            kAssetsLabelText, L"Assets label", failure)
+        || !ValidateBoundStaticText(statics.status, window, processId,
+            kStatusText, L"Status", failure)
+        || !ValidateBoundStaticText(statics.inspector, window, processId,
+            expectedInspectorText, L"Inspector body", failure)) {
         return false;
     }
 
@@ -379,6 +437,11 @@ bool ValidateShellState(HWND window, DWORD processId,
         || !DirectVisibleControlOwnedByProcessAndParent(
             assets, window, processId, kAssetListId, L"ListBox")) {
         failure = L"required Outliner/assets surface identity, ownership, parent, class, ID, visibility, or enabled state is invalid";
+        return false;
+    }
+    if (!ValidatedControlHasStyle(outliner, window, processId,
+            kOutlinerId, L"ListBox", static_cast<LONG_PTR>(LBS_NOTIFY))) {
+        failure = L"Outliner is missing LBS_NOTIFY required for user-driven selection notifications";
         return false;
     }
 
@@ -416,13 +479,6 @@ bool ValidateShellState(HWND window, DWORD processId,
             failure = L"unexpected asset item identity at row " + std::to_wstring(index);
             return false;
         }
-    }
-
-    std::wstring inspectorText;
-    if (!ReadValidatedChildText(inspector, window, processId, L"Static", inspectorText)
-        || inspectorText != expectedInspectorText) {
-        failure = L"Inspector fixture changed during validated read";
-        return false;
     }
 
     const auto finalControls = DirectChildren(window, processId);
@@ -484,8 +540,9 @@ bool DirectChildrenContained(HWND window, DWORD processId,
 }
 
 bool ResizeAndCheck(HWND window, DWORD processId,
-    const std::vector<ChildControl>& initialControls, int width, int height,
-    const wchar_t* expectedInspectorText, int expectedSelection, std::wstring& failure) {
+    const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
+    int width, int height, const wchar_t* expectedInspectorText,
+    int expectedSelection, std::wstring& failure) {
     if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
         || !IsWindowEnabled(window)) {
         failure = L"editor HWND ownership, visibility, or enabled state changed before resize";
@@ -515,7 +572,7 @@ bool ResizeAndCheck(HWND window, DWORD processId,
         }
         if (rect.right - rect.left == width && rect.bottom - rect.top == height) {
             if (!DirectChildrenContained(window, processId, initialControls, failure)) return false;
-            return ValidateShellState(window, processId, initialControls,
+            return ValidateShellState(window, processId, initialControls, statics,
                 expectedInspectorText, expectedSelection, failure);
         }
         if (GetTickCount64() >= deadline) {
@@ -527,7 +584,8 @@ bool ResizeAndCheck(HWND window, DWORD processId,
 }
 
 bool SelectCubeAndNotify(HWND window, DWORD processId,
-    const std::vector<ChildControl>& initialControls, std::wstring& failure) {
+    const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
+    std::wstring& failure) {
     if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
         || !IsWindowEnabled(window)) {
         failure = L"editor top-level ownership, visibility, or enabled state changed before selection";
@@ -539,9 +597,9 @@ bool SelectCubeAndNotify(HWND window, DWORD processId,
     }
 
     const HWND outliner = GetDlgItem(window, kOutlinerId);
-    if (!DirectVisibleControlOwnedByProcessAndParent(
-            outliner, window, processId, kOutlinerId, L"ListBox")) {
-        failure = L"Outliner target is invalid, hidden, or disabled before selection";
+    if (!ValidatedControlHasStyle(outliner, window, processId,
+            kOutlinerId, L"ListBox", static_cast<LONG_PTR>(LBS_NOTIFY))) {
+        failure = L"Outliner target is invalid, disabled, or missing LBS_NOTIFY before selection";
         return false;
     }
 
@@ -553,12 +611,12 @@ bool SelectCubeAndNotify(HWND window, DWORD processId,
     }
 
     if (!SameControlHandles(initialControls, DirectChildren(window, processId))
-        || !DirectVisibleControlOwnedByProcessAndParent(
-            outliner, window, processId, kOutlinerId, L"ListBox")
+        || !ValidatedControlHasStyle(outliner, window, processId,
+            kOutlinerId, L"ListBox", static_cast<LONG_PTR>(LBS_NOTIFY))
         || !WindowOwnedByProcess(window, processId)
         || !IsWindowVisible(window)
         || !IsWindowEnabled(window)) {
-        failure = L"Outliner/editor identity or enabled state changed before selection notification";
+        failure = L"Outliner/editor identity, enabled state, or notification style changed before selection notification";
         return false;
     }
     LRESULT commandResult = 0;
@@ -570,7 +628,7 @@ bool SelectCubeAndNotify(HWND window, DWORD processId,
     }
 
     return ValidateShellState(
-        window, processId, initialControls, kCubeInspectorText, 3, failure);
+        window, processId, initialControls, statics, kCubeInspectorText, 3, failure);
 }
 
 bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) {
@@ -609,6 +667,7 @@ int wmain(int argc, wchar_t** argv) {
     std::wstring failure;
     DWORD exitCode = 1;
     std::vector<ChildControl> initialControls;
+    ShellStaticHandles statics{};
 
     WaitForInputIdle(process.hProcess, 5000);
     int visibleTopLevelCount = 0;
@@ -625,17 +684,20 @@ int wmain(int argc, wchar_t** argv) {
     } else if (!CaptureInitialControlInventory(
                    window, process.dwProcessId, initialControls, failure)) {
         // failure set by capture helper.
-    } else if (!ValidateShellState(window, process.dwProcessId, initialControls,
+    } else if (!CaptureInitialStaticHandles(
+                   initialControls, window, process.dwProcessId, statics, failure)) {
+        // failure set by semantic-control capture helper.
+    } else if (!ValidateShellState(window, process.dwProcessId, initialControls, statics,
                    kSceneRootInspectorText, 0, failure)) {
         // failure set by validator.
     } else if (!SelectCubeAndNotify(
-                   window, process.dwProcessId, initialControls, failure)) {
+                   window, process.dwProcessId, initialControls, statics, failure)) {
         // failure set by selector/validator.
-    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, 800, 600,
-                   kCubeInspectorText, 3, failure)) {
+    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics,
+                   800, 600, kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
-    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, 420, 260,
-                   kCubeInspectorText, 3, failure)) {
+    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics,
+                   420, 260, kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
     } else {
         int finalVisibleTopLevelCount = 0;
@@ -648,7 +710,7 @@ int wmain(int argc, wchar_t** argv) {
                 failure = L"editor did not remain one stable visible process-owned top-level window; observed "
                     + std::to_wstring(finalVisibleTopLevelCount);
             }
-        } else if (!ValidateShellState(window, process.dwProcessId, initialControls,
+        } else if (!ValidateShellState(window, process.dwProcessId, initialControls, statics,
                        kCubeInspectorText, 3, failure)) {
             // failure set by validator.
         } else if (CloseEditor(window, process.dwProcessId, process.hProcess, exitCode)
@@ -673,10 +735,10 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible, enabled, process-owned top-level editor window before and after "
-        << L"interaction; the original 12 process-owned child HWND identities, disabled pending tools, "
-        << L"enabled Outliner/assets surfaces, shell labels, exact row identities, and Inspector state were "
-        << L"revalidated around every bounded cross-process read and after both normal+narrow resizes; "
-        << L"Cube selection stayed synchronized, all direct children remained contained, and shutdown exited "
-        << L"cleanly.\n";
+        << L"interaction; the original 12 process-owned child HWND identities, bound semantic Static HWNDs, "
+        << L"disabled pending tools, enabled Outliner/assets surfaces, required Outliner LBS_NOTIFY style, "
+        << L"exact row identities, and Inspector state were revalidated around every bounded cross-process "
+        << L"read and after both normal+narrow resizes; Cube selection stayed synchronized, all direct children "
+        << L"remained contained, and shutdown exited cleanly.\n";
     return 0;
 }
