@@ -1,8 +1,47 @@
 #include "Engine/Scene/LandmarkEncounter.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 
 namespace Astral::Scene {
+namespace {
+
+int NonnegativeDelta(int current, int baseline) {
+    return current >= baseline ? current - baseline : 0;
+}
+
+std::int64_t NonnegativeDelta(std::int64_t current, std::int64_t baseline) {
+    return current >= baseline ? current - baseline : 0;
+}
+
+std::int64_t SaturatingAddNonnegative(std::int64_t left, std::int64_t right) {
+    if (left <= 0) return std::max<std::int64_t>(0, right);
+    if (right <= 0) return left;
+    const std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
+    return left > maximum - right ? maximum : left + right;
+}
+
+std::int64_t EncounterCombatScore(const TrainingStats& current,
+    const TrainingStats& baseline, double completionSeconds) {
+    const std::int64_t damage = NonnegativeDelta(current.totalDamage, baseline.totalDamage);
+    const std::int64_t technique =
+        NonnegativeDelta(current.techniqueScore, baseline.techniqueScore);
+    const std::int64_t baseScore = SaturatingAddNonnegative(damage, technique);
+    if (baseScore <= 0) return 0;
+
+    if (completionSeconds <= CombatSandbox::FastChallengeSeconds) {
+        return SaturatingAddNonnegative(baseScore, baseScore / 4);
+    }
+    if (completionSeconds <= CombatSandbox::StandardChallengeSeconds) {
+        return baseScore;
+    }
+    const std::int64_t quarter = baseScore / 4;
+    const std::int64_t remainder = baseScore % 4;
+    return quarter * 3 + remainder * 3 / 4;
+}
+
+} // namespace
 
 LandmarkEncounterReport LandmarkEncounter::TryActivate(
     const LandmarkInteractionReport& interaction, const CombatSandbox& combatSandbox) {
@@ -21,6 +60,7 @@ LandmarkEncounterReport LandmarkEncounter::TryActivate(
 
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
+    activationTrainingStats_ = combatSandbox.Stats();
     lastReport_ = {LandmarkEncounterResult::Activated, 0.0f};
     return lastReport_;
 }
@@ -46,10 +86,10 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
     if (challengeTracker_.Enabled()) {
         const TrainingStats& stats = combatSandbox.Stats();
         challenge = challengeTracker_.Resolve({
-            combatSandbox.TrainingChallengeScore(),
-            stats.reactionCount,
-            stats.staggerCount,
-            stats.finisherCount,
+            EncounterCombatScore(stats, activationTrainingStats_, completionSecondsPrecise),
+            NonnegativeDelta(stats.reactionCount, activationTrainingStats_.reactionCount),
+            NonnegativeDelta(stats.staggerCount, activationTrainingStats_.staggerCount),
+            NonnegativeDelta(stats.finisherCount, activationTrainingStats_.finisherCount),
             shadowbladeActions.PlayerHealth() == ShadowbladeActions::MaximumPlayerHealth,
             ChallengeTimeGrade(grade),
         });
@@ -82,6 +122,7 @@ LandmarkEncounterReport LandmarkEncounter::Retry(CombatSandbox& combatSandbox,
     shadowbladeActions.SetDefenseTimingPreset(timingPreset);
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
+    activationTrainingStats_ = combatSandbox.Stats();
     lastReport_ = {LandmarkEncounterResult::Retried, 0.0f};
     return lastReport_;
 }
