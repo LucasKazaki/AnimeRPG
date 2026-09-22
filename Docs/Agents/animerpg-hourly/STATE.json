@@ -18,42 +18,46 @@
   "pass": "GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22",
   "task_packet": "Tasks/GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22.md",
   "pr": 27,
-  "verified_repaired_implementation_head_before_final_records": "0cf4d15e7a7a77f5b9eee89678c69dc23823513e",
+  "latest_review_repair_code_commit_before_final_records": "2e69762fb3f1bfb19a5588921f4d470feb4a8eb7",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
     "increments_with_explicit_regression_coverage": 6,
-    "increments_hosted_verified_on_repaired_implementation_head": 6,
+    "increments_hosted_verified_on_prior_repaired_heads": 6,
     "increments_native_playable_verified": 0,
-    "increments_independently_reviewed_on_final_head": 0,
+    "increments_independently_reviewed_clean_on_final_head": 0,
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-052","title":"Enemy-plan to Shadowblade threat bridge","status":"implemented_registered_test_coverage_hosted_verified_code_head"},
-    {"id":"GAME-053","title":"Defense outcome round-trip","status":"implemented_registered_test_coverage_hosted_verified_code_head"},
-    {"id":"GAME-054","title":"Automatic impact synchronization","status":"implemented_registered_test_coverage_hosted_verified_code_head"},
-    {"id":"GAME-055","title":"Interruption synchronization","status":"implemented_review_repaired_registered_test_coverage_hosted_verified_code_head"},
-    {"id":"GAME-056","title":"Defense drill telemetry and grade","status":"implemented_registered_test_coverage_hosted_verified_code_head"},
-    {"id":"QOL-012","title":"Explicit defense timing cue metadata","status":"implemented_review_repaired_backend_metadata_hosted_verified_no_rendered_ui"}
+    {"id":"GAME-052","title":"Enemy-plan to Shadowblade threat bridge","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-053","title":"Defense outcome round-trip","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-054","title":"Automatic impact synchronization","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-055","title":"Interruption synchronization","status":"implemented_review_repaired_registered_test_coverage"},
+    {"id":"GAME-056","title":"Defense drill telemetry and grade","status":"implemented_registered_test_coverage"},
+    {"id":"QOL-012","title":"Explicit defense timing cue metadata","status":"implemented_review_repaired_backend_metadata_no_rendered_ui"}
   ],
   "review_repairs": {
-    "source_review_head": "1f70a647f62ad7f751df00aef102594d830e344c",
+    "first_review_head": "1f70a647f62ad7f751df00aef102594d830e344c",
     "stale_hit_ordering": "repaired_cancel_owned_threat_before_advancing_when_authoritative_plan_missing",
     "ownership": "repaired_exact_combat_object_actions_object_and_successful_threat_generation",
     "cue_boundary": "repaired_reuse_tolerance_aware_shadowblade_window_predicates",
-    "regressions": "delayed_interruption_replacement_generation_wrong_object_generation_progression_and_0_43_quickcut_boundary_added",
+    "first_repair_checkpoint": "0cf4d15e7a7a77f5b9eee89678c69dc23823513e",
+    "second_review_head": "72958f29b1008260a804292e5ed1c2b86d465995",
+    "invalid_delta_reconciliation": "repaired_reject_nonfinite_zero_and_negative_delta_before_link_reconciliation",
+    "latest_repair_commit": "2e69762fb3f1bfb19a5588921f4d470feb4a8eb7",
     "fresh_final_head_review": "pending"
   },
   "verification": {
     "registered_test_target": "ShadowbladeActionsTests_via_existing_astral_add_test",
-    "repaired_implementation_head": "0cf4d15e7a7a77f5b9eee89678c69dc23823513e",
-    "hosted_windows_ci_on_repaired_implementation": "passed_run_358",
-    "release_manifest_on_repaired_implementation": "passed_run_281",
+    "checkpoint_0cf4_windows": "passed_run_358",
+    "checkpoint_0cf4_release_manifest": "passed_run_281",
+    "reviewed_head_72958_windows": "passed_run_360",
+    "reviewed_head_72958_release_manifest": "passed_run_283",
     "final_records_head_hosted_windows_ci": "pending_exact_final_head",
     "final_records_head_release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "pending_fresh_exact_final_head_after_material_repairs",
+    "independent_review": "pending_fresh_exact_final_head_after_invalid_delta_repair",
     "save_compatibility": "not_applicable_no_persistent_format_changed"
   },
   "coordination": {
@@ -62,5 +66,5 @@
     "art_pr_26": "separate asymmetric glTF calibration ownership; no overlap with pass-11 paths",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies and R0 unchanged"
   },
-  "next_action": "Freeze this records head, require fresh exact-head Windows/release checks and a fresh Codex review of the repaired implementation, resolve every material thread, then re-read main and PR head and merge with expected-head protection only if all gates remain green."
+  "next_action": "Freeze this records head, require fresh exact-head Windows/release checks and a fresh Codex review after the invalid-delta repair, resolve every material thread, then re-read main and PR head and merge with expected-head protection only if all gates remain green."
 }
