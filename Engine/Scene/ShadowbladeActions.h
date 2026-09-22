@@ -122,7 +122,7 @@ public:
 
 private:
     static constexpr std::int64_t DefenseMicrosPerSecond = 1000000;
-    static constexpr std::int64_t DefenseBoundaryToleranceMicros = 100;
+    static constexpr std::int64_t DefenseBoundaryToleranceMicros = 2;
     static std::int64_t DefenseSecondsToMicros(double seconds);
     static std::int64_t SaturatingMicrosAdd(std::int64_t left, std::int64_t right);
     static bool DefenseDeadlineReached(std::int64_t now, std::int64_t deadline);
