@@ -63,6 +63,7 @@ public:
         linkedAttackActive_ = true;
         linkedCombat_ = &combat;
         linkedActions_ = &actions;
+        linkedCombatAttackGeneration_ = combat.EnemyAttackGeneration();
         linkedAttackGeneration_ = actions.IncomingAttackGeneration();
         SaturatingIncrement(stats_.attacksQueued);
         return true;
@@ -73,7 +74,7 @@ public:
         if (!linkedAttackActive_) return actions.TryDefend(input);
         if (!OwnsObjects(combat, actions)) return NoLinkedThreatReport();
 
-        if (!combat.HasPendingEnemyAttack()) {
+        if (!OwnsCombatPlan(combat)) {
             if (OwnsGeneration(actions) && actions.HasIncomingAttack()) {
                 actions.CancelIncomingAttack();
             }
@@ -145,10 +146,10 @@ public:
         }
         if (!OwnsObjects(combat, actions)) return false;
 
-        // Reconcile an authoritative interruption before advancing the linked
-        // Shadowblade clock. A delayed coordinator tick must never resurrect a
-        // staggered/defeated enemy's already-cleared attack as stale damage.
-        if (!combat.HasPendingEnemyAttack()) {
+        // Reconcile an authoritative interruption or replacement before
+        // advancing the linked Shadowblade clock. Planner-event identity keeps a
+        // reset/requeued attack from being consumed as this coordinator's event.
+        if (!OwnsCombatPlan(combat)) {
             if (OwnsGeneration(actions) && actions.HasIncomingAttack()) {
                 actions.CancelIncomingAttack();
             }
@@ -167,27 +168,54 @@ public:
             return InterruptLinked(combat, true);
         }
 
-        combat.AdvanceTime(deltaSeconds);
-        if (!combat.HasPendingEnemyAttack()) {
+        // If this frame spans impact, stop the first step at the threat deadline.
+        // Resolve the planner at that impact-time clock, then carry the frame's
+        // remainder through recovery. This keeps cadence invariant to whether the
+        // same elapsed time arrived as one long frame or multiple shorter frames.
+        float firstStep = deltaSeconds;
+        float overflow = 0.0f;
+        const float remaining = actions.IncomingAttackRemaining();
+        if (remaining > 0.0f && remaining < deltaSeconds) {
+            const float impactStep = std::nextafter(
+                remaining, std::numeric_limits<float>::infinity());
+            firstStep = std::min(deltaSeconds, impactStep);
+            overflow = std::max(0.0f, deltaSeconds - firstStep);
+        }
+
+        combat.AdvanceTime(firstStep);
+        if (!OwnsCombatPlan(combat)) {
             if (OwnsGeneration(actions) && actions.HasIncomingAttack()) {
                 actions.CancelIncomingAttack();
             }
             return InterruptLinked(combat, false);
         }
 
-        actions.AdvanceTime(deltaSeconds);
-        if (actions.HasIncomingAttack()) return false;
+        actions.AdvanceTime(firstStep);
+        if (actions.HasIncomingAttack()) {
+            if (overflow > 0.0f) {
+                return AdvanceTime(combat, actions, overflow);
+            }
+            return false;
+        }
 
         const DefenseReport report = actions.LastDefense();
-        if (ResolveTerminalReport(combat, report)) return true;
-        return InterruptLinked(combat, true);
+        bool resolved = ResolveTerminalReport(combat, report);
+        if (!resolved) resolved = InterruptLinked(combat, true);
+
+        if (overflow > 0.0f) {
+            // The linked event is terminal now, so overflow advances ordinary
+            // post-impact recovery/cooldown clocks without another resolution.
+            combat.AdvanceTime(overflow);
+            actions.AdvanceTime(overflow);
+        }
+        return resolved;
     }
 
     DefenseTrainingCue Cue(const CombatSandbox& combat,
         const ShadowbladeActions& actions) const {
         DefenseTrainingCue cue{};
         if (!linkedAttackActive_ || !OwnsObjects(combat, actions)
-            || !combat.HasPendingEnemyAttack() || !actions.HasIncomingAttack()
+            || !OwnsCombatPlan(combat) || !actions.HasIncomingAttack()
             || !OwnsGeneration(actions)) {
             return cue;
         }
@@ -246,6 +274,13 @@ private:
         return linkedAttackActive_ && linkedCombat_ == &combat && linkedActions_ == &actions;
     }
 
+    bool OwnsCombatPlan(const CombatSandbox& combat) const {
+        return linkedAttackActive_ && linkedCombat_ == &combat
+            && linkedCombatAttackGeneration_ != 0
+            && combat.HasPendingEnemyAttack()
+            && combat.EnemyAttackGeneration() == linkedCombatAttackGeneration_;
+    }
+
     bool OwnsGeneration(const ShadowbladeActions& actions) const {
         return linkedAttackActive_ && linkedActions_ == &actions
             && linkedAttackGeneration_ != 0
@@ -256,12 +291,13 @@ private:
         linkedAttackActive_ = false;
         linkedCombat_ = nullptr;
         linkedActions_ = nullptr;
+        linkedCombatAttackGeneration_ = 0;
         linkedAttackGeneration_ = 0;
     }
 
     bool InterruptLinked(CombatSandbox& combat, bool resolvePlanner) {
         if (!linkedAttackActive_ || linkedCombat_ != &combat) return false;
-        if (resolvePlanner && combat.HasPendingEnemyAttack()
+        if (resolvePlanner && OwnsCombatPlan(combat)
             && !combat.ResolveEnemyAttack(EnemyAttackOutcome::Interrupted)) {
             return false;
         }
@@ -306,7 +342,7 @@ private:
     bool ResolveLinked(CombatSandbox& combat, EnemyAttackOutcome outcome,
         const DefenseReport& report, ResolutionKind kind) {
         if (!linkedAttackActive_ || linkedCombat_ != &combat
-            || !combat.HasPendingEnemyAttack()) {
+            || !OwnsCombatPlan(combat)) {
             return false;
         }
         if (!combat.ResolveEnemyAttack(outcome)) return false;
@@ -331,6 +367,7 @@ private:
     DefenseTrainingStats stats_{};
     CombatSandbox* linkedCombat_{};
     ShadowbladeActions* linkedActions_{};
+    std::uint64_t linkedCombatAttackGeneration_{};
     std::uint64_t linkedAttackGeneration_{};
     bool linkedAttackActive_{};
 };
