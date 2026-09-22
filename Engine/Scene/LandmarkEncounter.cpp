@@ -22,6 +22,20 @@ LandmarkEncounterReport LandmarkEncounter::TryActivate(
     return lastReport_;
 }
 
+LandmarkEncounterReport LandmarkEncounter::TryRetry(CombatSandbox& combatSandbox,
+    ShadowbladeActions& shadowbladeActions) {
+    if (state_ == LandmarkEncounterState::Locked) {
+        lastReport_ = {LandmarkEncounterResult::RetryUnavailable, 0.0f};
+        return lastReport_;
+    }
+
+    combatSandbox.ResetTrainingSession();
+    shadowbladeActions.ResetForEncounter();
+    state_ = LandmarkEncounterState::Active;
+    lastReport_ = {LandmarkEncounterResult::Retried, 0.0f};
+    return lastReport_;
+}
+
 bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
     ShadowbladeActions& shadowbladeActions) {
     if (state_ != LandmarkEncounterState::Active || !combatSandbox.Dummy().IsDefeated()) {
@@ -29,8 +43,11 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
     }
 
     state_ = LandmarkEncounterState::Completed;
-    lastReport_ = {LandmarkEncounterResult::Completed,
-        shadowbladeActions.RestoreResource(CompletionReward)};
+    const float rewardApplied = rewardGranted_
+        ? 0.0f
+        : shadowbladeActions.RestoreResource(CompletionReward);
+    rewardGranted_ = true;
+    lastReport_ = {LandmarkEncounterResult::Completed, rewardApplied};
     return true;
 }
 
