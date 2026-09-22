@@ -190,6 +190,53 @@ void TestConfiguredChallengeRewardsPersistAcrossRetryAndRespectCap() {
         "pre-activation reaction cannot satisfy encounter tactical or variety goals");
     Expect(local.score == 400 && local.rank == EncounterChallengeRank::Silver,
         "challenge score uses only post-activation damage and encounter-local timing");
+
+    CombatSandbox chainCombat;
+    ShadowbladeActions chainActions;
+    LandmarkEncounter chainEncounter;
+    chainCombat.SetTrainingEnemyProfile(TrainingEnemyProfile::Bulwark);
+    chainEncounter.ConfigureChallenge(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Stagger);
+    chainCombat.ApplyManaAffinity(ManaAffinity::Solar);
+    chainCombat.ApplyManaAffinity(ManaAffinity::Umbral);
+    const auto chainBaselineScore = chainCombat.Stats().techniqueScore;
+    Expect(chainCombat.TechniqueChain() == 1
+            && chainBaselineScore == CombatSandbox::ReactionTechniquePoints,
+        "pre-activation reaction primes one transient technique-chain step");
+    Expect(chainEncounter.TryActivate(
+            Discovery(LandmarkKind::LincolnMemorial), chainCombat).result
+            == LandmarkEncounterResult::Activated
+            && chainCombat.TechniqueChain() == 0
+            && chainCombat.Stats().techniqueScore == chainBaselineScore,
+        "configured activation clears transient chain state without erasing cumulative stats");
+    chainCombat.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    chainCombat.AdvanceTime(1.0f);
+    const AttackReport postActivationStagger =
+        chainCombat.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    Expect(postActivationStagger.staggerTriggered
+            && chainCombat.TechniqueChain() == 1
+            && chainCombat.Stats().techniqueScore
+                == chainBaselineScore + CombatSandbox::StaggerTechniquePoints,
+        "first post-activation technique starts a fresh chain with standalone scoring");
+    chainCombat.ApplyDamage(chainCombat.Dummy().health);
+    Expect(chainEncounter.Update(chainCombat, chainActions)
+            && chainEncounter.LastReport().challenge.tacticalGoal
+            && !chainEncounter.LastReport().challenge.techniqueVarietyGoal,
+        "post-activation stagger counts while pre-activation reaction stays outside encounter variety");
+
+    CombatSandbox unconfiguredCombat;
+    LandmarkEncounter unconfiguredEncounter;
+    unconfiguredCombat.ApplyManaAffinity(ManaAffinity::Solar);
+    unconfiguredCombat.ApplyManaAffinity(ManaAffinity::Umbral);
+    const auto unconfiguredTechniqueScore = unconfiguredCombat.Stats().techniqueScore;
+    Expect(unconfiguredCombat.TechniqueChain() == 1,
+        "unconfigured setup primes the same transient technique chain");
+    Expect(unconfiguredEncounter.TryActivate(
+            Discovery(LandmarkKind::LincolnMemorial), unconfiguredCombat).result
+            == LandmarkEncounterResult::Activated
+            && unconfiguredCombat.TechniqueChain() == 1
+            && unconfiguredCombat.Stats().techniqueScore == unconfiguredTechniqueScore,
+        "challenge-disabled activation preserves existing technique-chain behavior");
 }
 
 void TestManaReactionStateAndReset() {
