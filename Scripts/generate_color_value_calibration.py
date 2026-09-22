@@ -1,11 +1,11 @@
-"""Generate small deterministic Astral art-reference color/value calibration PNGs.
+"""Generate deterministic Astral art-reference color/value calibration PNGs.
 Standard library only. Outputs are review references, not runtime color-grading assets.
 """
 from __future__ import annotations
 import argparse, hashlib, json, struct, zlib
 from pathlib import Path
 
-VERSION="astral-color-calibration-1"
+VERSION="astral-color-calibration-2"
 
 
 def png_rgb8(width,height,pixel):
@@ -21,6 +21,21 @@ def rgb(h):
     return tuple(int(h[i:i+2],16) for i in (0,2,4))
 
 
+def lin(c):
+    c=c/255.0
+    return c/12.92 if c<=0.04045 else ((c+0.055)/1.055)**2.4
+
+
+def relative_luminance(c):
+    return 0.2126*lin(c[0])+0.7152*lin(c[1])+0.0722*lin(c[2])
+
+
+def srgb_gray_from_linear_luminance(y):
+    encoded=12.92*y if y<=0.0031308 else 1.055*(y**(1/2.4))-0.055
+    v=max(0,min(255,round(encoded*255)))
+    return (v,v,v)
+
+
 def build(source_path:Path):
     source=json.loads(source_path.read_text())
     if source.get("schema_version")!=1: raise ValueError("source schema")
@@ -29,29 +44,23 @@ def build(source_path:Path):
     colors=[rgb(r["hex"]) for r in roles]
     ids=[r["id"] for r in roles]
     if len(set(ids))!=len(ids): raise ValueError("duplicate role")
+    luminance={r["id"]:relative_luminance(c) for r,c in zip(roles,colors)}
 
-    # 512x256. Top half: eight exact semantic swatches. Bottom half: matching
-    # grayscale luminance preview on left and 16-step value ladder on right.
+    grays=[srgb_gray_from_linear_luminance(luminance[r["id"]]) for r in roles]
     def palette_pixel(x,y):
         if y<128:
             return colors[min(7,x//64)]
         if x<256:
-            c=colors[min(7,x//32)]
-            # sRGB-space preview only. Accurate relative luminance is recorded in manifest.
-            v=round(0.2126*c[0]+0.7152*c[1]+0.0722*c[2])
-            return (v,v,v)
+            return grays[min(7,x//32)]
         step=min(15,(x-256)//16)
         v=round(step*255/15)
         return (v,v,v)
 
-    # Own neutral 16^3 LUT layout, not claimed compatible with any engine:
-    # x = red + 16*blue; y = green. Values are exact 8-bit endpoints.
     def lut_pixel(x,y):
         b=x//16; r=x%16; g=y
         q=lambda n: round(n*255/15)
         return (q(r),q(g),q(b))
 
-    # 16 equal grayscale patches, useful for fixed-camera exposure/tonemap review.
     def ramp_pixel(x,y):
         step=min(15,x//16); v=round(step*255/15); return (v,v,v)
 
@@ -60,11 +69,6 @@ def build(source_path:Path):
         "neutral_lut_16.png": png_rgb8(256,16,lut_pixel),
         "value_ramp_16.png": png_rgb8(256,64,ramp_pixel),
     }
-    # W3C-style relative luminance and contrast are used only as screening metrics.
-    def lin(c):
-        c=c/255.0
-        return c/12.92 if c<=0.04045 else ((c+0.055)/1.055)**2.4
-    luminance={r["id"]:0.2126*lin(c[0])+0.7152*lin(c[1])+0.0722*lin(c[2]) for r,c in zip(roles,colors)}
     contrast=[]
     by_id={r["id"]:r for r in roles}
     for pair in source.get("ui_screening_pairs",[]):
@@ -77,9 +81,11 @@ def build(source_path:Path):
         "status":"art_reference_source_validated_not_runtime",
         "source_sha256":hashlib.sha256(source_path.read_bytes()).hexdigest(),
         "files":[{"path":p,"bytes":len(d),"sha256":hashlib.sha256(d).hexdigest()} for p,d in sorted(files.items())],
-        "roles":[{"id":r["id"],"hex":r["hex"].upper(),"relative_luminance":round(luminance[r["id"]],6)} for r in roles],
+        "roles":[{"id":r["id"],"hex":r["hex"].upper(),"relative_luminance":round(luminance[r["id"]],6),
+                  "preview_gray_srgb8":grays[i][0]} for i,r in enumerate(roles)],
         "ui_screening":contrast,
         "lut_layout":"16x16x16 neutral cube; x=R+16*B, y=G; diagnostic only",
+        "grayscale_preview":"linearize sRGB, compute relative luminance, then re-encode luminance as sRGB gray",
         "color_note":"role hex values and PNG RGB are sRGB display references; do not treat as scene-linear shader constants"
     }
     return files,(json.dumps(manifest,indent=2,sort_keys=True)+"\n").encode()

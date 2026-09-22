@@ -24,9 +24,11 @@ Until Astral exposes these controls, all three states are requirements, not runt
 
 `Content/Calibration/ColorValue/` defines eight proposed semantic colors already present in the art bible. The generator emits:
 
-- `palette_card.png`: exact top-half semantic swatches, grayscale-preview blocks, and a 16-step value ladder;
+- `palette_card.png`: exact top-half semantic swatches, relative-luminance preview blocks, and a 16-step code-value ladder;
 - `neutral_lut_16.png`: a deterministic neutral 16x16x16 cube unwrapped to 256x16 with **Astral's own documented layout** `x = R + 16*B`, `y = G`;
 - `value_ramp_16.png`: 16 exact sRGB grayscale patches.
+
+The grayscale preview is computed by decoding each sRGB role color to linear light, calculating relative luminance, and re-encoding that luminance as neutral sRGB gray. It is intended to reveal broad value separation. It is not a perceptual-lightness model and should not be used as a substitute for grayscale playtesting.
 
 The LUT is a diagnostic source reference only. It is **not** claimed compatible with Unreal, Unity, Astral, OCIO, ACES, or any particular shader until an importer/render test says so.
 
@@ -36,7 +38,7 @@ The eight proposed roles remain civic limestone, graphite, asphalt, vegetation, 
 
 Critical UI text-like pairings on graphite are screened at 4.5:1 using the WCAG relative-luminance formula. This is a useful accessibility screen, not a claim that the game UI conforms to WCAG by color contrast alone. Game HUD states still need icon/shape redundancy, scaling, motion/readability tests and actual implementation review.
 
-Mana, hostile danger and rewards must still be identifiable when hue information is weak. The grayscale preview intentionally shows that some different semantic accents can approach one another in luminance. Shape, timing, iconography and motion remain mandatory secondary channels.
+Mana, hostile danger and rewards must still be identifiable when hue information is weak. The relative-luminance preview intentionally shows that some different semantic accents can approach one another in value. Shape, timing, iconography and motion remain mandatory secondary channels.
 
 ## Capture metadata required later
 
@@ -49,4 +51,4 @@ Do not use an unlabeled offline render as runtime acceptance.
 - Epic, Unreal Engine 5.8, Color Grading and the Filmic Tonemapper: https://dev.epicgames.com/documentation/unreal-engine/color-grading-and-the-filmic-tonemapper-in-unreal-engine
 - Unity 6 URP, Tonemapping volume override and HDR output guidance: https://docs.unity3d.com/6000.0/Manual/urp/post-processing-tonemapping.html
 - Unity 6 URP, Color Adjustments: https://docs.unity3d.com/6000.0/Manual/urp/Post-Processing-Color-Adjustments.html
-- W3C WCAG 2.2, Success Criterion 1.4.3 Contrast (Minimum): https://www.w3.org/TR/WCAG22/#contrast-minimum
+- W3C WCAG 2.2 relative-luminance definition and contrast guidance: https://www.w3.org/WAI/WCAG21/Understanding/relative-luminance.html

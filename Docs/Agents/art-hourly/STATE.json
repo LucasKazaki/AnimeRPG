@@ -2,31 +2,31 @@
   "schema_version": 1,
   "loop_id": "astral-art-hourly-20260922",
   "original_baseline": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
-  "latest_observed_main": "b3a2b1bf8f2b0c356d5b352006c48cb86532426b",
+  "latest_observed_main": "012ca98f6aa1ec49bbec830666830de5ab7d1874",
   "run_date": "2026-09-23",
-  "focus": "establish reproducible color, value and exposure review references while ART-003 moves to engine-owned import/render acceptance",
+  "focus": "repair ART-007 independent-review findings before accepting the color/value calibration source pack",
   "delivered": [
-    "PR #26 exact-head Windows CI passed and exact-head Codex review completed; PR marked ready without merging",
-    "proposed color/exposure reference separating asset color, lighting/exposure and creative grading",
-    "deterministic palette card, neutral diagnostic LUT and 16-step value ramp generators",
-    "independent validator with full LUT semantic scan, PNG CRC/bounds checks and UI contrast screening",
-    "seven-test regression suite and pinned expected manifest for ART-007"
+    "regenerated and repinned all three checked-in calibration PNGs",
+    "bounded PNG dimensions and decompressed bytes before inflation",
+    "full semantic scan of every palette and value-ramp pixel",
+    "relative-luminance grayscale preview computed in linear light and re-encoded to sRGB",
+    "expanded ART-007 regression suite from seven to eleven tests"
   ],
   "verification": {
-    "art003_exact_head_hosted_ci": "passed: workflow 35778589314 at e81f32b8545954b30a205a969bb6f90f0661f7f2",
-    "art003_exact_head_independent_review": "completed: Codex exact-head review summary at 2026-09-22T20:19:05Z; no new inline findings observed after repair",
     "art003_pr_state": "ready_for_review_unmerged",
-    "color_generator": "passed: 3 PNGs, astral-color-calibration-1",
-    "color_exact_regeneration_check": "passed",
-    "color_validator": "passed: 8 roles, 3 PNGs, 4 UI screening pairs",
-    "color_regression_tests": "passed: 7/7",
-    "color_python_compile": "passed",
-    "palette_card_sha256": "c1ab8182f37aab7e91fbb919226c46b86a3496698669d21f89b7511e9cd7e564",
+    "color_generator": "passed locally: 3 PNGs, astral-color-calibration-2",
+    "color_exact_regeneration_check": "passed locally",
+    "color_validator": "passed locally: 8 roles, 3 PNGs, 4 UI screening pairs",
+    "color_regression_tests": "passed locally: 11/11",
+    "color_python_compile": "passed locally",
+    "palette_card_sha256": "4fa15493ed523ec5624f325d0ebe2b4cd45a814a1150a364464da10f9fcf0e5c",
     "neutral_lut_sha256": "b9c2e13d85416055d65c6eb9d9a42e297515123c52b8dfd2a9d040458e1b256a",
     "value_ramp_sha256": "7c61e5e17eb2873dd0ae3fc861cb5e51881a08c2492962f2e553f8698c810226",
-    "expected_manifest_sha256": "2362896b77e919baf417127cafad8436bf772edd64ea1eed960dbc6577a68622",
+    "expected_manifest_sha256": "730bd19f4c1f7cb8296991d3cd868144e403dade1055c0984924159792de3ff4",
+    "repaired_exact_head_hosted_ci": "pending_after_publication",
+    "repaired_exact_head_independent_review": "pending_after_publication",
     "native_astral_color_management": "not_run_engine_unsupported",
     "independent_art_review": "not_run"
   },
-  "next_action": "publish ART-007 as a stacked source/reference PR, run exact-head hosted checks and independent review; engine worker remains owner of ART-003 runtime import/render"
+  "next_action": "run exact-head hosted checks and fresh independent review of the repaired ART-007 branch; do not merge under ART-007"
 }
