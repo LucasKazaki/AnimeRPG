@@ -2,377 +2,114 @@
   "schema_version": 1,
   "assessed_at": "2026-09-22",
   "repository": "LucasKazaki/AnimeRPG",
-  "inspected_base": "e12e6c559bf776ffc9c715c809a517f8e02ce5d5",
-  "inspected_engine_tree": "804d643d3b253bd020b7bf6aa3d86c1113ec5d1b",
-  "source_catalog_and_acceptance_contracts": "ENGINE-CAPABILITIES-2026-09-20.md",
-  "scope": "custom C++17 engine-first; no UE migration or paused content restart",
+  "scope": "custom C++17 engine-first; 3D primary; genuine 2D required; no UE migration or paused-content restart",
   "parity_claim": false,
   "inventory_complete": false,
   "local_state": "not_observed",
-  "scheduling": {
-    "requested_interval_minutes": 15,
-    "chat_minimum_interval_minutes": 60,
-    "configured_schedule": null,
-    "local_execution_authority": "existing Company Runtime only"
+  "controls": {
+    "production_repository": "LucasKazaki/AnimeRPG",
+    "default_branch": "main",
+    "engine_branch": "engine/2026-09-22-editor-runtime-smoke",
+    "company_runtime_is_sole_local_executor": true,
+    "historical_r0_runner_allowed": false,
+    "issue_7_state": "open",
+    "merge_release_deploy_allowed_for_engine_worker": false
   },
-  "items": [
-    {
-      "id": "E00",
-      "title": "Evidence and recovery safety",
-      "repository_status": "partial",
-      "source_ids": [
-        "UE-QA"
-      ],
-      "depends_on": [],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E01",
-      "title": "Runtime, jobs and memory",
-      "repository_status": "partial",
-      "source_ids": [
-        "UE-TASKS",
-        "UNITY-JOBS"
-      ],
-      "depends_on": [
-        "E00"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E02",
-      "title": "Scene ownership and serialization",
-      "repository_status": "partial",
-      "source_ids": [],
-      "depends_on": [
-        "E00",
-        "E01"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E03",
-      "title": "Asset pipeline and resources",
-      "repository_status": "partial",
-      "source_ids": [
-        "UE-ASSETS",
-        "UNITY-ASSETS"
-      ],
-      "depends_on": [
-        "E00",
-        "E02"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E04",
-      "title": "GPU rendering and materials",
-      "repository_status": "not_found",
-      "source_ids": [
-        "UNITY-RENDER"
-      ],
-      "depends_on": [
-        "E01",
-        "E02",
-        "E03"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E05",
-      "title": "Lighting, shadows and reflections",
-      "repository_status": "not_found",
-      "source_ids": [
-        "UE-LUMEN"
-      ],
-      "depends_on": [
-        "E04"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E06",
-      "title": "Large worlds and virtualized detail",
-      "repository_status": "not_found",
-      "source_ids": [
-        "UE-WORLD",
-        "UE-NANITE"
-      ],
-      "depends_on": [
-        "E01",
-        "E02",
-        "E03",
-        "E04"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E07",
-      "title": "Animation",
-      "repository_status": "not_found",
-      "source_ids": [
-        "UNITY-ANIMATION"
-      ],
-      "depends_on": [
-        "E02",
-        "E03",
-        "E04"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E08",
-      "title": "Physics and collision",
-      "repository_status": "not_found",
-      "source_ids": [
-        "UNITY-PHYSICS"
-      ],
-      "depends_on": [
-        "E01",
-        "E02"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E09",
-      "title": "AI and navigation",
-      "repository_status": "partial",
-      "source_ids": [
-        "UE-AI"
-      ],
-      "depends_on": [
-        "E02",
-        "E08"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E10",
-      "title": "Audio engine",
-      "repository_status": "not_found",
-      "source_ids": [
-        "UNITY-AUDIO"
-      ],
-      "depends_on": [
-        "E01",
-        "E03"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E11",
-      "title": "UI and editor tooling",
-      "repository_status": "partial_editor_shell_candidate",
-      "source_ids": [
-        "UNITY-UI"
-      ],
-      "depends_on": [
-        "E02",
-        "E03",
-        "E04"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E12",
-      "title": "Genuine 2D support",
-      "repository_status": "partial",
-      "source_ids": [
-        "UNITY-2D"
-      ],
-      "depends_on": [
-        "E02",
-        "E03",
-        "E04",
-        "E08"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E13",
-      "title": "Networking and multiplayer runtime",
-      "repository_status": "not_found",
-      "source_ids": [
-        "UNITY-NET"
-      ],
-      "depends_on": [
-        "E01",
-        "E02"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E14",
-      "title": "Profiling and budgets",
-      "repository_status": "partial",
-      "source_ids": [
-        "UE-PROFILE",
-        "UNITY-PROFILE"
-      ],
-      "depends_on": [
-        "E00",
-        "E01"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E15",
-      "title": "Packaging and platform acceptance",
-      "repository_status": "partial",
-      "source_ids": [
-        "UE-PACKAGE"
-      ],
-      "depends_on": [
-        "E00",
-        "E03"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E16",
-      "title": "Complete feature-catalogue audit",
-      "repository_status": "research_pending",
-      "source_ids": [],
-      "depends_on": [
-        "E00"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    },
-    {
-      "id": "E17",
-      "title": "Comparative acceptance and soak",
-      "repository_status": "blocked",
-      "source_ids": [
-        "UE-QA",
-        "UE-PROFILE",
-        "UNITY-PROFILE"
-      ],
-      "depends_on": [
-        "E00",
-        "E01",
-        "E02",
-        "E03",
-        "E04",
-        "E05",
-        "E06",
-        "E07",
-        "E08",
-        "E09",
-        "E10",
-        "E11",
-        "E12",
-        "E13",
-        "E14",
-        "E15",
-        "E16"
-      ],
-      "native_evidence": [],
-      "independent_acceptance": false
-    }
+  "capabilities": [
+    {"id":"E00","title":"Evidence and recovery safety","status":"partial","depends_on":[],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E01","title":"Runtime, jobs and memory","status":"partial","depends_on":["E00"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E02","title":"Scene ownership and serialization","status":"partial","depends_on":["E00","E01"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E03","title":"Asset pipeline and resources","status":"partial","depends_on":["E00","E02"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E04","title":"GPU rendering and materials","status":"not_found","depends_on":["E01","E02","E03"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E05","title":"Lighting, shadows and reflections","status":"not_found","depends_on":["E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E06","title":"Large-world streaming and detail","status":"not_found","depends_on":["E01","E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E07","title":"Animation","status":"not_found","depends_on":["E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E08","title":"Physics and collision","status":"not_found","depends_on":["E01","E02"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E09","title":"AI and navigation","status":"partial","depends_on":["E02","E08"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E10","title":"Audio engine","status":"not_found","depends_on":["E01","E03"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_candidate","depends_on":["E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E12","title":"Genuine 2D support","status":"partial","depends_on":["E02","E03","E04","E08"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E13","title":"Networking and multiplayer runtime","status":"not_found","depends_on":["E01","E02"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E14","title":"Profiling and budgets","status":"partial","depends_on":["E00","E01"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E15","title":"Packaging and platforms","status":"partial","depends_on":["E00","E03"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E16","title":"Complete feature-catalogue audit","status":"research_pending","depends_on":["E00"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E17","title":"Comparative acceptance and soak","status":"blocked","depends_on":["E00","E01","E02","E03","E04","E05","E06","E07","E08","E09","E10","E11","E12","E13","E14","E15","E16"],"native_evidence":[],"independent_acceptance":false}
   ],
-  "current_repair": {
-    "id": "E0-ASSET-VALIDATION-2026-09-20",
-    "kind": "existing-engine-bugfix",
-    "status": "sandbox_verified_native_pending",
-    "covered_subrequirement": "bounded wireframe input validation only, not all of E03",
-    "task": "Tasks/E0-ASSET-VALIDATION-2026-09-20.md",
-    "evidence": "Docs/QA/E0-ASSET-VALIDATION-2026-09-20.md"
-  },
+  "feature_catalogue_gaps_retained": [
+    "terrain and foliage",
+    "particles and VFX",
+    "cinematics and sequencing",
+    "scripting and reflection",
+    "input actions and replay",
+    "accessibility",
+    "localization",
+    "plugins/extensions",
+    "additional desktop platforms",
+    "mobile",
+    "consoles",
+    "XR",
+    "web",
+    "measured comparative performance/memory/reliability",
+    "clean-machine packaging",
+    "stress and recovery",
+    "24-hour soak"
+  ],
   "active_candidates": [
-    {
-      "id": "E11-EDITOR-SHELL-2026-09-22",
-      "kind": "editor-tooling-slice",
-      "status": "integrated_hosted_windows_verified_native_gui_pending",
-      "integrated_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
-      "latest_hosted_candidate": "ad34df2827ab63400db131469af90ccf643343f9",
-      "covered_subrequirement": "separate Win32 editor frame with toolbar, Outliner, procedural viewport, Inspector and primitive asset browser; unsupported Select/Move/Rotate/Scale/Play actions stay disabled; deterministic contained panel geometry across standard/narrow/short/zero/malformed tested client extents; clipped GDI viewport; guarded integer coordinate arithmetic; message-loop error handling; all 12 required child controls must be created; no scene mutation or serialization",
-      "task": "Tasks/E11-EDITOR-SHELL-2026-09-22.md",
-      "evidence": "Docs/QA/E11-EDITOR-SHELL-2026-09-22.md"
-    },
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "complete_fixed_outliner_identity_hosted_verified_independent_review_clean_native_runtime_pending",
+      "status": "interactive_enabled_state_hardened_hosted_verified_independent_review_pending_native_runtime_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_observed_main_revision": "b3a2b1bf8f2b0c356d5b352006c48cb86532426b",
-      "latest_code_candidate": "0d2524c5e22035e3bf3a0f762e57616f896a9f57",
-      "latest_evidence_head": "bad411c9cfc1c7a3b6ec7038fee1b188f53130f2",
-      "latest_hosted_evidence_head": "bad411c9cfc1c7a3b6ec7038fee1b188f53130f2",
-      "hosted_windows_run": 35774968831,
-      "hosted_windows_status": "passed",
-      "profiling_run": 35774968840,
-      "profiling_status": "passed",
-      "release_manifest_run": 35774968736,
-      "release_manifest_status": "passed",
-      "candidate_direct_workflows": {
-        "profiling_run": 35773477112,
-        "profiling_status": "passed",
-        "release_manifest_run": 35773476964,
-        "release_manifest_status": "passed",
-        "windows_run": 35773476962,
-        "windows_status": "cancelled_superseded_no_pass_claim"
+      "code_candidate": "9543ec4b022d2bd2249eb8560a2912d0606c0d5f",
+      "runtime_smoke_blob": "63ae08458f6c277b184ce1d4ab1543cb8be5d92e",
+      "editor_source_blob": "5142e632a79c89d0d0ce3efe87e752456f802185",
+      "portable_contract_fixture_sha256": "546a88fc599be0a54a69e6fa5e288b67fb6980b9052708e29196425101b38a13",
+      "hosted": {
+        "windows_run": 35785913785,
+        "windows_job": 106942555966,
+        "windows_status": "completed_success",
+        "profiling_run": 35785913791,
+        "profiling_status": "completed_success",
+        "release_manifest_run": 35785913903,
+        "release_manifest_status": "completed_success",
+        "runtime_smoke_executed_by_hosted_ctest": false
       },
-      "prior_independent_review": {
-        "reviewed_head": "75727914e37f3c16628607c9b7bb232949359dbe",
-        "reviewer": "chatgpt-codex-connector",
-        "status": "completed_no_new_findings_for_superseded_tree",
-        "applies_as_acceptance_to_current_code_candidate": false
+      "independent_review": {
+        "prior_clean_reviewed_tree": "bad411c9cfc1c7a3b6ec7038fee1b188f53130f2",
+        "applies_to_current_code_candidate": false,
+        "current_status": "fresh_review_required"
       },
-      "current_independent_review": {
-        "status": "completed_no_findings",
-        "reviewed_head": "bad411c9cfc1c7a3b6ec7038fee1b188f53130f2",
-        "reviewer": "chatgpt-codex-connector",
-        "completed_at_utc": "2026-09-22T19:42:43Z",
-        "evidence": "Codex review summary completed on bad411c plus bot +1 reaction at 2026-09-22T19:42:46Z; no new inline finding appeared",
-        "applies_as_source_review_to_current_code_candidate": true,
-        "applies_as_final_acceptance": false
-      },
-      "covered_subrequirement": "native Windows smoke for integrated editor shell: one stable process-owned top-level editor HWND; exact initial 12 child HWND/class inventory preserved through selection/resizes/final state; bounded per-send ownership/parent/class/visibility/control-ID revalidation; exact top-level class/title; five visible disabled pending toolbar buttons; exact shell labels/status; exact five ordered Outliner rows Scene Root/Camera/Directional Light/Cube/Floor; exact four ordered asset rows Primitive/Cube/Primitive/Plane/Camera/DirectionalLight; exact Scene Root and Cube Inspector fixtures; Cube selection/notification synchronization; bounded 800x600 and 420x260 asynchronous resize preserving containment and full shell state; owned clean shutdown. Portable complete-Outliner identity fixture passed warning-clean GCC and Clang ASan+UBSan. Exact current evidence head bad411c... passed hosted Windows Debug/Release deterministic checks plus profiling and release-manifest workflows, and received a fresh independent Codex review with no findings. Native Win32 RuntimeSmoke remains unexecuted by hosted CI.",
+      "covered_subrequirement": "Native Windows editor smoke contract for one stable visible and enabled process-owned top-level editor; original 12 child HWND/class continuity; five exact visible disabled pending tools; enabled Outliner and Assets list-box interaction surfaces; exact five ordered Outliner rows and four ordered asset rows; exact Scene Root/Cube Inspector fixtures; bounded Cube selection notification; bounded 800x600 and 420x260 asynchronous resizes preserving enabled/visible state, ownership, containment and complete shell state; bounded process-owned shutdown. Portable enabled-state mutation fixture passed GCC and Clang ASan+UBSan. Hosted compilation/deterministic checks passed. Native interactive RuntimeSmoke and final independent acceptance remain pending.",
+      "research": [
+        {"source":"Microsoft Learn IsWindowEnabled","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-iswindowenabled","accessed":"2026-09-22","applicability":"enabled child window required for normal mouse/keyboard input"},
+        {"source":"Microsoft Learn EnableWindow","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enablewindow","accessed":"2026-09-22","applicability":"disabled controls cannot receive focus/user access"},
+        {"source":"Epic UE 5.8 Outliner","url":"https://dev.epicgames.com/documentation/unreal-engine/outliner-in-unreal-engine","accessed":"2026-09-22","applicability":"interactive hierarchical selection/modification workflow only"},
+        {"source":"Epic UE 5.8 Selecting Actors","url":"https://dev.epicgames.com/documentation/unreal-engine/selecting-actors-in-unreal-engine","accessed":"2026-09-22","applicability":"Outliner/viewport user selection synchronization only"},
+        {"source":"Unity 6.0 Hierarchy","url":"https://docs.unity3d.com/6000.0/Documentation/Manual/hierarchy-window.html","accessed":"2026-09-22","applicability":"scene-object management surface comparison only"}
+      ],
+      "licensing_constraints": "Behavioral/API references only. No proprietary source copied and no new dependency imported.",
       "task": "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
       "evidence": "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
-      "source_fixture": {
-        "editor_source_blob": "5142e632a79c89d0d0ce3efe87e752456f802185",
-        "runtime_smoke_blob": "c493cb962f86a054e0e2a60dcd934ef4610196fd",
-        "portable_contract_fixture_sha256": "8944112d252d2b2c83a28d2e598b6d47ea516266319853e5abadeb19dc170f63"
-      },
-      "hosted_windows_job": 106906174550
+      "native_evidence": [],
+      "independent_acceptance": false
     }
   ],
   "benchmark_proposals": {
     "status": "not_approved_not_measured",
-    "initial_resolutions": [
-      "1920x1080",
-      "2560x1440"
-    ],
-    "initial_frame_budget_ms": 16.67,
+    "resolutions": ["1920x1080", "2560x1440"],
+    "frame_budget_ms": 16.67,
     "budget_statistic": "p95",
     "ram_vram_limits": null,
     "comparison_tolerances": null,
     "required_soak_hours": 24
   },
   "progression_rules": [
-    "No completion from docs, stubs, test counts or green compilation.",
-    "Research one dependency-ready gap, reproduce or specify a failure, then implement one bounded packet.",
+    "No completion from docs, stubs, test counts, or green compilation alone.",
+    "Research one dependency-ready gap, reproduce/specify a failure, then implement one bounded packet.",
     "Keep native and independent acceptance gates; staged repairs are not auto-merged.",
-    "Record source SHA, commands, exits, versions, files, hashes and deferred local checks.",
-    "No second local scheduler, local process control or publication from this record.",
-    "Advance after acceptance and stop/resume honestly at external gates."
+    "Record source SHA, commands, exits, versions, files, hashes, and deferred local checks.",
+    "No second local scheduler, local process control, R0 execution, publication, release, or merge from this engine packet.",
+    "Do not remove unresolved capability rows or catalogue gaps to make parity easier."
   ]
 }
