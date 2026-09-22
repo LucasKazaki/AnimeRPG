@@ -43,8 +43,8 @@ public:
 
     bool UpdateSelection(const Math::Vec3& playerPosition, const WorldBlockout& world);
     LandmarkInteractionReport TryInteract(const Math::Vec3& playerPosition,
-        const WorldBlockout& world, ShadowbladeActions& shadowbladeActions,
-        CharacterProgression* progression = nullptr);
+        const WorldBlockout& world, ShadowbladeActions& shadowbladeActions);
+    void SetCharacterProgression(CharacterProgression* progression) { progression_ = progression; }
 
     bool HasSelection() const { return selectedIndex_ < LedgerCapacity; }
     std::size_t SelectedIndex() const { return selectedIndex_; }
@@ -73,6 +73,7 @@ private:
     std::size_t orderedDiscoveryProgress_{};
     bool orderedSequenceIntact_{true};
     bool orderedResonanceRewardGranted_{};
+    CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
     LandmarkInteractionReport lastReport_{};
 };
 
