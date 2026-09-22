@@ -39,6 +39,12 @@ enum class EditorTool {
     Play,
 };
 
+enum class EditorMessageLoopAction {
+    Dispatch,
+    Quit,
+    Error,
+};
+
 EditorLayout ComputeEditorLayout(int clientWidth, int clientHeight);
 EditorToolbarLayout ComputeEditorToolbarLayout(const EditorRect& toolbar);
 EditorPanelContentLayout ComputeEditorPanelContentLayout(const EditorRect& panel);
@@ -47,5 +53,6 @@ EditorRect ComputeEditorViewportClipRect(const EditorRect& viewport);
 bool Contains(const EditorRect& outer, const EditorRect& inner);
 bool Overlaps(const EditorRect& a, const EditorRect& b);
 bool IsEditorToolAvailable(EditorTool tool);
+EditorMessageLoopAction ClassifyEditorMessageResult(int result);
 
 } // namespace Astral::Editor
