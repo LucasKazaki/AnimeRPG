@@ -3,6 +3,7 @@
 #include <array>
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -12,9 +13,9 @@ constexpr DWORD kMessageTimeoutMs = 1000;
 constexpr DWORD kProcessExitTimeoutMs = 5000;
 constexpr DWORD kCleanupTimeoutMs = 2000;
 
-struct WindowSearch {
+struct ProcessWindowCollection {
     DWORD processId{};
-    HWND window{};
+    std::vector<HWND> windows;
 };
 
 struct ChildControl {
@@ -28,22 +29,36 @@ struct ChildCollection {
     std::vector<ChildControl> controls;
 };
 
-BOOL CALLBACK FindProcessWindow(HWND window, LPARAM parameter) {
-    auto& search = *reinterpret_cast<WindowSearch*>(parameter);
+BOOL CALLBACK CollectVisibleProcessWindow(HWND window, LPARAM parameter) {
+    auto& collection = *reinterpret_cast<ProcessWindowCollection*>(parameter);
     DWORD processId = 0;
     GetWindowThreadProcessId(window, &processId);
-    if (processId == search.processId && IsWindowVisible(window)) {
-        search.window = window;
-        return FALSE;
+    if (processId == collection.processId && IsWindowVisible(window)) {
+        collection.windows.push_back(window);
     }
     return TRUE;
 }
 
-HWND WaitForWindow(DWORD processId) {
+bool VisibleProcessWindows(DWORD processId, std::vector<HWND>& windows) {
+    ProcessWindowCollection collection{processId, {}};
+    if (!EnumWindows(CollectVisibleProcessWindow, reinterpret_cast<LPARAM>(&collection))) {
+        return false;
+    }
+    windows = std::move(collection.windows);
+    return true;
+}
+
+HWND WaitForSingleWindow(DWORD processId, int& observedCount, bool& enumerationFailed) {
+    observedCount = 0;
+    enumerationFailed = false;
     for (int attempt = 0; attempt < 100; ++attempt) {
-        WindowSearch search{processId, nullptr};
-        EnumWindows(FindProcessWindow, reinterpret_cast<LPARAM>(&search));
-        if (search.window) return search.window;
+        std::vector<HWND> windows;
+        if (!VisibleProcessWindows(processId, windows)) {
+            enumerationFailed = true;
+            return nullptr;
+        }
+        observedCount = static_cast<int>(windows.size());
+        if (windows.size() == 1) return windows.front();
         Sleep(50);
     }
     return nullptr;
@@ -208,9 +223,17 @@ int wmain(int argc, wchar_t** argv) {
     DWORD exitCode = 1;
 
     WaitForInputIdle(process.hProcess, 5000);
-    window = WaitForWindow(process.dwProcessId);
+    int visibleTopLevelCount = 0;
+    bool topLevelEnumerationFailed = false;
+    window = WaitForSingleWindow(
+        process.dwProcessId, visibleTopLevelCount, topLevelEnumerationFailed);
     if (!window) {
-        failure = L"editor top-level window not found";
+        if (topLevelEnumerationFailed) {
+            failure = L"EnumWindows failed while locating the editor top-level window";
+        } else {
+            failure = L"expected exactly one visible process-owned top-level window, observed "
+                + std::to_wstring(visibleTopLevelCount);
+        }
     } else if (ClassName(window) != L"AstralEditorWindow") {
         failure = L"unexpected editor window class: " + ClassName(window);
     } else if (WindowText(window) != L"Astral Editor 0.1") {
@@ -300,7 +323,8 @@ int wmain(int argc, wchar_t** argv) {
     }
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
-        << L"Observed 12 required controls, disabled pending tools, Outliner/Inspector "
-        << L"selection sync, contained normal+narrow layouts, and clean exit.\n";
+        << L"Observed exactly one visible process-owned top-level editor window, 12 required "
+        << L"controls, disabled pending tools, Outliner/Inspector selection sync, contained "
+        << L"normal+narrow layouts, and clean exit.\n";
     return 0;
 }

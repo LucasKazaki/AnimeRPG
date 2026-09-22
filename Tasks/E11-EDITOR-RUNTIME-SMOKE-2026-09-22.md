@@ -25,7 +25,7 @@ The test must remain named `EditorRuntimeSmoke` so `cmake/AstralTestSafety.cmake
 
 ## Current primary-source research
 
-Read 2026-09-22:
+Read or rechecked 2026-09-22:
 
 - Epic Games, Unreal Engine 5.8, Unreal Editor Interface: https://dev.epicgames.com/documentation/unreal-engine/unreal-editor-interface
   - Applicability: a comparable editor exposes a viewport, Outliner, Details panel, content surface, toolbar, and tool state that can be observed as a coherent application shell.
@@ -35,16 +35,30 @@ Read 2026-09-22:
   - Licensing: behavioral reference only. No Unity source or assets are copied.
 - Microsoft Win32 `EnumChildWindows`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumchildwindows
   - Applicability: enumerate the editor's child controls without depending on fixed child handles in the smoke process.
+- Microsoft Win32 `EnumWindows`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumwindows
+  - Applicability: enumerate all desktop-app top-level windows rather than stopping after the first process-owned match. Microsoft documents that enumeration continues until all top-level windows are visited unless the callback returns `FALSE`.
+- Microsoft Win32 `GetWindowThreadProcessId`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid
+  - Applicability: associate each enumerated top-level window with the exact editor process launched by the smoke.
+- Microsoft Win32 `IsWindowVisible`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-iswindowvisible
+  - Applicability: count only process-owned top-level windows with the `WS_VISIBLE` state when enforcing the single-visible-window contract.
 - Microsoft Win32 `GetClassNameW`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclassnamew
   - Applicability: classify observed child controls by actual Win32 class.
 - Microsoft Win32 `IsWindowEnabled`: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-iswindowenabled
   - Applicability: verify the E11 contract that Select/Move/Rotate/Scale/Play remain disabled until implemented.
 
+## Continuation finding: top-level cardinality was not actually enforced
+
+Source audit of pre-pass `Tests/EditorRuntimeSmoke.cpp` at branch head `7f30690faec7532a35b2e7e050e873a40a562889` found that `FindProcessWindow` stored the first visible process-owned top-level window and returned `FALSE` immediately. `WaitForWindow` therefore established that at least one visible process-owned window existed, but it did not establish acceptance item 1 below: **exactly one** visible top-level editor window.
+
+A bounded disposable C++17 logic fixture, not the production Win32 subsystem, demonstrates the distinction: the old first-match algorithm accepts `{101, 202}` by returning `101`, while an exact-cardinality algorithm rejects the same two-window observation. Fixture SHA-256: `d9b25b1c9919d485a251542bafed19059582117163aff15d80bc39e02ac1fa0a`. It passed both warning-clean GCC and Clang ASan+UBSan execution. This fixture is only source-logic evidence; native Windows execution remains required.
+
+The repair enumerates all visible top-level windows owned by the launched process, succeeds only when the observed set reaches exactly one within the existing bounded startup polling window, and reports enumeration failure separately from zero/multiple-window observations. It does not broaden process ownership or terminate any unrelated process.
+
 ## Acceptance test
 
 `EditorRuntimeSmoke` must launch the exact built `AstralEditor` executable in a separate process and fail unless all of the following are observed:
 
-1. one visible top-level editor window owned by the launched process;
+1. exactly one visible top-level editor window owned by the launched process;
 2. title `Astral Editor 0.1`;
 3. exactly the required 12 direct E11 child controls: five `BUTTON`, two `LISTBOX`, and five `STATIC` controls;
 4. all five pending tool buttons are visible and disabled;
@@ -57,6 +71,15 @@ Read 2026-09-22:
 The smoke must use bounded waits and must terminate only the process it launched if cleanup is required. It must not use global keyboard/mouse injection.
 
 ## Verification
+
+Disposable source-logic fixture executed in the coordinator sandbox:
+
+```bash
+g++ -std=c++17 -Wall -Wextra -Werror /tmp/e11_window_selection_fixture.cpp -o /tmp/e11_window_selection_fixture
+/tmp/e11_window_selection_fixture
+clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer /tmp/e11_window_selection_fixture.cpp -o /tmp/e11_window_selection_fixture_san
+ASAN_OPTIONS=detect_leaks=1 /tmp/e11_window_selection_fixture_san
+```
 
 Hosted/source checks for the exact candidate:
 
