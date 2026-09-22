@@ -57,6 +57,7 @@ enum class DefenseResult {
     Hit,
     UnblockableHit,
     InvalidThreat,
+    Paused,
 };
 
 struct IncomingAttackDefinition {

@@ -211,6 +211,32 @@ public:
     bool SetTrainingTargetMode(TrainingTargetMode mode);
     bool SetEnemyAggressionPreset(EnemyAggressionPreset preset);
     bool QueueNextEnemyAttack();
+    bool QueueEnemyAttackPattern(EnemyAttackPattern pattern) {
+        if (dummy_.IsDefeated() || IsStaggered() || enemyAttackPending_
+            || CurrentMicros() < enemyAttackReadyMicros_) {
+            return false;
+        }
+
+        const float baseRecovery = EnemyRecoverySeconds();
+        switch (pattern) {
+        case EnemyAttackPattern::QuickCut:
+            pendingEnemyAttack_ = {pattern, 0.55f, 18, 20, true, baseRecovery};
+            break;
+        case EnemyAttackPattern::GuardBreaker:
+            pendingEnemyAttack_ = {pattern, 0.90f, 28, 55, true, baseRecovery + 0.15f};
+            break;
+        case EnemyAttackPattern::RiftBurst:
+            pendingEnemyAttack_ = {pattern, 0.70f, 34, 0, false, baseRecovery + 0.25f};
+            break;
+        default:
+            return false;
+        }
+
+        ++enemyAttackGeneration_;
+        if (enemyAttackGeneration_ == 0) ++enemyAttackGeneration_;
+        enemyAttackPending_ = true;
+        return true;
+    }
     bool ResolveEnemyAttack(EnemyAttackOutcome outcome);
     bool SetBossPracticePhase(EnemyPhase phase);
     bool ClearBossPracticePhase();

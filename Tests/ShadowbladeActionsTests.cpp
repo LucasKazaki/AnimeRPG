@@ -1010,6 +1010,8 @@ void TestDefenseTrainingReviewRepairs() {
 }
 }
 
+#include "DefensePracticePass12Tests.inc"
+
 int main() {
     TestDashCostCooldownAndRegenerationCap();
     TestDirectionalDashNormalizationAndFallback();
@@ -1031,6 +1033,7 @@ int main() {
     TestCombatDefenseTrainingBridgeAndCues();
     TestCombatDefenseTrainingInterruptionAndGrades();
     TestDefenseTrainingReviewRepairs();
+    TestDefensePracticePass12();
     if (failures != 0) return 1;
     std::cout << "Shadowblade action tests passed\n";
     return 0;

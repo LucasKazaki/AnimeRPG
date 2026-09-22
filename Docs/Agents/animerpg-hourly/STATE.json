@@ -3,22 +3,24 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-22",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "b3a2b1bf8f2b0c356d5b352006c48cb86532426b",
+  "last_verified_main_at_pass_start": "012ca98f6aa1ec49bbec830666830de5ab7d1874",
   "last_merged_pass": {
-    "id": "GAME-PASS10-ENEMY-PATTERNS-2026-09-22",
-    "pr": 25,
-    "merge_sha": "b3a2b1bf8f2b0c356d5b352006c48cb86532426b",
-    "head_sha": "0576fdc869b7aa824b7be9e2e7e2d2aad0742ef4",
-    "hosted_windows_ci": "passed_run_344",
-    "release_manifest": "passed_run_269",
+    "id": "GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22",
+    "pr": 27,
+    "merge_sha": "012ca98f6aa1ec49bbec830666830de5ab7d1874",
+    "head_sha": "489992bdd29e8d24c2fd604d6693ba2a3184db6e",
+    "hosted_windows_ci": "passed_run_384",
+    "release_manifest": "passed_run_305",
     "independent_review": "completed_no_unresolved_major_issues",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-22-defense-integration-pass11",
-  "pass": "GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22",
-  "task_packet": "Tasks/GAME-PASS11-DEFENSE-INTEGRATION-2026-09-22.md",
-  "pr": 27,
-  "latest_implementation_checkpoint_before_final_records": "bfd7762ad23d254691bf885e9fb116928514de63",
+  "working_branch": "game/2026-09-22-defense-practice-pass12",
+  "pass": "GAME-PASS12-DEFENSE-PRACTICE-2026-09-22",
+  "task_packet": "Tasks/GAME-PASS12-DEFENSE-PRACTICE-2026-09-22.md",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS12.md",
+  "pr": 29,
+  "latest_review_repair_checkpoint": "dcdc7fc5354b340254f13992bf84a1d9d9c9025e",
+  "final_head": "pending_self_reference_see_pr_29_final_receipt",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -30,30 +32,29 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-052","title":"Enemy-plan to Shadowblade threat bridge","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-053","title":"Defense outcome round-trip","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-054","title":"Automatic impact synchronization","status":"implemented_review_repaired_split_stable_registered_test_coverage"},
-    {"id":"GAME-055","title":"Interruption synchronization","status":"implemented_review_repaired_exact_dual_event_identity_registered_test_coverage"},
-    {"id":"GAME-056","title":"Defense drill telemetry and grade","status":"implemented_review_repaired_threshold_and_streak_registered_test_coverage"},
-    {"id":"QOL-012","title":"Explicit defense timing cue metadata","status":"implemented_review_repaired_backend_metadata_no_rendered_ui"}
+    {"id":"GAME-057","title":"Selectable defense-practice attack patterns","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-058","title":"Bounded defense drill goals","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-059","title":"Semantic guard/dodge control reminders","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-060","title":"Mistake-driven tutorial reminder escalation","status":"implemented_review_repaired_registered_test_coverage"},
+    {"id":"GAME-061","title":"Pause and exact-resume defense drill","status":"implemented_ownership_hardened_registered_test_coverage"},
+    {"id":"QOL-013","title":"Non-color-only defense cue symbols","status":"implemented_backend_metadata_registered_test_coverage_no_rendered_ui"}
   ],
   "review_repairs": {
-    "stale_hit_ordering": "cancel_owned_threat_before_advancing_when_authoritative_plan_missing",
-    "shadowblade_ownership": "exact_actions_object_and_successful_threat_generation",
-    "cue_boundary": "reuse_tolerance_aware_shadowblade_window_predicates",
-    "invalid_delta_reconciliation": "reject_nonfinite_zero_and_negative_delta_before_link_reconciliation",
-    "planner_event_identity": "monotonic_successful_queue_generation_survives_reset_and_requeue",
-    "impact_overflow": "split_at_impact_then_apply_frame_overflow_to_post_impact_recovery",
-    "valid_interruption_tick_forwarding": "cancel_stale_owned_threat_then_advance_ordinary_combat_and_action_clocks_for_positive_finite_delta",
-    "exact_plan_field_regressions": "behavioral_quickcut_damage_guard_damage_blockability_and_riftburst_damage_zero_guard_damage_unblockable_coverage",
-    "grade_coverage": "ordinary_defense_and_interruption_streak_resets_plus_silver_and_below_silver_transitions",
-    "known_review_threads": "final_three_repaired_pending_reply_resolution_and_fresh_exact_head_review",
+    "partial_review_sha": "9f86207d08da73808d249a66fa3a59796a7b4ff1",
+    "required_regression_registration": "added_DefensePracticePass12Tests_inc_to_existing_ShadowbladeActionsTests_target_without_CMake_change",
+    "post_hit_hint_context": "retain_resolved_attack_blockability_for_recovery_time_guard_or_dodge_guidance",
+    "ordinary_timing_hint": "track_consecutive_ordinary_defenses_separately_from_lifetime_perfects",
+    "paused_object_ownership": "unrelated_objects_cannot_impersonate_the_owned_paused_link",
+    "exact_review_sha_e23f2f9": "found_current_threat_overwriting_retained_mistake_hint",
+    "mixed_context_hint_repair": "TutorialHint_uses_lastMissedAttackBlockable_while_ControlReminder_uses_current_cue_with_QuickCut_to_RiftBurst_regression",
     "fresh_final_head_review": "pending"
   },
   "verification": {
     "registered_test_target": "ShadowbladeActionsTests_via_existing_astral_add_test",
-    "implementation_checkpoint_hosted_windows_ci": "started_on_bfd7762_pending_or_completed_separately",
-    "implementation_checkpoint_release_manifest": "started_on_bfd7762_pending_or_completed_separately",
+    "partial_head_9f862_hosted_windows_ci": "passed_run_398_not_final_acceptance",
+    "partial_head_9f862_release_manifest": "passed_run_317_not_final_acceptance",
+    "reviewed_head_e23f2f9_hosted_windows_ci": "passed_run_405_not_final_after_review_repair",
+    "reviewed_head_e23f2f9_release_manifest": "passed_run_324_not_final_after_review_repair",
     "final_records_head_hosted_windows_ci": "pending_exact_final_head",
     "final_records_head_release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
@@ -61,12 +62,11 @@
     "save_compatibility": "not_applicable_no_persistent_format_changed"
   },
   "coordination": {
-    "engine_pr_13": "separate engine/editor/runtime-smoke ownership; pass 11 does not touch its generic paths",
-    "art_pr_23": "separate starter-art ownership; no overlap with pass-11 paths",
-    "art_pr_26": "separate asymmetric glTF calibration ownership; no overlap with pass-11 paths",
-    "art_pr_28": "separate color/exposure calibration ownership; no overlap with pass-11 paths",
-    "combat_sandbox_exception": "only monotonic enemy-planner generation added for independent-review event-identity repair",
-    "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies and R0 unchanged"
+    "engine_pr_13": "separate engine/editor/runtime-smoke ownership; pass 12 does not touch its generic paths",
+    "art_pr_23": "separate starter-art ownership; no overlap with pass-12 paths",
+    "art_pr_26": "separate asymmetric glTF calibration ownership; no overlap with pass-12 paths",
+    "art_pr_28": "separate color/exposure calibration ownership; no overlap with pass-12 paths",
+    "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release and deployment unchanged"
   },
-  "next_action": "Freeze the final records head. Reply to and resolve the three repaired exact-head review threads, require fresh exact-head Windows/release checks and fresh independent Codex review with no unresolved material findings, re-read main and PR head immediately before merge, then merge with expected-head protection and put self-referential final SHA receipts in the PR discussion."
+  "next_action": "Freeze this records head, require exact-head Windows/release gates and a fresh independent Codex review with all material threads resolved, re-read main and PR head immediately before merge, merge with expected-head protection, then record self-referential final head/workflow/review/merge receipts in PR #29 discussion and task result."
 }
