@@ -51,7 +51,8 @@ Sources were read on 2026-09-22. Comparator mechanics are design references only
 
 - Distinct first-time choices for the same topic yield distinct authored response IDs where specified.
 - Invalid topic/choice values fail closed and do not enter history or mutate trust/lore/clues.
-- Trust remains between -3 and +3, first-time choices apply at most one delta, and repeated topics return `AlreadyDiscussed` without changing trust or duplicating unlocks.
+- Trust remains between -3 and +3 and records the actual applied delta after clamping. Repeated ordinary choices return `AlreadyDiscussed` without changing trust or duplicating lore.
+- A topic discussed before its evidence prerequisite becomes true does not permanently lose that clue: a later `ShareEvidence` may unlock the newly eligible clue and contextual response, but it still cannot reapply trust or lore rewards.
 - Lore unlocks are one-time and bounded to three original entries.
 - Evidence clues require their exploration/objective/trust prerequisites and are one-time.
 - Dialogue context comes from the actual `LandmarkInteraction::VisitedCount()` and `ObjectiveComplete()` state.
