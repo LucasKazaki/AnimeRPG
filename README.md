@@ -18,6 +18,10 @@ The audit branch carries previously unintegrated director context. Its files onl
 become default-branch guidance after an approved merge. The August 14 recovery
 deadline and old heartbeat are historical, not evidence of current PC activity.
 
+See the [UE5/Unity capability survey](Docs/Research/ENGINE-CAPABILITIES-2026-09-20.md)
+and [machine-readable work map](Docs/Research/ENGINE-CAPABILITIES.json) for the
+engine comparison plan. No recurring scheduler or parity claim is established.
+
 ## Existing systems prototype
 
 - Native window, bounded loop, keyboard input, frame timing, title telemetry, and logging.
@@ -25,7 +29,7 @@ deadline and old heartbeat are historical, not evidence of current PC activity.
 - Light/heavy training-target combat, range/cooldowns, and terminal target defeat.
 - Shadowblade dash, guard, fatal strike, resources, cooldowns, and regeneration.
 - Five key-driven Thought Commands, landmark discovery, and one Lincoln Memorial training encounter with capped rewards.
-- Fourteen native CTest targets: eight domain tests and six interactive runtime smokes.
+- Fifteen native CTest targets: nine domain tests and six interactive runtime smokes.
 
 This is not the complete National Mall, final anime art, a natural-language AI
 command system, three complete classes, multiple dungeons, multiplayer, or a
@@ -89,6 +93,8 @@ within one CTest invocation; do not launch competing test invocations. Hosted CI
 builds them but intentionally does not claim interactive execution.
 
 See [Audit Evidence](Docs/QA/AUDIT-2026-09-19.md) for verified and pending gates.
+The [asset-loader repair report](Docs/QA/E0-ASSET-VALIDATION-2026-09-20.md) documents
+portable Debug/Release/sanitizer tests and the separate local acceptance handoff.
 Do not run the historical R0 packaging script without a current task and its
 outstanding safety/provenance repairs. No local heartbeat or package was validated
 by the connector audit.
