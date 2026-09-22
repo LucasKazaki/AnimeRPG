@@ -10,6 +10,7 @@ namespace {
 constexpr wchar_t kEditorWindowClass[] = L"AstralEditorWindow";
 constexpr int kOutlinerId = 1001;
 constexpr int kAssetListId = 1002;
+constexpr int kMessageLoopErrorExitCode = 3;
 
 HWND g_outlinerLabel = nullptr;
 HWND g_outliner = nullptr;
@@ -257,9 +258,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     UpdateWindow(window);
 
     MSG message{};
-    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
-        TranslateMessage(&message);
-        DispatchMessageW(&message);
+    while (true) {
+        const BOOL getMessageResult = GetMessageW(&message, nullptr, 0, 0);
+        switch (Astral::Editor::ClassifyEditorMessageResult(
+            static_cast<int>(getMessageResult))) {
+        case Astral::Editor::EditorMessageLoopAction::Error:
+            return kMessageLoopErrorExitCode;
+        case Astral::Editor::EditorMessageLoopAction::Quit:
+            return static_cast<int>(message.wParam);
+        case Astral::Editor::EditorMessageLoopAction::Dispatch:
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+            break;
+        }
     }
-    return static_cast<int>(message.wParam);
 }
