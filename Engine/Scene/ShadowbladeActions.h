@@ -3,8 +3,6 @@
 #include "Engine/Math/Math.h"
 #include "Engine/Scene/CombatSandbox.h"
 
-#include <cstdint>
-
 namespace Astral::Scene {
 
 enum class ShadowActionType {
@@ -121,17 +119,13 @@ public:
     const DefenseReport& LastDefense() const { return lastDefense_; }
 
 private:
-    static constexpr std::int64_t DefenseMicrosPerSecond = 1000000;
-    static std::int64_t DefenseSecondsToMicros(double seconds);
     static double FloatHalfUlpSeconds(float seconds);
-    std::int64_t DefenseTimingToleranceMicros(double deadlineUncertaintySeconds) const;
-    static bool DefenseDeadlineReached(std::int64_t now, std::int64_t deadline,
-        std::int64_t toleranceMicros);
-    static bool DefenseWindowContains(std::int64_t remaining, std::int64_t window,
-        std::int64_t toleranceMicros);
-    std::int64_t CurrentDefenseMicros() const;
+    double DefenseTimingToleranceSeconds(double deadlineUncertaintySeconds) const;
+    static bool DefenseDeadlineReached(double now, double deadline, double toleranceSeconds);
+    static bool DefenseWindowContains(double remaining, double window, double toleranceSeconds);
+    double CurrentDefenseSeconds() const { return defenseElapsedSecondsPrecise_; }
     void RebaseDefenseClock();
-    std::int64_t StartDefenseCounterDeadline();
+    double StartDefenseCounterDeadline();
     DefenseReport ResolveIncomingHit(DefenseResult result);
 
     float resource_{MaximumResource};
@@ -146,9 +140,9 @@ private:
     IncomingAttackDefinition incomingAttack_{};
     double defenseElapsedSecondsPrecise_{};
     double defenseElapsedUncertaintySeconds_{};
-    std::int64_t incomingAttackEndMicros_{};
+    double incomingAttackEndSeconds_{};
     double incomingAttackDeadlineUncertaintySeconds_{};
-    std::int64_t defenseCounterEndMicros_{};
+    double defenseCounterEndSeconds_{};
     double defenseCounterDeadlineUncertaintySeconds_{};
     DefenseTimingPreset defenseTimingPreset_{DefenseTimingPreset::Standard};
     DefenseReport lastDefense_{};
