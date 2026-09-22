@@ -16,7 +16,7 @@
   },
   "working_branch": "game/2026-09-22-training-journey-pass8",
   "pass": "GAME-PASS8-TRAINING-JOURNEY-2026-09-22",
-  "pr": null,
+  "pr": 22,
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -48,5 +48,5 @@
   "coordination": {
     "engine_pr_13": "active; owns shared CMake/editor runtime-smoke paths; pass 8 leaves those paths untouched"
   },
-  "next_action": "Create the scoped pass-8 PR, require exact-head Windows Debug/Release deterministic checks, release-manifest integrity, and independent Codex review; repair findings before expected-head merge and verify main."
+  "next_action": "Require exact-head Windows Debug/Release deterministic checks, release-manifest integrity, and independent Codex review on PR #22; repair findings before expected-head merge and verify main."
 }
