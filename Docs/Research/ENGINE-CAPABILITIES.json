@@ -57,15 +57,23 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "hosted_debug_release_compile_verified_native_runtime_pending",
+      "status": "hosted_debug_release_compile_verified_independent_code_reviewed_native_runtime_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_code_candidate": "40d2e3fe2b42ff9177be5c88b36e1711506f6f8b",
-      "latest_hosted_candidate": "40d2e3fe2b42ff9177be5c88b36e1711506f6f8b",
-      "hosted_windows_run": 35726708407,
-      "hosted_windows_job": 106742016089,
-      "profiling_run": 35726708416,
-      "release_manifest_run": 35726708369,
-      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: process-owned launch; one visible process-owned top-level window must remain the same HWND for 20 consecutive 50 ms observations at startup and again after editor interactions; expected class/title; required direct child-control inventory; disabled pending tool state; exact Outliner Scene Root and Cube identities; exact four-entry Assets fixture identities and order Primitive/Cube, Primitive/Plane, Camera, DirectionalLight using bounded LB_GETTEXTLEN/LB_GETTEXT reads in addition to count verification; exact complete Inspector fixture text for Scene Root and Cube; before side-effecting Outliner selection the editor and Outliner HWNDs are revalidated against the launched PID, direct-parent relation and expected control ID, with the guard repeated before notification and post-notification reads; LB_SETCURSEL accepts the documented non-LB_ERR success contract and the actual requested Cube index is independently verified afterward by LB_GETCURSEL, selected-row text and Inspector state; each side-effecting normal or narrow/short resize revalidates the saved editor HWND against the launched PID immediately before SetWindowPos and fails closed on invalid/recycled HWND or PID mismatch; child-control containment follows bounded SWP_ASYNCWINDOWPOS resizes; shutdown revalidates ownership before one WM_CLOSE and failure cleanup uses only the retained launched-process handle; hosted CI compiled Debug and Release and passed non-runtime regressions but intentionally did not execute the interactive RuntimeSmoke target",
+      "latest_evidence_head": "c8e0bd2e3952f7b77a3f9701cf69af8544f39620",
+      "latest_hosted_candidate": "c8e0bd2e3952f7b77a3f9701cf69af8544f39620",
+      "hosted_windows_run": 35727159651,
+      "hosted_windows_job": 106743549477,
+      "profiling_run": 35727159588,
+      "release_manifest_run": 35727159769,
+      "independent_code_review": {
+        "reviewed_head": "c8e0bd2e3952f7b77a3f9701cf69af8544f39620",
+        "reviewer": "chatgpt-codex-connector",
+        "completed_at_utc": "2026-09-22T12:33:45Z",
+        "new_findings": 0,
+        "evidence": "PR #13 Codex review summary completed for c8e0bd2 plus bot +1 reaction id 518891448"
+      },
+      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: process-owned launch; one visible process-owned top-level window must remain the same HWND for 20 consecutive 50 ms observations at startup and again after editor interactions; expected class/title; required direct child-control inventory; disabled pending tool state; exact Outliner Scene Root and Cube identities; exact four-entry Assets fixture identities and order Primitive/Cube, Primitive/Plane, Camera, DirectionalLight using bounded LB_GETTEXTLEN/LB_GETTEXT reads in addition to count verification; exact complete Inspector fixture text for Scene Root and Cube; before side-effecting Outliner selection the editor and Outliner HWNDs are revalidated against the launched PID, direct-parent relation and expected control ID, with the guard repeated before notification and post-notification reads; LB_SETCURSEL accepts the documented non-LB_ERR success contract and the actual requested Cube index is independently verified afterward by LB_GETCURSEL, selected-row text and Inspector state; each side-effecting normal or narrow/short resize revalidates the saved editor HWND against the launched PID immediately before SetWindowPos and fails closed on invalid/recycled HWND or PID mismatch; child-control containment follows bounded SWP_ASYNCWINDOWPOS resizes; shutdown revalidates ownership before one WM_CLOSE and failure cleanup uses only the retained launched-process handle; exact evidence head passed hosted Debug/Release and non-runtime checks and received a fresh independent Codex code review with no new findings, but hosted CI intentionally did not execute the interactive RuntimeSmoke target",
       "task": "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
       "evidence": "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md"
     }
