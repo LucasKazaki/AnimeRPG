@@ -788,6 +788,116 @@ void TestDefenseTrainingReviewRepairs() {
         boundaryCombat, boundaryActions, DefenseInput::Guard);
     Expect(boundaryGuard.result == DefenseResult::PerfectGuard,
         "guard at the 0.43 second QuickCut boundary agrees with the cue stage");
+
+    CombatSandbox plannerGenerations;
+    const std::uint64_t plannerInitial = plannerGenerations.EnemyAttackGeneration();
+    Expect(plannerGenerations.QueueNextEnemyAttack(),
+        "planner-generation test queues its first event");
+    const std::uint64_t plannerFirst = plannerGenerations.EnemyAttackGeneration();
+    Expect(plannerFirst != 0 && plannerFirst != plannerInitial,
+        "successful planner queue receives a new nonzero generation");
+    Expect(!plannerGenerations.QueueNextEnemyAttack()
+            && plannerGenerations.EnemyAttackGeneration() == plannerFirst,
+        "rejected duplicate planner queue does not consume a generation");
+    plannerGenerations.ResetTrainingSession();
+    Expect(plannerGenerations.QueueNextEnemyAttack()
+            && plannerGenerations.EnemyAttackGeneration() != plannerFirst,
+        "reset and requeue receives a distinct planner event generation");
+
+    CombatSandbox replacementPlanCombat;
+    ShadowbladeActions replacementPlanActions;
+    CombatDefenseTraining replacementPlanDrill;
+    Expect(replacementPlanDrill.QueueNextAttack(replacementPlanCombat, replacementPlanActions),
+        "planner-replacement setup queues a linked event");
+    const std::uint64_t oldPlannerGeneration = replacementPlanCombat.EnemyAttackGeneration();
+    Expect(replacementPlanCombat.SetTrainingEnemyProfile(TrainingEnemyProfile::Vanguard)
+            && replacementPlanCombat.QueueNextEnemyAttack()
+            && replacementPlanCombat.EnemyAttackGeneration() != oldPlannerGeneration,
+        "profile reset plus direct queue creates a replacement planner event");
+    const std::uint64_t replacementPlannerGeneration =
+        replacementPlanCombat.EnemyAttackGeneration();
+    Expect(replacementPlanDrill.AdvanceTime(
+            replacementPlanCombat, replacementPlanActions, 0.2f)
+            && !replacementPlanDrill.HasLinkedAttack()
+            && replacementPlanCombat.HasPendingEnemyAttack()
+            && replacementPlanCombat.EnemyAttackGeneration() == replacementPlannerGeneration
+            && !replacementPlanActions.HasIncomingAttack()
+            && replacementPlanActions.PlayerHealth() == 100,
+        "old link cancellation preserves the reset/requeued planner event exactly");
+    Expect(replacementPlanDrill.Stats().interruptions == 1,
+        "planner replacement records one interruption without consuming the replacement");
+
+    CombatSandbox longTickCombat;
+    ShadowbladeActions longTickActions;
+    CombatDefenseTraining longTickDrill;
+    Expect(longTickDrill.QueueNextAttack(longTickCombat, longTickActions),
+        "long-tick cadence setup queues a QuickCut");
+    const EnemyAttackPlan longTickPlan = longTickCombat.PendingEnemyAttack();
+    Expect(longTickDrill.AdvanceTime(longTickCombat, longTickActions,
+            longTickPlan.windupSeconds + longTickPlan.recoverySeconds),
+        "one long tick resolves the attack and carries overflow through recovery");
+    Expect(!longTickCombat.HasPendingEnemyAttack()
+            && Near(longTickCombat.EnemyAttackReadyInSeconds(), 0.0f)
+            && longTickActions.PlayerHealth() == 82
+            && longTickDrill.QueueNextAttack(longTickCombat, longTickActions),
+        "windup-plus-recovery long tick makes the next attack ready immediately");
+
+    CombatSandbox splitTickCombat;
+    ShadowbladeActions splitTickActions;
+    CombatDefenseTraining splitTickDrill;
+    Expect(splitTickDrill.QueueNextAttack(splitTickCombat, splitTickActions),
+        "split-tick cadence setup queues a QuickCut");
+    const EnemyAttackPlan splitTickPlan = splitTickCombat.PendingEnemyAttack();
+    Expect(splitTickDrill.AdvanceTime(splitTickCombat, splitTickActions,
+            splitTickPlan.windupSeconds),
+        "split cadence resolves at the impact boundary");
+    Expect(!splitTickDrill.AdvanceTime(splitTickCombat, splitTickActions,
+            splitTickPlan.recoverySeconds)
+            && Near(splitTickCombat.EnemyAttackReadyInSeconds(), 0.0f)
+            && splitTickActions.PlayerHealth() == 82
+            && splitTickDrill.QueueNextAttack(splitTickCombat, splitTickActions),
+        "equivalent split ticks produce identical next-attack readiness");
+
+    CombatSandbox invalidInterruptedCombat;
+    ShadowbladeActions invalidInterruptedActions;
+    CombatDefenseTraining invalidInterruptedDrill;
+    Expect(invalidInterruptedDrill.QueueNextAttack(
+            invalidInterruptedCombat, invalidInterruptedActions),
+        "invalid-after-interruption setup queues a linked threat");
+    invalidInterruptedCombat.TryAttack(AttackType::Light, {});
+    invalidInterruptedDrill.AdvanceTime(
+        invalidInterruptedCombat, invalidInterruptedActions, 0.4f);
+    const AttackReport invalidInterruptedHeavy =
+        invalidInterruptedCombat.TryAttack(AttackType::Heavy, {});
+    Expect(invalidInterruptedHeavy.staggerTriggered
+            && !invalidInterruptedCombat.HasPendingEnemyAttack()
+            && invalidInterruptedDrill.HasLinkedAttack(),
+        "authoritative planner disappears before invalid-delta reconciliation");
+    const float invalidInterruptedRemaining =
+        invalidInterruptedActions.IncomingAttackRemaining();
+    const int interruptionsBeforeInvalid =
+        invalidInterruptedDrill.Stats().interruptions;
+    Expect(!invalidInterruptedDrill.AdvanceTime(
+            invalidInterruptedCombat, invalidInterruptedActions, 0.0f)
+            && !invalidInterruptedDrill.AdvanceTime(
+                invalidInterruptedCombat, invalidInterruptedActions, -1.0f)
+            && !invalidInterruptedDrill.AdvanceTime(invalidInterruptedCombat,
+                invalidInterruptedActions, std::numeric_limits<float>::quiet_NaN())
+            && invalidInterruptedDrill.HasLinkedAttack()
+            && invalidInterruptedActions.HasIncomingAttack()
+            && Near(invalidInterruptedActions.IncomingAttackRemaining(),
+                invalidInterruptedRemaining)
+            && invalidInterruptedDrill.Stats().interruptions
+                == interruptionsBeforeInvalid,
+        "invalid deltas remain no-ops even after the authoritative plan disappears");
+    Expect(invalidInterruptedDrill.AdvanceTime(
+            invalidInterruptedCombat, invalidInterruptedActions, 0.01f)
+            && !invalidInterruptedDrill.HasLinkedAttack()
+            && !invalidInterruptedActions.HasIncomingAttack()
+            && invalidInterruptedActions.PlayerHealth() == 100
+            && invalidInterruptedDrill.Stats().interruptions
+                == interruptionsBeforeInvalid + 1,
+        "next positive finite tick performs the deferred interruption safely");
 }
 }
 
