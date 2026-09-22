@@ -3,87 +3,58 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-22",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "84dc005e4e6259faf7209265def762339a6c0cf9",
+  "last_verified_main_at_pass_start": "71e5eeb9c10bdd2b0860acb4d761334bd2336de3",
   "last_merged_pass": {
-    "id": "GAME-PASS2-DEFENSE-TIMING-2026-09-22",
-    "pr": 16,
-    "merge_sha": "84dc005e4e6259faf7209265def762339a6c0cf9",
+    "id": "GAME-PASS3-REACTIONS-RETRY-2026-09-22",
+    "pr": 17,
+    "merge_sha": "71e5eeb9c10bdd2b0860acb4d761334bd2336de3",
+    "head_sha": "77c37a4483de9169bdecbd922866f9937e5ca07f",
     "hosted_windows_ci": "passed",
     "release_manifest": "passed",
-    "independent_review": "completed",
+    "independent_review": "completed_no_major_issues_after_two_p2_repairs",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-22-reactions-retry-pass3",
-  "pass": "GAME-PASS3-REACTIONS-RETRY-2026-09-22",
+  "working_branch": "game/2026-09-22-enemy-depth-pass4",
+  "pass": "GAME-PASS4-ENEMY-DEPTH-2026-09-22",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
-    "increments_with_focused_tests": 6,
+    "increments_with_explicit_regression_coverage": 6,
+    "increments_hosted_verified": 0,
     "increments_native_playable_verified": 0,
     "increments_independently_reviewed": 0,
     "increments_merged": 0
   },
   "increments": [
-    {
-      "id": "GAME-012",
-      "title": "Solar/Umbral Eclipse mana reaction",
-      "status": "implemented_domain_behavior",
-      "note": "Opposing original affinities trigger one bounded Eclipse bonus hit and clear the primed affinity; same/None applications do not fabricate reactions."
-    },
-    {
-      "id": "GAME-013",
-      "title": "Earned combo finisher",
-      "status": "implemented_domain_behavior",
-      "note": "Standard play arms one finisher after three successful combo hits; out-of-range rejection preserves it and successful use consumes it."
-    },
-    {
-      "id": "GAME-014",
-      "title": "Accessible combo-assist preset",
-      "status": "implemented_domain_setting",
-      "note": "Opt-in Accessible lowers only the finisher threshold from three hits to two and persists through training-session resets; Standard remains default."
-    },
-    {
-      "id": "GAME-015",
-      "title": "Deterministic training encounter grade",
-      "status": "implemented_domain_behavior",
-      "note": "Lincoln completion records Gold at <=3 seconds, Silver at <=6 seconds, otherwise Bronze, using combat-domain elapsed time."
-    },
-    {
-      "id": "GAME-016",
-      "title": "National Mall objective-completion reward",
-      "status": "implemented_domain_behavior",
-      "note": "The existing free-discovery landmark chain grants one capped completion resource reward when all three objectives are satisfied; repeats cannot farm it."
-    },
-    {
-      "id": "QOL-004",
-      "title": "Clean completed-encounter retry",
-      "status": "implemented_domain_behavior",
-      "note": "Retry restores transient combat/Shadowblade attempt state and immediately re-enters the encounter, preserves the defense timing preset, and preserves the one-time completion reward ledger."
-    }
+    {"id":"GAME-017","title":"Weakness-aware training enemies","status":"implemented_domain_behavior"},
+    {"id":"GAME-018","title":"Weakness-sensitive Eclipse","status":"implemented_domain_behavior"},
+    {"id":"GAME-019","title":"Eclipse finisher opening","status":"implemented_domain_behavior"},
+    {"id":"GAME-020","title":"Technique-chain challenge scoring","status":"implemented_domain_behavior"},
+    {"id":"GAME-021","title":"Ordered landmark resonance","status":"implemented_domain_behavior"},
+    {"id":"QOL-005","title":"Training enemy variant selector","status":"implemented_domain_behavior"}
   ],
   "research": {
     "accessed": "2026-09-22",
     "reference_sources": [
-      "https://store.playstation.com/en-fi/concept/10000896",
+      "https://apps.apple.com/us/app/zenless-zone-zero/id1606356401",
+      "https://www.playstation.com/en-us/games/genshin-impact/",
+      "https://www.playstation.com/en-us/games/wuthering-waves/",
       "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
-      "https://store.playstation.com/en-us/product/UP5460-PPSA06954_00-GBRELINKERDGSTD1",
       "https://zenless.hoyoverse.com/fr-fr/news/166073"
     ],
     "community_sources": [
-      "https://www.reddit.com/r/GenshinImpact/comments/u0e71n/",
-      "https://www.reddit.com/r/Genshin_Impact/comments/mau8t9/"
+      "https://www.reddit.com/r/ZenlessZoneZero/comments/1k2qi6u/",
+      "https://www.reddit.com/r/ZenlessZoneZero/comments/1hru9ss/"
     ],
-    "community_limit": "Historical individual retry-friction reports, not consensus and not proof of current comparator behavior."
+    "community_limit": "Two historical individual/community discussions requesting broader free-training enemy coverage; not proof of current ZZZ behavior or consensus."
   },
   "verification": {
-    "focused_gcc": "passed",
-    "focused_clang_asan_ubsan": "passed",
-    "fixture_limit": "Exact modified sources plus a minimal test-only interface for unchanged Shadowblade dependency; not a full repository or native Windows run.",
+    "local_checkout_build": "not_run_container_dns_blocked",
     "hosted_windows_ci": "pending_pr_exact_head",
     "release_manifest": "pending_pr_exact_head",
     "native_windows_interactive": "not_run",
     "independent_review": "pending_pr_exact_head"
   },
-  "next_action": "Open the pass-3 PR, require real hosted Windows and release-manifest checks plus exact-head independent Codex review, then merge only if all gates are green."
+  "next_action": "Open pass-4 PR against current main, inspect exact diff, run hosted gates and exact-head independent review, repair findings, and merge only when all applicable gates are green."
 }
