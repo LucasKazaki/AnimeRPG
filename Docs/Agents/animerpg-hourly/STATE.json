@@ -83,7 +83,7 @@
     "hosted_windows_ci": "pending_latest_head_after_review_fix",
     "release_manifest": "pending_latest_head_after_review_fix",
     "native_windows_interactive": "not_run_domain_only_packet",
-    "independent_review": "initial_exact_head_review_found_P2_split_drift; fix_pushed_and_fresh_exact_head_review_required"
+    "independent_review": "initial_exact_head_review_found_P2_split_drift; absolute_timeline_fix_pushed_and_fresh_exact_head_review_required"
   },
   "review_findings": [
     {
@@ -91,7 +91,7 @@
       "reviewed_head": "2cd538aa60a1252699430ac450c7685c6a3a74b9",
       "severity": "P2",
       "finding": "Repeated float subtraction could move an 8.06 s threat across the 0.12 s perfect-defense boundary differently for one 7.94 s step versus 794 x 0.01 s steps.",
-      "resolution": "Defense attack and counter timers now store integer microseconds and decrement by quantized elapsed microseconds. Added direct 8.06/7.94/0.01 boundary and expiry regressions."
+      "resolution": "Defense timing now uses one accumulated high-precision elapsed clock quantized to integer microseconds at comparison points, with integer-microsecond attack/counter deadlines. This avoids both repeated remaining-time subtraction and per-frame microsecond rounding drift. Direct 8.06/7.94/0.01 boundary and expiry regressions are included."
     }
   ],
   "next_action": "Wait for hosted Windows and manifest checks on the final review-fix head, request exact-head Codex re-review, inspect all review threads and the full diff, then merge PR #16 only if every applicable gate passes."
