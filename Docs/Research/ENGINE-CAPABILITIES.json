@@ -48,8 +48,8 @@
       "id": "E11-EDITOR-SHELL-2026-09-22",
       "kind": "editor-tooling-slice",
       "status": "portable_and_hosted_windows_verified_native_gui_pending",
-      "latest_hosted_candidate": "0674188d2a801d278dcb39d65165f584165c29ef",
-      "covered_subrequirement": "separate Win32 editor frame with toolbar, Outliner, procedural viewport, Inspector and primitive asset browser; unsupported Select/Move/Rotate/Scale/Play actions stay disabled; toolbar and panel child-control geometry are deterministic and contained within their assigned regions across standard, narrow, short, zero and malformed tested client extents; viewport GDI paint is clipped to the deterministic viewport rectangle so fixed-inset grid/axis/text drawing cannot escape into neighboring panes during extreme resize; no scene mutation or serialization",
+      "latest_hosted_candidate": "db6896564efca514897302be151f8c4546555ec4",
+      "covered_subrequirement": "separate Win32 editor frame with toolbar, Outliner, procedural viewport, Inspector and primitive asset browser; unsupported Select/Move/Rotate/Scale/Play actions stay disabled; toolbar and panel child-control geometry are deterministic and contained within their assigned regions across standard, narrow, short, zero and malformed tested client extents; viewport GDI paint is clipped to the deterministic viewport rectangle during extreme resize; rectangle containment and overlap predicates compute edges in int64_t and are regression-tested near INT_MIN/INT_MAX to avoid signed-overflow undefined behavior; no scene mutation or serialization",
       "task": "Tasks/E11-EDITOR-SHELL-2026-09-22.md",
       "evidence": "Docs/QA/E11-EDITOR-SHELL-2026-09-22.md"
     }
