@@ -337,6 +337,40 @@ void TestDefenseCounterExpiryIsSplitStable() {
     Expect(!oneStep.HasDefenseCounter() && !split.HasDefenseCounter(),
         "counter expiration is stable across equivalent frame splits");
 }
+
+void TestIncomingAttackTimingIsSplitStable() {
+    using namespace Astral::Scene;
+
+    ShadowbladeActions oneStep;
+    ShadowbladeActions split;
+    Expect(oneStep.BeginIncomingAttack({8.06f, 20, 30, true})
+            && split.BeginIncomingAttack({8.06f, 20, 30, true}),
+        "long split-stability threats queue");
+    oneStep.AdvanceTime(7.94f);
+    for (int step = 0; step < 794; ++step) split.AdvanceTime(0.01f);
+    const DefenseReport oneStepGuard = oneStep.TryDefend(DefenseInput::Guard);
+    const DefenseReport splitGuard = split.TryDefend(DefenseInput::Guard);
+    Expect(oneStepGuard.result == DefenseResult::PerfectGuard
+            && splitGuard.result == DefenseResult::PerfectGuard,
+        "equivalent elapsed time reaches the same perfect-guard boundary");
+    Expect(Near(oneStepGuard.timeToImpact, 0.12f)
+            && Near(splitGuard.timeToImpact, 0.12f),
+        "equivalent elapsed time reports the same quantized impact time");
+
+    ShadowbladeActions oneStepExpiry;
+    ShadowbladeActions splitExpiry;
+    Expect(oneStepExpiry.BeginIncomingAttack({8.06f, 20, 30, true})
+            && splitExpiry.BeginIncomingAttack({8.06f, 20, 30, true}),
+        "expiry split-stability threats queue");
+    oneStepExpiry.AdvanceTime(8.06f);
+    for (int step = 0; step < 806; ++step) splitExpiry.AdvanceTime(0.01f);
+    Expect(!oneStepExpiry.HasIncomingAttack() && !splitExpiry.HasIncomingAttack(),
+        "equivalent elapsed time expires the telegraph on the same boundary");
+    Expect(oneStepExpiry.LastDefense().result == DefenseResult::Hit
+            && splitExpiry.LastDefense().result == DefenseResult::Hit
+            && oneStepExpiry.PlayerHealth() == 80 && splitExpiry.PlayerHealth() == 80,
+        "equivalent expiry applies exactly one identical incoming hit");
+}
 }
 
 int main() {
@@ -352,6 +386,7 @@ int main() {
     TestGuardIntegrityBreakAndUnblockableHit();
     TestPerfectGuardTimingPresetAndAutomaticHit();
     TestDefenseCounterExpiryIsSplitStable();
+    TestIncomingAttackTimingIsSplitStable();
     if (failures != 0) return 1;
     std::cout << "Shadowblade action tests passed\n";
     return 0;
