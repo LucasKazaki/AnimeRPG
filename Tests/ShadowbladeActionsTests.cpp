@@ -104,6 +104,8 @@ void TestFatalStrikeRangeDamageAndCooldown() {
         "ordinary fatal strike keeps its normal resource cost");
     Expect(hit.damageApplied == 80 && combat.Dummy().health == 20,
         "fatal strike applies distinct high damage through combat domain");
+    Expect(combat.ComboCount() == 1 && combat.Stats().bestCombo == 1,
+        "successful fatal strike participates in the shared attack combo");
     Expect(Near(actions.Resource(), 50.0f), "fatal strike consumes its defined cost");
     Expect(Near(actions.FatalStrikeCooldownRemaining(), 2.0f),
         "fatal strike starts its cooldown");
@@ -112,6 +114,7 @@ void TestFatalStrikeRangeDamageAndCooldown() {
     Expect(cooldown.result == Astral::Scene::ShadowActionResult::Cooldown,
         "fatal strike rejects during cooldown");
     actions.AdvanceTime(2.0f);
+    combat.AdvanceTime(2.0f);
     const auto defeat = actions.TryFatalStrike({0.0f, 0.0f, 0.0f}, combat);
     Expect(defeat.damageApplied == 20 && combat.Dummy().IsDefeated(),
         "fatal strike damage is capped to remaining dummy health");
@@ -119,6 +122,23 @@ void TestFatalStrikeRangeDamageAndCooldown() {
     const auto defeated = actions.TryFatalStrike({0.0f, 0.0f, 0.0f}, combat);
     Expect(defeated.result == Astral::Scene::ShadowActionResult::TargetDefeated,
         "fatal strike rejects a defeated target");
+}
+
+void TestMixedAttackComboIncludesFatalStrike() {
+    using namespace Astral::Scene;
+
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    const auto light = combat.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    Expect(light.result == AttackResult::Hit && combat.ComboCount() == 1,
+        "light attack starts the shared combo");
+    combat.AdvanceTime(0.4f);
+    const auto fatal = actions.TryFatalStrike({0.0f, 0.0f, 0.0f}, combat);
+    Expect(fatal.result == ShadowActionResult::Activated && fatal.damageApplied == 75,
+        "fatal strike succeeds inside the active combo window");
+    Expect(combat.ComboCount() == 2 && combat.Stats().bestCombo == 2
+            && combat.Stats().hitCount == 2,
+        "light plus fatal strike records one coherent two-hit combo");
 }
 
 void TestStaggerFollowUpCostAndConsumption() {
@@ -148,6 +168,8 @@ void TestStaggerFollowUpCostAndConsumption() {
     Expect(!combat.IsStaggered(), "successful follow-up consumes the stagger opening exactly once");
     Expect(followUp.damageApplied == 15 && combat.Dummy().IsDefeated(),
         "follow-up damage remains capped to target health");
+    Expect(combat.ComboCount() == 3 && combat.Stats().bestCombo == 3,
+        "stagger follow-up extends the successful light-heavy combo");
 }
 
 void TestGuardConflicts() {
@@ -198,6 +220,7 @@ int main() {
     TestDirectionalDashNormalizationAndFallback();
     TestInvalidDeltaDoesNotMutateState();
     TestFatalStrikeRangeDamageAndCooldown();
+    TestMixedAttackComboIncludesFatalStrike();
     TestStaggerFollowUpCostAndConsumption();
     TestGuardConflicts();
     TestInsufficientResourceRejection();
