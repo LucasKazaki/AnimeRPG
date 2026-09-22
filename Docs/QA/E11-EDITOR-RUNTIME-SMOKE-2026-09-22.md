@@ -9,13 +9,16 @@ Latest independently moving `main` observed during this pass: `755faabfb5f04d5bc
 
 Current code candidate: `46b9a018af5dd6a1ae01d414497ee1e6ef294dfb`.
 `Tests/EditorRuntimeSmoke.cpp` blob: `98ab2d576da85b5f298bd83bb5135c79fc21b2b0`.
+Latest exact hosted evidence head: `0bb638949adc4a79c1053eb2102741139497ea56`.
 Integrated editor source fixture: `Tools/AstralEditorMain.cpp` blob `5142e632a79c89d0d0ce3efe87e752456f802185`; not modified by this packet.
 
 ## Independent finding repaired
 
-The latest independent Codex review reported one current P2 false-pass gap: post-resize and final shell validation freshly enumerated controls, so a `WM_SIZE` regression that destroyed and recreated a control with matching class, caption, ID, contents and state could still pass. The task contract requires the original shell control identities to survive.
+Fresh independent Codex review of exact head `0bb638949adc4a79c1053eb2102741139497ea56` completed at `2026-09-22T16:39:32Z`. It reported one P2 evidence-traceability defect and no new runtime-smoke code defect: the durable capability/task/QA records still pointed to the earlier `c3f1ea2...` evidence state and `357541...` workflow runs even though `0bb6389...` had already completed its own exact-head hosted verification.
 
-Candidate `46b9a018...` repairs that gap:
+This pass repairs that finding without changing runtime-smoke or production editor code. The durable records now distinguish the code candidate from the exact reviewed evidence head and record the exact workflow receipts that belong to that evidence tree.
+
+The underlying code repair in candidate `46b9a018...` remains unchanged:
 
 - `CaptureInitialControlInventory` records exactly twelve direct process-owned child HWND plus class identities after the top-level window is stable;
 - `SameControlHandles` performs one-to-one, enumeration-order-independent equality of the later handle/class set with that initial set;
@@ -25,11 +28,20 @@ Candidate `46b9a018...` repairs that gap:
 - each 800x600 and 420x260 resize checks the original inventory immediately before the side effect and again through containment/full-state validation;
 - final shell validation still requires the original twelve handles.
 
-The previous per-send ownership/parent/class/visibility/control-ID checks remain in place, so current HWND identity and the original-inventory continuity requirement are both enforced. Production editor code was not changed.
+The previous per-send ownership/parent/class/visibility/control-ID checks remain in place, so current HWND identity and the original-inventory continuity requirement are both enforced.
 
-## Primary-source research, rechecked 2026-09-22
+## Primary-source evidence, rechecked 2026-09-22
 
-References are behavioral/API references only. No proprietary source, artwork, asset or dependency was copied/imported.
+The selected gap in this pass is evidence traceability, so the primary evidence is GitHub's exact-head Actions and review state. No proprietary source, artwork, asset or dependency was copied/imported.
+
+- GitHub Actions, exact head `0bb638949adc4a79c1053eb2102741139497ea56`:
+  - Windows Server 2022 workflow `35754595962`, job `106837143068`, `completed/success`, head SHA exactly `0bb638949adc4a79c1053eb2102741139497ea56`, completed at `2026-09-22T16:33:01Z`.
+  - Profiling capture portability workflow `35754596189`, `completed/success`.
+  - Release manifest integrity workflow `35754596081`, `completed/success`.
+- GitHub Codex review submission: exact reviewed commit `0bb638949adc4a79c1053eb2102741139497ea56`, submitted `2026-09-22T16:39:32Z`.
+- Codex review thread on `Docs/Research/ENGINE-CAPABILITIES.json`, created `2026-09-22T16:39:32Z`: P2 request to record the final evidence-head verification in capability/task/QA receipts while keeping native runtime acceptance pending.
+
+The existing behavioral/API references remain applicable and unchanged:
 
 - Epic Games, Unreal Engine 5.8, Unreal Editor Interface: https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-editor-interface
   - Defines the editor as cooperating Level Viewport, Outliner, Details and Content Browser/Drawer surfaces. Astral's twelve-control fixture remains a minimum verification target, not parity.
@@ -46,10 +58,10 @@ Access date: 2026-09-22.
 
 ## Portable reproduction and compiler checks
 
-Disposable C++17 handle-inventory fixture SHA-256:
+Disposable C++17 handle-inventory fixture SHA-256 remains:
 `619092d28540a53ee81e93efa29c93efc6571845de6d631a38800f4460c9ff4e`
 
-Commands executed in the coordinator sandbox:
+Commands executed in the prior code-hardening pass:
 
 ```bash
 g++ -std=c++17 -Wall -Wextra -Werror -pedantic /tmp/e11_handle_inventory_fixture.cpp -o /tmp/e11_handle_inventory_fixture
@@ -60,32 +72,32 @@ sha256sum /tmp/e11_handle_inventory_fixture.cpp
 clang++ -std=c++17 -Wall -Wextra -Werror -pedantic -fsyntax-only -I/tmp/winstub /tmp/EditorRuntimeSmoke.new.cpp
 ```
 
-Results:
+Results remain:
 
 - GCC warning-clean compile and execution: PASS, printed `initial HWND inventory preservation contract fixture: PASS`.
 - Clang ASan+UBSan warning-clean compile and execution with leak detection: PASS, printed the same marker.
 - Fixture hash: `619092d28540a53ee81e93efa29c93efc6571845de6d631a38800f4460c9ff4e`.
-- Exact rewritten smoke SHA-256: `5b24e49f0b37f3a83f710e4147dcc1253679a07f7e5258de8e6190bbb0c49302`; Git blob `98ab2d576da85b5f298bd83bb5135c79fc21b2b0`.
+- Exact runtime-smoke source SHA-256 from that pass: `5b24e49f0b37f3a83f710e4147dcc1253679a07f7e5258de8e6190bbb0c49302`; Git blob `98ab2d576da85b5f298bd83bb5135c79fc21b2b0`.
 - The exact rewritten smoke passed Clang C++17 `-Wall -Wextra -Werror -pedantic -fsyntax-only` against a disposable minimal Win32 declaration shim.
 
-The fixture accepts identical handles in a different enumeration order and rejects a replaced handle, class change, duplicate replacement, and missing control. These are source-logic/compiler checks only. They are not native Win32 editor execution.
+The fixture accepts identical handles in a different enumeration order and rejects a replaced handle, class change, duplicate replacement, and missing control. These are source-logic/compiler checks only. They are not native Win32 editor execution. This evidence-only repair did not modify the smoke source, so the portable fixture was not rerun solely to reproduce unchanged code evidence.
 
-One public `git clone` attempt in the sandbox failed because DNS could not resolve `github.com`; it was not repeated without a changed condition. Exact repository source and writes were instead verified through the connected GitHub repository interface and hosted CI.
+## Hosted exact-head evidence
 
-## Hosted exact-candidate evidence
+Exact hosted evidence head `0bb638949adc4a79c1053eb2102741139497ea56` passed Windows Server 2022 run `35754595962`, job `106837143068`, completed at `2026-09-22T16:33:01Z`. GitHub records that job against exact head SHA `0bb638949adc4a79c1053eb2102741139497ea56`. Successful steps include checkout/external build root, R0 parser-only and safety contracts, PE/prerequisite/runtime-policy contracts, Release assertion and CTest safety contracts, VS2022 x64 configuration, MSVC Debug build and deterministic Debug tests, MSVC Release build and deterministic Release tests, Release dependency/prerequisite/runtime checks, static milestone verifiers and clean tracked-tree verification. The historical R0 runner itself was not executed.
 
-Exact code candidate `46b9a018af5dd6a1ae01d414497ee1e6ef294dfb` passed Windows Server 2022 run `35754110237`, job `106835418831`, completed at `2026-09-22T16:28:22Z`. Successful steps included checkout/external build root, R0 parser-only and safety contracts, PE/prerequisite/runtime-policy contracts, Release assertion and CTest safety contracts, VS2022 x64 configuration, MSVC Debug build and deterministic Debug tests, MSVC Release build and deterministic Release tests, Release dependency/prerequisite/runtime checks, static milestone verifiers and clean tracked-tree verification. The historical R0 runner itself was not executed.
+Additional exact-head checks:
 
-Additional exact-candidate checks:
-
-- Profiling capture portability run `35754109941`: PASS.
-- Release manifest integrity run `35754109935`: PASS.
+- Profiling capture portability run `35754596189`: PASS.
+- Release manifest integrity run `35754596081`: PASS.
 
 Hosted deterministic CTest intentionally excludes every `RuntimeSmoke`. These hosted results therefore prove compilation and deterministic non-runtime regression status, not native editor GUI execution.
 
 ## Review state
 
-The latest independent review finding is repaired by `46b9a018...`, but that review predates this code change. Fresh independent review of the exact final code/evidence head is required. Same-author inspection is not counted as independent acceptance.
+Fresh independent Codex review completed on exact evidence head `0bb638949adc4a79c1053eb2102741139497ea56` at `2026-09-22T16:39:32Z`. It raised one new P2 finding, limited to stale receipt references in the durable capability/task/QA evidence. No new runtime-smoke code finding was reported.
+
+This pass remediates that evidence finding. Because the durable evidence files changed after the review, the evidence-only remediation should receive a fresh independent recheck before the packet is treated as fully reviewed. Same-author inspection is not counted as independent acceptance.
 
 ## Native evidence and handoff
 
@@ -105,8 +117,8 @@ Retain source SHA, machine/Windows identity, MSVC and CMake versions, GPU/driver
 
 ## Result
 
-Status: **original twelve child HWND identities are now retained and checked across selection, both resizes, containment, full shell validation and final validation; portable warning-clean/sanitizer fixture passes; exact-candidate hosted Windows Debug/Release, profiling and release-manifest workflows pass; fresh independent review and native Debug/Release RuntimeSmoke remain pending**.
+Status: **exact evidence-head traceability repaired; code candidate `46b9a018...` unchanged; exact evidence head `0bb6389...` passed hosted Windows Debug/Release, profiling and release-manifest workflows; fresh independent review of that head reported only the stale-receipt finding now remediated; evidence-only recheck and native Debug/Release RuntimeSmoke remain pending**.
 
 E11 remains a partial editor-shell candidate, not UE5/Unity parity. No native GUI, GPU/performance, clean-machine, stress/recovery, soak, or final independent runtime acceptance claim is made. Issue #7 remains separate and open, and R0 was not invoked.
 
-Single next useful action: obtain fresh independent review of the exact final code/evidence head, then execute Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with the required receipts/screenshots.
+Single next useful action: independently recheck this evidence-only repair, then execute Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with the required receipts/screenshots.
