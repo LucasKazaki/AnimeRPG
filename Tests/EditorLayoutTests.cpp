@@ -6,6 +6,7 @@
 #include <limits>
 
 namespace {
+using Astral::Editor::AreRequiredEditorControlsCreated;
 using Astral::Editor::ClassifyEditorMessageResult;
 using Astral::Editor::ComputeEditorLayout;
 using Astral::Editor::ComputeEditorPanelContentLayout;
@@ -13,6 +14,7 @@ using Astral::Editor::ComputeEditorStatusContentLayout;
 using Astral::Editor::ComputeEditorToolbarLayout;
 using Astral::Editor::ComputeEditorViewportClipRect;
 using Astral::Editor::Contains;
+using Astral::Editor::EditorControlCreationState;
 using Astral::Editor::EditorMessageLoopAction;
 using Astral::Editor::EditorRect;
 using Astral::Editor::EditorTool;
@@ -220,6 +222,17 @@ int main() {
         "GetMessage error must not be treated as normal quit");
     ok &= Expect(ClassifyEditorMessageResult(minInt) == EditorMessageLoopAction::Error,
         "negative message results must fail closed");
+
+    EditorControlCreationState completeControls{};
+    completeControls.fill(true);
+    ok &= Expect(AreRequiredEditorControlsCreated(completeControls),
+        "all required editor controls should permit WM_CREATE success");
+    for (std::size_t missing = 0; missing < completeControls.size(); ++missing) {
+        auto incompleteControls = completeControls;
+        incompleteControls[missing] = false;
+        ok &= Expect(!AreRequiredEditorControlsCreated(incompleteControls),
+            "any missing required editor control must fail WM_CREATE");
+    }
 
     if (!ok) return EXIT_FAILURE;
     std::cout << "EditorLayoutTests: PASS\n";
