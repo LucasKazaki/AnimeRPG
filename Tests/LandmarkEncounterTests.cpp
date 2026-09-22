@@ -163,6 +163,33 @@ void TestConfiguredChallengeRewardsPersistAcrossRetryAndRespectCap() {
             && cappedEncounter.ChallengeTracker().FirstClearGranted(
                 EncounterChallengeDifficulty::Standard),
         "challenge and completion rewards cannot overflow or bypass the maximum resource cap");
+
+    CombatSandbox preActivationCombat;
+    ShadowbladeActions preActivationActions;
+    LandmarkEncounter preActivationEncounter;
+    preActivationEncounter.ConfigureChallenge(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Reaction);
+    preActivationCombat.ApplyManaAffinity(ManaAffinity::Solar);
+    const ManaReactionReport beforeActivation =
+        preActivationCombat.ApplyManaAffinity(ManaAffinity::Umbral);
+    Expect(beforeActivation.reaction == ManaReaction::Eclipse
+            && preActivationCombat.Stats().reactionCount == 1
+            && preActivationCombat.Stats().totalDamage == CombatSandbox::EclipseReactionDamage,
+        "setup records one reaction and its damage before encounter activation");
+    Expect(preActivationEncounter.TryActivate(
+            Discovery(LandmarkKind::LincolnMemorial), preActivationCombat).result
+            == LandmarkEncounterResult::Activated,
+        "challenge activation snapshots the current training metrics");
+    preActivationCombat.ApplyDamage(preActivationCombat.Dummy().health);
+    Expect(preActivationEncounter.Update(preActivationCombat, preActivationActions),
+        "activation-local challenge completes after only post-activation direct damage");
+    const EncounterChallengeResult local = preActivationEncounter.LastReport().challenge;
+    Expect(!local.tacticalGoal && !local.techniqueVarietyGoal
+            && local.flawlessGoal && local.speedGoal
+            && local.sideGoalsCompleted == 2,
+        "pre-activation reaction cannot satisfy encounter tactical or variety goals");
+    Expect(local.score == 400 && local.rank == EncounterChallengeRank::Silver,
+        "challenge score uses only post-activation damage and encounter-local timing");
 }
 
 void TestManaReactionStateAndReset() {
