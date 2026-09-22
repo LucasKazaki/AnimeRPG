@@ -66,15 +66,16 @@ Results:
 
 This fixture proves only the portable guard model. It is not production Win32/native editor execution.
 
-## Hosted workflow evidence
+## Hosted exact-candidate evidence
 
-For exact code candidate `b28b8cc079c92b925b3f59c223e67651a238d276` at this checkpoint:
+Exact code candidate `b28b8cc079c92b925b3f59c223e67651a238d276` passed Windows Server 2022 run `35743225947`, job `106798072594`. Successful steps included checkout/external build root, R0 parser-only and runner-safety contracts, PE/prerequisite/runtime-policy contracts, Release assertion and CTest safety contracts, VS2022 x64 configure, MSVC Debug build and deterministic Debug tests, MSVC Release build and deterministic Release tests, Release dependency/prerequisite checks, static milestone verifiers and clean tracked-tree verification. The historical R0 runner itself was not executed.
+
+Additional exact-candidate checks:
 
 - Profiling capture portability run `35743225660`: PASS.
 - Release manifest integrity run `35743225770`: PASS.
-- Windows build and deterministic tests run `35743225947`: in progress when last checked, so no success/failure is claimed in this receipt yet.
 
-Hosted deterministic CTest intentionally excludes every `RuntimeSmoke`. A green hosted Windows workflow would prove compilation and deterministic non-runtime regression status, not native editor GUI execution.
+Hosted deterministic CTest intentionally excludes every `RuntimeSmoke`. These hosted results therefore prove compilation and deterministic non-runtime regression status, not native editor GUI execution.
 
 ## Independent review state
 
@@ -100,8 +101,8 @@ Retain source SHA, machine/Windows identity, MSVC and CMake versions, GPU/driver
 
 ## Result
 
-Status: **shell-surface handle identity/ownership/parent/class/visibility verification is hardened; portable warning-clean and sanitizer fixtures pass; profiling and release-manifest hosted checks pass; exact-head Windows hosted verification, fresh independent review, and native Debug/Release RuntimeSmoke remain pending**.
+Status: **shell-surface handle identity/ownership/parent/class/visibility verification is hardened; portable warning-clean and sanitizer fixtures pass; exact-candidate Windows Debug/Release, profiling and release-manifest workflows pass; fresh independent review and native Debug/Release RuntimeSmoke remain pending**.
 
 E11 remains a partial editor-shell candidate, not UE5/Unity parity. No native GUI, GPU/performance, clean-machine, stress/recovery, soak, or final independent runtime acceptance claim is made. Issue #7 remains separate and open, and R0 was not invoked.
 
-Single next useful action: finish exact-head Windows hosted verification and fresh independent review, then execute Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with the required receipts/screenshots.
+Single next useful action: obtain fresh independent review of the exact code/evidence state, then execute Debug and Release `EditorRuntimeSmoke` on the registered Windows desktop with the required receipts/screenshots.
