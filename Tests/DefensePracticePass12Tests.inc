@@ -202,6 +202,10 @@ void TestDefensePracticePass12() {
             Expect(hintDrill.TutorialHint(hintCombat, hintActions)
                     == DefenseTrainingTutorialHint::ReadTelegraph,
                 "one consecutive hit suggests rereading the telegraph");
+        } else {
+            Expect(hintDrill.TutorialHint(hintCombat, hintActions)
+                    == DefenseTrainingTutorialHint::GuardBlockable,
+                "second missed blockable attack remains actionable during recovery");
         }
         hintDrill.AdvanceTime(hintCombat, hintActions, plan.recoverySeconds);
     }
@@ -209,7 +213,7 @@ void TestDefensePracticePass12() {
             hintCombat, hintActions, EnemyAttackPattern::QuickCut)
             && hintDrill.TutorialHint(hintCombat, hintActions)
                 == DefenseTrainingTutorialHint::GuardBlockable,
-        "repeated hits specialize the tutorial reminder for a blockable attack");
+        "repeated-hit hint remains specialized when the next blockable threat begins");
     Expect(hintDrill.TryDefend(
             hintCombat, hintActions, DefenseInput::Guard).result == DefenseResult::Guarded
             && hintDrill.Stats().consecutiveHits == 0,
@@ -220,24 +224,35 @@ void TestDefensePracticePass12() {
     CombatDefenseTraining unblockableHintDrill;
     for (int hit = 0; hit < 2; ++hit) {
         Expect(unblockableHintDrill.QueueAttackPattern(unblockableHintCombat,
-                unblockableHintActions, EnemyAttackPattern::QuickCut),
-            "unblockable-hint setup queues a known hit");
+                unblockableHintActions, EnemyAttackPattern::RiftBurst),
+            "unblockable-hint setup queues a known RiftBurst hit");
         const EnemyAttackPlan plan = unblockableHintCombat.PendingEnemyAttack();
-        unblockableHintDrill.AdvanceTime(
-            unblockableHintCombat, unblockableHintActions, plan.windupSeconds);
-        unblockableHintDrill.AdvanceTime(
-            unblockableHintCombat, unblockableHintActions, plan.recoverySeconds);
+        Expect(unblockableHintDrill.AdvanceTime(
+                unblockableHintCombat, unblockableHintActions, plan.windupSeconds),
+            "unblockable-hint setup resolves the known RiftBurst hit");
+        if (hit == 1) {
+            Expect(unblockableHintDrill.TutorialHint(
+                    unblockableHintCombat, unblockableHintActions)
+                    == DefenseTrainingTutorialHint::DodgeUnblockable,
+                "second missed unblockable attack remains actionable during recovery");
+        }
+        if (hit == 0) {
+            unblockableHintDrill.AdvanceTime(
+                unblockableHintCombat, unblockableHintActions, plan.recoverySeconds);
+        }
     }
-    Expect(unblockableHintDrill.QueueAttackPattern(unblockableHintCombat,
-            unblockableHintActions, EnemyAttackPattern::RiftBurst)
-            && unblockableHintDrill.TutorialHint(
-                unblockableHintCombat, unblockableHintActions)
-                == DefenseTrainingTutorialHint::DodgeUnblockable,
-        "repeated hits specialize the tutorial reminder for an unblockable attack");
 
     CombatSandbox timingHintCombat;
     ShadowbladeActions timingHintActions;
     CombatDefenseTraining timingHintDrill;
+    Expect(timingHintDrill.QueueAttackPattern(
+            timingHintCombat, timingHintActions, EnemyAttackPattern::QuickCut),
+        "timing-hint setup queues one earlier perfect defense");
+    timingHintDrill.AdvanceTime(timingHintCombat, timingHintActions, 0.45f);
+    Expect(timingHintDrill.TryDefend(timingHintCombat,
+            timingHintActions, DefenseInput::Dodge).result == DefenseResult::PerfectDodge,
+        "timing-hint setup records an earlier lifetime perfect defense");
+    timingHintDrill.AdvanceTime(timingHintCombat, timingHintActions, 0.85f);
     for (int defense = 0; defense < CombatDefenseTraining::GoalTarget; ++defense) {
         Expect(timingHintDrill.QueueAttackPattern(
                 timingHintCombat, timingHintActions, EnemyAttackPattern::QuickCut)
@@ -248,9 +263,12 @@ void TestDefensePracticePass12() {
             timingHintDrill.AdvanceTime(timingHintCombat, timingHintActions, 0.85f);
         }
     }
-    Expect(timingHintDrill.TutorialHint(timingHintCombat, timingHintActions)
-            == DefenseTrainingTutorialHint::AimPerfectTiming,
-        "clean ordinary defense practice suggests tighter perfect timing after three successes");
+    Expect(timingHintDrill.Stats().perfectDefenses == 1
+            && timingHintDrill.Stats().consecutiveOrdinaryDefenses
+                == CombatDefenseTraining::GoalTarget
+            && timingHintDrill.TutorialHint(timingHintCombat, timingHintActions)
+                == DefenseTrainingTutorialHint::AimPerfectTiming,
+        "three consecutive ordinary defenses suggest tighter timing even after an earlier perfect");
 
     // GAME-061: pausing freezes the linked gameplay clocks and input mutation,
     // then resumes the exact same threat once.
@@ -278,6 +296,11 @@ void TestDefensePracticePass12() {
         pauseDrill.TryDefend(pauseCombat, pauseActions, DefenseInput::Guard);
     Expect(pausedDefense.result == DefenseResult::Paused,
         "paused practice rejects defense input without resolving the threat");
+    CombatSandbox unrelatedPauseCombat;
+    ShadowbladeActions unrelatedPauseActions;
+    Expect(pauseDrill.TryDefend(unrelatedPauseCombat,
+            unrelatedPauseActions, DefenseInput::Guard).result == DefenseResult::NoThreat,
+        "paused coordinator preserves linked-object ownership for unrelated callers");
     Expect(!pauseDrill.AdvanceTime(pauseCombat, pauseActions, 100.0f),
         "paused practice consumes no simulation time even for a very large delta");
     Expect(pauseCombat.HasPendingEnemyAttack() && pauseActions.HasIncomingAttack()
