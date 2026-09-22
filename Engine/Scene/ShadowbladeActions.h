@@ -103,6 +103,14 @@ public:
     DefenseReport TryDefend(DefenseInput input);
     void SetDefenseTimingPreset(DefenseTimingPreset preset) { defenseTimingPreset_ = preset; }
     void ResetDefenseState();
+    bool CancelIncomingAttack() {
+        if (!incomingAttackActive_) return false;
+        incomingAttackActive_ = false;
+        incomingAttackEndSeconds_ = 0.0;
+        incomingAttackDeadlineUncertaintySeconds_ = 0.0;
+        RebaseDefenseClock();
+        return true;
+    }
 
     float Resource() const { return resource_; }
     float DashCooldownRemaining() const { return dashCooldownRemaining_; }
