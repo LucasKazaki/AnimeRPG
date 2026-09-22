@@ -33,20 +33,24 @@
     {"id":"GAME-039","title":"Combat readiness score","status":"implemented_domain_behavior"},
     {"id":"GAME-040","title":"Journey milestone rewards","status":"implemented_domain_behavior"},
     {"id":"GAME-041","title":"Late-progression weapon awakening","status":"implemented_domain_behavior"},
-    {"id":"QOL-009","title":"Opt-in landmark objective activation","status":"implemented_existing_exploration_integration"}
+    {"id":"QOL-009","title":"Opt-in landmark objective activation","status":"implemented_existing_exploration_integration_runtime_label_repaired"}
   ],
   "verification": {
     "registered_test_target": "LandmarkInteractionTests",
     "sandbox_character_progression_gcc": "passed_partial_source_fixture_wall_wextra_werror",
     "sandbox_manual_objective_gcc": "passed_production_landmark_source_with_dependency_stubs_wall_wextra_werror",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
+    "prior_head_970b733_hosted_windows_ci": "passed_run_35756612998",
+    "prior_head_970b733_release_manifest": "passed_run_35756613785",
+    "prior_head_970b733_independent_review": "p2_runtime_mapper_finding_repaired_after_review",
+    "hosted_windows_ci": "pending_exact_final_head_after_review_repair_and_record_updates",
+    "release_manifest": "pending_exact_final_head_after_review_repair_and_record_updates",
     "native_windows_interactive": "not_run",
-    "independent_review": "pending_exact_final_head",
+    "independent_review": "pending_exact_final_head_after_review_repair",
     "persistence_restart_test": "not_applicable_no_save_format_in_this_packet"
   },
   "coordination": {
-    "engine_pr_13": "active; owns shared CMake/editor runtime-smoke paths; pass 8 leaves those paths untouched"
+    "engine_pr_13": "active; owns shared CMake/editor runtime-smoke paths and does not modify Engine/Platform/Win32Application.cpp",
+    "platform_integration_exception": "independent review required one line in Win32Application.cpp to map ObjectiveAdvanced to player-visible status; task scope explicitly amended; no other platform behavior changed"
   },
-  "next_action": "Require exact-head Windows Debug/Release deterministic checks, release-manifest integrity, and independent Codex review on PR #22; repair findings before expected-head merge and verify main."
+  "next_action": "Freeze the branch head, require exact-head Windows Debug/Release deterministic checks, release-manifest integrity, and fresh independent Codex review on PR #22; merge with expected-head protection only if all gates pass, then verify main."
 }
