@@ -107,12 +107,179 @@ if(BUILD_TESTING)
     target_include_directories(EditorLayoutTests PRIVATE .)
     astral_add_test(EditorLayoutTests)
 
-    add_executable(EditorRuntimeSmoke Tests/EditorRuntimeSmoke.cpp)
-    target_include_directories(EditorRuntimeSmoke PRIVATE .)
+    add_executable(EditorRuntimeSmokeWorker Tests/EditorRuntimeSmoke.cpp)
+    target_include_directories(EditorRuntimeSmokeWorker PRIVATE .)
+    target_compile_definitions(EditorRuntimeSmokeWorker PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(EditorRuntimeSmokeWorker PRIVATE user32)
+    target_sources(EditorRuntimeSmokeWorker PRIVATE Tests/AssertionsEnabled.cpp)
+    if(MSVC)
+        target_compile_options(EditorRuntimeSmokeWorker PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(EditorRuntimeSmokeWorker PRIVATE -UNDEBUG)
+    endif()
+
+    set(ASTRAL_EDITOR_RUNTIME_SUPERVISOR_SOURCE
+        "${CMAKE_CURRENT_BINARY_DIR}/EditorRuntimeSmokeSupervisor.cpp")
+    file(WRITE "${ASTRAL_EDITOR_RUNTIME_SUPERVISOR_SOURCE}" [=[
+#include <windows.h>
+
+#include <iostream>
+#include <string>
+#include <vector>
+
+namespace {
+constexpr DWORD kWorkerTimeoutMs = 150000;
+constexpr DWORD kContainmentCleanupTimeoutMs = 5000;
+
+std::wstring QuoteArgument(const wchar_t* value) {
+    std::wstring quoted = L"\"";
+    std::size_t backslashes = 0;
+    for (const wchar_t* cursor = value; *cursor != L'\0'; ++cursor) {
+        if (*cursor == L'\\') {
+            ++backslashes;
+            continue;
+        }
+        if (*cursor == L'\"') {
+            quoted.append(backslashes * 2 + 1, L'\\');
+            quoted.push_back(L'\"');
+            backslashes = 0;
+            continue;
+        }
+        quoted.append(backslashes, L'\\');
+        backslashes = 0;
+        quoted.push_back(*cursor);
+    }
+    quoted.append(backslashes * 2, L'\\');
+    quoted.push_back(L'\"');
+    return quoted;
+}
+
+void PrintWin32Failure(const char* operation, DWORD error) {
+    std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (" << operation
+              << ", Win32 error " << error << ")\n";
+}
+} // namespace
+
+int wmain(int argc, wchar_t** argv) {
+    if (argc != 4) {
+        std::cerr << "usage: EditorRuntimeSmoke <worker> <AstralEditor> <working-directory>\n";
+        return 1;
+    }
+
+    HANDLE job = CreateJobObjectW(nullptr, nullptr);
+    if (!job) {
+        PrintWin32Failure("CreateJobObjectW", GetLastError());
+        return 1;
+    }
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation,
+            &limits, sizeof(limits))) {
+        const DWORD error = GetLastError();
+        CloseHandle(job);
+        PrintWin32Failure("SetInformationJobObject", error);
+        return 1;
+    }
+
+    SIZE_T attributeBytes = 0;
+    SetLastError(ERROR_SUCCESS);
+    const BOOL probeResult = InitializeProcThreadAttributeList(
+        nullptr, 1, 0, &attributeBytes);
+    if (probeResult != FALSE || GetLastError() != ERROR_INSUFFICIENT_BUFFER
+        || attributeBytes == 0) {
+        const DWORD error = GetLastError();
+        CloseHandle(job);
+        PrintWin32Failure("InitializeProcThreadAttributeList probe", error);
+        return 1;
+    }
+
+    std::vector<unsigned char> attributeStorage(attributeBytes);
+    auto* attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(
+        attributeStorage.data());
+    if (!InitializeProcThreadAttributeList(attributes, 1, 0, &attributeBytes)) {
+        const DWORD error = GetLastError();
+        CloseHandle(job);
+        PrintWin32Failure("InitializeProcThreadAttributeList", error);
+        return 1;
+    }
+
+    HANDLE jobList[] = {job};
+    if (!UpdateProcThreadAttribute(attributes, 0, PROC_THREAD_ATTRIBUTE_JOB_LIST,
+            jobList, sizeof(jobList), nullptr, nullptr)) {
+        const DWORD error = GetLastError();
+        DeleteProcThreadAttributeList(attributes);
+        CloseHandle(job);
+        PrintWin32Failure("UpdateProcThreadAttribute(PROC_THREAD_ATTRIBUTE_JOB_LIST)", error);
+        return 1;
+    }
+
+    STARTUPINFOEXW startup{};
+    startup.StartupInfo.cb = sizeof(startup);
+    startup.lpAttributeList = attributes;
+    PROCESS_INFORMATION worker{};
+    std::wstring command = QuoteArgument(argv[1]) + L" "
+        + QuoteArgument(argv[2]) + L" " + QuoteArgument(argv[3]);
+
+    const BOOL created = CreateProcessW(argv[1], command.data(), nullptr, nullptr,
+        FALSE, EXTENDED_STARTUPINFO_PRESENT, nullptr, argv[3],
+        &startup.StartupInfo, &worker);
+    const DWORD createError = created ? ERROR_SUCCESS : GetLastError();
+    DeleteProcThreadAttributeList(attributes);
+
+    if (!created) {
+        CloseHandle(job);
+        PrintWin32Failure("CreateProcessW(worker)", createError);
+        return 1;
+    }
+
+    CloseHandle(worker.hThread);
+    const DWORD waitState = WaitForSingleObject(worker.hProcess, kWorkerTimeoutMs);
+    if (waitState != WAIT_OBJECT_0) {
+        std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (worker "
+                  << (waitState == WAIT_TIMEOUT ? "timeout" : "wait") << ")\n";
+        const BOOL closed = CloseHandle(job);
+        job = nullptr;
+        if (!closed) {
+            std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (could not close kill-on-close job)\n";
+        }
+        const DWORD cleanupState = WaitForSingleObject(
+            worker.hProcess, kContainmentCleanupTimeoutMs);
+        if (cleanupState != WAIT_OBJECT_0) {
+            std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (kill-on-close job did not terminate worker in time)\n";
+        }
+        CloseHandle(worker.hProcess);
+        return 1;
+    }
+
+    DWORD workerExitCode = 1;
+    if (!GetExitCodeProcess(worker.hProcess, &workerExitCode)
+        || workerExitCode == STILL_ACTIVE) {
+        const DWORD error = GetLastError();
+        CloseHandle(job);
+        CloseHandle(worker.hProcess);
+        PrintWin32Failure("GetExitCodeProcess(worker)", error);
+        return 1;
+    }
+
+    CloseHandle(worker.hProcess);
+    CloseHandle(job);
+    if (workerExitCode != 0) {
+        std::cerr << "EDITOR RUNTIME SUPERVISOR: FAIL (worker exit "
+                  << workerExitCode << ")\n";
+        return 1;
+    }
+
+    std::cout << "EDITOR RUNTIME SUPERVISOR: PASS (worker completed inside kill-on-close job)\n";
+    return 0;
+}
+]=])
+
+    add_executable(EditorRuntimeSmoke "${ASTRAL_EDITOR_RUNTIME_SUPERVISOR_SOURCE}")
     target_compile_definitions(EditorRuntimeSmoke PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(EditorRuntimeSmoke PRIVATE user32)
+    target_link_libraries(EditorRuntimeSmoke PRIVATE kernel32)
     astral_add_test(EditorRuntimeSmoke
-        $<TARGET_FILE:AstralEditor> ${CMAKE_SOURCE_DIR})
+        $<TARGET_FILE:EditorRuntimeSmokeWorker> $<TARGET_FILE:AstralEditor> ${CMAKE_SOURCE_DIR})
 
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp
