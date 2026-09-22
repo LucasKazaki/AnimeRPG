@@ -9,6 +9,7 @@ using Astral::Editor::ComputeEditorLayout;
 using Astral::Editor::ComputeEditorPanelContentLayout;
 using Astral::Editor::ComputeEditorStatusContentLayout;
 using Astral::Editor::ComputeEditorToolbarLayout;
+using Astral::Editor::ComputeEditorViewportClipRect;
 using Astral::Editor::Contains;
 using Astral::Editor::EditorRect;
 using Astral::Editor::EditorTool;
@@ -70,6 +71,8 @@ bool CheckLayout(int width, int height) {
     ok &= CheckPanelContentLayout(layout.assets);
     ok &= Expect(Contains(layout.status, ComputeEditorStatusContentLayout(layout.status)),
         "status text control outside status area");
+    ok &= Expect(Contains(layout.viewport, ComputeEditorViewportClipRect(layout.viewport)),
+        "viewport clip outside viewport");
     return ok;
 }
 }
@@ -123,6 +126,19 @@ int main() {
         "standard status vertical padding changed");
     ok &= Expect(standardStatusContent.height == standard.status.height - 6,
         "standard status height changed");
+
+    const auto standardViewportClip = ComputeEditorViewportClipRect(standard.viewport);
+    ok &= Expect(standardViewportClip.x == standard.viewport.x
+            && standardViewportClip.y == standard.viewport.y
+            && standardViewportClip.width == standard.viewport.width
+            && standardViewportClip.height == standard.viewport.height,
+        "standard viewport clip must match viewport bounds");
+
+    const auto malformedViewportClip = ComputeEditorViewportClipRect({12, 34, -50, -60});
+    ok &= Expect(malformedViewportClip.x == 12 && malformedViewportClip.y == 34,
+        "viewport clip origin changed for malformed dimensions");
+    ok &= Expect(malformedViewportClip.width == 0 && malformedViewportClip.height == 0,
+        "viewport clip must clamp malformed dimensions to zero");
 
     const auto narrow = ComputeEditorLayout(320, 200);
     const auto narrowToolbar = ComputeEditorToolbarLayout(narrow.toolbar);
