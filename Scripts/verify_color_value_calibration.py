@@ -82,9 +82,17 @@ def verify(root:Path,source:Path,expected_manifest:Path|None=None):
     expected_roles=[{"id":r["id"],"hex":r["hex"].upper(),"relative_luminance":round(lums[r["id"]],6),"preview_gray_srgb8":grays[i][0]} for i,r in enumerate(roles)]
     req(manifest["roles"]==expected_roles,"role manifest")
     req(manifest.get("grayscale_preview")=="linearize sRGB, compute relative luminance, then re-encode luminance as sRGB gray","grayscale note")
+    expected_screening=[]
     for item in src["ui_screening_pairs"]:
         hi,lo=sorted((lums[item["foreground"]],lums[item["background"]]),reverse=True); ratio=(hi+0.05)/(lo+0.05)
         req(ratio+1e-9>=float(item["minimum_ratio"]),"ui screening contrast")
+        expected_screening.append({
+            "foreground":item["foreground"],
+            "background":item["background"],
+            "ratio":round(ratio,6),
+            "minimum_ratio":item["minimum_ratio"],
+        })
+    req(manifest.get("ui_screening")==expected_screening,"ui screening manifest")
     return {"roles":8,"png_files":3,"ui_pairs":len(src["ui_screening_pairs"])}
 
 def main():

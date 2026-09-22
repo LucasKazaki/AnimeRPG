@@ -5,14 +5,16 @@ Create one deterministic, reviewable color/value reference pack for the proposed
 
 Base dependency: exact ART-003 head `e81f32b8545954b30a205a969bb6f90f0661f7f2`. Use a new art-owned branch/worktree. This packet may add or update only the ART-007 files, `Docs/Agents/art-hourly/STATE.json`, `BACKLOG.json`, and `TOOLCHAIN.md`. Do not merge under this packet.
 
+Derived PNGs are deliberately generated outside the source tree. `color-roles.json`, the generator, verifier, tests, and `expected-manifest.json` are the source contract. Do not check in a second generated pack that can drift from the pin.
+
 ## Acceptance
 
 ```text
 python Scripts/generate_color_value_calibration.py --source Content/Calibration/ColorValue/color-roles.json --output <new-dir>
-python Scripts/generate_color_value_calibration.py --source Content/Calibration/ColorValue/color-roles.json --output Content/Calibration/ColorValue/Generated --check
-python Scripts/verify_color_value_calibration.py Content/Calibration/ColorValue/Generated --source Content/Calibration/ColorValue/color-roles.json --expected-manifest Content/Calibration/ColorValue/expected-manifest.json
+python Scripts/generate_color_value_calibration.py --source Content/Calibration/ColorValue/color-roles.json --output <new-dir> --check
+python Scripts/verify_color_value_calibration.py <new-dir> --source Content/Calibration/ColorValue/color-roles.json --expected-manifest Content/Calibration/ColorValue/expected-manifest.json
 python Scripts/test_color_value_calibration.py
 python -m py_compile Scripts/generate_color_value_calibration.py Scripts/verify_color_value_calibration.py Scripts/test_color_value_calibration.py
 ```
 
-Accept only if all pass and the generated manifest bytes exactly equal the checked-in expected manifest. Record generated-file hashes. No runtime color-management or art-approval claim.
+Accept only if all pass, the fresh generated manifest bytes exactly equal the checked-in expected manifest, and the regression suite confirms there is no stale source-tree `Generated/` pack. Record fresh generated-file hashes. No runtime color-management or art-approval claim.

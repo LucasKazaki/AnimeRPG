@@ -22,7 +22,16 @@ Until Astral exposes these controls, all three states are requirements, not runt
 
 ## Reference pack
 
-`Content/Calibration/ColorValue/` defines eight proposed semantic colors already present in the art bible. The generator emits:
+`Content/Calibration/ColorValue/` defines eight proposed semantic colors already present in the art bible. `expected-manifest.json` pins the exact bytes that the generator must produce. The PNGs are derived review artifacts and are intentionally generated into a fresh directory outside the source tree so a stale checked-in binary pack cannot disagree with the source contract.
+
+Generate and verify with:
+
+```text
+python Scripts/generate_color_value_calibration.py --source Content/Calibration/ColorValue/color-roles.json --output <new-dir>
+python Scripts/verify_color_value_calibration.py <new-dir> --source Content/Calibration/ColorValue/color-roles.json --expected-manifest Content/Calibration/ColorValue/expected-manifest.json
+```
+
+The generator emits:
 
 - `palette_card.png`: exact top-half semantic swatches, relative-luminance preview blocks, and a 16-step code-value ladder;
 - `neutral_lut_16.png`: a deterministic neutral 16x16x16 cube unwrapped to 256x16 with **Astral's own documented layout** `x = R + 16*B`, `y = G`;

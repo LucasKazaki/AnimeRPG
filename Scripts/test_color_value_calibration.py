@@ -3,7 +3,10 @@ from pathlib import Path
 from generate_color_value_calibration import build
 from verify_color_value_calibration import verify
 
-SOURCE=Path(__file__).parent.parent/"Content/Calibration/ColorValue/color-roles.json"
+REPO=Path(__file__).parent.parent
+SOURCE=REPO/"Content/Calibration/ColorValue/color-roles.json"
+GENERATED=REPO/"Content/Calibration/ColorValue/Generated"
+EXPECTED=REPO/"Content/Calibration/ColorValue/expected-manifest.json"
 
 def png_chunk(kind,data):
     return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data)&0xffffffff)
@@ -36,6 +39,11 @@ class Tests(unittest.TestCase):
         for r in m["files"]:
             if r["path"]==path:r.update(bytes=len(d),sha256=hashlib.sha256(d).hexdigest())
         b=(json.dumps(m,indent=2,sort_keys=True)+"\n").encode(); (self.root/"manifest.json").write_bytes(b); self.pin.write_bytes(b)
+    def test_no_stale_derived_pack_is_tracked(self):
+        self.assertFalse(GENERATED.exists(), "derived PNG pack must be generated outside the source tree")
+    def test_fresh_pack_matches_pinned_manifest(self):
+        self.assertEqual(self.manifest,EXPECTED.read_bytes())
+        self.assertEqual(verify(self.root,SOURCE,EXPECTED)["png_files"],3)
     def test_valid(self): self.assertEqual(self.ok()["png_files"],3)
     def test_palette_unsampled_swatch_corruption_even_rehashed(self):
         p=self.root/"palette_card.png"; p.write_bytes(mutate_rgb_pixel(p.read_bytes(),17,45,(1,2,3))); self.rehash("palette_card.png")
@@ -55,6 +63,10 @@ class Tests(unittest.TestCase):
     def test_stale_pin(self):
         m=json.loads((self.root/"manifest.json").read_text()); m["status"]="changed"; (self.root/"manifest.json").write_text(json.dumps(m,indent=2,sort_keys=True)+"\n")
         with self.assertRaisesRegex(ValueError,"expected manifest"): self.ok()
+    def test_ui_screening_manifest_corruption_even_repinned(self):
+        m=json.loads((self.root/"manifest.json").read_text()); m["ui_screening"]=[{"foreground":"fake","background":"graphite","ratio":99.0,"minimum_ratio":1.0}]
+        b=(json.dumps(m,indent=2,sort_keys=True)+"\n").encode(); (self.root/"manifest.json").write_bytes(b); self.pin.write_bytes(b)
+        with self.assertRaisesRegex(ValueError,"ui screening manifest"): self.ok()
     def test_bad_source_contrast(self):
         bad=Path(self.t.name)/"bad.json"; s=json.loads(SOURCE.read_text()); s["roles"][0]["hex"]="#20242A"; bad.write_text(json.dumps(s)); files,man=build(bad)
         out=Path(self.t.name)/"badout"; out.mkdir(); [ (out/p).write_bytes(d) for p,d in files.items() ]; (out/"manifest.json").write_bytes(man)

@@ -4,29 +4,31 @@
   "original_baseline": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
   "latest_observed_main": "012ca98f6aa1ec49bbec830666830de5ab7d1874",
   "run_date": "2026-09-23",
-  "focus": "repair ART-007 independent-review findings before accepting the color/value calibration source pack",
+  "focus": "repair the second ART-007 independent-review findings and eliminate stale derived binary drift",
   "delivered": [
-    "regenerated and repinned all three checked-in calibration PNGs",
-    "bounded PNG dimensions and decompressed bytes before inflation",
-    "full semantic scan of every palette and value-ramp pixel",
-    "relative-luminance grayscale preview computed in linear light and re-encoded to sRGB",
-    "expanded ART-007 regression suite from seven to eleven tests"
+    "removed stale tracked color-calibration PNG derivations; generator plus expected manifest are now the source contract",
+    "added fresh-pack equality with the pinned manifest and source-tree no-derived-pack regressions",
+    "required exact manifest UI-screening metadata derived from source roles and luminance",
+    "added repinned false UI-screening metadata regression",
+    "expanded ART-007 regression suite from eleven to fourteen tests"
   ],
   "verification": {
     "art003_pr_state": "ready_for_review_unmerged",
-    "color_generator": "passed locally: 3 PNGs, astral-color-calibration-2",
-    "color_exact_regeneration_check": "passed locally",
-    "color_validator": "passed locally: 8 roles, 3 PNGs, 4 UI screening pairs",
-    "color_regression_tests": "passed locally: 11/11",
+    "prior_art007_head_hosted_ci": "passed: workflow 35792343037 at 8b87654f036dfd0e7804281b966d973b8a7296ac; superseded by current repair",
+    "color_fresh_generation": "passed locally: 3 PNGs, astral-color-calibration-2",
+    "color_fresh_exact_regeneration_check": "passed locally",
+    "color_fresh_validator": "passed locally: 8 roles, 3 PNGs, 4 UI screening pairs",
+    "color_regression_tests": "passed locally: 14/14",
     "color_python_compile": "passed locally",
+    "derived_source_tree_pack": "removed_by_design_to_prevent_stale_binary_drift",
     "palette_card_sha256": "4fa15493ed523ec5624f325d0ebe2b4cd45a814a1150a364464da10f9fcf0e5c",
     "neutral_lut_sha256": "b9c2e13d85416055d65c6eb9d9a42e297515123c52b8dfd2a9d040458e1b256a",
     "value_ramp_sha256": "7c61e5e17eb2873dd0ae3fc861cb5e51881a08c2492962f2e553f8698c810226",
     "expected_manifest_sha256": "730bd19f4c1f7cb8296991d3cd868144e403dade1055c0984924159792de3ff4",
-    "repaired_exact_head_hosted_ci": "pending_after_publication",
-    "repaired_exact_head_independent_review": "pending_after_publication",
+    "current_exact_head_hosted_ci": "pending_after_publication",
+    "current_exact_head_independent_review": "pending_after_publication",
     "native_astral_color_management": "not_run_engine_unsupported",
     "independent_art_review": "not_run"
   },
-  "next_action": "run exact-head hosted checks and fresh independent review of the repaired ART-007 branch; do not merge under ART-007"
+  "next_action": "run exact-head hosted checks and fresh independent review of the source-only ART-007 repair; keep PR #28 draft and unmerged until both are clean"
 }
