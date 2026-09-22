@@ -57,39 +57,44 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "surface_identity_hardened_hosted_debug_release_verified_independent_review_pending_native_runtime_pending",
+      "status": "per_send_identity_and_post_resize_state_hardened_hosted_debug_release_verified_independent_review_pending_native_runtime_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_observed_main_revision": "1ac6bf8d54219968effadd17e575aafb4ebd3847",
-      "latest_code_candidate": "b28b8cc079c92b925b3f59c223e67651a238d276",
-      "latest_evidence_head": "93a87c5bc0f1360c7dda0a55ba5574ed27235279",
-      "latest_hosted_candidate": "b28b8cc079c92b925b3f59c223e67651a238d276",
-      "hosted_windows_run": 35743225947,
-      "hosted_windows_job": 106798072594,
+      "latest_code_candidate": "7ead712f69b18d4a1be9818ae53fb3e252f06214",
+      "latest_evidence_head": "4bf1a787fb463f77ee1209ac202ff9c7e6cdc26e",
+      "latest_hosted_candidate": "7ead712f69b18d4a1be9818ae53fb3e252f06214",
+      "hosted_windows_run": 35746903272,
+      "hosted_windows_job": 106810756831,
       "hosted_windows_status": "passed",
-      "profiling_run": 35743225660,
+      "profiling_run": 35746903276,
       "profiling_status": "passed",
-      "release_manifest_run": 35743225770,
+      "release_manifest_run": 35746903314,
       "release_manifest_status": "passed",
-      "prior_independent_evidence_recheck": {
-        "reviewed_head": "3385769790f8c428c2f84de85c522138b9cae189",
+      "prior_independent_review": {
+        "reviewed_head": "9931095a40a32e4ec6c93e35a9fb550f7bd1a243",
         "reviewer": "chatgpt-codex-connector",
-        "completed_at_utc": "2026-09-22T14:46:17Z",
-        "new_reported_findings": 0,
-        "applies_to_current_code_candidate": false
+        "completed_at_utc": "2026-09-22T15:04:25Z",
+        "new_reported_findings": 2,
+        "finding_summary": [
+          "revalidate cached child HWND identity immediately before every cross-process send, including both phases of list/text reads",
+          "after each resize revalidate required control inventory, identities, visibility, labels and disabled pending-action state, not geometry alone"
+        ],
+        "remediated_by_code_candidate": "7ead712f69b18d4a1be9818ae53fb3e252f06214",
+        "applies_as_acceptance_to_current_code_candidate": false
       },
       "current_independent_review": {
         "reviewed_head": null,
         "status": "required_after_current_code_change"
       },
-      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: process-owned launch; one visible process-owned top-level window must remain the same HWND for 20 consecutive 50 ms observations at startup and again after editor interactions; expected class/title and direct child inventory; disabled pending tool state; exact shell labels/status; Outliner and Assets handles must be visible process-owned direct ListBox children at exact control IDs before initial list reads; Inspector must be a visible process-owned direct Static before fixture reads and is revalidated before the post-notification Cube read; exact Outliner Scene Root/Cube identities and exact four-entry Assets fixture; before selection, notification and post-notification reads the Outliner handle is revalidated for launched PID, direct parent, ListBox class, visibility and ID; requested Cube selection is independently verified by LB_GETCURSEL, selected-row text and exact Inspector state; each resize revalidates top-level ownership and uses bounded asynchronous resize before containment checks; shutdown revalidates top-level ownership and failure cleanup uses only the retained launched-process handle. Portable warning-clean and ASan/UBSan guard fixture passed; exact candidate passed hosted Windows Debug/Release deterministic checks plus profiling and release-manifest workflows, while native Win32 RuntimeSmoke remains unexecuted by hosted CI.",
+      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: process-owned launch; one visible process-owned top-level window must remain the same HWND for 20 consecutive 50 ms observations at startup and again after interactions; every top-level/child/list text or value read revalidates ownership and, for child controls, expected parent/class/visibility/control ID immediately before each bounded cross-process send, including revalidation between length and text messages; complete shell-state validation checks exact top-level class/title, 12 process-owned direct children, exact class inventory, five exact visible disabled pending toolbar buttons, exact shell labels/status, exact Scene Root or Cube Inspector fixture, Outliner/Assets identity, exact Outliner and four-asset item identities, and expected selection; Cube selection/notification must preserve full synchronized state; both 800x600 and 420x260 bounded asynchronous resizes revalidate top-level ownership, child containment and then the complete shell state; final stable-window check is followed by complete Cube-state validation before clean shutdown. Portable warning-clean and ASan/UBSan contract fixture passed; exact candidate passed hosted Windows Debug/Release deterministic checks plus profiling and release-manifest workflows, while native Win32 RuntimeSmoke remains unexecuted by hosted CI.",
       "task": "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
-      "task_blob": "58fede162298ad3564da394fb1bd7f3cb881cd78",
+      "task_blob": "d69b99ff22aa5d46cd75e2f52f17d04b8a50d0ae",
       "evidence": "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
-      "evidence_blob": "1afcd530a4d98739b5fccfe45ceca9dfe36be503",
+      "evidence_blob": "b0bca911367387dad42ec25b62a9fe9e7d5167d0",
       "source_fixture": {
         "editor_source_blob": "5142e632a79c89d0d0ce3efe87e752456f802185",
-        "runtime_smoke_blob": "6e8ab5a04e87d7b41d2cf1abf68803c79881e3c9",
-        "portable_contract_fixture_sha256": "641888fe4da9a018e0116a76990ce81b10246edfc6a42cd2a6dafc70a1b3e161"
+        "runtime_smoke_blob": "f4e4c1a14bc2d382fbe32849f5b07bee15e55118",
+        "portable_contract_fixture_sha256": "47ad65939c672b33f1aad3831d5dcb770dae96865c698ef7c7774720299f3e57"
       }
     }
   ],
