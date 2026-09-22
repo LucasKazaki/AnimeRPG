@@ -81,7 +81,8 @@ bool DirectVisibleControlOwnedByProcessAndParent(HWND control, HWND parent, DWOR
     int expectedControlId, const wchar_t* expectedClassName) {
     return DirectVisibleChildOwnedByProcessAndParent(
                control, parent, processId, expectedClassName)
-        && GetDlgItem(parent, expectedControlId) == control;
+        && GetDlgItem(parent, expectedControlId) == control
+        && IsWindowEnabled(control);
 }
 
 bool SendMessageBounded(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
@@ -308,8 +309,9 @@ HWND FindDirectVisibleChildByText(const std::vector<ChildControl>& controls, HWN
 bool ValidateShellState(HWND window, DWORD processId,
     const std::vector<ChildControl>& initialControls, const wchar_t* expectedInspectorText,
     int expectedSelection, std::wstring& failure) {
-    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)) {
-        failure = L"editor top-level ownership or visibility changed";
+    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+        || !IsWindowEnabled(window)) {
+        failure = L"editor top-level ownership, visibility, or enabled state changed";
         return false;
     }
     if (ClassName(window) != L"AstralEditorWindow") {
@@ -376,7 +378,7 @@ bool ValidateShellState(HWND window, DWORD processId,
             outliner, window, processId, kOutlinerId, L"ListBox")
         || !DirectVisibleControlOwnedByProcessAndParent(
             assets, window, processId, kAssetListId, L"ListBox")) {
-        failure = L"required Outliner/assets surface identity, ownership, parent, class, ID, or visibility is invalid";
+        failure = L"required Outliner/assets surface identity, ownership, parent, class, ID, visibility, or enabled state is invalid";
         return false;
     }
 
@@ -484,8 +486,9 @@ bool DirectChildrenContained(HWND window, DWORD processId,
 bool ResizeAndCheck(HWND window, DWORD processId,
     const std::vector<ChildControl>& initialControls, int width, int height,
     const wchar_t* expectedInspectorText, int expectedSelection, std::wstring& failure) {
-    if (!WindowOwnedByProcess(window, processId)) {
-        failure = L"editor HWND is no longer owned by launched process before resize";
+    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+        || !IsWindowEnabled(window)) {
+        failure = L"editor HWND ownership, visibility, or enabled state changed before resize";
         return false;
     }
     if (!SameControlHandles(initialControls, DirectChildren(window, processId))) {
@@ -500,8 +503,9 @@ bool ResizeAndCheck(HWND window, DWORD processId,
 
     const ULONGLONG deadline = GetTickCount64() + kResizeTimeoutMs;
     while (true) {
-        if (!WindowOwnedByProcess(window, processId)) {
-            failure = L"editor HWND ownership changed while waiting for asynchronous resize";
+        if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+            || !IsWindowEnabled(window)) {
+            failure = L"editor HWND ownership, visibility, or enabled state changed while waiting for asynchronous resize";
             return false;
         }
         RECT rect{};
@@ -524,8 +528,9 @@ bool ResizeAndCheck(HWND window, DWORD processId,
 
 bool SelectCubeAndNotify(HWND window, DWORD processId,
     const std::vector<ChildControl>& initialControls, std::wstring& failure) {
-    if (!WindowOwnedByProcess(window, processId)) {
-        failure = L"editor top-level ownership changed before selection";
+    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+        || !IsWindowEnabled(window)) {
+        failure = L"editor top-level ownership, visibility, or enabled state changed before selection";
         return false;
     }
     if (!SameControlHandles(initialControls, DirectChildren(window, processId))) {
@@ -536,7 +541,7 @@ bool SelectCubeAndNotify(HWND window, DWORD processId,
     const HWND outliner = GetDlgItem(window, kOutlinerId);
     if (!DirectVisibleControlOwnedByProcessAndParent(
             outliner, window, processId, kOutlinerId, L"ListBox")) {
-        failure = L"Outliner target is invalid before selection";
+        failure = L"Outliner target is invalid, hidden, or disabled before selection";
         return false;
     }
 
@@ -550,8 +555,10 @@ bool SelectCubeAndNotify(HWND window, DWORD processId,
     if (!SameControlHandles(initialControls, DirectChildren(window, processId))
         || !DirectVisibleControlOwnedByProcessAndParent(
             outliner, window, processId, kOutlinerId, L"ListBox")
-        || !WindowOwnedByProcess(window, processId)) {
-        failure = L"Outliner/editor identity changed before selection notification";
+        || !WindowOwnedByProcess(window, processId)
+        || !IsWindowVisible(window)
+        || !IsWindowEnabled(window)) {
+        failure = L"Outliner/editor identity or enabled state changed before selection notification";
         return false;
     }
     LRESULT commandResult = 0;
@@ -665,10 +672,11 @@ int wmain(int argc, wchar_t** argv) {
     }
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
-        << L"Observed one stable visible process-owned top-level editor window before and after "
+        << L"Observed one stable visible, enabled, process-owned top-level editor window before and after "
         << L"interaction; the original 12 process-owned child HWND identities, disabled pending tools, "
-        << L"shell labels, exact Outliner/assets row identities, and Inspector state were revalidated around "
-        << L"every bounded cross-process read and after both normal+narrow resizes; Cube selection stayed "
-        << L"synchronized, all direct children remained contained, and shutdown exited cleanly.\n";
+        << L"enabled Outliner/assets surfaces, shell labels, exact row identities, and Inspector state were "
+        << L"revalidated around every bounded cross-process read and after both normal+narrow resizes; "
+        << L"Cube selection stayed synchronized, all direct children remained contained, and shutdown exited "
+        << L"cleanly.\n";
     return 0;
 }
