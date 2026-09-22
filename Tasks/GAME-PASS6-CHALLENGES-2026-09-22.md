@@ -7,7 +7,7 @@ Target: `main`
 
 ## Scope
 
-Game-domain-only packet. Allowed paths are `Engine/Scene/EncounterChallenge.h`, `Engine/Scene/LandmarkEncounter.*`, the already-registered `Tests/LandmarkInteractionTests.cpp`, this task, and the hourly game state/receipt. Do not touch renderer, platform, editor, CMake, workflows, dependencies, R0, or engine-worker files. PR #13 currently owns CMake/editor runtime-smoke work, so this packet deliberately avoids CMake edits.
+Game-domain-only packet. Allowed paths are `Engine/Scene/EncounterChallenge.h`, `Engine/Scene/LandmarkEncounter.*`, the already-registered `Tests/LandmarkInteractionTests.cpp`, the already-registered `Tests/LandmarkEncounterTests.cpp`, this task, and the hourly game state/receipt. `Tests/LandmarkEncounterTests.cpp` is explicitly included for production-path integration coverage of encounter activation, retry, reward caps, and activation-local challenge metrics. Do not touch renderer, platform, editor, CMake, workflows, dependencies, R0, or engine-worker files. PR #13 currently owns CMake/editor runtime-smoke work, so this packet deliberately avoids CMake edits.
 
 ## Research mapping
 
@@ -29,6 +29,7 @@ Genshin remains a broader combat/exploration reference: its official PlayStation
 - Four side goals are deterministic: flawless, technique variety, speed, and selected tactical focus.
 - Standard, Expert, and Apex produce progressively stricter rank thresholds. Apex specifically uses 2 goals = None, 3 = Bronze, 4 = Silver unless Gold time, and 4 + Gold time = Gold.
 - Challenge scoring uses saturating 64-bit arithmetic and fails closed for negative counts/base scores.
+- Challenge technique counters and base combat score are measured from activation-local deltas, so pre-activation training actions cannot satisfy encounter goals or inflate encounter score.
 - TechniqueFirst weighting materially rewards techniques and side goals without increasing target health.
 - First-clear resource rewards are one-shot per difficulty, persist across encounter retries, and are applied only through the existing resource cap.
 - Existing unconfigured LandmarkEncounter behavior remains backward-compatible.
@@ -37,9 +38,10 @@ Genshin remains a broader combat/exploration reference: its official PlayStation
 ## Verification plan
 
 1. Use focused GCC C++17 `-Wall -Wextra -Werror -pedantic` and Clang ASan/UBSan checks while developing challenge rules.
-2. Keep all final challenge regression cases in the already-registered `LandmarkInteractionTests` target so hosted CTest compiles and executes them without modifying CMake owned by engine PR #13.
-3. Hosted Windows Debug/Release deterministic tests must pass on the exact final head after all review repairs.
-4. Release-manifest integrity and independent Codex review must pass on that same final head.
-5. Merge only after material findings are repaired and a final current-main/diff recheck is clean.
+2. Keep pure challenge-rule boundary cases in the already-registered `LandmarkInteractionTests` target and production encounter integration cases in the already-registered `LandmarkEncounterTests` target, so hosted CTest compiles and executes both without modifying CMake owned by engine PR #13.
+3. `LandmarkEncounterTests` must cover first-clear persistence through `Retry`, capped reward application, and exclusion of pre-activation damage/techniques from challenge scoring and side goals.
+4. Hosted Windows Debug/Release deterministic tests must pass on the exact final head after all review repairs.
+5. Release-manifest integrity and independent Codex review must pass on that same final head.
+6. Merge only after material findings are repaired and a final current-main/diff recheck is clean.
 
 Native input/UI/playable verification is not claimed by this domain-only packet.
