@@ -16,6 +16,7 @@
   },
   "working_branch": "game/2026-09-22-challenge-pass6",
   "pass": "GAME-PASS6-CHALLENGES-2026-09-22",
+  "pr": 20,
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -47,19 +48,23 @@
       "https://www.reddit.com/r/ZZZ_Official/comments/1solaxz/what_changes_would_you_make_to_endgame/",
       "https://www.reddit.com/r/ZZZ_Official/comments/1r8ts9k/endgame_increasing_enemy_hp_pools/"
     ],
-    "community_limit": "Current 2026 player discussions criticize HP inflation and ask for more emphasis on boss mechanics; anecdotal feedback rather than consensus or developer intent."
+    "community_limit": "Current 2026 player discussions criticize HP inflation and ask for more emphasis on boss skill/mechanics; anecdotal feedback rather than consensus or developer intent."
   },
   "verification": {
     "focused_gcc": "passed_challenge_rules_and_boundary_tests",
     "focused_clang_asan_ubsan": "initial_overflow_found_then_fixed_and_passed",
-    "fixture_limit": "Focused challenge-rule verification only; standalone pass-6 test is not CTest-registered because active engine PR 13 owns CMake. Full hosted Windows integration remains required.",
-    "hosted_windows_ci": "pending_pr_exact_head",
-    "release_manifest": "pending_pr_exact_head",
+    "review_repairs": [
+      "P1 fixed by moving pass-6 challenge regressions into registered LandmarkInteractionTests without touching CMake; unregistered duplicate removed",
+      "P2 fixed with stricter Apex 2-goal=None, 3-goal=Bronze, 4-goal=Silver unless Gold time, plus registered boundary coverage"
+    ],
+    "hosted_test_registration": "pass6_challenge_cases_are_now_executed_by_registered_LandmarkInteractionTests",
+    "hosted_windows_ci": "pending_exact_final_head_after_review_repairs",
+    "release_manifest": "pending_exact_final_head_after_review_repairs",
     "native_windows_interactive": "not_run",
-    "independent_review": "pending_pr_exact_head"
+    "independent_review": "requested_exact_final_head_after_review_repairs"
   },
   "coordination": {
-    "engine_pr_13": "active; owns CMakeLists.txt and editor runtime-smoke files; pass 6 intentionally avoids those paths"
+    "engine_pr_13": "active; owns CMakeLists.txt and editor runtime-smoke files; pass 6 does not touch those paths"
   },
-  "next_action": "Open the pass-6 PR against current main, inspect exact diff, require hosted Windows and manifest checks plus exact-head Codex review, repair findings, and merge only when all applicable gates are green."
+  "next_action": "Verify exact final head Windows/manifest workflows and fresh Codex review, re-read main and the final diff, then merge PR 20 with expected-head protection only if all gates pass."
 }
