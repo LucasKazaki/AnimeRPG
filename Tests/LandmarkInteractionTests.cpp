@@ -1,3 +1,4 @@
+#include "Engine/Scene/CharacterProgression.h"
 #include "Engine/Scene/EncounterChallenge.h"
 #include "Engine/Scene/LandmarkInteraction.h"
 
@@ -130,6 +131,135 @@ void TestRewardRoutesThroughResourceRules() {
         "invalid restoration cannot mutate player resource");
 }
 
+void TestSingleCharacterProgressionAndBuildPresets() {
+    using namespace Astral::Scene;
+    CharacterProgression progression;
+
+    const ProgressionRewardReport grant = progression.GrantRewards(650, 120, 100);
+    Expect(grant.experienceApplied == 650 && grant.levelsGained == 3
+            && progression.Level() == 4 && progression.ExperienceIntoLevel() == 50,
+        "experience advances the persistent protagonist through deterministic level thresholds");
+    Expect(grant.masteryPointsApplied == 120 && progression.MasteryRank() == 3
+            && progression.AvailableMasteryPoints() == 120,
+        "mastery rewards advance rank while remaining available for specialization spending");
+    Expect(grant.enhancementMaterialsApplied == 100
+            && progression.EnhancementMaterials() == 100,
+        "enhancement materials accumulate independently from mastery currency");
+
+    Expect(progression.UpgradeTalent(CoreTalent::ShadowStep)
+            == ProgressionActionResult::Success
+            && progression.UpgradeTalent(CoreTalent::ShadowStep)
+                == ProgressionActionResult::Success
+            && progression.TalentTier(CoreTalent::ShadowStep) == 2
+            && progression.AvailableMasteryPoints() == 60,
+        "mastery points upgrade an original Shadowblade talent through rank-gated tiers");
+    Expect(progression.UpgradeTalent(CoreTalent::ShadowStep)
+            == ProgressionActionResult::Locked
+            && progression.TalentTier(CoreTalent::ShadowStep) == 2,
+        "higher talent tiers cannot bypass their mastery-rank prerequisite");
+    Expect(progression.UpgradeTalent(CoreTalent::EclipseEdge)
+            == ProgressionActionResult::Success
+            && progression.UpgradeTalent(CoreTalent::BreakerFocus)
+                == ProgressionActionResult::Success,
+        "earned mastery can be split across distinct single-character specialization paths");
+
+    Expect(progression.UpgradeWeapon() == ProgressionActionResult::Success
+            && progression.UpgradeWeapon() == ProgressionActionResult::Success
+            && progression.WeaponTier() == 2
+            && progression.EnhancementMaterials() == 70,
+        "weapon enhancement consumes bounded materials and honors protagonist level gates");
+    Expect(progression.UpgradeWeapon() == ProgressionActionResult::Locked
+            && progression.WeaponTier() == 2,
+        "weapon enhancement cannot skip its next character-level gate");
+
+    Expect(progression.EquipTalent(0, CoreTalent::ShadowStep)
+            == ProgressionActionResult::Success
+            && progression.EquipTalent(1, CoreTalent::EclipseEdge)
+                == ProgressionActionResult::Success
+            && progression.SaveBuildPreset(0) == ProgressionActionResult::Success
+            && progression.BuildPresetSaved(0),
+        "one of three preset slots saves the protagonist's equipped unlocked talents");
+    Expect(progression.EquipTalent(1, CoreTalent::BreakerFocus)
+            == ProgressionActionResult::Success
+            && progression.EquippedTalent(1) == CoreTalent::BreakerFocus,
+        "equipped build state can change independently of permanent progression");
+    Expect(progression.LoadBuildPreset(0) == ProgressionActionResult::Success
+            && progression.EquippedTalent(0) == CoreTalent::ShadowStep
+            && progression.EquippedTalent(1) == CoreTalent::EclipseEdge,
+        "loading a saved preset atomically restores the intended equipped talent pair");
+    Expect(progression.EquipTalent(1, CoreTalent::ShadowStep)
+            == ProgressionActionResult::Invalid,
+        "a preset loadout cannot equip the same talent twice");
+    Expect(progression.LoadBuildPreset(1) == ProgressionActionResult::EmptyPreset
+            && progression.SaveBuildPreset(CharacterProgression::BuildPresetSlots)
+                == ProgressionActionResult::Invalid,
+        "empty and out-of-range preset operations fail closed without mutating the build");
+
+    int capLevels = 0;
+    CharacterProgression capped;
+    const int capExperience = capped.GrantExperience(std::numeric_limits<int>::max(), capLevels);
+    Expect(capped.Level() == CharacterProgression::MaximumLevel
+            && capped.ExperienceIntoLevel() == 0 && capLevels == 19
+            && capExperience == 19000,
+        "extreme experience input saturates at the explicit level cap without overflow");
+    int ignoredLevels = 0;
+    Expect(capped.GrantExperience(100, ignoredLevels) == 0 && ignoredLevels == 0,
+        "experience after the level cap is ignored deterministically");
+}
+
+void TestLandmarkObjectiveGrantsProgressionOnce() {
+    using namespace Astral::Scene;
+    WorldBlockout world;
+    LandmarkInteraction interaction;
+    ShadowbladeActions actions;
+    CharacterProgression progression;
+    interaction.SetCharacterProgression(&progression);
+
+    const Astral::Math::Vec3 lincoln{-8.0f, 18.0f, 0.0f};
+    const Astral::Math::Vec3 pool{4.0f, 39.0f, 0.0f};
+    const Astral::Math::Vec3 monument{5.0f, 68.0f, 0.0f};
+    Expect(interaction.TryInteract(lincoln, world, actions).result
+            == LandmarkInteractionResult::Discovered
+            && interaction.TryInteract(pool, world, actions).result
+                == LandmarkInteractionResult::Discovered,
+        "progression integration preserves ordinary landmark discovery before completion");
+    const LandmarkInteractionReport completion =
+        interaction.TryInteract(monument, world, actions);
+    Expect(completion.result == LandmarkInteractionResult::Discovered
+            && completion.progressionReward.experienceApplied
+                == LandmarkInteraction::ObjectiveExperienceReward
+            && completion.progressionReward.masteryPointsApplied
+                == LandmarkInteraction::ObjectiveMasteryReward
+            && completion.progressionReward.enhancementMaterialsApplied
+                == LandmarkInteraction::ObjectiveEnhancementMaterialReward,
+        "first National Mall objective completion grants all bounded progression currencies");
+    Expect(progression.Level() == 2 && progression.ExperienceIntoLevel() == 80
+            && progression.AvailableMasteryPoints() == 40
+            && progression.EnhancementMaterials() == 15,
+        "landmark reward feeds the persistent protagonist's level, mastery, and weapon material state");
+
+    const LandmarkInteractionReport repeated =
+        interaction.TryInteract(monument, world, actions);
+    Expect(repeated.result == LandmarkInteractionResult::AlreadyVisited
+            && repeated.progressionReward.experienceApplied == 0
+            && repeated.progressionReward.masteryPointsApplied == 0
+            && repeated.progressionReward.enhancementMaterialsApplied == 0
+            && progression.Level() == 2 && progression.ExperienceIntoLevel() == 80
+            && progression.AvailableMasteryPoints() == 40
+            && progression.EnhancementMaterials() == 15,
+        "repeat landmark interaction cannot farm persistent progression rewards");
+
+    LandmarkInteraction compatibilityInteraction;
+    ShadowbladeActions compatibilityActions;
+    compatibilityInteraction.TryInteract(lincoln, world, compatibilityActions);
+    compatibilityInteraction.TryInteract(pool, world, compatibilityActions);
+    const auto compatibilityCompletion =
+        compatibilityInteraction.TryInteract(monument, world, compatibilityActions);
+    Expect(compatibilityCompletion.result == LandmarkInteractionResult::Discovered
+            && compatibilityCompletion.progressionReward.experienceApplied == 0,
+        "callers that do not attach progression preserve the existing landmark behavior");
+}
+
 void TestEncounterChallengeScoringRanksAndFirstClears() {
     using namespace Astral::Scene;
 
@@ -248,6 +378,8 @@ int main() {
     TestBoundedDiscoveryLedgerAndRepeatSafety();
     TestOrderedObjectiveGuidanceKeepsFreeDiscovery();
     TestRewardRoutesThroughResourceRules();
+    TestSingleCharacterProgressionAndBuildPresets();
+    TestLandmarkObjectiveGrantsProgressionOnce();
     TestEncounterChallengeScoringRanksAndFirstClears();
     if (failures != 0) return 1;
     std::cout << "Landmark interaction tests passed\n";

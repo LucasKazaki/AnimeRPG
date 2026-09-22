@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Scene/CharacterProgression.h"
 #include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/WorldBlockout.h"
 
@@ -26,6 +27,7 @@ struct LandmarkInteractionReport {
     LandmarkInteractionResult result{LandmarkInteractionResult::None};
     LandmarkKind landmark{LandmarkKind::LincolnMemorial};
     float rewardApplied{};
+    ProgressionRewardReport progressionReward{};
 };
 
 class LandmarkInteraction {
@@ -34,11 +36,15 @@ public:
     static constexpr float LincolnReward = 20.0f;
     static constexpr float ObjectiveCompletionReward = 15.0f;
     static constexpr float OrderedResonanceReward = 10.0f;
+    static constexpr int ObjectiveExperienceReward = 180;
+    static constexpr int ObjectiveMasteryReward = 40;
+    static constexpr int ObjectiveEnhancementMaterialReward = 15;
     static constexpr std::size_t LedgerCapacity = 3;
 
     bool UpdateSelection(const Math::Vec3& playerPosition, const WorldBlockout& world);
     LandmarkInteractionReport TryInteract(const Math::Vec3& playerPosition,
         const WorldBlockout& world, ShadowbladeActions& shadowbladeActions);
+    void SetCharacterProgression(CharacterProgression* progression) { progression_ = progression; }
 
     bool HasSelection() const { return selectedIndex_ < LedgerCapacity; }
     std::size_t SelectedIndex() const { return selectedIndex_; }
@@ -67,6 +73,7 @@ private:
     std::size_t orderedDiscoveryProgress_{};
     bool orderedSequenceIntact_{true};
     bool orderedResonanceRewardGranted_{};
+    CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
     LandmarkInteractionReport lastReport_{};
 };
 
