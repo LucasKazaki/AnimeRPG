@@ -24,8 +24,33 @@ std::int64_t ShadowbladeActions::SaturatingMicrosAdd(std::int64_t left,
     return left > maximum - right ? maximum : left + right;
 }
 
+bool ShadowbladeActions::DefenseDeadlineReached(std::int64_t now,
+    std::int64_t deadline) {
+    if (deadline <= 0) return false;
+    if (now >= deadline) return true;
+    return deadline - now <= DefenseBoundaryToleranceMicros;
+}
+
+bool ShadowbladeActions::DefenseWindowContains(std::int64_t remaining,
+    std::int64_t window) {
+    if (remaining <= window) return true;
+    return remaining - window <= DefenseBoundaryToleranceMicros;
+}
+
 std::int64_t ShadowbladeActions::CurrentDefenseMicros() const {
     return DefenseSecondsToMicros(defenseElapsedSecondsPrecise_);
+}
+
+std::int64_t ShadowbladeActions::StartDefenseCounterDeadline() {
+    const std::int64_t counterMicros = DefenseSecondsToMicros(
+        DefenseCounterWindowSeconds);
+    std::int64_t now = CurrentDefenseMicros();
+    const std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
+    if (counterMicros > 0 && now > maximum - counterMicros) {
+        defenseElapsedSecondsPrecise_ = 0.0;
+        now = 0;
+    }
+    return SaturatingMicrosAdd(now, counterMicros);
 }
 
 void ShadowbladeActions::AdvanceTime(float deltaSeconds) {
@@ -44,11 +69,13 @@ void ShadowbladeActions::AdvanceTime(float deltaSeconds) {
             / static_cast<double>(DefenseMicrosPerSecond);
     }
     const std::int64_t now = CurrentDefenseMicros();
-    if (defenseCounterEndMicros_ > 0 && now >= defenseCounterEndMicros_) {
+    if (defenseCounterEndMicros_ > 0
+        && DefenseDeadlineReached(now, defenseCounterEndMicros_)) {
         defenseCounterEndMicros_ = 0;
     }
 
-    if (incomingAttackActive_ && now >= incomingAttackEndMicros_) {
+    if (incomingAttackActive_
+        && DefenseDeadlineReached(now, incomingAttackEndMicros_)) {
         ResolveIncomingHit(DefenseResult::Hit);
     }
 }
@@ -170,8 +197,19 @@ bool ShadowbladeActions::BeginIncomingAttack(const IncomingAttackDefinition& att
         return false;
     }
 
+    std::int64_t now = CurrentDefenseMicros();
+    const std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
+    if (now > maximum - windupMicros) {
+        const std::int64_t counterRemaining = defenseCounterEndMicros_ > now
+            ? defenseCounterEndMicros_ - now
+            : 0;
+        defenseElapsedSecondsPrecise_ = 0.0;
+        defenseCounterEndMicros_ = counterRemaining;
+        now = 0;
+    }
+
     incomingAttack_ = attack;
-    incomingAttackEndMicros_ = SaturatingMicrosAdd(CurrentDefenseMicros(), windupMicros);
+    incomingAttackEndMicros_ = now + windupMicros;
     incomingAttackActive_ = true;
     lastDefense_ = {DefenseResult::ThreatQueued, 0, 0, false,
         static_cast<float>(windupMicros) / static_cast<float>(DefenseMicrosPerSecond)};
@@ -184,24 +222,26 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
         return lastDefense_;
     }
 
-    const std::int64_t remainingMicros = std::max<std::int64_t>(0,
-        incomingAttackEndMicros_ - CurrentDefenseMicros());
+    const std::int64_t now = CurrentDefenseMicros();
+    const std::int64_t remainingMicros = incomingAttackEndMicros_ > now
+        ? incomingAttackEndMicros_ - now
+        : 0;
     const float remaining = static_cast<float>(remainingMicros)
         / static_cast<float>(DefenseMicrosPerSecond);
     const std::int64_t perfectWindowMicros = DefenseSecondsToMicros(
         static_cast<double>(PerfectDefenseWindowSeconds()));
 
     if (input == DefenseInput::Dodge) {
-        if (remainingMicros > DefenseSecondsToMicros(DodgeWindowSeconds)) {
+        if (!DefenseWindowContains(remainingMicros,
+                DefenseSecondsToMicros(DodgeWindowSeconds))) {
             lastDefense_ = {DefenseResult::TooEarly, 0, 0, false, remaining};
             return lastDefense_;
         }
 
         incomingAttackActive_ = false;
         incomingAttackEndMicros_ = 0;
-        if (remainingMicros <= perfectWindowMicros) {
-            defenseCounterEndMicros_ = SaturatingMicrosAdd(CurrentDefenseMicros(),
-                DefenseSecondsToMicros(DefenseCounterWindowSeconds));
+        if (DefenseWindowContains(remainingMicros, perfectWindowMicros)) {
+            defenseCounterEndMicros_ = StartDefenseCounterDeadline();
             lastDefense_ = {DefenseResult::PerfectDodge, 0, 0, true, remaining};
         } else {
             lastDefense_ = {DefenseResult::Evaded, 0, 0, false, remaining};
@@ -215,9 +255,8 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
 
     incomingAttackActive_ = false;
     incomingAttackEndMicros_ = 0;
-    if (remainingMicros <= perfectWindowMicros) {
-        defenseCounterEndMicros_ = SaturatingMicrosAdd(CurrentDefenseMicros(),
-            DefenseSecondsToMicros(DefenseCounterWindowSeconds));
+    if (DefenseWindowContains(remainingMicros, perfectWindowMicros)) {
+        defenseCounterEndMicros_ = StartDefenseCounterDeadline();
         lastDefense_ = {DefenseResult::PerfectGuard, 0, 0, true, remaining};
         return lastDefense_;
     }
@@ -250,18 +289,24 @@ void ShadowbladeActions::ResetDefenseState() {
 
 float ShadowbladeActions::IncomingAttackRemaining() const {
     if (!incomingAttackActive_) return 0.0f;
-    const std::int64_t remaining = std::max<std::int64_t>(0,
-        incomingAttackEndMicros_ - CurrentDefenseMicros());
+    const std::int64_t now = CurrentDefenseMicros();
+    if (DefenseDeadlineReached(now, incomingAttackEndMicros_)) return 0.0f;
+    const std::int64_t remaining = incomingAttackEndMicros_ - now;
     return static_cast<float>(remaining) / static_cast<float>(DefenseMicrosPerSecond);
 }
 
 bool ShadowbladeActions::HasDefenseCounter() const {
-    return defenseCounterEndMicros_ > CurrentDefenseMicros();
+    return defenseCounterEndMicros_ > 0
+        && !DefenseDeadlineReached(CurrentDefenseMicros(), defenseCounterEndMicros_);
 }
 
 float ShadowbladeActions::DefenseCounterRemaining() const {
-    const std::int64_t remaining = std::max<std::int64_t>(0,
-        defenseCounterEndMicros_ - CurrentDefenseMicros());
+    const std::int64_t now = CurrentDefenseMicros();
+    if (defenseCounterEndMicros_ <= 0
+        || DefenseDeadlineReached(now, defenseCounterEndMicros_)) {
+        return 0.0f;
+    }
+    const std::int64_t remaining = defenseCounterEndMicros_ - now;
     return static_cast<float>(remaining) / static_cast<float>(DefenseMicrosPerSecond);
 }
 
