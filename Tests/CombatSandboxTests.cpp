@@ -247,6 +247,56 @@ void TestComboExpiryPostureRecoveryAndInvalidInputs() {
         && recovery.Stats().hitCount == before.hitCount
         && recovery.Stats().peakHit == before.peakHit);
 }
+
+void TestSplitStableTimingBoundaries() {
+    using namespace Astral::Scene;
+
+    CombatSandbox comboOneStep;
+    CombatSandbox comboSplit;
+    comboOneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    comboSplit.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    comboOneStep.AdvanceTime(CombatSandbox::ComboWindowSeconds);
+    for (int step = 0; step < 7; ++step) {
+        comboSplit.AdvanceTime(CombatSandbox::ComboWindowSeconds / 7.0f);
+    }
+    comboOneStep.RegisterSuccessfulAttackHit();
+    comboSplit.RegisterSuccessfulAttackHit();
+    Check(comboOneStep.ComboCount() == 2 && comboSplit.ComboCount() == 2);
+
+    CombatSandbox staggerOneStep;
+    CombatSandbox staggerSplit;
+    staggerOneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    staggerSplit.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    staggerOneStep.AdvanceTime(0.4f);
+    staggerSplit.AdvanceTime(0.4f);
+    Check(staggerOneStep.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).staggerTriggered);
+    Check(staggerSplit.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).staggerTriggered);
+    staggerOneStep.AdvanceTime(CombatSandbox::StaggerDurationSeconds);
+    for (int step = 0; step < 30; ++step) staggerSplit.AdvanceTime(0.05f);
+    Check(!staggerOneStep.IsStaggered() && !staggerSplit.IsStaggered());
+    Check(staggerOneStep.Dummy().posture == 0 && staggerSplit.Dummy().posture == 0);
+
+    CombatSandbox longRecoveryOneStep;
+    CombatSandbox longRecoverySplit;
+    longRecoveryOneStep.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    longRecoverySplit.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    longRecoveryOneStep.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds + 1.4f);
+    longRecoverySplit.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds);
+    for (int step = 0; step < 35; ++step) longRecoverySplit.AdvanceTime(1.0f / 25.0f);
+    Check(longRecoveryOneStep.Dummy().posture == 21);
+    Check(longRecoverySplit.Dummy().posture == longRecoveryOneStep.Dummy().posture);
+
+    CombatSandbox cooldownOneStep;
+    CombatSandbox cooldownSplit;
+    cooldownOneStep.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    cooldownSplit.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    cooldownOneStep.AdvanceTime(0.4f);
+    for (int step = 0; step < 4; ++step) cooldownSplit.AdvanceTime(0.1f);
+    Check(cooldownOneStep.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).result
+        == AttackResult::Hit);
+    Check(cooldownSplit.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).result
+        == AttackResult::Hit);
+}
 }
 
 int main() {
@@ -296,6 +346,7 @@ int main() {
 
     TestComboStaggerAndTrainingMetrics();
     TestComboExpiryPostureRecoveryAndInvalidInputs();
+    TestSplitStableTimingBoundaries();
     return 0;
 }
 #endif
