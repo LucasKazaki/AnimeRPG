@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
+
 namespace Astral::Editor {
 
 struct EditorRect {
@@ -45,6 +48,9 @@ enum class EditorMessageLoopAction {
     Error,
 };
 
+constexpr std::size_t kRequiredEditorControlCount = 12;
+using EditorControlCreationState = std::array<bool, kRequiredEditorControlCount>;
+
 EditorLayout ComputeEditorLayout(int clientWidth, int clientHeight);
 EditorToolbarLayout ComputeEditorToolbarLayout(const EditorRect& toolbar);
 EditorPanelContentLayout ComputeEditorPanelContentLayout(const EditorRect& panel);
@@ -54,5 +60,6 @@ bool Contains(const EditorRect& outer, const EditorRect& inner);
 bool Overlaps(const EditorRect& a, const EditorRect& b);
 bool IsEditorToolAvailable(EditorTool tool);
 EditorMessageLoopAction ClassifyEditorMessageResult(int result);
+bool AreRequiredEditorControlsCreated(const EditorControlCreationState& created);
 
 } // namespace Astral::Editor
