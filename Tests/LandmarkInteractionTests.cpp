@@ -1,7 +1,10 @@
+#include "Engine/Scene/EncounterChallenge.h"
 #include "Engine/Scene/LandmarkInteraction.h"
 
 #include <cmath>
+#include <cstdint>
 #include <iostream>
+#include <limits>
 
 namespace {
 int failures = 0;
@@ -126,6 +129,118 @@ void TestRewardRoutesThroughResourceRules() {
     Expect(Near(cappedActions.RestoreResource(-5.0f), 0.0f),
         "invalid restoration cannot mutate player resource");
 }
+
+void TestEncounterChallengeScoringRanksAndFirstClears() {
+    using namespace Astral::Scene;
+
+    EncounterChallengeTracker disabled;
+    const auto disabledResult = disabled.Resolve(
+        {1000, 1, 1, 1, true, EncounterTimeGrade::Gold});
+    Expect(disabledResult.score == 0
+            && disabledResult.rank == EncounterChallengeRank::None
+            && !disabledResult.firstClear,
+        "challenge tracker remains inert until explicitly configured");
+
+    EncounterChallengeTracker standard;
+    standard.Configure(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Reaction);
+    const auto standardResult = standard.Resolve(
+        {1000, 2, 1, 0, true, EncounterTimeGrade::Gold});
+    Expect(standardResult.flawlessGoal && standardResult.techniqueVarietyGoal
+            && standardResult.speedGoal && standardResult.tacticalGoal
+            && standardResult.sideGoalsCompleted == 4,
+        "configured Standard challenge records all four independent side goals");
+    Expect(standardResult.rank == EncounterChallengeRank::Gold
+            && standardResult.score == 1680,
+        "Standard challenge combines base, tactical, and side-goal scoring deterministically");
+    Expect(standardResult.firstClear
+            && Near(standardResult.firstClearRewardRequested,
+                EncounterChallengeTracker::StandardFirstClearReward),
+        "first Standard clear requests its one-time reward");
+    const auto repeatStandard = standard.Resolve(
+        {1000, 2, 1, 0, true, EncounterTimeGrade::Gold});
+    Expect(!repeatStandard.firstClear
+            && Near(repeatStandard.firstClearRewardRequested, 0.0f),
+        "repeating Standard cannot request the first-clear reward twice");
+
+    standard.Configure(EncounterChallengeDifficulty::Expert,
+        EncounterTacticalFocus::Finisher);
+    const auto expert = standard.Resolve(
+        {800, 0, 1, 2, false, EncounterTimeGrade::Silver});
+    Expect(expert.sideGoalsCompleted == 3
+            && expert.rank == EncounterChallengeRank::Silver
+            && expert.firstClear
+            && standard.FirstClearGranted(EncounterChallengeDifficulty::Expert),
+        "Expert uses its stricter thresholds and an independent first-clear ledger entry");
+
+    standard.Configure(EncounterChallengeDifficulty::Apex,
+        EncounterTacticalFocus::Balanced);
+    const auto apexNoRank = standard.Resolve(
+        {0, 1, 1, 0, false, EncounterTimeGrade::Bronze});
+    Expect(apexNoRank.sideGoalsCompleted == 2
+            && apexNoRank.rank == EncounterChallengeRank::None,
+        "Apex requires more than two side goals before awarding a rank");
+    const auto apexBronze = standard.Resolve(
+        {0, 1, 0, 0, true, EncounterTimeGrade::Silver});
+    Expect(apexBronze.sideGoalsCompleted == 3
+            && apexBronze.rank == EncounterChallengeRank::Bronze,
+        "Apex awards Bronze at three side goals, stricter than Expert");
+    const auto apexSilver = standard.Resolve(
+        {900, 1, 1, 1, true, EncounterTimeGrade::Silver});
+    Expect(apexSilver.sideGoalsCompleted == 4
+            && apexSilver.rank == EncounterChallengeRank::Silver,
+        "Apex with all side goals still requires Gold time for Gold rank");
+    const auto apexGold = standard.Resolve(
+        {900, 1, 1, 1, true, EncounterTimeGrade::Gold});
+    Expect(apexGold.rank == EncounterChallengeRank::Gold,
+        "Apex Gold requires both all side goals and Gold clear time");
+
+    EncounterChallengeTracker balancedMode;
+    balancedMode.Configure(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Balanced, EncounterScoringMode::Balanced);
+    const auto balancedScore = balancedMode.Resolve(
+        {2000, 1, 1, 1, false, EncounterTimeGrade::Bronze});
+
+    EncounterChallengeTracker techniqueFirst;
+    techniqueFirst.Configure(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Balanced, EncounterScoringMode::TechniqueFirst);
+    const auto techniqueScore = techniqueFirst.Resolve(
+        {2000, 1, 1, 1, false, EncounterTimeGrade::Bronze});
+    Expect(techniqueScore.sideGoalsCompleted == balancedScore.sideGoalsCompleted
+            && techniqueScore.score == 1900
+            && techniqueScore.score != balancedScore.score,
+        "TechniqueFirst changes score weighting without changing objective completion");
+
+    EncounterChallengeTracker noTechnique;
+    noTechnique.Configure(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Reaction, EncounterScoringMode::TechniqueFirst);
+    const auto noTechniqueResult = noTechnique.Resolve(
+        {2000, 0, 0, 0, false, EncounterTimeGrade::Bronze});
+    Expect(!noTechniqueResult.tacticalGoal
+            && noTechniqueResult.sideGoalsCompleted == 0
+            && noTechniqueResult.rank == EncounterChallengeRank::None
+            && noTechniqueResult.score == 1000,
+        "TechniqueFirst cannot manufacture technique goals from raw damage alone");
+
+    EncounterChallengeTracker overflow;
+    overflow.Configure(EncounterChallengeDifficulty::Apex,
+        EncounterTacticalFocus::Balanced, EncounterScoringMode::Balanced);
+    const auto saturated = overflow.Resolve(
+        {std::numeric_limits<std::int64_t>::max(),
+            std::numeric_limits<int>::max(), std::numeric_limits<int>::max(),
+            std::numeric_limits<int>::max(), true, EncounterTimeGrade::Gold});
+    Expect(saturated.score == std::numeric_limits<std::int64_t>::max(),
+        "challenge score saturates instead of overflowing at extreme valid counts");
+
+    EncounterChallengeTracker negativeCounts;
+    negativeCounts.Configure(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Balanced);
+    const auto clamped = negativeCounts.Resolve(
+        {-50, -3, -2, -1, false, EncounterTimeGrade::Bronze});
+    Expect(clamped.score == 0 && clamped.sideGoalsCompleted == 0
+            && clamped.rank == EncounterChallengeRank::None,
+        "negative score and event inputs fail closed to zero contribution");
+}
 }
 
 int main() {
@@ -133,6 +248,7 @@ int main() {
     TestBoundedDiscoveryLedgerAndRepeatSafety();
     TestOrderedObjectiveGuidanceKeepsFreeDiscovery();
     TestRewardRoutesThroughResourceRules();
+    TestEncounterChallengeScoringRanksAndFirstClears();
     if (failures != 0) return 1;
     std::cout << "Landmark interaction tests passed\n";
     return 0;
