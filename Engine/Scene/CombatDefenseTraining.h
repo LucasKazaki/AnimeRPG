@@ -19,7 +19,6 @@ enum class DefenseTrainingCuePhase {
 
 enum class DefenseTrainingCueSymbol {
     None,
-    Observe,
     Blockable,
     Unblockable,
     PerfectTiming,
@@ -74,6 +73,8 @@ struct DefenseTrainingStats {
     int currentPerfectStreak{};
     int bestPerfectStreak{};
     int consecutiveHits{};
+    int consecutiveOrdinaryDefenses{};
+    bool lastMissedAttackBlockable{true};
 };
 
 struct DefenseTrainingGoalStatus {
@@ -101,6 +102,9 @@ public:
     DefenseReport TryDefend(CombatSandbox& combat, ShadowbladeActions& actions,
         DefenseInput input) {
         if (paused_) {
+            if (linkedAttackActive_ && !OwnsObjects(combat, actions)) {
+                return NoLinkedThreatReport();
+            }
             return {DefenseResult::Paused, 0, 0, false,
                 actions.HasIncomingAttack() ? actions.IncomingAttackRemaining() : 0.0f};
         }
@@ -303,18 +307,17 @@ public:
         const ShadowbladeActions& actions) const {
         if (stats_.consecutiveHits >= 2) {
             const DefenseTrainingCue cue = Cue(combat, actions);
-            if (cue.phase == DefenseTrainingCuePhase::None) {
-                return DefenseTrainingTutorialHint::ReadTelegraph;
-            }
-            return cue.blockable
+            const bool blockable = cue.phase != DefenseTrainingCuePhase::None
+                ? cue.blockable
+                : stats_.lastMissedAttackBlockable;
+            return blockable
                 ? DefenseTrainingTutorialHint::GuardBlockable
                 : DefenseTrainingTutorialHint::DodgeUnblockable;
         }
         if (stats_.consecutiveHits == 1) {
             return DefenseTrainingTutorialHint::ReadTelegraph;
         }
-        const int successful = stats_.perfectDefenses + stats_.ordinaryDefenses;
-        if (successful >= GoalTarget && stats_.perfectDefenses == 0) {
+        if (stats_.consecutiveOrdinaryDefenses >= GoalTarget) {
             return DefenseTrainingTutorialHint::AimPerfectTiming;
         }
         return DefenseTrainingTutorialHint::None;
@@ -468,6 +471,8 @@ private:
         ClearLink();
         SaturatingIncrement(stats_.interruptions);
         stats_.currentPerfectStreak = 0;
+        stats_.consecutiveHits = 0;
+        stats_.consecutiveOrdinaryDefenses = 0;
         return true;
     }
 
@@ -520,6 +525,7 @@ private:
             || !OwnsCombatPlan(combat)) {
             return false;
         }
+        const bool resolvedAttackBlockable = combat.PendingEnemyAttack().blockable;
         if (!combat.ResolveEnemyAttack(outcome)) return false;
 
         ClearLink();
@@ -528,16 +534,20 @@ private:
             SaturatingIncrement(stats_.currentPerfectStreak);
             stats_.bestPerfectStreak = std::max(
                 stats_.bestPerfectStreak, stats_.currentPerfectStreak);
+            stats_.consecutiveOrdinaryDefenses = 0;
             RecordSuccessfulDefense(defenseKind);
         } else if (kind == ResolutionKind::OrdinaryDefense) {
             SaturatingIncrement(stats_.ordinaryDefenses);
+            SaturatingIncrement(stats_.consecutiveOrdinaryDefenses);
             stats_.currentPerfectStreak = 0;
             RecordSuccessfulDefense(defenseKind);
         } else {
             SaturatingIncrement(stats_.hitsTaken);
             SaturatingAddDamage(stats_.damageTaken, report.damageTaken);
             stats_.currentPerfectStreak = 0;
+            stats_.consecutiveOrdinaryDefenses = 0;
             SaturatingIncrement(stats_.consecutiveHits);
+            stats_.lastMissedAttackBlockable = resolvedAttackBlockable;
         }
         return true;
     }
