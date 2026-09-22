@@ -61,7 +61,7 @@ public:
     std::int64_t LifetimeMasteryPoints() const { return masteryPointsEarned_; }
 
     int TalentTier(CoreTalent talent) const {
-        return talentTiers_[TalentIndex(talent)];
+        return IsValidTalent(talent) ? talentTiers_[TalentIndex(talent)] : 0;
     }
     int WeaponTier() const { return weaponTier_; }
     int EnhancementMaterials() const { return enhancementMaterials_; }
@@ -122,6 +122,7 @@ public:
     }
 
     ProgressionActionResult UpgradeTalent(CoreTalent talent) {
+        if (!IsValidTalent(talent)) return ProgressionActionResult::Invalid;
         const std::size_t index = TalentIndex(talent);
         const int currentTier = talentTiers_[index];
         if (currentTier >= MaximumTalentTier) return ProgressionActionResult::Maxed;
@@ -152,7 +153,9 @@ public:
     }
 
     ProgressionActionResult EquipTalent(std::size_t slot, CoreTalent talent) {
-        if (slot >= EquippedTalentSlots) return ProgressionActionResult::Invalid;
+        if (slot >= EquippedTalentSlots || !IsValidTalent(talent)) {
+            return ProgressionActionResult::Invalid;
+        }
         if (TalentTier(talent) <= 0) return ProgressionActionResult::Locked;
         for (std::size_t index = 0; index < EquippedTalentSlots; ++index) {
             if (index != slot && equippedOccupied_[index] && equippedTalents_[index] == talent) {
@@ -184,7 +187,9 @@ public:
         const BuildPreset& preset = presets_[slot];
         if (!preset.saved) return ProgressionActionResult::EmptyPreset;
         for (std::size_t index = 0; index < EquippedTalentSlots; ++index) {
-            if (preset.occupied[index] && TalentTier(preset.talents[index]) <= 0) {
+            if (preset.occupied[index]
+                && (!IsValidTalent(preset.talents[index])
+                    || TalentTier(preset.talents[index]) <= 0)) {
                 return ProgressionActionResult::Locked;
             }
             if (preset.occupied[index]) {
@@ -205,6 +210,12 @@ public:
     }
 
 private:
+    static bool IsValidTalent(CoreTalent talent) {
+        return talent == CoreTalent::ShadowStep
+            || talent == CoreTalent::EclipseEdge
+            || talent == CoreTalent::BreakerFocus;
+    }
+
     static std::size_t TalentIndex(CoreTalent talent) {
         switch (talent) {
         case CoreTalent::EclipseEdge: return 1;
