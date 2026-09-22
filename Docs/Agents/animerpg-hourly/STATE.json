@@ -22,7 +22,7 @@
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
     "increments_with_explicit_regression_coverage": 6,
-    "increments_hosted_verified": 0,
+    "increments_hosted_verified": 6,
     "increments_native_playable_verified": 0,
     "increments_independently_reviewed": 0,
     "increments_merged": 0
@@ -36,23 +36,25 @@
     {"id":"QOL-007","title":"Technique-first scoring mode","status":"implemented_domain_behavior"}
   ],
   "verification": {
-    "focused_gcc": "passed_on_earlier_challenge_head; final_review_repair_head_requires_hosted_exact_head_verification",
-    "focused_clang_asan_ubsan": "initial_overflow_found_then_fixed_and_passed_on_earlier_head; final_review_repair_head_requires_hosted_exact_head_verification",
+    "focused_gcc": "passed_on_earlier_challenge_head; later review repairs are covered by hosted exact-code-head verification",
+    "focused_clang_asan_ubsan": "initial_overflow_found_then_fixed_and_passed_on_earlier_head; later review repairs are covered by hosted exact-code-head verification",
     "review_repairs": [
       "P1 fixed by moving pure challenge regressions into registered LandmarkInteractionTests and removing the unregistered duplicate",
       "P2 fixed with stricter Apex 2-goal=None, 3-goal=Bronze, 4-goal=Silver unless Gold time, plus registered boundary coverage",
       "P2 integration gap fixed by adding configured LandmarkEncounter reward tests covering retry persistence, requested/applied reward accounting, and full resource-cap behavior",
       "P1 packet-scope finding fixed by explicitly admitting the already-registered LandmarkEncounterTests integration path before subsequent repair work",
-      "P2 pre-activation metric leakage fixed by snapshotting TrainingStats at activation/retry and resolving damage, technique score, reaction, stagger, and finisher metrics from nonnegative activation-local deltas; registered integration coverage proves a pre-activation Eclipse cannot satisfy encounter tactical/variety goals or inflate score"
+      "P2 pre-activation metric leakage fixed by snapshotting TrainingStats at activation/retry and resolving damage, technique score, reaction, stagger, and finisher metrics from nonnegative activation-local deltas; registered integration coverage proves a pre-activation Eclipse cannot satisfy encounter tactical/variety goals or inflate score",
+      "P2 transient technique-chain carryover fixed by clearing only chain count/time/type on configured challenge activation while preserving cumulative TrainingStats and leaving challenge-disabled activation unchanged",
+      "P1 chain-isolation verification gap fixed in registered LandmarkEncounterTests: a pre-activation Reaction followed by a post-activation Stagger now proves standalone Stagger scoring, preserved cumulative stats, and unchanged unconfigured activation behavior"
     ],
-    "latest_code_repair_commit": "c61b462d2efac815714a05bc83834044dcae3705",
-    "hosted_windows_ci": "pending_exact_final_head_after_state_and_receipt_update",
-    "release_manifest": "pending_exact_final_head_after_state_and_receipt_update",
+    "latest_code_repair_commit": "a4143af3292b342e891cf9ecdfaf07e0fc5b4133",
+    "hosted_windows_ci": "passed_on_code_head_a4143af3_run_35741599073_number_293; final_documentation_head_requires_exact_head_confirmation",
+    "release_manifest": "passed_on_code_head_a4143af3_run_35741599403_number_225; final_documentation_head_requires_exact_head_confirmation",
     "native_windows_interactive": "not_run",
-    "independent_review": "pending_exact_final_head_after_state_and_receipt_update"
+    "independent_review": "pending_fresh_exact_final_head_after_state_and_receipt_reconciliation"
   },
   "coordination": {
     "engine_pr_13": "active; owns CMakeLists.txt and editor runtime-smoke files; pass 6 does not touch those paths"
   },
-  "next_action": "On the immutable final PR head after this state/receipt update, require Windows Debug/Release deterministic workflow, release-manifest integrity, and fresh independent Codex review; re-read main and final diff, then merge PR 20 with expected-head protection only if every gate passes."
+  "next_action": "Require Windows Debug/Release deterministic workflow, release-manifest integrity, and fresh independent Codex review on the immutable final PR head after this state update; re-read main, review threads, and final diff, then merge PR 20 with expected-head protection only if every gate passes."
 }
