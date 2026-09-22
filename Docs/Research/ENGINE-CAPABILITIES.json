@@ -57,18 +57,19 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "initial_child_hwnd_continuity_hardened_hosted_debug_release_verified_independent_recheck_pending_native_runtime_pending",
+      "status": "initial_child_hwnd_continuity_hardened_exact_evidence_head_hosted_verified_evidence_recheck_pending_native_runtime_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_observed_main_revision": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
       "latest_code_candidate": "46b9a018af5dd6a1ae01d414497ee1e6ef294dfb",
-      "latest_evidence_head": "c3f1ea2fa9b64020c036184add9dbfd243858141",
-      "latest_hosted_candidate": "46b9a018af5dd6a1ae01d414497ee1e6ef294dfb",
-      "hosted_windows_run": 35754110237,
-      "hosted_windows_job": 106835418831,
+      "latest_evidence_head": "0bb638949adc4a79c1053eb2102741139497ea56",
+      "latest_hosted_evidence_head": "0bb638949adc4a79c1053eb2102741139497ea56",
+      "hosted_windows_run": 35754595962,
+      "hosted_windows_job": 106837143068,
       "hosted_windows_status": "passed",
-      "profiling_run": 35754109941,
+      "hosted_windows_completed_at_utc": "2026-09-22T16:33:01Z",
+      "profiling_run": 35754596189,
       "profiling_status": "passed",
-      "release_manifest_run": 35754109935,
+      "release_manifest_run": 35754596081,
       "release_manifest_status": "passed",
       "prior_independent_review": {
         "reviewed_head": "5eeaa1d2dd293f1647669664af34801ce0824b6e",
@@ -82,14 +83,26 @@
         "applies_as_acceptance_to_current_code_candidate": false
       },
       "current_independent_review": {
-        "reviewed_head": null,
-        "status": "required_after_current_code_change"
+        "reviewed_head": "0bb638949adc4a79c1053eb2102741139497ea56",
+        "reviewer": "chatgpt-codex-connector",
+        "submitted_at_utc": "2026-09-22T16:39:32Z",
+        "status": "completed_with_evidence_traceability_finding_remediated_recheck_pending",
+        "new_reported_findings": 1,
+        "finding_scope": "durable evidence traceability only; no new runtime-smoke code finding reported",
+        "finding_summary": [
+          "record exact final evidence-head 0bb6389... and its 357545... workflow receipts in the capability, task, and QA records while keeping native runtime acceptance pending"
+        ],
+        "remediated_by": [
+          "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
+          "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
+          "Docs/Research/ENGINE-CAPABILITIES.json"
+        ],
+        "evidence_recheck_required": true,
+        "applies_as_final_acceptance": false
       },
-      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: one stable process-owned top-level editor HWND; initial capture of exactly twelve process-owned direct child HWND plus class identities; every later selection, resize, containment, shell-state and final checkpoint must preserve that original handle/class set; per-send ownership/parent/class/visibility/control-ID revalidation remains in place; exact top-level class/title, five visible disabled toolbar buttons, exact shell labels/status, Inspector fixture, Outliner/Assets identities, exact rows and expected selection are validated; Cube selection/notification must preserve full synchronized state; both 800x600 and 420x260 bounded asynchronous resizes preserve the original child handle inventory, containment and complete shell state; final stable-window check is followed by complete Cube-state and original-handle validation before clean shutdown. Portable warning-clean and ASan/UBSan handle-inventory fixture passed; exact candidate passed hosted Windows Debug/Release deterministic checks plus profiling and release-manifest workflows, while native Win32 RuntimeSmoke remains unexecuted by hosted CI.",
+      "covered_subrequirement": "native Windows smoke target for the integrated editor shell: one stable process-owned top-level editor HWND; initial capture of exactly twelve process-owned direct child HWND plus class identities; every later selection, resize, containment, shell-state and final checkpoint must preserve that original handle/class set; per-send ownership/parent/class/visibility/control-ID revalidation remains in place; exact top-level class/title, five visible disabled toolbar buttons, exact shell labels/status, Inspector fixture, Outliner/Assets identities, exact rows and expected selection are validated; Cube selection/notification must preserve full synchronized state; both 800x600 and 420x260 bounded asynchronous resizes preserve the original child handle inventory, containment and complete shell state; final stable-window check is followed by complete Cube-state and original-handle validation before clean shutdown. Portable warning-clean and ASan/UBSan handle-inventory fixture passed; exact evidence head 0bb6389... passed hosted Windows Debug/Release deterministic checks plus profiling and release-manifest workflows, while native Win32 RuntimeSmoke remains unexecuted by hosted CI.",
       "task": "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
-      "task_blob": "7316c0d554901ed0fd695dd2611eb9ab44326d82",
       "evidence": "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
-      "evidence_blob": "557f3fcb8c4c71f32277e593542e91bc08130f4b",
       "source_fixture": {
         "editor_source_blob": "5142e632a79c89d0d0ce3efe87e752456f802185",
         "runtime_smoke_blob": "98ab2d576da85b5f298bd83bb5135c79fc21b2b0",
