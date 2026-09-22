@@ -725,6 +725,7 @@ int wmain(int argc, wchar_t** argv) {
         return 1;
     }
 
+    gWorkDeadlineTick = GetTickCount64() + kWorkBudgetMs;
     std::wstring command = L"\"" + std::wstring(argv[1]) + L"\"";
     STARTUPINFOW startup{sizeof(startup)};
     PROCESS_INFORMATION process{};
@@ -733,7 +734,6 @@ int wmain(int argc, wchar_t** argv) {
         std::cerr << "EDITOR AUTOMATED NATIVE RUNTIME SMOKE: FAIL (launch)\n";
         return 1;
     }
-    gWorkDeadlineTick = GetTickCount64() + kWorkBudgetMs;
 
     HWND window = nullptr;
     bool passed = false;
@@ -742,11 +742,15 @@ int wmain(int argc, wchar_t** argv) {
     std::vector<ChildControl> initialControls;
     ShellStaticHandles statics{};
 
-    const DWORD inputIdleTimeoutMs = RemainingWorkBudget(5000);
-    if (inputIdleTimeoutMs == 0) {
-        failure = L"internal runtime work budget exhausted before input-idle wait";
+    if (WorkBudgetExpired()) {
+        failure = L"135-second internal work budget exhausted during editor launch";
     } else {
-        WaitForInputIdle(process.hProcess, inputIdleTimeoutMs);
+        const DWORD inputIdleTimeoutMs = RemainingWorkBudget(5000);
+        if (inputIdleTimeoutMs == 0) {
+            failure = L"internal runtime work budget exhausted before input-idle wait";
+        } else {
+            WaitForInputIdle(process.hProcess, inputIdleTimeoutMs);
+        }
     }
     int visibleTopLevelCount = 0;
     bool topLevelEnumerationFailed = false;
@@ -812,7 +816,7 @@ int wmain(int argc, wchar_t** argv) {
     if (!passed) {
         if (WorkBudgetExpired()) {
             AppendCleanupFailure(failure,
-                L"135-second internal work budget exhausted; cleanup margin reserved before CTest's 180-second timeout");
+                L"135-second internal launch+work budget exhausted; cleanup margin reserved before CTest's 180-second timeout");
         }
         CleanupProcess(process.hProcess, exitCode, failure);
     }
