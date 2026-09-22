@@ -2,8 +2,20 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace Astral::Scene {
+namespace {
+std::int64_t SaturatingAdd(std::int64_t left, std::int64_t right) {
+    if (right <= 0) return left;
+    const std::int64_t maximum = std::numeric_limits<std::int64_t>::max();
+    return left > maximum - right ? maximum : left + right;
+}
+
+void SaturatingIncrement(int& value) {
+    if (value < std::numeric_limits<int>::max()) ++value;
+}
+}
 
 CombatSandbox::CombatSandbox() = default;
 
@@ -91,8 +103,8 @@ int CombatSandbox::ApplyDamage(int damage) {
     if (damage <= 0 || dummy_.IsDefeated()) return 0;
 
     if (targetMode_ == TrainingTargetMode::Endless) {
-        stats_.totalDamage += damage;
-        ++stats_.hitCount;
+        stats_.totalDamage = SaturatingAdd(stats_.totalDamage, damage);
+        SaturatingIncrement(stats_.hitCount);
         stats_.peakHit = std::max(stats_.peakHit, damage);
         return damage;
     }
@@ -100,8 +112,8 @@ int CombatSandbox::ApplyDamage(int damage) {
     const int applied = std::min(damage, dummy_.health);
     dummy_.health -= applied;
     if (applied > 0) {
-        stats_.totalDamage += applied;
-        ++stats_.hitCount;
+        stats_.totalDamage = SaturatingAdd(stats_.totalDamage, applied);
+        SaturatingIncrement(stats_.hitCount);
         stats_.peakHit = std::max(stats_.peakHit, applied);
     }
     if (dummy_.IsDefeated()) {
@@ -190,7 +202,7 @@ ComboFinisherReport CombatSandbox::TryComboFinisher(const Math::Vec3& attackerPo
         + (eclipseFollowUp ? EclipseFinisherBonusDamage : 0);
     const int applied = ApplyDamage(requestedDamage);
     if (applied > 0) {
-        ++stats_.finisherCount;
+        SaturatingIncrement(stats_.finisherCount);
         RegisterTechnique(TechniqueType::Finisher, FinisherTechniquePoints);
     }
     comboCount_ = 0;
@@ -222,7 +234,7 @@ ManaReactionReport CombatSandbox::ApplyManaAffinity(ManaAffinity affinity) {
     report.reaction = ManaReaction::Eclipse;
     report.bonusDamage = ApplyDamage(requestedDamage);
     if (report.bonusDamage > 0) {
-        ++stats_.reactionCount;
+        SaturatingIncrement(stats_.reactionCount);
         RegisterTechnique(TechniqueType::Reaction, ReactionTechniquePoints);
         if (!dummy_.IsDefeated()) eclipseOpening_ = true;
     }
@@ -287,20 +299,22 @@ TrainingEnemyDefinition CombatSandbox::CurrentEnemyDefinition() const {
     }
 }
 
-int CombatSandbox::TrainingChallengeScore() const {
-    const int baseScore = stats_.totalDamage + stats_.techniqueScore;
+std::int64_t CombatSandbox::TrainingChallengeScore() const {
+    const std::int64_t baseScore = SaturatingAdd(stats_.totalDamage, stats_.techniqueScore);
     if (baseScore <= 0) return 0;
 
     const double effectiveSeconds = targetDefeatElapsedSeconds_ >= 0.0
         ? targetDefeatElapsedSeconds_
         : elapsedSecondsPrecise_;
     if (effectiveSeconds <= FastChallengeSeconds) {
-        return baseScore * 5 / 4;
+        return SaturatingAdd(baseScore, baseScore / 4);
     }
     if (effectiveSeconds <= StandardChallengeSeconds) {
         return baseScore;
     }
-    return baseScore * 3 / 4;
+    const std::int64_t quarter = baseScore / 4;
+    const std::int64_t remainder = baseScore % 4;
+    return quarter * 3 + remainder * 3 / 4;
 }
 
 float CombatSandbox::TrainingDps() const {
@@ -321,7 +335,7 @@ bool CombatSandbox::ApplyPostureDamage(int postureDamage) {
     postureAtRecoveryStart_ = dummy_.posture;
     if (dummy_.posture >= dummy_.maximumPosture) {
         staggerEndMicros_ = CurrentMicros() + SecondsToMicros(StaggerDurationSeconds);
-        ++stats_.staggerCount;
+        SaturatingIncrement(stats_.staggerCount);
         RegisterTechnique(TechniqueType::Stagger, StaggerTechniquePoints);
         return true;
     }
@@ -332,7 +346,7 @@ void CombatSandbox::RegisterComboHit() {
     const std::int64_t now = CurrentMicros();
     if (comboCount_ > 0
         && now - lastComboHitMicros_ <= SecondsToMicros(ComboWindowSeconds)) {
-        ++comboCount_;
+        SaturatingIncrement(comboCount_);
     } else {
         comboCount_ = 1;
     }
@@ -354,7 +368,8 @@ void CombatSandbox::RegisterTechnique(TechniqueType type, int basePoints) {
     lastTechniqueMicros_ = now;
     lastTechniqueType_ = type;
     stats_.bestTechniqueChain = std::max(stats_.bestTechniqueChain, techniqueChain_);
-    stats_.techniqueScore += basePoints * techniqueChain_;
+    stats_.techniqueScore = SaturatingAdd(stats_.techniqueScore,
+        static_cast<std::int64_t>(basePoints) * techniqueChain_);
 }
 
 int CombatSandbox::AdjustDirectAttackDamage(AttackType type, int damage,
