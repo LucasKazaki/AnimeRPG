@@ -43,6 +43,7 @@ EditorLayout ComputeEditorLayout(int clientWidth, int clientHeight);
 EditorToolbarLayout ComputeEditorToolbarLayout(const EditorRect& toolbar);
 EditorPanelContentLayout ComputeEditorPanelContentLayout(const EditorRect& panel);
 EditorRect ComputeEditorStatusContentLayout(const EditorRect& status);
+EditorRect ComputeEditorViewportClipRect(const EditorRect& viewport);
 bool Contains(const EditorRect& outer, const EditorRect& inner);
 bool Overlaps(const EditorRect& a, const EditorRect& b);
 bool IsEditorToolAvailable(EditorTool tool);
