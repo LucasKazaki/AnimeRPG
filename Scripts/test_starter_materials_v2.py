@@ -2,13 +2,16 @@
 from pathlib import Path
 import hashlib
 import json
+import struct
 import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
 
-from generate_starter_materials_v2 import build_pack
-from verify_starter_materials_v2 import verify
+from generate_starter_materials_v2 import build_pack, png_rgb
+from verify_starter_materials_v2 import decode_png, verify
+
 
 class MaterialPackTests(unittest.TestCase):
     @classmethod
@@ -42,10 +45,30 @@ class MaterialPackTests(unittest.TestCase):
         b = bytearray(f.read_bytes()); b[-1] ^= 1; f.write_bytes(b)
         with self.assertRaises(ValueError): verify(self.root)
 
-    def test_semantic_metal_error_is_rejected_even_with_fresh_hash(self):
+    def test_single_unsampled_metal_error_is_rejected_even_with_fresh_hash(self):
         rel = "asphalt/asphalt_orm.png"
-        src = self.root/"brushed_steel/brushed_steel_orm.png"
-        (self.root/rel).write_bytes(src.read_bytes()); self.rehash(rel)
+        f = self.root / rel
+        w, h, rows = decode_png(f.read_bytes())
+        mutable = [bytearray(row) for row in rows]
+        mutable[1][1*3 + 2] = 127
+        f.write_bytes(png_rgb(w, h, lambda x, y: tuple(mutable[y][x*3:x*3+3])))
+        self.rehash(rel)
+        with self.assertRaises(ValueError): verify(self.root)
+
+    def test_periodic_sampling_uses_unique_final_texel(self):
+        _, _, rows = decode_png(self.template_files["limestone/limestone_height.png"])
+        self.assertNotEqual(rows[0], rows[-1])
+        self.assertNotEqual(b"".join(row[:3] for row in rows), b"".join(row[-3:] for row in rows))
+
+    def test_png_inflate_bomb_is_bounded_and_rejected(self):
+        rel = "limestone/limestone_basecolor.png"
+        f = self.root / rel
+        def chunk(kind, body):
+            return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind+body) & 0xffffffff)
+        ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+        bomb = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(b"\0" * 2_000_000, 9)) + chunk(b"IEND", b"")
+        f.write_bytes(bomb)
+        self.rehash(rel)
         with self.assertRaises(ValueError): verify(self.root)
 
     def test_manifest_traversal_is_rejected(self):

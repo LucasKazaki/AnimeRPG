@@ -6,7 +6,7 @@ The checked-in source of truth is the generator plus `expected-manifest.json`. R
 
 ## Contents generated
 
-Four standalone 512 x 512 tileable material families:
+Four standalone 512 x 512 repeatable material families:
 
 - limestone
 - concrete
@@ -24,7 +24,7 @@ The generated pack contains 16 PNGs plus `manifest.json`. Every PNG is SHA-256 r
 
 ## Why this is an upgrade from the first pack
 
-The original starter pack used a 256 x 256 atlas containing sixteen 64 x 64 calibration swatches. Those were useful for format tests but are poor repeatable material sources because atlas filtering and mipmaps can bleed between tiles. V2 generates standalone 512 x 512 textures with exact seam continuity and independently validated map semantics.
+The original starter pack used a 256 x 256 atlas containing sixteen 64 x 64 calibration swatches. Those were useful for format tests but are poor repeatable material sources because atlas filtering and mipmaps can bleed between tiles. V2 generates standalone 512 x 512 textures and samples one complete periodic domain over `[0,1)` using 512 unique texels on each axis. It does not duplicate the first texel at the opposite edge, avoiding a one-texel plateau when the texture repeats.
 
 This still does not establish professional material quality. The maps are procedural calibration/default sources, not scans or artist-finished hero surfaces. Runtime quality must be judged only after Astral supports textured solid rendering with a defined tangent basis and import path.
 
@@ -41,6 +41,8 @@ python Scripts/test_starter_materials_v2.py
 
 The generator refuses to overwrite an existing destination. `--check` is read-only and regenerates expected bytes in memory before comparison. The pinned manifest lets CI or a local worker detect silent generator drift without storing 16 generated binary files in Git.
 
+The validator bounds PNG dimensions before decompression and limits inflation to the exact decoded image budget. It checks every metallic texel rather than sampling a sparse grid, verifies height-map grayscale replication, validates normal Z over the full map, and checks that repeat-boundary steps are consistent with ordinary adjacent variation.
+
 ## Material contract
 
 This pack intentionally aligns its map semantics with a common future interchange path:
@@ -49,7 +51,8 @@ This pack intentionally aligns its map semantics with a common future interchang
 - normal/ORM/height are linear data;
 - normal is tangent space, positive Y;
 - ORM is R occlusion, G roughness, B metallic;
-- pure nonmetals use metallic 0, brushed steel uses metallic 1.
+- pure nonmetals use metallic 0, brushed steel uses metallic 1;
+- periodic generation samples unique texels over `[0,1)` and computes wrapped normal derivatives modulo 512.
 
 Khronos glTF 2.0.1 defines base-color sRGB, tangent-space +Y normals, roughness in G, metalness in B and occlusion in R. Blender 5.2 LTS documents the corresponding glTF metal/rough workflow. Astral does **not** import glTF yet, so this alignment is an importer-facing design choice, not runtime proof.
 
@@ -57,7 +60,7 @@ Khronos glTF 2.0.1 defines base-color sRGB, tangent-space +Y normals, roughness 
 
 Before any v2 material is promoted beyond `source_validated_not_imported`, capture:
 
-1. a 3 x 3 tiled view to check repetition and seams;
+1. a 3 x 3 tiled view to check repetition and repeat-boundary behavior;
 2. neutral daylight and overcast material-sphere views;
 3. grazing-light closeup to reveal normal/roughness problems;
 4. measured texture memory and mip behavior in the actual Astral renderer;

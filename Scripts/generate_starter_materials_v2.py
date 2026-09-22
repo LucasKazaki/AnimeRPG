@@ -15,7 +15,7 @@ import struct
 import zlib
 
 SIZE = 512
-VERSION = "astral-materials-v2-1"
+VERSION = "astral-materials-v2-2"
 TAU = math.tau
 
 MATERIALS = {
@@ -74,13 +74,14 @@ def png_rgb(width, height, pixel_fn):
 
 
 def build_material(name, spec):
-    denom = SIZE - 1
+    # Sample one complete periodic domain over [0, 1). Do not duplicate u/v=0
+    # at the final texel, which would create a one-texel plateau at repeats.
     heights = [[0.0] * SIZE for _ in range(SIZE)]
     for y in range(SIZE):
-        v = y / denom
+        v = y / SIZE
         row = heights[y]
         for x in range(SIZE):
-            row[x] = height_value(spec["height"], x / denom, v)
+            row[x] = height_value(spec["height"], x / SIZE, v)
 
     base = spec["base"]
     rough0 = spec["rough"]
@@ -97,14 +98,15 @@ def build_material(name, spec):
         q = int(round(clamp(heights[y][x]) * 255))
         return (q, q, q)
 
-    # Positive-Y tangent-space convention. Height changes are centered and wrapped.
+    # Positive-Y tangent-space convention. Height changes are centered and wrapped
+    # over all SIZE unique texels, including derivatives across the repeat boundary.
     def normal_px(x, y):
-        xl = (x - 1) % denom
-        xr = (x + 1) % denom
-        yu = (y - 1) % denom
-        yd = (y + 1) % denom
-        dx = heights[y % denom][xr] - heights[y % denom][xl]
-        dy = heights[yd][x % denom] - heights[yu][x % denom]
+        xl = (x - 1) % SIZE
+        xr = (x + 1) % SIZE
+        yu = (y - 1) % SIZE
+        yd = (y + 1) % SIZE
+        dx = heights[y][xr] - heights[y][xl]
+        dy = heights[yd][x] - heights[yu][x]
         strength = 7.0 if name in ("concrete", "asphalt") else 5.0
         nx, ny, nz = -dx * strength, -dy * strength, 1.0
         inv = 1.0 / math.sqrt(nx*nx + ny*ny + nz*nz)
@@ -166,6 +168,7 @@ def build_pack():
         "texture_origin": "top_left",
         "normal_convention": "tangent_space_positive_y",
         "packing": "ORM: R occlusion, G roughness, B metallic",
+        "periodic_sampling": "unique_texels_[0,1)_repeat_wrap",
         "resolution": [SIZE, SIZE],
         "materials": list(MATERIALS),
         "counts": {"materials": len(MATERIALS), "png_files": len(records)},
