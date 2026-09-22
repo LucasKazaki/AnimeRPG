@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 
 #ifdef ASTRAL_RUNTIME_SMOKE
 #include <windows.h>
@@ -150,6 +151,73 @@ bool NearlyEqual(float left, float right) {
 void Check(bool condition) {
     if (!condition) std::abort();
 }
+
+void TestComboStaggerAndTrainingMetrics() {
+    using namespace Astral::Scene;
+
+    CombatSandbox sandbox;
+    Check(sandbox.Stats().totalDamage == 0 && sandbox.Stats().hitCount == 0
+        && sandbox.Stats().peakHit == 0 && sandbox.Stats().bestCombo == 0);
+
+    const AttackReport light = sandbox.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    Check(light.result == AttackResult::Hit && light.comboCount == 1);
+    Check(sandbox.ComboCount() == 1 && sandbox.Dummy().posture == 25);
+    Check(sandbox.Stats().totalDamage == 25 && sandbox.Stats().hitCount == 1
+        && sandbox.Stats().peakHit == 25 && sandbox.Stats().bestCombo == 1);
+
+    sandbox.AdvanceTime(0.4f);
+    const AttackReport heavy = sandbox.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    Check(heavy.result == AttackResult::Hit && heavy.comboCount == 2
+        && heavy.staggerTriggered);
+    Check(sandbox.IsStaggered() && sandbox.Dummy().posture == sandbox.Dummy().maximumPosture);
+    Check(sandbox.Stats().totalDamage == 85 && sandbox.Stats().hitCount == 2
+        && sandbox.Stats().peakHit == 60 && sandbox.Stats().bestCombo == 2);
+
+    sandbox.AdvanceTime(0.5f);
+    Check(sandbox.IsStaggered() && sandbox.StaggerRemaining() > 0.0f);
+    Check(sandbox.ConsumeStaggerOpening());
+    Check(!sandbox.IsStaggered() && sandbox.Dummy().posture == 0);
+    Check(!sandbox.ConsumeStaggerOpening());
+
+    sandbox.ResetTrainingSession();
+    Check(sandbox.Dummy().health == sandbox.Dummy().maximumHealth
+        && sandbox.Dummy().posture == 0 && sandbox.ComboCount() == 0);
+    Check(sandbox.Stats().totalDamage == 0 && sandbox.Stats().hitCount == 0
+        && sandbox.Stats().peakHit == 0 && sandbox.Stats().bestCombo == 0);
+    Check(NearlyEqual(sandbox.ElapsedSeconds(), 0.0f)
+        && NearlyEqual(sandbox.CooldownRemaining(), 0.0f));
+}
+
+void TestComboExpiryPostureRecoveryAndInvalidInputs() {
+    using namespace Astral::Scene;
+
+    CombatSandbox sandbox;
+    sandbox.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    sandbox.AdvanceTime(CombatSandbox::ComboWindowSeconds + 0.01f);
+    Check(sandbox.ComboCount() == 0);
+    Check(sandbox.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f}).comboCount == 1);
+
+    CombatSandbox recovery;
+    recovery.TryAttack(AttackType::Light, {0.0f, 0.0f, 0.0f});
+    recovery.AdvanceTime(CombatSandbox::PostureRecoveryDelaySeconds - 0.01f);
+    Check(recovery.Dummy().posture == 25);
+    recovery.AdvanceTime(0.02f);
+    Check(recovery.Dummy().posture < 25);
+
+    const float elapsed = recovery.ElapsedSeconds();
+    const int posture = recovery.Dummy().posture;
+    recovery.AdvanceTime(0.0f);
+    recovery.AdvanceTime(-1.0f);
+    recovery.AdvanceTime(std::numeric_limits<float>::quiet_NaN());
+    recovery.AdvanceTime(std::numeric_limits<float>::infinity());
+    Check(NearlyEqual(recovery.ElapsedSeconds(), elapsed) && recovery.Dummy().posture == posture);
+
+    const TrainingStats before = recovery.Stats();
+    Check(recovery.ApplyDamage(0) == 0 && recovery.ApplyDamage(-5) == 0);
+    Check(recovery.Stats().totalDamage == before.totalDamage
+        && recovery.Stats().hitCount == before.hitCount
+        && recovery.Stats().peakHit == before.peakHit);
+}
 }
 
 int main() {
@@ -197,6 +265,8 @@ int main() {
     Check(report.damageApplied == 0);
     Check(cooldownSandbox.Dummy().health == 0);
 
+    TestComboStaggerAndTrainingMetrics();
+    TestComboExpiryPostureRecoveryAndInvalidInputs();
     return 0;
 }
 #endif
