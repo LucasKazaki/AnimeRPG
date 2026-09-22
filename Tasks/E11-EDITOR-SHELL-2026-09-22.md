@@ -32,8 +32,12 @@ Accessed 2026-09-22:
   - Relevant API behavior: intersects the current device-context clipping region with an explicit rectangle.
 - Microsoft Win32 GDI `SaveDC`: https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-savedc
   - Relevant API behavior: saves DC state so a temporary viewport clip can be restored after painting.
+- Microsoft Win32 `CreateWindowExW`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexw
+  - Relevant API behavior: returns `NULL` when window or child-control creation fails.
+- Microsoft Win32 `WM_CREATE`: https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-create
+  - Relevant API behavior: returning `-1` from `WM_CREATE` aborts window creation, destroys the new window, and causes `CreateWindowEx` to return `NULL`.
 
-No proprietary source was copied. The panel arrangement, command-state model and GDI clipping behavior are original Astral implementations using Win32 child controls, GDI and dependency-free C++17 layout code.
+No proprietary source was copied. The panel arrangement, command-state model, GDI clipping behavior and startup-failure contract are original Astral implementations using Win32 child controls, GDI and dependency-free C++17 code.
 
 ## Bounded command-honesty repair
 
@@ -46,6 +50,12 @@ This repair stays inside the E11.0 shell packet rather than starting the deferre
 A later source audit found a separate narrow-resize paint defect. The top-level viewport rectangle could be only a few pixels wide or high, while `DrawViewport` still issued axis lines with fixed 10-pixel insets and `TextOutW` calls at fixed `+12/+30` offsets. The panel rectangles themselves were contained, but those GDI draw calls were not clipped to the viewport and could paint into adjacent editor regions during extreme resize.
 
 The repair adds `ComputeEditorViewportClipRect` to the portable layout contract and makes `DrawViewport` save the paint DC, intersect its current clipping region with that viewport rectangle, draw the viewport, then restore the original DC state. Empty or failed clip regions stop viewport painting rather than falling back to unbounded drawing. This does not change the graphics API or make any editor tool available.
+
+## Bounded child-control startup repair
+
+A source audit found that E11.0 returned success from `WM_CREATE` even if one or more required toolbar, Outliner, Inspector, Assets or status child controls failed to create. `CreateWindowExW` reports a failed child creation as `NULL`; continuing startup could therefore leave a partially constructed editor that still looks like a successful process launch.
+
+The repair introduces a deterministic required-control creation state. All 12 E11.0 child controls must exist before the editor populates lists, updates the Inspector, applies tool state or lays out the UI. If any required child is missing, `WM_CREATE` returns `-1`, using the documented Win32 failure path so the parent creation fails closed. This does not attempt to fabricate a native child-control failure during hosted CI; the portable regression exhaustively removes each required slot one at a time, while real Windows creation remains part of native acceptance.
 
 ## Allowed paths
 
@@ -69,7 +79,8 @@ The repair adds `ComputeEditorViewportClipRect` to the portable layout contract 
 3. Keep not-yet-implemented controls honest. `Select`, `Move`, `Rotate`, `Scale` and `Play` toolbar actions are disabled and labeled pending until their actual viewport/edit/play behavior exists. Outliner selection remains functional. Save/reopen, gizmos, undo/redo, import and real scene mutation remain explicitly pending.
 4. Use only procedural editor fixtures (`Scene Root`, camera, light, cube and floor), not paused game content or production art.
 5. Resize without negative panel geometry, panel overlap, child-control escape, or viewport GDI paint escaping the computed viewport clip region.
-6. Do not modify `AstralGame`, change GDI, install dependencies or invoke R0.
+6. Fail editor parent-window creation if any required E11.0 child control fails to create; never continue with a partial toolbar/panel set.
+7. Do not modify `AstralGame`, change GDI, install dependencies or invoke R0.
 
 ## Tests and evidence
 
@@ -80,7 +91,7 @@ g++ -std=c++17 -Wall -Wextra -Werror -I. Engine/Editor/EditorLayout.cpp Tests/Ed
 ./editor_layout_tests
 ```
 
-`EditorLayoutTests` must cover panel geometry, child-control containment, the viewport clip rectangle, and the command-state contract. The viewport clip must equal normal viewport bounds and clamp malformed negative extents to zero. A later packet that enables a toolbar tool must update the corresponding test with actual implementation evidence.
+`EditorLayoutTests` must cover panel geometry, child-control containment, the viewport clip rectangle, the command-state contract, message-loop error classification, and fail-closed required-control creation. The required-control test must pass only when all 12 slots are present and fail for each individual missing slot. The viewport clip must equal normal viewport bounds and clamp malformed negative extents to zero. A later packet that enables a toolbar tool must update the corresponding test with actual implementation evidence.
 
 Windows hosted/local gate:
 
@@ -99,6 +110,7 @@ Registered local interactive acceptance, still required after hosted compilation
 - Verify Outliner selection changes Inspector text and selected viewport label.
 - Verify Select/Move/Rotate/Scale/Play are visibly disabled and labeled pending; clicking/tabbing must not imply an implemented transform or Play mode.
 - Resize repeatedly at 800x600, 1280x720, 1440x900, maximized desktop size, and one deliberately short/narrow size if Windows permits it; verify panels and child controls remain contained and viewport grid/axes/text do not bleed into Outliner, Inspector, Assets or status regions.
+- Verify all expected child controls are present in the successful launch. A forced native CreateWindowEx failure is not required for this GUI acceptance because the exhaustive portable control-state regression is the bounded fault-injection evidence for the fail-closed path.
 - Verify `AstralGame` still launches separately and no game-content behavior is changed by this packet.
 
 ## Stop and rollback
