@@ -12,6 +12,10 @@ constexpr int kAssetListId = 1002;
 constexpr DWORD kMessageTimeoutMs = 1000;
 constexpr DWORD kProcessExitTimeoutMs = 5000;
 constexpr DWORD kCleanupTimeoutMs = 2000;
+constexpr DWORD kWindowPollIntervalMs = 50;
+constexpr DWORD kResizePollIntervalMs = 25;
+constexpr DWORD kResizeTimeoutMs = 1500;
+constexpr int kStableWindowSamples = 20;
 
 struct ProcessWindowCollection {
     DWORD processId{};
@@ -48,9 +52,11 @@ bool VisibleProcessWindows(DWORD processId, std::vector<HWND>& windows) {
     return true;
 }
 
-HWND WaitForSingleWindow(DWORD processId, int& observedCount, bool& enumerationFailed) {
+HWND WaitForStableSingleWindow(DWORD processId, int& observedCount, bool& enumerationFailed) {
     observedCount = 0;
     enumerationFailed = false;
+    HWND candidate = nullptr;
+    int stableSamples = 0;
     for (int attempt = 0; attempt < 100; ++attempt) {
         std::vector<HWND> windows;
         if (!VisibleProcessWindows(processId, windows)) {
@@ -58,10 +64,27 @@ HWND WaitForSingleWindow(DWORD processId, int& observedCount, bool& enumerationF
             return nullptr;
         }
         observedCount = static_cast<int>(windows.size());
-        if (windows.size() == 1) return windows.front();
-        Sleep(50);
+        if (windows.size() == 1) {
+            if (windows.front() == candidate) {
+                ++stableSamples;
+            } else {
+                candidate = windows.front();
+                stableSamples = 1;
+            }
+            if (stableSamples >= kStableWindowSamples) return candidate;
+        } else {
+            candidate = nullptr;
+            stableSamples = 0;
+        }
+        Sleep(kWindowPollIntervalMs);
     }
     return nullptr;
+}
+
+bool RevalidateStableSingleWindow(DWORD processId, HWND expectedWindow,
+    int& observedCount, bool& enumerationFailed) {
+    const HWND observed = WaitForStableSingleWindow(processId, observedCount, enumerationFailed);
+    return observed != nullptr && observed == expectedWindow;
 }
 
 std::wstring ClassName(HWND window) {
@@ -175,28 +198,51 @@ bool DirectChildrenContained(HWND window, std::wstring& failure) {
 
 bool ResizeAndCheck(HWND window, int width, int height, std::wstring& failure) {
     if (!SetWindowPos(window, nullptr, 0, 0, width, height,
-            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE)) {
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS)) {
         failure = L"SetWindowPos failed";
         return false;
     }
-    Sleep(150);
-    return DirectChildrenContained(window, failure);
+
+    const ULONGLONG deadline = GetTickCount64() + kResizeTimeoutMs;
+    while (true) {
+        RECT rect{};
+        if (!GetWindowRect(window, &rect)) {
+            failure = L"GetWindowRect failed while waiting for asynchronous resize";
+            return false;
+        }
+        if (rect.right - rect.left == width && rect.bottom - rect.top == height) {
+            return DirectChildrenContained(window, failure);
+        }
+        if (GetTickCount64() >= deadline) {
+            failure = L"asynchronous resize did not complete within deadline";
+            return false;
+        }
+        Sleep(kResizePollIntervalMs);
+    }
 }
 
 bool ReadListboxValue(HWND listbox, UINT message, WPARAM wParam, LRESULT& value) {
     return SendMessageBounded(listbox, message, wParam, 0, value) && value != LB_ERR;
 }
 
-bool CloseEditor(HWND window, HANDLE process, DWORD& exitCode) {
-    if (window) PostMessageW(window, WM_CLOSE, 0, 0);
+bool WindowOwnedByProcess(HWND window, DWORD processId) {
+    if (!window) return false;
+    DWORD ownerProcessId = 0;
+    if (GetWindowThreadProcessId(window, &ownerProcessId) == 0) return false;
+    return ownerProcessId == processId;
+}
+
+bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) {
+    if (!WindowOwnedByProcess(window, processId)) return false;
+    if (!PostMessageW(window, WM_CLOSE, 0, 0)) return false;
     if (WaitForSingleObject(process, kProcessExitTimeoutMs) != WAIT_OBJECT_0) return false;
     return GetExitCodeProcess(process, &exitCode) != FALSE;
 }
 
-void CleanupProcess(HWND window, HANDLE process) {
-    if (window) PostMessageW(window, WM_CLOSE, 0, 0);
-    if (WaitForSingleObject(process, kCleanupTimeoutMs) != WAIT_OBJECT_0) {
-        TerminateProcess(process, 2);
+void CleanupProcess(HANDLE process) {
+    const DWORD state = WaitForSingleObject(process, 0);
+    if (state == WAIT_OBJECT_0) return;
+    if (TerminateProcess(process, 2)) {
         WaitForSingleObject(process, kCleanupTimeoutMs);
     }
 }
@@ -225,13 +271,13 @@ int wmain(int argc, wchar_t** argv) {
     WaitForInputIdle(process.hProcess, 5000);
     int visibleTopLevelCount = 0;
     bool topLevelEnumerationFailed = false;
-    window = WaitForSingleWindow(
+    window = WaitForStableSingleWindow(
         process.dwProcessId, visibleTopLevelCount, topLevelEnumerationFailed);
     if (!window) {
         if (topLevelEnumerationFailed) {
             failure = L"EnumWindows failed while locating the editor top-level window";
         } else {
-            failure = L"expected exactly one visible process-owned top-level window, observed "
+            failure = L"expected one stable visible process-owned top-level window, observed "
                 + std::to_wstring(visibleTopLevelCount);
         }
     } else if (ClassName(window) != L"AstralEditorWindow") {
@@ -301,7 +347,22 @@ int wmain(int argc, wchar_t** argv) {
                 pendingStateOk = false;
             }
 
-            if (pendingStateOk && CloseEditor(window, process.hProcess, exitCode)
+            int finalVisibleTopLevelCount = 0;
+            bool finalTopLevelEnumerationFailed = false;
+            if (pendingStateOk
+                && !RevalidateStableSingleWindow(process.dwProcessId, window,
+                    finalVisibleTopLevelCount, finalTopLevelEnumerationFailed)) {
+                if (finalTopLevelEnumerationFailed) {
+                    failure = L"EnumWindows failed during final editor-window revalidation";
+                } else {
+                    failure = L"editor did not remain one stable visible process-owned top-level "
+                        L"window; observed " + std::to_wstring(finalVisibleTopLevelCount);
+                }
+                pendingStateOk = false;
+            }
+
+            if (pendingStateOk
+                && CloseEditor(window, process.dwProcessId, process.hProcess, exitCode)
                 && exitCode == 0) {
                 passed = true;
             } else if (pendingStateOk) {
@@ -310,7 +371,7 @@ int wmain(int argc, wchar_t** argv) {
         }
     }
 
-    if (!passed) CleanupProcess(window, process.hProcess);
+    if (!passed) CleanupProcess(process.hProcess);
     if (!passed && GetExitCodeProcess(process.hProcess, &exitCode) == FALSE) exitCode = 1;
 
     CloseHandle(process.hThread);
@@ -323,8 +384,8 @@ int wmain(int argc, wchar_t** argv) {
     }
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
-        << L"Observed exactly one visible process-owned top-level editor window, 12 required "
-        << L"controls, disabled pending tools, Outliner/Inspector selection sync, contained "
-        << L"normal+narrow layouts, and clean exit.\n";
+        << L"Observed one stable visible process-owned top-level editor window before and after "
+        << L"interaction, 12 required controls, disabled pending tools, Outliner/Inspector "
+        << L"selection sync, bounded asynchronous normal+narrow resizes, and clean exit.\n";
     return 0;
 }
