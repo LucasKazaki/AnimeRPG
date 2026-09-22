@@ -3,75 +3,85 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-22",
   "target_branch": "main",
-  "baseline_commit": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
-  "working_branch": "game/2026-09-22-combat-exploration-pass1",
-  "pass": "GAME-PASS1-COMBAT-EXPLORATION-2026-09-22",
+  "last_merged_pass": {
+    "id": "GAME-PASS1-COMBAT-EXPLORATION-2026-09-22",
+    "pr": 14,
+    "head": "f445f156acf7ed2899f93a34191782aa357ad0d1",
+    "merge_sha": "a14aef5c484705567adac741809f7f4eebb4cbde",
+    "hosted_windows_ci": "passed_run_213",
+    "release_manifest": "passed_run_150",
+    "independent_review": "completed_no_new_findings",
+    "native_playable": false
+  },
+  "working_branch": "game/2026-09-22-defense-pass2-v2",
+  "pass": "GAME-PASS2-DEFENSE-TIMING-2026-09-22",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
-    "increments_with_domain_tests": 6,
+    "increments_with_regression_tests_added": 6,
     "increments_native_playable_verified": 0,
     "increments_independently_reviewed": 0,
     "increments_merged": 0
   },
   "increments": [
     {
-      "id": "GAME-001",
-      "title": "Direction-aware normalized Shadowblade dash",
+      "id": "GAME-007",
+      "title": "Incoming attack telegraph state",
       "status": "implemented_domain_api",
-      "note": "Cardinal/diagonal normalization and safe neutral/nonfinite fallback are implemented and covered by deterministic tests. Existing Win32 Q and Thought Command call sites still use the one-argument forward fallback, so directional live input integration is intentionally not claimed in this pass."
+      "note": "Validated attacks carry windup, damage, guard damage, and blockability; expiry resolves exactly one hit. No renderer or enemy-AI cue is claimed."
     },
     {
-      "id": "GAME-006",
-      "title": "Deterministic attack combo tracking",
-      "status": "implemented_live_domain_state",
-      "note": "Successful existing light/heavy attacks update combo/best-combo state; timeout and rejected attempts do not inflate it. No new HUD presentation is claimed."
+      "id": "GAME-008",
+      "title": "Guard integrity and guard break",
+      "status": "implemented_domain_behavior",
+      "note": "Ordinary guard spends bounded guard integrity instead of health; an over-limit block breaks guard and applies the attack once."
     },
     {
-      "id": "GAME-003",
-      "title": "Posture, stagger, and recovery",
-      "status": "implemented_live_domain_behavior",
-      "note": "Existing light/heavy attacks now apply bounded posture, trigger a finite stagger opening, recover posture after idle delay, and clear stagger on defeat."
+      "id": "GAME-009",
+      "title": "Perfect guard",
+      "status": "implemented_domain_behavior",
+      "note": "Guard inside the perfect window preserves health and guard integrity and grants one bounded defense counter."
     },
     {
-      "id": "GAME-004",
-      "title": "Stagger-earned Fatal Strike follow-up",
-      "status": "implemented_live_domain_behavior",
-      "note": "Existing Fatal Strike recognizes an active stagger opening, uses a reduced 30-resource follow-up cost, and consumes that opening only after range/resource checks pass. Damage and cooldown remain unchanged."
+      "id": "GAME-010",
+      "title": "Timed dodge and perfect dodge",
+      "status": "implemented_domain_behavior",
+      "note": "Too-early dodge preserves the threat, normal evade prevents damage, and perfect dodge grants one bounded counter."
     },
     {
-      "id": "GAME-005",
-      "title": "Ordered National Mall objective guidance state",
-      "status": "implemented_live_domain_state",
-      "note": "Landmark discovery keeps free exploration but exposes ordered Lincoln -> Reflecting Pool -> Washington Monument progression. Existing UI does not yet present the next objective."
+      "id": "GAME-011",
+      "title": "Defense-earned Fatal Strike counter",
+      "status": "implemented_domain_behavior",
+      "note": "A valid perfect defense can reduce one eligible Fatal Strike to 35 resource; rejection does not consume the counter and successful use consumes it once."
     },
     {
-      "id": "QOL-002",
-      "title": "Resettable training-session combat metrics",
-      "status": "implemented_domain_api",
-      "note": "CombatSandbox records total damage, hits, peak hit, best combo, and exposes an idempotent session reset. No runtime key/UI is added in this bounded pass, so player-visible reset/metrics are not claimed."
+      "id": "QOL-003",
+      "title": "Forgiving perfect-defense timing preset",
+      "status": "implemented_domain_setting",
+      "note": "Standard remains default at 0.12 s; optional forgiving preset uses 0.20 s without altering damage, resource, enemy timing, or dodge reach."
     }
   ],
   "community_source": {
-    "id": "WUWA-PLAYER-20260802-DPS",
-    "url": "https://www.reddit.com/r/WuWaves/comments/1vd8ctk/",
-    "published": "2026-08-02",
+    "id": "GRANBLUE-PLAYER-20240220-PERFECT-GUARD",
+    "url": "https://steamcommunity.com/app/881020/discussions/0/7198511214976169414/",
+    "published": "2024-02-20",
     "accessed": "2026-09-22",
-    "request": "A training target/tool that reports total damage and combat statistics for build and rotation testing.",
-    "evidence_limit": "Original player post and discussion, not a community consensus measurement. Discussion also cautions that training-dummy optimization does not reproduce interruption-heavy real combat."
+    "request": "A way to make the satisfying but very tight Perfect Guard timing more lenient.",
+    "evidence_limit": "Historical discussion, not consensus and not proof the current game retains the same timing. A separate 2024-02-03 thread contains both criticism of strict/reward-light early Perfect Guard and counterexamples describing useful endgame Perfect Guard builds."
   },
   "reference_sources": [
-    "https://www.playstation.com/en-us/games/genshin-impact/",
-    "https://apps.apple.com/us/app/zenless-zone-zero/id1606356401",
-    "https://store.playstation.com/en-us/concept/10010764/",
-    "https://www.playstation.com/en-us/games/granblue-fantasy-relink/"
+    "https://apps.apple.com/sg/app/zenless-zone-zero/id1606356401",
+    "https://apps.apple.com/us/app/wuthering-waves/id6475033368",
+    "https://steamcommunity.com/app/881020/discussions/0/4208119548512183204/",
+    "https://steamcommunity.com/app/881020/discussions/0/565913463540536527/"
   ],
   "verification": {
-    "sandbox_source_fixture": "passed",
+    "focused_design_fixture": "passed_before_final_branch_packaging",
+    "repository_regression_tests": "added_pending_hosted_execution",
     "hosted_windows_ci": "pending_pr",
     "native_windows_interactive": "not_run",
     "independent_review": "pending_pr"
   },
-  "next_action": "Open the bounded PR, verify hosted Windows compile/tests and exact-head independent review, address findings, then merge only if those gates pass. Carry player-visible dash direction, objective HUD, and training reset/metrics presentation into a later coordinated input/UI packet."
+  "next_action": "Open the bounded defense PR against merged main, verify the exact diff contains only pass-2 changes, run hosted Windows and manifest checks, obtain exact-head independent Codex review, repair findings, and merge only if all applicable gates pass."
 }
