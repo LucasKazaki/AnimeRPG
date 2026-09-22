@@ -357,6 +357,21 @@ void TestIncomingAttackTimingIsSplitStable() {
             && Near(splitGuard.timeToImpact, 0.12f),
         "equivalent elapsed time reports the same quantized impact time");
 
+    ShadowbladeActions fractionalOneStep;
+    ShadowbladeActions fractionalSplit;
+    Expect(fractionalOneStep.BeginIncomingAttack({1.12001f, 20, 30, true})
+            && fractionalSplit.BeginIncomingAttack({1.12001f, 20, 30, true}),
+        "fractional-microsecond split-stability threats queue");
+    fractionalOneStep.AdvanceTime(1.0f);
+    for (int step = 0; step < 60; ++step) {
+        fractionalSplit.AdvanceTime(1.0f / 60.0f);
+    }
+    const DefenseReport fractionalOneStepGuard = fractionalOneStep.TryDefend(DefenseInput::Guard);
+    const DefenseReport fractionalSplitGuard = fractionalSplit.TryDefend(DefenseInput::Guard);
+    Expect(fractionalOneStepGuard.result == DefenseResult::Guarded
+            && fractionalSplitGuard.result == DefenseResult::Guarded,
+        "fractional frame splits do not round into a different perfect-guard outcome");
+
     ShadowbladeActions oneStepExpiry;
     ShadowbladeActions splitExpiry;
     Expect(oneStepExpiry.BeginIncomingAttack({8.06f, 20, 30, true})
@@ -370,6 +385,26 @@ void TestIncomingAttackTimingIsSplitStable() {
             && splitExpiry.LastDefense().result == DefenseResult::Hit
             && oneStepExpiry.PlayerHealth() == 80 && splitExpiry.PlayerHealth() == 80,
         "equivalent expiry applies exactly one identical incoming hit");
+
+    ShadowbladeActions fractionalOneStepExpiry;
+    ShadowbladeActions fractionalSplitExpiry;
+    Expect(fractionalOneStepExpiry.BeginIncomingAttack({1.00001f, 20, 30, true})
+            && fractionalSplitExpiry.BeginIncomingAttack({1.00001f, 20, 30, true}),
+        "fractional expiry split-stability threats queue");
+    fractionalOneStepExpiry.AdvanceTime(1.0f);
+    for (int step = 0; step < 60; ++step) {
+        fractionalSplitExpiry.AdvanceTime(1.0f / 60.0f);
+    }
+    Expect(fractionalOneStepExpiry.HasIncomingAttack()
+            && fractionalSplitExpiry.HasIncomingAttack(),
+        "fractional equivalent elapsed time preserves the same pre-expiry state");
+    fractionalOneStepExpiry.AdvanceTime(0.00002f);
+    fractionalSplitExpiry.AdvanceTime(0.00002f);
+    Expect(!fractionalOneStepExpiry.HasIncomingAttack()
+            && !fractionalSplitExpiry.HasIncomingAttack()
+            && fractionalOneStepExpiry.LastDefense().result == DefenseResult::Hit
+            && fractionalSplitExpiry.LastDefense().result == DefenseResult::Hit,
+        "fractional equivalent elapsed time crosses expiry identically");
 }
 }
 
