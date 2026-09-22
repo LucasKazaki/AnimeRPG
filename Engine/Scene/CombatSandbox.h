@@ -90,14 +90,14 @@ struct TrainingDummy {
 };
 
 struct TrainingStats {
-    int totalDamage{};
+    std::int64_t totalDamage{};
     int hitCount{};
     int peakHit{};
     int bestCombo{};
     int reactionCount{};
     int finisherCount{};
     int staggerCount{};
-    int techniqueScore{};
+    std::int64_t techniqueScore{};
     int bestTechniqueChain{};
 };
 
@@ -191,7 +191,7 @@ public:
     bool EclipseOpeningReady() const { return eclipseOpening_; }
     int TechniqueChain() const { return techniqueChain_; }
     TechniqueType LastTechniqueType() const { return lastTechniqueType_; }
-    int TrainingChallengeScore() const;
+    std::int64_t TrainingChallengeScore() const;
     float TrainingDps() const;
     const AttackDefinition& Definition(AttackType type) const;
 
