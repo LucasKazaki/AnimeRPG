@@ -86,13 +86,24 @@ void ApplyLayout(HWND window) {
 }
 
 void DrawViewport(HDC dc) {
-    const auto& v = g_layout.viewport;
+    const auto clip = Astral::Editor::ComputeEditorViewportClipRect(g_layout.viewport);
+    if (clip.width <= 0 || clip.height <= 0) return;
+
+    const int savedDc = SaveDC(dc);
+    if (savedDc == 0) return;
+
+    const int clipResult = IntersectClipRect(
+        dc, clip.x, clip.y, clip.x + clip.width, clip.y + clip.height);
+    if (clipResult == ERROR || clipResult == NULLREGION) {
+        RestoreDC(dc, savedDc);
+        return;
+    }
+
+    const auto& v = clip;
     RECT viewport{v.x, v.y, v.x + v.width, v.y + v.height};
     HBRUSH background = CreateSolidBrush(RGB(24, 27, 34));
     FillRect(dc, &viewport, background);
     DeleteObject(background);
-
-    if (v.width <= 0 || v.height <= 0) return;
 
     HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(48, 53, 64));
     HGDIOBJ priorPen = SelectObject(dc, gridPen);
@@ -149,6 +160,8 @@ void DrawViewport(HDC dc) {
         selected += kFixtureNames[static_cast<std::size_t>(selection)];
         TextOutW(dc, v.x + 12, v.y + 30, selected.c_str(), static_cast<int>(selected.size()));
     }
+
+    RestoreDC(dc, savedDc);
 }
 
 HWND MakeControl(HWND parent, const wchar_t* className, const wchar_t* text,
