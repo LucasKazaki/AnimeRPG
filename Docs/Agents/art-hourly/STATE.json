@@ -2,26 +2,29 @@
   "schema_version": 1,
   "loop_id": "astral-art-hourly-20260922",
   "original_baseline": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
-  "latest_observed_main": "dece8fbb47b6a937b9bafafa3faea837a359fb4d",
+  "latest_observed_main": "1042339ee7052fcbff60b1b8bba6840b43019c4e",
   "run_date": "2026-09-23",
-  "focus": "repair final ART-007 exact-head review findings for expected-manifest pin coverage and durable test-count evidence",
+  "focus": "repair ART-007 canonical source-status boundary after exact-head independent review",
   "delivered": [
-    "changed the stale-pin regression to mutate semantically valid metadata and require the expected manifest pin failure specifically",
-    "corrected the durable ART-007 toolchain regression count from seven to sixteen tests",
-    "re-ran fresh generation, exact regeneration, independent validation, all sixteen regressions, and Python compilation in an isolated sandbox fixture"
+    "made the generator require color-roles.json status proposed_art_reference_not_runtime",
+    "made the independent verifier require the same canonical source-only status before source hash or pin acceptance",
+    "added separate generator and verifier regressions for false runtime source status, including a deliberately repinned source-hash/manifest case",
+    "re-ran fresh generation, exact regeneration, independent validation, all eighteen regressions, and Python compilation in an isolated sandbox fixture"
   ],
   "verification": {
     "art003_pr_state": "ready_for_review_unmerged",
-    "prior_art007_exact_head_hosted_ci": "passed: workflow 35800823163 at 34ed461572de3da860c63fb9a2358210e7ebffb6; superseded by current repair",
-    "prior_art007_independent_review": "completed at 34ed461 with two findings: stale-pin test no longer isolated expected-manifest enforcement and TOOLCHAIN.md still reported seven regressions; both addressed in current repair",
+    "prior_art007_exact_head_hosted_ci": "passed: workflow 35805036809 at a90be95389e04a5dffa2f31212e3a66c636572ed; superseded by current repair",
+    "prior_art007_independent_review": "completed at a90be953 with one finding: canonical source status was not semantically enforced; addressed in current repair",
     "color_fresh_generation": "passed locally: 3 PNGs, astral-color-calibration-2",
     "color_fresh_exact_regeneration_check": "passed locally",
     "color_fresh_validator": "passed locally: 8 roles, 3 PNGs, 4 UI screening pairs",
-    "color_regression_tests": "passed locally: 16/16",
+    "color_regression_tests": "passed locally: 18/18",
     "color_python_compile": "passed locally",
+    "generator_source_status_negative_test": "passed locally: runtime_validated_and_approved source status rejected as source status",
+    "verifier_source_status_negative_test": "passed locally: deliberately repinned runtime source status rejected as source status",
     "expected_manifest_negative_test": "passed locally: semantically valid color_note drift rejected specifically as expected manifest pin",
     "crlf_checkout_simulation": "passed locally: generated manifest unchanged and CRLF expected pin verified",
-    "runtime_status_negative_test": "passed locally: repinned runtime_validated_and_approved rejected",
+    "manifest_runtime_status_negative_test": "passed locally: repinned runtime_validated_and_approved manifest status rejected",
     "derived_source_tree_pack": "removed_by_design_to_prevent_stale_binary_drift",
     "palette_card_sha256": "4fa15493ed523ec5624f325d0ebe2b4cd45a814a1150a364464da10f9fcf0e5c",
     "neutral_lut_sha256": "b9c2e13d85416055d65c6eb9d9a42e297515123c52b8dfd2a9d040458e1b256a",
@@ -33,5 +36,5 @@
     "native_astral_color_management": "not_run_engine_unsupported",
     "independent_art_review": "not_run"
   },
-  "next_action": "run exact-head hosted checks and fresh independent review of the final ART-007 repair; keep PR #28 draft and unmerged until both are clean"
+  "next_action": "run exact-head hosted checks and fresh independent review of the source-status repair; keep PR #28 draft and unmerged until both are clean"
 }
