@@ -10,12 +10,13 @@ PR: `#48`
 
 ## Scope and ownership
 
-This packet deepens the already-live single-protagonist Shadowblade loadout. It does not change the Astral Engine renderer/platform/editor/import/animation/audio/physics layers, shared build or CI ownership, networking, R0, releases, deployment, or other workers' PRs. `ShadowbladeActions` remains the live game-domain owner and now owns a small loadout-workbench state object next to its existing `ShadowbladeLoadout`.
+This packet deepens the already-live single-protagonist Shadowblade loadout. It does not change the Astral Engine renderer/platform/editor/import/animation/audio/physics layers, shared build or CI ownership, networking, R0, releases, deployment, or other workers' PRs. `ShadowbladeActions` remains the live game-domain owner. The workbench itself is stateless for player metadata; preset labels and last-successful-preset state are stored with the authoritative `ShadowbladeLoadout` so ordinary loadout assignment cannot split metadata from the build it describes.
 
 Allowed production paths:
 - `Engine/Scene/ShadowbladeLoadoutWorkbench.h`
+- `Engine/Scene/ShadowbladeLoadout.h`, only to pair pass-28 preset label/last-applied metadata with the existing presets and build state
 - `Engine/Scene/ShadowbladeActions.h`, only to own/expose the workbench and bind stateful operations to the live owner
-- `Engine/Scene/ShadowbladeActions.cpp`, only for the existing transient-reset helper to preserve the persistent workbench metadata introduced by this packet
+- `Engine/Scene/ShadowbladeActions.cpp`, only for the existing transient-reset helper admitted during review
 
 Verification/records:
 - `Tests/ShadowbladeLoadoutWorkbenchPass28Tests.inc`
@@ -25,7 +26,7 @@ Verification/records:
 - `Docs/Agents/animerpg-hourly/STATE.json`
 - `Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS28.md`
 
-The `ShadowbladeActions.cpp` admission was added after independent review found that the pre-existing `ResetTransientStatePreservingLoadout()` reconstructed the action owner and therefore discarded pass-28 labels/last-preset metadata while keeping the saved presets. The repair is limited to preserving the paired workbench value alongside the already-preserved authoritative loadout and timing preset.
+The `ShadowbladeLoadout.h` admission was added after independent review demonstrated that keeping labels and recall metadata in a separate workbench object was incompatible with the pre-existing public mutable `ShadowbladeActions::Loadout()` reference. Moving only that metadata into the loadout makes copy assignment carry or clear it atomically with the saved presets. The earlier narrow `ShadowbladeActions.cpp` reset repair remains in the diff; with metadata now loadout-owned, its workbench copy is semantically redundant but harmless and does not expand ownership.
 
 ## Research provenance
 
@@ -77,20 +78,20 @@ The post asks about removing preset configurations. Replies also specifically co
 
 **Reference mechanic:** Genshin 5.7 says Mystic Offering remembers the last selected Strongbox and other challenge interfaces retain prior configuration for quicker repeat use.  
 **Repository gap:** `ShadowbladeLoadout` has three exact presets, but callers must remember the last successfully applied slot themselves.  
-**Adaptation:** the live `ShadowbladeActions` workbench remembers only a successful preset apply and can reapply that same saved slot after later manual equipment changes. Failed/empty preset attempts do not replace the remembered selection.  
-**Acceptance:** saving alone creates no remembered selection; successful apply records it; failed apply preserves it; transient combat/training resets preserve the remembered selection; one-action reapply restores the preset through the existing validated `ApplyPreset()` path.
+**Adaptation:** the live `ShadowbladeActions` workbench records only a successful preset apply into metadata paired with the authoritative loadout and can reapply that same saved slot after later manual equipment changes. Failed/empty preset attempts do not replace the remembered selection.  
+**Acceptance:** saving alone creates no remembered selection; successful apply records it; failed apply preserves it; transient combat/training resets preserve it with the loadout; replacing the entire loadout replaces/clears recall metadata with that build; one-action reapply restores the preset through the existing validated `ApplyPreset()` path.
 
 ### QOL-029: human-readable preset labels with spaces
 
 **Community request:** the 2026-07-11 ZZZ discussion includes frustration that custom preset names cannot contain spaces and cannot be returned to an unnamed-looking state.  
 **Repository gap:** Astral's three loadout slots have no player-facing label metadata at all.  
-**Adaptation:** each saved slot can receive an optional 24-byte label. Outer ASCII spaces are trimmed, internal spaces are preserved, control characters/empty/overlong labels are rejected atomically, and the label can be cleared without altering the underlying saved preset or current equipment. Stateful edits are routed only through the paired `ShadowbladeActions` owner.  
-**Acceptance:** `"  Mall Patrol  "` becomes `"Mall Patrol"`; an internal space remains; rejected edits preserve the previous label; empty slots cannot be labeled; another action owner cannot use its own empty preset slot to mutate this owner's metadata; transient combat/training resets preserve the label; clearing the label leaves saved/equipped gameplay state unchanged.
+**Adaptation:** each saved slot can receive an optional 24-byte label paired directly with the authoritative loadout. Outer ASCII spaces are trimmed, internal spaces are preserved, control characters/empty/overlong labels are rejected atomically, and the label can be cleared without altering the underlying saved preset or current equipment. Stateful edits are routed through the paired `ShadowbladeActions` owner.  
+**Acceptance:** `"  Mall Patrol  "` becomes `"Mall Patrol"`; an internal space remains; rejected edits preserve the previous label; empty slots cannot be labeled; unrelated owners cannot mutate each other's metadata; assigning an empty/different loadout cannot leave stale labels behind; transient combat/training resets preserve labels with the loadout; clearing a label leaves saved/equipped gameplay state unchanged.
 
 ## Verification plan
 
 1. Registered `ThoughtCommandsTests` must compile/run on the exact candidate in both Debug and Release through existing hosted Windows CI.
-2. Pass-28 regressions cover preview non-mutation and exact deltas, focus changes, family filtering, malformed filters, scope divergence, owner-bound preset metadata, transient-reset persistence, successful/failed preset recall, reapply, label spaces, label rejection atomicity, and clear-label non-mutation.
+2. Pass-28 regressions cover preview non-mutation and exact deltas, focus changes, family filtering, malformed filters, scope divergence, owner-bound preset metadata, whole-loadout replacement pairing, transient-reset persistence, successful/failed preset recall, reapply, label spaces, label rejection atomicity, and clear-label non-mutation.
 3. Existing pass 13-27 registered tests stay in the same aggregate and must remain green.
 4. Release-manifest integrity must pass on the exact same head.
 5. A fresh independent authorized reviewer must review the exact final head. Material findings must be repaired and all affected checks rerun before merge.
