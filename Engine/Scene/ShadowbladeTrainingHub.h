@@ -175,11 +175,25 @@ public:
             return;
         }
 
+        const std::int64_t damageDelta = safeDamage - latestDamage_;
+        const int hitDelta = safeHits - latestHits_;
+        if (damageDelta > 0 || hitDelta > 0) {
+            if (pendingActivitySeconds_ < 0.0) pendingActivitySeconds_ = now;
+            pendingDamage_ += damageDelta;
+            pendingHits_ += hitDelta;
+        }
+
         latestObservedSeconds_ = now;
         latestDamage_ = safeDamage;
         latestHits_ = safeHits;
         if (now - lastStoredSampleSeconds_ >= DamageSampleIntervalSeconds) {
-            AddDamageSample(now, safeDamage, safeHits);
+            const double activitySeconds = pendingActivitySeconds_ >= 0.0
+                ? pendingActivitySeconds_
+                : now;
+            AddDamageSample(now, activitySeconds, pendingDamage_, pendingHits_);
+            pendingDamage_ = 0;
+            pendingHits_ = 0;
+            pendingActivitySeconds_ = -1.0;
         }
     }
 
@@ -264,8 +278,9 @@ public:
 
 private:
     struct DamageSample {
-        double seconds{};
-        std::int64_t totalDamage{};
+        double storedSeconds{};
+        double activitySeconds{};
+        std::int64_t damage{};
         int hits{};
     };
 
@@ -306,64 +321,68 @@ private:
         nextSample_ = 0;
         latestObservedSeconds_ = 0.0;
         lastStoredSampleSeconds_ = 0.0;
+        damageWindowStartSeconds_ = 0.0;
         latestDamage_ = 0;
         latestHits_ = 0;
+        pendingDamage_ = 0;
+        pendingHits_ = 0;
+        pendingActivitySeconds_ = -1.0;
         const double now = combat.ElapsedSecondsPrecise();
         if (!std::isfinite(now) || now < 0.0) return;
         const TrainingStats& stats = combat.Stats();
-        const std::int64_t safeDamage = std::max<std::int64_t>(0, stats.totalDamage);
-        const int safeHits = std::max(0, stats.hitCount);
         latestObservedSeconds_ = now;
-        latestDamage_ = safeDamage;
-        latestHits_ = safeHits;
-        AddDamageSample(now, safeDamage, safeHits);
+        lastStoredSampleSeconds_ = now;
+        damageWindowStartSeconds_ = now;
+        latestDamage_ = std::max<std::int64_t>(0, stats.totalDamage);
+        latestHits_ = std::max(0, stats.hitCount);
+        AddDamageSample(now, now, 0, 0);
     }
 
-    void AddDamageSample(double seconds, std::int64_t totalDamage, int hits) {
+    void AddDamageSample(double storedSeconds, double activitySeconds,
+        std::int64_t damage, int hits) {
         damageSamples_[nextSample_] = {
-            seconds,
-            std::max<std::int64_t>(0, totalDamage),
+            storedSeconds,
+            activitySeconds,
+            std::max<std::int64_t>(0, damage),
             std::max(0, hits),
         };
         nextSample_ = (nextSample_ + 1) % MaximumDamageSamples;
         if (sampleCount_ < MaximumDamageSamples) ++sampleCount_;
-        lastStoredSampleSeconds_ = seconds;
+        lastStoredSampleSeconds_ = storedSeconds;
     }
 
     ShadowbladeTrainingDamageWindow RecentDamage() const {
         ShadowbladeTrainingDamageWindow window{};
-        if (sampleCount_ == 0 || !std::isfinite(latestObservedSeconds_)) return window;
+        if (sampleCount_ == 0 || !std::isfinite(latestObservedSeconds_)
+            || !std::isfinite(damageWindowStartSeconds_)) {
+            return window;
+        }
 
-        const double cutoff = std::max(0.0, latestObservedSeconds_ - DamageWindowSeconds);
-        // Never use a sample older than the actual cutoff as the cumulative
-        // baseline. Doing so would keep pre-window damage in the result while
-        // reporting a clamped 20-second duration. The first retained sample at
-        // or after the cutoff is conservative by at most one sampling interval:
-        // it can omit unsampled in-window damage, but it cannot report stale
-        // out-of-window damage. If observations were too sparse to retain such a
-        // sample, use the current cumulative totals as a zero-length baseline.
-        bool foundAtOrAfterCutoff = false;
-        DamageSample baseline{
-            latestObservedSeconds_,
-            latestDamage_,
-            latestHits_,
-        };
+        const double cutoff = std::max(damageWindowStartSeconds_,
+            latestObservedSeconds_ - DamageWindowSeconds);
+        std::int64_t damage = 0;
+        int hits = 0;
         for (std::size_t index = 0; index < sampleCount_; ++index) {
             const DamageSample& sample = damageSamples_[index];
-            if (!std::isfinite(sample.seconds) || sample.seconds < cutoff) continue;
-            if (!foundAtOrAfterCutoff || sample.seconds < baseline.seconds) {
-                baseline = sample;
-                foundAtOrAfterCutoff = true;
+            if (!std::isfinite(sample.activitySeconds)
+                || sample.activitySeconds < cutoff
+                || sample.activitySeconds > latestObservedSeconds_) {
+                continue;
             }
+            damage += sample.damage;
+            hits += sample.hits;
+        }
+        if (pendingActivitySeconds_ >= cutoff
+            && pendingActivitySeconds_ <= latestObservedSeconds_) {
+            damage += pendingDamage_;
+            hits += pendingHits_;
         }
 
         window.valid = true;
         window.windowSeconds = std::min(DamageWindowSeconds,
-            std::max(0.0, latestObservedSeconds_ - baseline.seconds));
-        window.damage = latestDamage_ >= baseline.totalDamage
-            ? latestDamage_ - baseline.totalDamage
-            : 0;
-        window.hits = latestHits_ >= baseline.hits ? latestHits_ - baseline.hits : 0;
+            std::max(0.0, latestObservedSeconds_ - damageWindowStartSeconds_));
+        window.damage = std::max<std::int64_t>(0, damage);
+        window.hits = std::max(0, hits);
         return window;
     }
 
@@ -379,8 +398,12 @@ private:
     std::size_t nextSample_{};
     double latestObservedSeconds_{};
     double lastStoredSampleSeconds_{};
+    double damageWindowStartSeconds_{};
     std::int64_t latestDamage_{};
     int latestHits_{};
+    std::int64_t pendingDamage_{};
+    int pendingHits_{};
+    double pendingActivitySeconds_{-1.0};
 };
 
 } // namespace Astral::Scene
