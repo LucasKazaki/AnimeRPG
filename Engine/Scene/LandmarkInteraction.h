@@ -119,7 +119,7 @@ public:
     // already-merged expedition rules through the same live landmark/narrative
     // owner that produces the authoritative ShadowCryptLead evidence.
     bool BeginShadowCrypt() {
-        if (!shadowCryptMission_.Begin(fieldGuide_)) return false;
+        if (progression_ == nullptr || !shadowCryptMission_.Begin(fieldGuide_)) return false;
         // Bind reward/replay authority to the protagonist owner that entered the
         // run. A later pointer swap cannot redirect a completed clear to a
         // different progression object.
