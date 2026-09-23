@@ -125,8 +125,16 @@ void TestShadowCryptMissionPass27() {
             && firstRecord.defeats == 0 && firstRecord.score == 3210,
         "pass27 clean cache clear records the deterministic Gold personal best");
 
-    // GAME-136: first-clear progression remains protagonist-owned and idempotent,
-    // while the full dungeon can replay immediately without erasing the best.
+    // GAME-136: reward/replay authority stays bound to the protagonist owner that
+    // entered the run, then first-clear remains idempotent across later replay.
+    CharacterProgression unrelatedProgression;
+    owner.SetCharacterProgression(&unrelatedProgression);
+    Expect(!owner.ClaimShadowCryptFirstClearReward().granted
+            && !unrelatedProgression.ShadowCryptFirstClearClaimed()
+            && !owner.ReplayCompletedShadowCrypt(),
+        "pass27 swapping the live progression pointer cannot redirect reward or replay authority to another protagonist");
+    owner.SetCharacterProgression(&progression);
+
     const ShadowCryptRewardReport reward = owner.ClaimShadowCryptFirstClearReward();
     Expect(reward.granted
             && reward.progression.experienceApplied == ShadowCryptExpedition::FirstClearExperience

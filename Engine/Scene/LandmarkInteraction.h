@@ -118,7 +118,14 @@ public:
     // Pass 27 production-owned Shadow Crypt path. These methods expose the
     // already-merged expedition rules through the same live landmark/narrative
     // owner that produces the authoritative ShadowCryptLead evidence.
-    bool BeginShadowCrypt() { return shadowCryptMission_.Begin(fieldGuide_); }
+    bool BeginShadowCrypt() {
+        if (!shadowCryptMission_.Begin(fieldGuide_)) return false;
+        // Bind reward/replay authority to the protagonist owner that entered the
+        // run. A later pointer swap cannot redirect a completed clear to a
+        // different progression object.
+        shadowCryptProgressionOwner_ = progression_;
+        return true;
+    }
     bool AdvanceShadowCryptObjective() { return shadowCryptMission_.RecordObjectiveStep(); }
     bool DiscoverShadowCryptCoolingCache() {
         return shadowCryptMission_.DiscoverCoolingCache();
@@ -131,6 +138,7 @@ public:
     bool SuspendShadowCrypt() { return shadowCryptMission_.SuspendAtSafeBoundary(); }
     bool ResumeShadowCrypt() { return shadowCryptMission_.ResumeSuspendedRun(); }
     bool ReplayCompletedShadowCrypt() {
+        if (progression_ != shadowCryptProgressionOwner_) return false;
         return shadowCryptMission_.ReplayCompletedRun(fieldGuide_);
     }
     ShadowCryptMissionBriefing ShadowCryptBriefing() const {
@@ -140,7 +148,7 @@ public:
         return shadowCryptMission_.BestRecord();
     }
     ShadowCryptRewardReport ClaimShadowCryptFirstClearReward() {
-        if (progression_ == nullptr) return {};
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return {};
         return shadowCryptMission_.ClaimFirstClearReward(*progression_);
     }
     const ShadowCryptMission& ShadowCrypt() const { return shadowCryptMission_; }
@@ -203,6 +211,7 @@ private:
         LandmarkObjectiveActivationMode::AutoStart};
     bool objectiveStarted_{true};
     CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
+    CharacterProgression* shadowCryptProgressionOwner_{}; // Identity only; never dereferenced directly.
     LandmarkDialogue dialogue_{};
     ExplorationFieldGuide fieldGuide_{};
     ManaReactorMission manaReactorMission_{};
