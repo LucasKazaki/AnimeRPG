@@ -101,6 +101,8 @@ private:
     LandmarkEncounterReport lastReport_{};
     double activationElapsedSeconds_{};
     TrainingStats activationTrainingStats_{};
+    const CombatSandbox* activationCombatOwner_{};
+    const ShadowbladeActions* activationActionsOwner_{};
     bool completionRewardGranted_{};
     EncounterChallengeTracker challengeTracker_{};
     ShadowbladeTrainingHub trainingHub_{};
