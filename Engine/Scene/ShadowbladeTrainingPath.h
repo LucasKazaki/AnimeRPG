@@ -179,8 +179,10 @@ public:
 
         for (EnemyAttackPattern pattern : BossPatterns()) {
             const DefensePracticePatternStats stats = session.PatternStats(pattern);
-            const int resolved = stats.perfectDefenses + stats.ordinaryDefenses + stats.hitsTaken;
-            if (stats.attempts < 1 || resolved < 1) return false;
+            const bool resolved = stats.perfectDefenses > 0
+                || stats.ordinaryDefenses > 0
+                || stats.hitsTaken > 0;
+            if (stats.attempts < 1 || !resolved) return false;
         }
         return true;
     }
@@ -195,8 +197,10 @@ public:
             for (EnemyAttackPattern pattern : BossPatterns()) {
                 const DefensePracticePatternStats stats = session.PatternStats(pattern);
                 everySuccess = everySuccess
-                    && stats.perfectDefenses + stats.ordinaryDefenses >= 1;
-                everyPerfect = everyPerfect && stats.perfectDefenses >= 1;
+                    && (stats.perfectDefenses > 0 || stats.ordinaryDefenses > 0);
+                everyPerfect = everyPerfect
+                    && stats.perfectDefenses > 0
+                    && stats.ordinaryDefenses == 0;
                 anyHit = anyHit || stats.hitsTaken > 0;
             }
             if (anyHit) return ShadowbladeTrainingMedal::Bronze;
