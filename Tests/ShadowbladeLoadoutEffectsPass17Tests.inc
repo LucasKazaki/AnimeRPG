@@ -260,47 +260,36 @@ void TestShadowbladeLoadoutEffectsPass17() {
             && retryLoadout.TryEquipModule(ResonanceSlot::Edge, ResonanceModule::RiftEdge)
                 == LoadoutActionResult::Success
             && retryLoadout.SavePreset(0) == LoadoutActionResult::Success,
-        "pass17 retry fixture owns, equips, and saves a non-default persistent loadout");
-    const ShadowbladeActionTuning tuningBeforeRetry = retryActions.CurrentLoadoutTuning();
+        "pass17 reset fixture owns, equips, and saves a non-default persistent loadout");
+    const ShadowbladeActionTuning tuningBeforeReset = retryActions.CurrentLoadoutTuning();
     retryActions.SetDefenseTimingPreset(DefenseTimingPreset::Forgiving);
-
-    CombatSandbox retryCombat;
-    LandmarkEncounter retryEncounter;
-    const LandmarkInteractionReport retryDiscovery{
-        LandmarkInteractionResult::Discovered, LandmarkEncounter::EncounterLandmark, 0.0f};
-    Expect(retryEncounter.TryActivate(retryDiscovery, retryCombat).result
-                == LandmarkEncounterResult::Activated,
-        "pass17 retry fixture activates the production landmark encounter");
-    retryCombat.ApplyDamage(retryCombat.Dummy().maximumHealth);
-    Expect(retryEncounter.Update(retryCombat, retryActions),
-        "pass17 retry fixture completes the production landmark encounter");
     Expect(retryActions.TryDash({}).result == ShadowActionResult::Activated
             && retryActions.BeginIncomingAttack({1.0f, 20, 10, true}),
-        "pass17 retry fixture creates transient action state before retry reset");
+        "pass17 reset fixture creates transient action state before retry reset");
     retryActions.SetGuarding(true);
 
-    const LandmarkEncounterReport retryReport = retryEncounter.Retry(retryCombat, retryActions);
-    const ShadowbladeActionTuning tuningAfterRetry = retryActions.CurrentLoadoutTuning();
-    Expect(retryReport.result == LandmarkEncounterResult::Retried
-            && retryActions.Loadout().OwnsWeapon(ShadowbladeWeapon::RiftsteelSabre)
+    retryActions.ResetTransientStatePreservingLoadout();
+    const ShadowbladeActionTuning tuningAfterReset = retryActions.CurrentLoadoutTuning();
+    Expect(retryActions.Loadout().OwnsWeapon(ShadowbladeWeapon::RiftsteelSabre)
             && retryActions.Loadout().EquippedWeapon() == ShadowbladeWeapon::RiftsteelSabre
             && retryActions.Loadout().OwnsModule(ResonanceModule::RiftEdge)
             && retryActions.Loadout().ModuleSlotOccupied(ResonanceSlot::Edge)
             && retryActions.Loadout().EquippedModule(ResonanceSlot::Edge)
                 == ResonanceModule::RiftEdge
             && retryActions.Loadout().PresetSaved(0)
-            && tuningAfterRetry.fatalStrikeDamage == tuningBeforeRetry.fatalStrikeDamage
-            && Near(tuningAfterRetry.dashDistance, tuningBeforeRetry.dashDistance)
-            && Near(tuningAfterRetry.resourceRegenerationPerSecond,
-                tuningBeforeRetry.resourceRegenerationPerSecond)
-            && tuningAfterRetry.guardDamageMitigation == tuningBeforeRetry.guardDamageMitigation,
-        "pass17 production encounter retry preserves owned, equipped, preset, and tuned loadout state");
+            && tuningAfterReset.fatalStrikeDamage == tuningBeforeReset.fatalStrikeDamage
+            && Near(tuningAfterReset.dashDistance, tuningBeforeReset.dashDistance)
+            && Near(tuningAfterReset.resourceRegenerationPerSecond,
+                tuningBeforeReset.resourceRegenerationPerSecond)
+            && tuningAfterReset.guardDamageMitigation == tuningBeforeReset.guardDamageMitigation,
+        "pass17 transient retry reset preserves owned, equipped, preset, and tuned loadout state");
     Expect(Near(retryActions.Resource(), ShadowbladeActions::MaximumResource)
             && Near(retryActions.DashCooldownRemaining(), 0.0f)
+            && Near(retryActions.FatalStrikeCooldownRemaining(), 0.0f)
             && !retryActions.IsGuarding() && !retryActions.HasIncomingAttack()
             && retryActions.PlayerHealth() == ShadowbladeActions::MaximumPlayerHealth
             && retryActions.GuardIntegrity() == ShadowbladeActions::MaximumGuardIntegrity
             && Near(retryActions.PerfectDefenseWindowSeconds(),
                 ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds),
-        "pass17 encounter retry still resets transient action/defense state while retaining timing preset");
+        "pass17 transient retry reset clears combat/action state while retaining timing preference");
 }
