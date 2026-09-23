@@ -10,11 +10,12 @@
 #include "Engine/Scene/ShadowbladeTrainingPath.h"
 #include "Engine/Scene/ShadowbladeTrainingCoach.h"
 
-// Pass 25 needs the existing out-of-line LandmarkEncounter implementation in
-// this registered aggregation target. Shared CMake remains owned by the engine
-// worker, so compile the exact production implementation into this test TU
-// instead of changing target ownership or substituting a mock.
+// Passes 25-26 need the existing out-of-line LandmarkEncounter and
+// LandmarkInteraction implementations in this registered aggregation target.
+// Shared CMake remains owned by the engine worker, so compile the exact production
+// implementations into this test TU instead of changing target ownership or using mocks.
 #include "Engine/Scene/LandmarkEncounter.cpp"
+#include "Engine/Scene/LandmarkInteraction.cpp"
 
 #include <cmath>
 #include <iostream>
