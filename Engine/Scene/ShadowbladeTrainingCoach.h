@@ -42,6 +42,7 @@ struct ShadowbladeTrainingDrillPlan {
 };
 
 struct ShadowbladeTrainingDebrief {
+    bool valid{};
     int resolvedAttempts{};
     int successfulDefenses{};
     int perfectDefenses{};
@@ -128,7 +129,13 @@ public:
     }
 
     static bool ApplyDrill(DefensePracticeSession& session,
+        const CombatSandbox& combat, const ShadowbladeActions& actions,
         ShadowbladeTrainingFocus focus, DefensePracticePace pace) {
+        // A directly queued replacement can exist outside the practice-session
+        // coordinator. Refuse reconfiguration while either authoritative live
+        // owner still carries a threat so setup remains all-or-nothing.
+        if (combat.HasPendingEnemyAttack() || actions.HasIncomingAttack()) return false;
+
         ShadowbladeTrainingDrillPlan plan{};
         if (!PlanForFocus(focus, pace, plan)) return false;
 
@@ -160,7 +167,14 @@ public:
         const std::int64_t hits = std::max(0, stats.hitsTaken);
         const std::int64_t resolved = perfect + ordinary + hits;
         const std::int64_t successful = perfect + ordinary;
+        const DefensePracticeScoreReport score = session.Score(combat);
 
+        // Score() is deliberately ownership-aware. Require its resolved-attempt
+        // witness to match the session metrics before composing a debrief, so a
+        // caller cannot mix one session's stats with another combat instance.
+        if (resolved <= 0 || score.resolvedAttempts != resolved) return report;
+
+        report.valid = true;
         report.resolvedAttempts = ClampToInt(resolved);
         report.successfulDefenses = ClampToInt(successful);
         report.perfectDefenses = ClampToInt(perfect);
@@ -169,12 +183,8 @@ public:
         report.damageTaken = std::max(0, stats.damageTaken);
         report.bestPerfectStreak = std::max(0, stats.bestPerfectStreak);
         report.bestAlternatingChain = std::max(0, session.BestAlternatingChain());
-        if (resolved > 0) {
-            report.accuracyPercent = static_cast<int>(successful * 100 / resolved);
-            report.perfectPercent = static_cast<int>(perfect * 100 / resolved);
-        }
-
-        const DefensePracticeScoreReport score = session.Score(combat);
+        report.accuracyPercent = static_cast<int>(successful * 100 / resolved);
+        report.perfectPercent = static_cast<int>(perfect * 100 / resolved);
         report.baseScore = score.baseScore;
         report.timeCoefficientPercent = score.timeCoefficientPercent;
         report.finalScore = score.score;
@@ -245,7 +255,11 @@ public:
         return ShadowbladeTrainingRecommendation::MaintainForm;
     }
 
-    static bool RetryDrill(DefensePracticeSession& session) {
+    static bool RetryDrill(DefensePracticeSession& session,
+        const CombatSandbox& combat, const ShadowbladeActions& actions) {
+        // ResetMetrics() can only see threats coordinated by this session. Also
+        // reject direct/replacement threats living on either authoritative owner.
+        if (combat.HasPendingEnemyAttack() || actions.HasIncomingAttack()) return false;
         return session.ResetMetrics();
     }
 
