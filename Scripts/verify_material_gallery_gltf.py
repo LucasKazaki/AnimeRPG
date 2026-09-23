@@ -5,6 +5,7 @@ from pathlib import Path
 VERSION="astral-material-gallery-gltf-3"
 SOURCE_STATUS="proposed_art_reference_not_runtime"
 RUNTIME_STATUS="source_validated_not_imported"
+CONTRACT_KEYS={"units","up","forward","right","status","capture_intent","station_order","forbid_baked_lighting","source_sha256"}
 
 def req(cond,msg):
     if not cond: raise ValueError(msg)
@@ -49,6 +50,11 @@ def normalize(v,msg):
     n=length(v); req(n>1e-12,msg); return tuple(c/n for c in v)
 
 def tri_normal(a,b,c): return cross(sub(b,a),sub(c,a))
+
+def geometry_binding(mesh):
+    req(len(mesh["primitives"])==1,"primitive count")
+    prim=mesh["primitives"][0]
+    return prim["attributes"],prim["indices"]
 
 def verify_floor_tangent_frame(pos,normal,tangent,uv,indices):
     for k in range(0,len(indices),3):
@@ -96,7 +102,8 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     source,source_raw=load_source(source_path); path=Path(path); raw=path.read_bytes(); g=json.loads(raw)
     req(g["asset"]=={"generator":VERSION,"version":"2.0"},"asset header"); req(g["extensionsUsed"]==["KHR_lights_punctual"],"extensions used")
     req(g["scene"]==0 and g["scenes"]==[{"name":"AstralNeutralMaterialGallery","nodes":list(range(12))}],"scene"); req(len(g["nodes"])==12,"node count")
-    contract=g["extras"]["astral_contract"]; req(contract["status"]==RUNTIME_STATUS,"runtime status")
+    req(set(g.get("extras",{}))=={"astral_contract"},"runtime extras")
+    contract=g["extras"]["astral_contract"]; req(set(contract)==CONTRACT_KEYS,"runtime contract fields"); req(contract["status"]==RUNTIME_STATUS,"runtime status")
     req(contract["units"]==source["units"] and contract["up"]==source["axes"]["up"] and contract["forward"]==source["axes"]["forward"] and contract["right"]==source["axes"]["right"],"axis contract")
     req(contract["forbid_baked_lighting"] is True,"baked-lighting rule")
     labels=tuple(s["label"] for s in source["stations"]); req(tuple(contract["station_order"])==labels,"station order"); req(contract["capture_intent"]==source["capture_intent"],"capture intent"); req(contract["source_sha256"]==hashlib.sha256(source_raw).hexdigest(),"source hash")
@@ -107,9 +114,21 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
         req(set(material)=={"name","pbrMetallicRoughness"},"material properties"); req(material["name"]==s["material_name"],"material name"); expected={"baseColorFactor":s["base_color_factor_linear"],"metallicFactor":s["metallic"],"roughnessFactor":s["roughness"]}; req(material["pbrMetallicRoughness"]==expected,"material values")
     geometry=source["geometry"]; sphere_counts=((geometry["sphere_lat_segments"]+1)*(geometry["sphere_lon_segments"]+1),6*geometry["sphere_lon_segments"]*(geometry["sphere_lat_segments"]-1)); cube_counts=(24,36); floor_counts=(4,6)
     req(len(g["meshes"])==9,"mesh count")
-    for i in range(4): verify_mesh(g,buf,i,i,sphere_counts)
-    for i in range(4): verify_mesh(g,buf,4+i,i,cube_counts)
+    sphere_binding=geometry_binding(g["meshes"][0]); cube_binding=geometry_binding(g["meshes"][4])
+    for i in range(1,4): req(geometry_binding(g["meshes"][i])==sphere_binding,"matched sphere geometry")
+    for i in range(5,8): req(geometry_binding(g["meshes"][i])==cube_binding,"matched cube geometry")
+    sphere_pos=None
+    for i in range(4):
+        pos=verify_mesh(g,buf,i,i,sphere_counts)
+        if sphere_pos is None: sphere_pos=pos
+    cube_pos=None
+    for i in range(4):
+        pos=verify_mesh(g,buf,4+i,i,cube_counts)
+        if cube_pos is None: cube_pos=pos
+    r=geometry["sphere_radius"]; req(all(abs(length(p)-r)<1e-5 for p in sphere_pos),"sphere radius")
+    h=geometry["cube_half_extent"]; req(all(all(abs(abs(c)-h)<1e-6 for c in p) for p in cube_pos),"cube extent")
     floor_pos=verify_mesh(g,buf,8,4,floor_counts,verify_floor_frame=True); req(all(abs(y)<1e-7 for x,y,z in floor_pos),"floor plane")
+    hx,hz=source["layout"]["floor_half_extents_xz"]; req(all(abs(abs(x)-hx)<1e-6 and abs(abs(z)-hz)<1e-5 for x,y,z in floor_pos),"floor extents")
     xs=source["layout"]["x_positions"]; sy,sz=source["layout"]["sphere_yz"]; cy,cz=source["layout"]["cube_yz"]; req(len(xs)==4,"layout count")
     for i,(label,x) in enumerate(zip(labels,xs)):
         req(g["nodes"][i]=={"name":f"{label}_Sphere","mesh":i,"translation":[x,sy,sz]},"sphere station node"); req(g["nodes"][4+i]=={"name":f"{label}_Cube","mesh":4+i,"translation":[x,cy,cz]},"cube station node")
