@@ -16,7 +16,7 @@
   "task_packet": "Tasks/GAME-PASS23-SHADOWBLADE-TRAINING-PATH-2026-09-23.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS23.md",
   "pr": 42,
-  "final_head": "pending_exact_final_head_after_cross_session_binding_state_record",
+  "final_head": "pending_exact_head_after_this_state_record",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -29,27 +29,28 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-112","title":"Sequential Shadowblade lesson curriculum","status":"implemented_registered_test_coverage_game_domain_exact_applied_session_binding_repaired"},
+    {"id":"GAME-112","title":"Sequential Shadowblade lesson curriculum","status":"implemented_registered_test_coverage_game_domain_exact_application_session_and_assignment_generation_binding_repaired"},
     {"id":"GAME-113","title":"Atomic authored lesson setup","status":"implemented_registered_test_coverage_game_domain_live_threat_lock_repaired"},
     {"id":"GAME-114","title":"Deterministic lesson mastery medals","status":"implemented_registered_test_coverage_game_domain_normal_and_boss_gold_rules_repaired"},
     {"id":"GAME-115","title":"Opt-in forgiving defense timing assist","status":"implemented_registered_test_coverage_game_domain"},
     {"id":"GAME-116","title":"Versioned monotonic training checkpoint","status":"implemented_registered_test_coverage_game_domain_in_memory_only_restore_invalidates_session_binding"},
-    {"id":"QOL-024","title":"Boss-style three-threat rehearsal","status":"implemented_registered_test_coverage_game_domain_pattern_provenance_overflow_and_exact_session_binding_repaired"}
+    {"id":"QOL-024","title":"Boss-style three-threat rehearsal","status":"implemented_registered_test_coverage_game_domain_pattern_provenance_overflow_and_session_binding_repaired"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
+    "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim_including_assignment_copy_regression",
     "sandbox_cpp17": "not_run_clone_failed_before_source_access_due_container_DNS_no_product_claim",
-    "hosted_windows_ci": "candidate_66bd5cd_passed_run_35871418392_number_687_then_invalidated; candidate_8568ed8_passed_run_35872965347_number_693_then_invalidated; candidate_9114ec9_passed_run_35874998727_number_707_then_invalidated_by_cross_session_review_repair; pending_exact_final_head",
-    "release_manifest": "candidate_66bd5cd_passed_run_35871418284_number_494_then_invalidated; candidate_8568ed8_passed_run_35872965442_number_499_then_invalidated; candidate_9114ec9_passed_run_35874998710_number_507_then_invalidated_by_cross_session_review_repair; pending_exact_final_head",
+    "hosted_windows_ci": "candidate_566282c_passed_run_35876273871_number_712_then_invalidated_by_assignment_bypass_review_repair; pending_exact_final_head",
+    "release_manifest": "candidate_566282c_passed_run_35876273879_number_512_then_invalidated_by_assignment_bypass_review_repair; pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "67f9039_review_found_four_P2s_repaired; 66bd5cd_review_found_P2_boss_gold_and_P3_counter_overflow_repaired; 8568ed8_review_found_P2_stale_metric_binding_repaired; 9114ec9_review_found_P2_cross_session_substitution_repaired; fresh_exact_final_head_review_required",
+    "independent_review": "67f9039_review_found_four_P2s_repaired; 66bd5cd_review_found_P2_boss_gold_and_P3_counter_overflow_repaired; 8568ed8_review_found_P2_stale_metric_binding_repaired; 9114ec9_review_found_P2_cross_session_substitution_repaired; 566282c_review_found_P2_copy_assignment_bypass_repaired; fresh_exact_final_head_review_required",
     "research": "five_official_reference_mechanics_plus_boss_training_rotation_request_verified_from_2026-02-14_and_2025-08-27_player_threads_with_2026-08-01_and_2026-09-11_fresh_corroboration_and_workaround_counterexamples",
-    "integration": "all_six_increments_layer_on_existing_DefensePracticeSession_and_ShadowbladeActions_authority; no_parallel_combat_framework",
+    "integration": "all_six_increments_layer_on_existing_DefensePracticeSession_and_ShadowbladeActions_authority; final review repair adds only an assignment-generation witness to the game-owned practice session; no parallel combat framework",
     "persistent_cross_process_save": "not_implemented_not_claimed"
   },
   "coordination": {
     "engine_pr_13": "separate editor/runtime-smoke ownership; no overlap",
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
+    "game_owned_shared_path": "Engine/Scene/DefensePracticeSession.h narrow assignment-generation witness only; introduced by game pass 13 and no current open engine/art PR overlap observed",
     "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
   "review_repairs": [
@@ -60,7 +61,8 @@
     "boss_gold_requires_zero_ordinary_defenses_per_authored_pattern",
     "boss_completion_and_success_do_not_add_saturating_int_counters",
     "lesson_completion_requires_same_path_successful_current_lesson_application_and_commit_restore_invalidate_binding",
-    "lesson_completion_requires_exact_DefensePracticeSession_identity_from_successful_application"
+    "lesson_completion_requires_exact_DefensePracticeSession_identity_from_successful_application",
+    "copy_assignment_of_bound_session_changes_assignment_generation_and_invalidates_completion_commit_binding"
   ],
-  "next_action": "Freeze this exact-session repair head, inspect the full six-path diff, require fresh exact-head Windows Debug/Release deterministic tests and release-manifest integrity, request fresh independent Codex review on the exact head, resolve all material threads, re-read live main/head immediately before merge, then merge only the exact tested/reviewed candidate with expected-head checking."
+  "next_action": "Treat the commit containing this state record as the final candidate unless a repair is required. Inspect the full eight-path diff, require fresh exact-head Windows Debug/Release deterministic tests and release-manifest integrity, request fresh independent Codex review on that exact head, resolve all material threads, re-read live main/head immediately before merge, then merge only the exact tested/reviewed candidate with expected-head checking."
 }
