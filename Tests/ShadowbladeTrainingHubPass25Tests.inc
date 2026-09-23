@@ -110,6 +110,16 @@ void TestShadowbladeTrainingHubPass25() {
                     && combat.HasPendingEnemyAttack()
                     && actions.HasIncomingAttack(),
                 "pass25 live training auto-queues the next drill threat after recovery");
+            const EnemyAttackPlan queuedPlan = combat.PendingEnemyAttack();
+            const ShadowbladeTrainingHubFeedback queuedFeedback =
+                encounter.TrainingFeedback(combat);
+            Expect(queuedFeedback.timingGuideValid
+                    && queuedFeedback.timingGuide.pattern == queuedPlan.pattern
+                    && Near(queuedFeedback.timingGuide.windupSeconds, queuedPlan.windupSeconds)
+                    && queuedFeedback.timingGuide.blockable == queuedPlan.blockable
+                    && queuedFeedback.timingGuide.recommendedInput
+                        == (queuedPlan.blockable ? DefenseInput::Guard : DefenseInput::Dodge),
+                "pass25 live timing guide follows the currently queued multi-pattern threat");
         }
     }
     const ShadowbladeTrainingHubFeedback debrief = encounter.TrainingFeedback(combat);
