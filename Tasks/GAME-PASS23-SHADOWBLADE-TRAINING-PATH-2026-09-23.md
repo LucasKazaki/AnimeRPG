@@ -53,6 +53,7 @@ Access date for all sources below: 2026-09-23.
 ### GAME-114
 - An incomplete lesson has no medal.
 - Clean ordinary completion earns Silver; Gold requires an all-perfect eligible completion; any completed run with a hit can only earn Bronze.
+- In Boss Rehearsal, later perfect defenses cannot erase prior ordinary defenses from Gold eligibility.
 - Stored mastery only moves upward.
 
 ### GAME-115
@@ -72,6 +73,7 @@ Access date for all sources below: 2026-09-23.
 - Completion requires at least one resolved attempt for each threat; interruptions alone cannot complete it.
 - Non-boss lessons also require per-pattern attempt provenance matching the authored lesson plan, so a same-length replacement sequence cannot omit a required threat and still complete.
 - Per-pattern practice telemetry demonstrates all three boss-rehearsal threats were actually exercised.
+- Boss completion and medal checks must not add independently saturating `int` counters, avoiding signed-overflow undefined behavior in long-running rehearsal sessions.
 
 ## Verification requirements
 
@@ -87,12 +89,14 @@ Native rendered/player-facing verification is separate. No UI/input-screen/contr
 
 ## Review repairs
 
-The first independent review on commit `67f9039cd295c7d95219e093ca81a73e17e0ba92` raised four P2 findings. The bounded repair keeps the same feature scope and adds regressions for each finding:
+The first independent review on commit `67f9039cd295c7d95219e093ca81a73e17e0ba92` raised four P2 findings. The first repaired candidate `66bd5cd33f977f8fbce64d830f9e975e7f476c9f` received two additional findings, one P2 and one P3. The bounded repairs keep the same feature scope and add targeted regressions where practical:
 
 1. Any hit in Boss Rehearsal caps mastery at Bronze.
 2. Gold on non-boss lessons requires zero ordinary defenses as well as zero hits.
 3. Completion verifies authored per-pattern provenance, so a same-length duplicate-pattern sequence cannot satisfy a lesson that requires another threat type.
 4. `ApplyCurrentLesson` rejects any live incoming threat on the supplied `ShadowbladeActions` before applying the session candidate or synchronizing the timing preset.
+5. Boss Gold now requires every authored pattern to have at least one perfect defense and zero ordinary defenses, so later perfect defenses cannot overwrite a mixed run's Silver result.
+6. Boss completion and success checks compare saturating counters individually against zero rather than adding them, eliminating signed-overflow risk when counters approach `INT_MAX`.
 
 A fresh exact-head independent review is still required after these fixes and all durable records are frozen.
 
