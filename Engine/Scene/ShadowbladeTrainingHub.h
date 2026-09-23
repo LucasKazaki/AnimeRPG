@@ -187,16 +187,24 @@ public:
         feedback.targetAttempts = targetAttempts_;
         if (boundCombat_ && boundCombat_ != &combat) return feedback;
 
-        feedback.resolvedAttempts = ResolvedAttempts();
-        feedback.paused = session_.Paused();
-        feedback.debrief = ShadowbladeTrainingCoach::Debrief(session_, combat);
-        feedback.recommendation = ShadowbladeTrainingCoach::Recommendation(session_);
-        feedback.challenges[0] = ShadowbladeTrainingCoach::ChallengeStatus(
-            session_, ShadowbladeTrainingChallenge::PerfectStreak);
-        feedback.challenges[1] = ShadowbladeTrainingCoach::ChallengeStatus(
-            session_, ShadowbladeTrainingChallenge::NoHitSequence);
-        feedback.challenges[2] = ShadowbladeTrainingCoach::ChallengeStatus(
-            session_, ShadowbladeTrainingChallenge::PatternMastery);
+        // Run-derived metrics belong only to the currently active run or its
+        // completed debrief. Reconfiguring a debrief transitions to Ready, so
+        // stale results from the previous drill must not be presented alongside
+        // the newly selected focus, pace, or attempt target.
+        if (state_ == ShadowbladeTrainingHubState::Active
+            || state_ == ShadowbladeTrainingHubState::Debrief) {
+            feedback.resolvedAttempts = ResolvedAttempts();
+            feedback.paused = session_.Paused();
+            feedback.debrief = ShadowbladeTrainingCoach::Debrief(session_, combat);
+            feedback.recommendation = ShadowbladeTrainingCoach::Recommendation(session_);
+            feedback.challenges[0] = ShadowbladeTrainingCoach::ChallengeStatus(
+                session_, ShadowbladeTrainingChallenge::PerfectStreak);
+            feedback.challenges[1] = ShadowbladeTrainingCoach::ChallengeStatus(
+                session_, ShadowbladeTrainingChallenge::NoHitSequence);
+            feedback.challenges[2] = ShadowbladeTrainingCoach::ChallengeStatus(
+                session_, ShadowbladeTrainingChallenge::PatternMastery);
+            feedback.recentDamage = RecentDamage();
+        }
 
         DefenseTimingPreset timingPreset = DefenseTimingPreset::Standard;
         if (boundActions_
@@ -210,7 +218,6 @@ public:
             feedback.timingGuideValid = ShadowbladeTrainingCoach::TimingGuide(
                 plan.sequence.patterns[0], timingPreset, feedback.timingGuide);
         }
-        feedback.recentDamage = RecentDamage();
         return feedback;
     }
 
