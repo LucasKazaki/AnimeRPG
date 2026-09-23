@@ -375,6 +375,14 @@ void ShadowbladeActions::ResetDefenseState() {
     lastDefense_ = {};
 }
 
+void ShadowbladeActions::ResetTransientStatePreservingLoadout() {
+    const ShadowbladeLoadout persistentLoadout = loadout_;
+    const DefenseTimingPreset timingPreset = defenseTimingPreset_;
+    *this = ShadowbladeActions{};
+    loadout_ = persistentLoadout;
+    defenseTimingPreset_ = timingPreset;
+}
+
 float ShadowbladeActions::IncomingAttackRemaining() const {
     if (!incomingAttackActive_) return 0.0f;
     const double now = CurrentDefenseSeconds();
