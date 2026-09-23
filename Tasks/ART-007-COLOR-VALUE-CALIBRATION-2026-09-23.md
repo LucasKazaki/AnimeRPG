@@ -7,6 +7,8 @@ Base dependency: exact ART-003 head `e81f32b8545954b30a205a969bb6f90f0661f7f2`. 
 
 Derived PNGs are deliberately generated outside the source tree. `color-roles.json`, the generator, verifier, tests, and `expected-manifest.json` are the source contract. Do not check in a second generated pack that can drift from the pin.
 
+Text-contract portability rule: source and expected-manifest hashing/comparison canonicalize CRLF or CR line endings to LF before hashing or byte comparison. This keeps the artifact contract stable on Windows checkouts with `core.autocrlf=true` without broadening this packet to repository-wide `.gitattributes` changes. Generated `manifest.json` remains deterministic LF output.
+
 ## Acceptance
 
 ```text
@@ -17,4 +19,4 @@ python Scripts/test_color_value_calibration.py
 python -m py_compile Scripts/generate_color_value_calibration.py Scripts/verify_color_value_calibration.py Scripts/test_color_value_calibration.py
 ```
 
-Accept only if all pass, the fresh generated manifest bytes exactly equal the checked-in expected manifest, and the regression suite confirms there is no stale source-tree `Generated/` pack. Record fresh generated-file hashes. No runtime color-management or art-approval claim.
+Accept only if all pass, the fresh generated manifest equals the checked-in expected manifest after the documented newline canonicalization, and the regression suite confirms there is no stale source-tree `Generated/` pack. The suite must also prove CRLF-checkout portability and reject a repinned false runtime-validation status. Record fresh generated-file hashes. No runtime color-management or art-approval claim.
