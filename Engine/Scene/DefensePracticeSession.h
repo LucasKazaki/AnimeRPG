@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -189,12 +190,11 @@ public:
     bool AdvanceTime(CombatSandbox& combat, ShadowbladeActions& actions,
         float deltaSeconds) {
         if (sessionStarted_ && !ObjectsOwned(combat, actions)) return false;
+        if (!IsSafeDeltaForCombatClock(combat, deltaSeconds)) return false;
 
         const bool countActiveTime = sessionStarted_
             && ObjectsOwned(combat, actions)
-            && !drill_.Paused()
-            && deltaSeconds > 0.0f
-            && deltaSeconds <= std::numeric_limits<float>::max();
+            && !drill_.Paused();
         const DefenseTrainingStats before = drill_.Stats();
         const bool resolved = drill_.AdvanceTime(combat, actions, deltaSeconds);
 
@@ -304,6 +304,25 @@ private:
         Guard,
         Dodge,
     };
+
+    static constexpr std::int64_t CombatMicrosPerSecond = 1000000;
+    static constexpr double CombatClockSafetyMarginSeconds = 60.0;
+    static constexpr double MaximumSafeCombatSeconds =
+        static_cast<double>(std::numeric_limits<std::int64_t>::max()
+            / CombatMicrosPerSecond)
+        - CombatClockSafetyMarginSeconds;
+
+    static bool IsSafeDeltaForCombatClock(const CombatSandbox& combat,
+        float deltaSeconds) {
+        if (!(deltaSeconds > 0.0f) || !std::isfinite(deltaSeconds)) return false;
+        const double elapsed = combat.ElapsedSecondsPrecise();
+        if (!std::isfinite(elapsed) || elapsed < 0.0
+            || elapsed >= MaximumSafeCombatSeconds) {
+            return false;
+        }
+        return static_cast<double>(deltaSeconds)
+            <= MaximumSafeCombatSeconds - elapsed;
+    }
 
     static bool IsValidPattern(EnemyAttackPattern pattern) {
         switch (pattern) {
