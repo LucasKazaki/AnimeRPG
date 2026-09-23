@@ -15,7 +15,7 @@
   "pass": "GAME-PASS24-SHADOWBLADE-TRAINING-COACH-2026-09-23",
   "task_packet": "Tasks/GAME-PASS24-SHADOWBLADE-TRAINING-COACH-2026-09-23.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS24.md",
-  "pr": null,
+  "pr": 43,
   "final_head": "pending_exact_head_after_this_state_record",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -29,20 +29,20 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-117","title":"Selectable focused threat drills","status":"implemented_registered_test_coverage_game_domain"},
-    {"id":"GAME-118","title":"Scored practice debrief","status":"implemented_registered_test_coverage_game_domain_read_only"},
+    {"id":"GAME-117","title":"Selectable focused threat drills","status":"implemented_registered_test_coverage_game_domain_live_owner_gate_and_all_focus_mapping_repaired"},
+    {"id":"GAME-118","title":"Scored practice debrief","status":"implemented_registered_test_coverage_game_domain_score_owner_witness_repaired"},
     {"id":"GAME-119","title":"Optional mastery challenge status","status":"implemented_registered_test_coverage_game_domain_read_only"},
     {"id":"GAME-120","title":"Deterministic post-session coaching","status":"implemented_registered_test_coverage_game_domain_read_only"},
-    {"id":"GAME-121","title":"Quick same-drill retry","status":"implemented_registered_test_coverage_game_domain"},
+    {"id":"GAME-121","title":"Quick same-drill retry","status":"implemented_registered_test_coverage_game_domain_replacement_live_owner_gate_repaired"},
     {"id":"QOL-025","title":"Authoritative threat timing guide","status":"implemented_registered_test_coverage_game_domain_read_only"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim_plus_ShadowbladeTrainingCoachPass24Tests",
     "sandbox_cpp17": "not_run_clone_failed_before_source_access_due_container_DNS_no_product_claim",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
+    "hosted_windows_ci": "candidate_5dcebf6_passed_run_35890369880_number_748_then_invalidated_by_four_independent_review_repairs; pending_exact_post_repair_head",
+    "release_manifest": "candidate_5dcebf6_passed_run_35890369808_number_528_then_invalidated_by_four_independent_review_repairs; pending_exact_post_repair_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "pending_fresh_exact_final_head_review",
+    "independent_review": "candidate_5dcebf6_completed_with_four_P2_findings: detached_live_owner_reconfiguration, replacement_threat_retry, mixed_provenance_debrief, incomplete_all_focus_mapping_tests; all_repaired; fresh_exact_post_repair_head_review_required",
     "research": "five_reference_mechanics_mapped_from_current_or_official_ZZZ_and_Granblue_material_plus_new_2026-09-14_ZZZ_player_request_for_visual_parry_timing_guidance_with_counterpoints",
     "integration": "all_six_increments_compose_existing_DefensePracticeSession_CombatSandbox_ShadowbladeActions_authority; no_parallel_combat_framework",
     "persistent_cross_process_save": "not_changed_not_claimed"
@@ -52,5 +52,11 @@
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "Treat the commit containing this state record as the initial final candidate unless a repair is required. Open one scoped PR to main, inspect the full six-path diff, require fresh exact-head hosted Windows Debug/Release deterministic tests and release-manifest integrity, request fresh independent Codex review on that exact head, repair and re-verify any material findings, re-read live main/head immediately before merge, then merge only the exact tested/reviewed candidate with expected-head checking."
+  "review_repairs": [
+    "apply_drill_rejects_pending_CombatSandbox_or_ShadowbladeActions_threat_before_any_mutation",
+    "retry_drill_rejects_direct_or_replacement_live_owner_threat_before_ResetMetrics",
+    "debrief_requires_score_resolved_attempt_owner_witness_and_fails_whole_report_closed_on_mismatch",
+    "registered_tests_assert_exact_mapping_for_all_five_advertised_training_focus_values"
+  ],
+  "next_action": "Treat the commit containing this state record as the post-review repair candidate unless another repair is required. Require fresh exact-head hosted Windows Debug/Release deterministic tests and release-manifest integrity, request fresh independent Codex review on that exact head, resolve all material threads, re-read live main/head and full scoped diff immediately before merge, then merge only the exact tested/reviewed candidate with expected-head checking."
 }
