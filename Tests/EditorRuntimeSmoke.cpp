@@ -16,6 +16,7 @@ constexpr DWORD kCleanupTimeoutMs = 2000;
 constexpr DWORD kWindowPollIntervalMs = 50;
 constexpr DWORD kResizePollIntervalMs = 25;
 constexpr DWORD kResizeTimeoutMs = 1500;
+constexpr DWORD kSelectionTimeoutMs = 3000;
 constexpr DWORD kShowStateTimeoutMs = 3000;
 constexpr ULONGLONG kWorkBudgetMs = 135000;
 constexpr int kStableWindowSamples = 20;
@@ -788,6 +789,73 @@ bool PostShowStateWhileOwnerPinned(HWND window, DWORD processId, DWORD threadId,
     return true;
 }
 
+bool PostSelectionMutationWhileOwnerPinned(HWND window, HWND outliner, DWORD processId,
+    DWORD threadId, HANDLE thread, HANDLE process, bool notifySelection,
+    std::wstring& failure) {
+    if (!WindowOwnedByProcess(window, processId)
+        || !ValidatedControlHasStyle(outliner, window, processId,
+            kOutlinerId, L"ListBox", static_cast<LONG_PTR>(LBS_NOTIFY))
+        || WaitForSingleObject(thread, 0) != WAIT_TIMEOUT
+        || WaitForSingleObject(process, 0) != WAIT_TIMEOUT) {
+        failure = L"editor/Outliner ownership or liveness changed before selection owner pin";
+        return false;
+    }
+
+    DWORD ownerProcessId = 0;
+    const DWORD ownerThreadId = GetWindowThreadProcessId(window, &ownerProcessId);
+    DWORD outlinerProcessId = 0;
+    const DWORD outlinerThreadId = GetWindowThreadProcessId(outliner, &outlinerProcessId);
+    if (ownerThreadId == 0 || ownerProcessId != processId || ownerThreadId != threadId
+        || outlinerThreadId == 0 || outlinerProcessId != processId
+        || outlinerThreadId != threadId) {
+        failure = L"editor or Outliner HWND is not owned by the launched primary thread before selection post";
+        return false;
+    }
+
+    const DWORD previousSuspendCount = SuspendThread(thread);
+    if (previousSuspendCount == static_cast<DWORD>(-1)) {
+        failure = L"SuspendThread failed before selection post";
+        return false;
+    }
+
+    bool suspendedContextCaptured = false;
+    bool postedSelectionMutation = false;
+    if (previousSuspendCount == 0) {
+        CONTEXT context{};
+        context.ContextFlags = CONTEXT_CONTROL;
+        suspendedContextCaptured = GetThreadContext(thread, &context) != FALSE;
+    }
+    if (previousSuspendCount == 0 && suspendedContextCaptured
+        && WaitForSingleObject(process, 0) == WAIT_TIMEOUT
+        && WaitForSingleObject(thread, 0) == WAIT_TIMEOUT) {
+        DWORD pinnedProcessId = 0;
+        const DWORD pinnedThreadId = GetWindowThreadProcessId(window, &pinnedProcessId);
+        DWORD pinnedOutlinerProcessId = 0;
+        const DWORD pinnedOutlinerThreadId =
+            GetWindowThreadProcessId(outliner, &pinnedOutlinerProcessId);
+        if (pinnedThreadId == threadId && pinnedProcessId == processId
+            && pinnedOutlinerThreadId == threadId && pinnedOutlinerProcessId == processId
+            && IsWindowVisible(window) && IsWindowEnabled(window)
+            && ValidatedControlHasStyle(outliner, window, processId,
+                kOutlinerId, L"ListBox", static_cast<LONG_PTR>(LBS_NOTIFY))) {
+            postedSelectionMutation = notifySelection
+                ? PostMessageW(window, WM_COMMAND,
+                    MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
+                    reinterpret_cast<LPARAM>(outliner)) != FALSE
+                : PostMessageW(outliner, LB_SETCURSEL, 3, 0) != FALSE;
+        }
+    }
+
+    const DWORD resumePreviousCount = ResumeThread(thread);
+    if (resumePreviousCount == static_cast<DWORD>(-1)
+        || previousSuspendCount != 0 || !suspendedContextCaptured
+        || resumePreviousCount != 1 || !postedSelectionMutation) {
+        failure = L"failed to pin, post, and resume the editor owner thread for selection mutation";
+        return false;
+    }
+    return true;
+}
+
 bool ResizeAndCheck(HWND window, DWORD processId, DWORD threadId, HANDLE thread, HANDLE process,
     const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
     const ShellButtonHandles& buttons, int width, int height,
@@ -997,9 +1065,10 @@ bool MaximizeRestoreAndCheck(HWND window, DWORD processId, DWORD threadId, HANDL
     }
 }
 
-bool SelectCubeAndNotify(HWND window, DWORD processId,
-    const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
-    const ShellButtonHandles& buttons, std::wstring& failure) {
+bool SelectCubeAndNotify(HWND window, DWORD processId, DWORD threadId, HANDLE thread,
+    HANDLE process, const std::vector<ChildControl>& initialControls,
+    const ShellStaticHandles& statics, const ShellButtonHandles& buttons,
+    std::wstring& failure) {
     if (WorkBudgetExpired()) {
         failure = L"internal runtime work budget exhausted before selection";
         return false;
@@ -1021,32 +1090,71 @@ bool SelectCubeAndNotify(HWND window, DWORD processId,
         return false;
     }
 
-    LRESULT newSelection = LB_ERR;
-    if (!SendMessageBounded(outliner, LB_SETCURSEL, 3, 0, newSelection)
-        || newSelection == LB_ERR) {
-        failure = L"failed to select Cube in Outliner";
+    const ULONGLONG deadline = GetTickCount64() + kSelectionTimeoutMs;
+    ScopedMessageDeadline phaseDeadline(deadline);
+    if (!PostSelectionMutationWhileOwnerPinned(
+            window, outliner, processId, threadId, thread, process, false, failure)) {
         return false;
     }
 
-    if (!SameControlHandles(initialControls, DirectChildren(window, processId))
-        || !ValidatedControlHasStyle(outliner, window, processId,
-            kOutlinerId, L"ListBox", static_cast<LONG_PTR>(LBS_NOTIFY))
-        || !WindowOwnedByProcess(window, processId)
-        || !IsWindowVisible(window)
-        || !IsWindowEnabled(window)) {
-        failure = L"Outliner/editor identity, enabled state, or notification style changed before selection notification";
-        return false;
+    while (true) {
+        if (WorkBudgetExpired()) {
+            failure = L"internal runtime work budget exhausted while waiting for Cube selection";
+            return false;
+        }
+        if (!ValidatedControlHasStyle(outliner, window, processId,
+                kOutlinerId, L"ListBox", static_cast<LONG_PTR>(LBS_NOTIFY))) {
+            failure = L"Outliner identity/style changed while waiting for Cube selection";
+            return false;
+        }
+        LRESULT selection = LB_ERR;
+        if (!ReadValidatedListboxValue(outliner, window, processId, kOutlinerId,
+                LB_GETCURSEL, 0, selection)) {
+            failure = L"failed to read Outliner selection after asynchronous Cube selection post";
+            return false;
+        }
+        if (selection == 3) break;
+        if (GetTickCount64() >= deadline) {
+            failure = L"Cube selection did not settle before the selection deadline";
+            return false;
+        }
+        const DWORD sleepMs = RemainingDeadlineBudget(deadline, kResizePollIntervalMs);
+        if (sleepMs == 0) {
+            failure = L"selection deadline exhausted while waiting for Cube selection";
+            return false;
+        }
+        Sleep(sleepMs);
     }
-    LRESULT commandResult = 0;
-    if (!SendMessageBounded(window, WM_COMMAND,
-            MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
-            reinterpret_cast<LPARAM>(outliner), commandResult)) {
-        failure = L"bounded Outliner selection notification failed";
+
+    if (!PostSelectionMutationWhileOwnerPinned(
+            window, outliner, processId, threadId, thread, process, true, failure)) {
         return false;
     }
 
-    return ValidateShellState(
-        window, processId, initialControls, statics, buttons, kCubeInspectorText, 3, failure);
+    std::wstring lastStateFailure;
+    while (true) {
+        std::wstring stateFailure;
+        if (ValidateShellState(window, processId, initialControls, statics, buttons,
+                kCubeInspectorText, 3, stateFailure)) {
+            if (GetTickCount64() >= deadline) {
+                failure = L"Cube selection/Inspector validation finished after the selection deadline";
+                return false;
+            }
+            return true;
+        }
+        lastStateFailure = std::move(stateFailure);
+        if (GetTickCount64() >= deadline) {
+            failure = L"Cube selection notification did not settle the shell before deadline: "
+                + lastStateFailure;
+            return false;
+        }
+        const DWORD sleepMs = RemainingDeadlineBudget(deadline, kResizePollIntervalMs);
+        if (sleepMs == 0) {
+            failure = L"selection deadline exhausted while waiting for Cube Inspector synchronization";
+            return false;
+        }
+        Sleep(sleepMs);
+    }
 }
 
 bool CloseEditor(HWND window, DWORD processId, DWORD threadId, HANDLE thread,
@@ -1204,8 +1312,8 @@ int wmain(int argc, wchar_t** argv) {
     } else if (!DirectChildrenContained(
                    window, process.dwProcessId, initialControls, failure)) {
         // failure set by startup containment validator before any resize can normalize layout.
-    } else if (!SelectCubeAndNotify(
-                   window, process.dwProcessId, initialControls, statics, buttons, failure)) {
+    } else if (!SelectCubeAndNotify(window, process.dwProcessId, process.dwThreadId,
+                   process.hThread, process.hProcess, initialControls, statics, buttons, failure)) {
         // failure set by selector/validator.
     } else if (!ResizeAndCheck(window, process.dwProcessId, process.dwThreadId,
                    process.hThread, process.hProcess, initialControls, statics, buttons,
@@ -1279,6 +1387,7 @@ int wmain(int argc, wchar_t** argv) {
         << L"left-to-right semantic toolbar Button HWNDs, disabled pending tools, enabled Outliner/assets surfaces, "
         << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
         << L"every bounded cross-process read and after 800x600, 1280x720, 1440x900, maximized+restored, and 420x260 states; "
+        << L"Cube selection and its WM_COMMAND notification were posted only while the exact launched editor/Outliner owner thread was suspended behind a valid thread-context barrier, then resumed before bounded polling confirmed selection and Inspector synchronization; "
         << L"each asynchronous resize post was issued while the exact launched window-owner thread was suspended behind a valid thread-context barrier, then resumed before polling, "
         << L"and resize containment/shell validation stayed inside its 1.5-second phase deadline; "
         << L"maximize/restore show-state posts were also issued while that exact owner thread was suspended behind a valid thread-context barrier, then resumed before show-state polling, with nested shell-message waits capped to each show-state deadline; "
