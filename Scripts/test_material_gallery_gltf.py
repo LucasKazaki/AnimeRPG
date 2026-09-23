@@ -283,6 +283,28 @@ def test_float_attribute_normalized_semantics(tmp):
 def test_accessor_bounds(tmp):
     out=generate(tmp); mutate_gltf(out,lambda g:g["bufferViews"][0].__setitem__("byteLength",4)); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "accessor within bufferView" in p.stderr
 
+def test_boolean_accessor_reference_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        for mesh_index in range(4): g["meshes"][mesh_index]["primitives"][0]["attributes"]["NORMAL"]=True
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "accessor index" in p.stderr
+
+def test_index_accessor_declared_bounds_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["indices"]
+        g["accessors"][accessor]["min"]=[999]; g["accessors"][accessor]["max"]=[1000]
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "index bounds" in p.stderr
+
+def test_accessor_alignment_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        prefix="data:application/octet-stream;base64,"; uri=g["buffers"][0]["uri"]; assert uri.startswith(prefix)
+        buf=b"\x00\x00"+base64.b64decode(uri[len(prefix):])
+        g["buffers"][0]["uri"]=prefix+base64.b64encode(buf).decode(); g["buffers"][0]["byteLength"]=len(buf)
+        for view in g["bufferViews"]: view["byteOffset"]+=2
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "accessor alignment" in p.stderr
+
 def test_expected_pin_negative(tmp):
     out=generate(tmp); m=json.loads((out/"manifest.json").read_text()); (out/"manifest.json").write_text(json.dumps(m,indent=4,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json","--expected-manifest",PIN],ok=False); assert "expected manifest pin" in p.stderr
 
@@ -301,7 +323,8 @@ TESTS=[
     test_nested_name_claim_semantics,test_uncontracted_manifest_claim_semantics,test_manifest_intent_semantics,test_manifest_schema_bool_semantics,
     test_reject_embedded_texture_or_baked_lighting_path,test_position_accessor_declared_bounds_semantics,test_position_accessor_format_semantics,
     test_normal_accessor_format_semantics,test_tangent_accessor_format_semantics,test_texcoord_accessor_format_semantics,test_index_accessor_format_semantics,
-    test_float_attribute_normalized_semantics,test_accessor_bounds,test_expected_pin_negative,test_crlf_source_and_pin_portability,
+    test_float_attribute_normalized_semantics,test_accessor_bounds,test_boolean_accessor_reference_semantics,test_index_accessor_declared_bounds_semantics,
+    test_accessor_alignment_semantics,test_expected_pin_negative,test_crlf_source_and_pin_portability,
 ]
 
 def main():
