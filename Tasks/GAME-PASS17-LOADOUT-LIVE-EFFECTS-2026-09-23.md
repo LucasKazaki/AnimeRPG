@@ -23,10 +23,11 @@ Wire the already-merged pass-16 `ShadowbladeLoadout` backend into the existing l
 Production:
 - `Engine/Scene/ShadowbladeActions.h`
 - `Engine/Scene/ShadowbladeActions.cpp`
+- `Engine/Scene/LandmarkEncounter.cpp`, narrowly admitted after independent review found that its existing retry reset discarded the newly persistent loadout state
 
 Verification:
 - `Tests/ShadowbladeLoadoutEffectsPass17Tests.inc`
-- `Tests/ThoughtCommandsTests.cpp`, include/call registration only
+- `Tests/ThoughtCommandsTests.cpp`, include/call registration plus the existing registered target's required `LandmarkEncounter` include
 
 Operating records:
 - this packet
@@ -44,8 +45,18 @@ No other path is authorized by this packet.
 5. Net Guard reduces only blockable non-perfect guard-integrity damage, with an explicit hard cap. Unblockable hits, perfect defense, player-health damage on guard break, and invalid threat handling retain their existing semantics.
 6. Crossing an existing two-module family-resonance threshold measurably changes effective action tuning through the live bridge, while one family module does not receive the set bonus.
 7. Preset preview uses a copy, returns the real `LoadoutActionResult`, mutates neither current equipment nor the caller's output on failure, and reports the same tuning that applying the valid preset would produce.
-8. All arithmetic remains bounded, deterministic, C++17, and baseline-neutral. No NaN/infinity path may create resource or movement.
-9. Existing registered tests continue to pass. Add explicit pass-17 regressions for default compatibility, offense, mobility, regeneration, defense, resonance, preview success/failure atomicity, caps, and nonfinite delta behavior.
+8. All arithmetic remains bounded, deterministic, C++17, and baseline-neutral. No NaN/infinity path may create resource or movement. The profile-to-action transform must clamp extreme integer profiles without signed-overflow behavior.
+9. Existing registered tests continue to pass. Add explicit pass-17 regressions for default compatibility, offense, mobility, regeneration, defense, resonance, preview success/failure atomicity, direct cap saturation, negative/extreme profile safety, and nonfinite delta behavior.
+10. A completed `LandmarkEncounter` retry must reset transient combat/action state without erasing acquired/equipped loadout items or saved presets, and must preserve the existing defense timing preset behavior.
+
+## Independent-review repairs
+
+Fresh Codex review of PR #36 head `f8c5daf26504930b890279a83867fc79a7ab02aa` found two material P2 issues:
+
+1. `LandmarkEncounter::Retry` reset `ShadowbladeActions` to a fresh object, which would silently erase persistent loadout ownership/equipment/presets after a completed encounter. The bounded repair copies the persistent `ShadowbladeLoadout`, resets transient action state through the existing retry path, restores the copied loadout, and regression-tests the real production retry flow.
+2. The initial complete-build test never exceeded most tuning clamps, so removal of the clamp logic could still pass. The repair exposes the pure profile-to-action transform as a production domain helper, makes its clamp arithmetic overflow-safe with `std::clamp`, and tests `INT_MAX`/`INT_MIN` profiles against the exact caps/baseline. This is not counted as an extra feature.
+
+These repairs do not authorize renderer/platform/editor/build-system work and do not change the five-plus-one feature count.
 
 ## Verification and merge gates
 
