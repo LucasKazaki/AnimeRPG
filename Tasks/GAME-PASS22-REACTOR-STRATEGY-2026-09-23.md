@@ -15,7 +15,7 @@ Sources accessed 2026-09-23. Comparator mechanics are design references only; no
 
 1. **GAME-107 - selectable reactor pressure presets.** Genshin Impact's official Stygian Onslaught descriptions require selecting a difficulty before a three-phase challenge and apply more restrictive rules at higher difficulties. Original adaptation: Guided, Standard, and Critical modify only Mana Reactor hazard pressure; the objective graph and one-time reward entitlement stay unchanged. Primary packet source: https://www.hoyolab.com/article/46329018 . Independent current-access revalidation on 2026-09-23: official Stygian Onslaught article published 2026-01-19, https://www.hoyolab.com/article/43362737 .
 2. **GAME-108 - opt-in reactor protocols.** Genshin Impact's official Reminiscent Regimen: Thrill description, published 2024-10-15, lets players select a stage buff before each stage. Original adaptation: Baseline, Thermal Sink, Stability Mesh, and Surge Harness are single-protagonist reactor-control protocols chosen before a run. Source: https://www.hoyolab.com/article/34259331
-3. **GAME-109 - bounded emergency vent.** Zenless Zone Zero's official Snap! Focus Showdown! description, published 2026-08-05, adds a stage-specific skill used at the right moment to obtain a stage buff. Original adaptation: a once-per-stage emergency vent is a manual tactical recovery action that cools the reactor at a stability/score cost; it does not advance objectives. Source: https://www.hoyolab.com/article/46150564
+3. **GAME-109 - bounded emergency vent.** Zenless Zone Zero's official Snap! Focus Showdown! description, published 2026-08-05, adds a stage-specific skill used at the right moment to obtain a stage buff. Original adaptation: a once-per-stage emergency vent is a manual tactical recovery action that cools the reactor by exactly 25 heat at a stability/score cost when that full cooling amount is available; it does not advance objectives. Source: https://www.hoyolab.com/article/46150564
 4. **GAME-110 - optional performance amplifies the selected protocol.** ZZZ's official Snap! Hollow Realm Showdown description, published 2026-03-06, says additional challenge targets permanently enhance the stage's Filter Effect. Original adaptation: meeting the existing thermal/stability optional target raises the selected reactor protocol one bounded rank for later stages in the same run. Source: https://www.hoyolab.com/article/44074876
 5. **GAME-111 - precision control chains.** ZZZ's official Simulated Sequence Showdown description, published 2025-12-05, awards Technique Combos and score multipliers for varied techniques inside a timing window. Original adaptation: alternating valid reactor controls builds a bounded precision chain; at three or more, a small pressure-relief pulse is applied and counted in the deterministic score. No real-time combo timer is introduced. Source: https://www.hoyolab.com/article/42631745
 6. **QOL-023 - compact, exact control forecast.** A Genshin player discussion published 2024-12-22 praised its event but called unit information inaccurate/lacking and asked for more detailed descriptions, while another June 10, 2024 discussion objected to pages of instructions that did not help with meaningful choices. A Wuthering Waves discussion on 2025-03-13 likewise criticized overlong skill descriptions, with a reply noting the game already offered a shorter details view with current/projected values. These are player anecdotes with counterexamples, not consensus. The cited events are historical and the Wuthering Waves thread itself documents a partial existing solution, so this packet does not claim an unresolved current defect. Original adaptation: `PreviewControl()` exposes compact projected objective progress, heat, stability, strategy application, chain state, and result. It evaluates on a copy through the same committed control path so terminal stage-clear, run-complete, and failure transitions forecast the post-commit authoritative values rather than an intermediate old-stage state. Sources: https://www.reddit.com/r/Genshin_Impact/comments/1hjsv5r ; https://www.reddit.com/r/Genshin_Impact/comments/1dc9cby ; https://www.reddit.com/r/WutheringWaves/comments/1jackhp
@@ -37,7 +37,8 @@ Sources accessed 2026-09-23. Comparator mechanics are design references only; no
 
 ### GAME-109
 - Vent is available at most once per stage and never advances objective progress.
-- It removes exactly 25 heat, costs exactly 5 stability, breaks the live precision chain, and is rejected when unavailable/unsafe.
+- A successful vent removes exactly 25 heat, costs exactly 5 stability, breaks the live precision chain, and is rejected when unavailable/unsafe.
+- If current heat is below 25, vent is rejected without partial cooling, stability cost, use consumption, chain mutation, or objective mutation.
 - Duplicate use is non-mutating.
 - Stage transition/retry refreshes stage availability, while run-level vent-use count remains bounded and score-accounted; Start Over resets run-local use count.
 
@@ -64,9 +65,11 @@ Sources accessed 2026-09-23. Comparator mechanics are design references only; no
 - Failure preview exposes the failed state's live-chain reset.
 - Committing each terminal preview lands on the exact projected authoritative fields.
 
-## Independent-review repair
+## Independent-review repairs
 
-Fresh Codex review of candidate `d03897bf7fb98e5829bd1a4eb5a7b55aba599755` found a P1 QOL-023 defect: terminal previews returned intermediate pre-transition values even though commit immediately reset stage/run/failure state. The repair makes `PreviewControl()` evaluate validity/metadata, apply the control to an isolated copy through the production commit path, and report the copy's resulting authoritative fields. Registered regressions now cover stage-clear, run-complete, and failure equivalence in addition to nonterminal and invalid-input behavior. Exact-final-head CI and independent re-review are required after this repair.
+Fresh Codex review of candidate `d03897bf7fb98e5829bd1a4eb5a7b55aba599755` found a P1 QOL-023 defect: terminal previews returned intermediate pre-transition values even though commit immediately reset stage/run/failure state. The repair makes `PreviewControl()` evaluate validity/metadata, apply the control to an isolated copy through the production commit path, and report the copy's resulting authoritative fields. Registered regressions now cover stage-clear, run-complete, and failure equivalence in addition to nonterminal and invalid-input behavior.
+
+Fresh Codex re-review of candidate `01276f1b9ddb1cefc8c8d6c36e1bc9703fc0ccd9` found a P2 GAME-109 contract defect: a vent could succeed with less than 25 current heat, clamp to zero, and therefore consume stability/use for less than the declared exact 25-point cooling. The repair requires at least `EmergencyVentCooling` heat before use, performs the exact subtraction, and adds a low-heat rejection regression proving no partial cooling, stability charge, use consumption, or objective mutation. Exact-final-head CI and independent re-review are required after this second repair.
 
 ## Allowed paths
 
@@ -82,7 +85,7 @@ Fresh Codex review of candidate `d03897bf7fb98e5829bd1a4eb5a7b55aba599755` found
 - Existing hosted Windows Debug and Release deterministic build/tests on the exact final head.
 - Existing release-manifest integrity workflow on the exact final head.
 - Registered pass-21 regressions remain green, including the exact legacy Gold score of 1310 for Standard/Baseline.
-- New pass-22 regressions exercise invalid enums, pressure bounds, protocol effects, vent idempotency/reset, amplification reset/cap behavior, precision scoring, and preview/commit equivalence including stage-clear, run-complete, and failure transitions.
+- New pass-22 regressions exercise invalid enums, pressure bounds, protocol effects, exact vent cooling plus low-heat rejection/idempotency/reset, amplification reset/cap behavior, precision scoring, and preview/commit equivalence including stage-clear, run-complete, and failure transitions.
 - Fresh independent implementation review on the exact final head, with every material finding repaired and thread resolved.
 - Full diff/scope audit and reread of `main` plus PR head immediately before merge.
 
