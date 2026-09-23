@@ -97,9 +97,8 @@ public:
         hasCoolingAnomaly_ = hasCoolingAnomaly_ || snapshot.hasCoolingAnomaly;
         hasCryptSigil_ = hasCryptSigil_ || snapshot.hasCryptSigil;
         hasShadowCryptLore_ = hasShadowCryptLore_ || snapshot.hasShadowCryptLore;
-        observedClueCount_ = static_cast<std::size_t>(hasRiftResidue_)
-            + static_cast<std::size_t>(hasCoolingAnomaly_)
-            + static_cast<std::size_t>(hasCryptSigil_);
+        observedRiftClueCount_ = static_cast<std::size_t>(hasRiftResidue_)
+            + static_cast<std::size_t>(hasCoolingAnomaly_);
 
         if (hasRiftResidue_ || hasCoolingAnomaly_) {
             UnlockJournal(FieldJournalEntry::RiftEvidence);
@@ -115,7 +114,7 @@ public:
         case FieldOperation::MallSurvey:
             return {static_cast<int>(discoveryCount_), static_cast<int>(SiteCount)};
         case FieldOperation::RiftInvestigation:
-            return {static_cast<int>(std::min<std::size_t>(observedClueCount_, 2)), 2};
+            return {static_cast<int>(std::min<std::size_t>(observedRiftClueCount_, 2)), 2};
         case FieldOperation::ShadowCryptLead:
             return {static_cast<int>(hasCryptSigil_) + static_cast<int>(hasShadowCryptLore_), 2};
         case FieldOperation::Count:
@@ -201,7 +200,7 @@ private:
     std::array<LandmarkKind, SiteCount> discoveryOrder_{};
     std::size_t discoveryCount_{};
     std::array<bool, JournalEntryCount> journal_{};
-    std::size_t observedClueCount_{};
+    std::size_t observedRiftClueCount_{};
     bool hasRiftResidue_{};
     bool hasCoolingAnomaly_{};
     bool hasCryptSigil_{};
@@ -229,6 +228,11 @@ constexpr bool ExplorationFieldGuideContract() {
 
     FieldNarrativeSnapshot evidence{};
     evidence.hasRiftResidue = true;
+    evidence.hasCryptSigil = true;
+    guide.SyncNarrativeEvidence(evidence);
+    if (guide.OperationProgress(FieldOperation::RiftInvestigation).current != 1
+        || guide.OperationProgress(FieldOperation::RiftInvestigation).Complete()) return false;
+
     evidence.hasCoolingAnomaly = true;
     guide.SyncNarrativeEvidence(evidence);
     if (!guide.OperationProgress(FieldOperation::RiftInvestigation).Complete()
@@ -236,7 +240,6 @@ constexpr bool ExplorationFieldGuideContract() {
 
     evidence.hasRiftResidue = false;
     evidence.hasCoolingAnomaly = false;
-    evidence.hasCryptSigil = true;
     evidence.hasShadowCryptLore = true;
     guide.SyncNarrativeEvidence(evidence);
     if (!guide.OperationProgress(FieldOperation::ShadowCryptLead).Complete()
