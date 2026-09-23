@@ -7,6 +7,7 @@ MAX_FILE=2*1024*1024
 MAX_WIDTH=4096
 MAX_HEIGHT=4096
 MAX_INFLATED=2*1024*1024
+EXPECTED_SOURCE_STATUS="proposed_art_reference_not_runtime"
 EXPECTED_STATUS="art_reference_source_validated_not_runtime"
 
 def req(x,msg):
@@ -58,7 +59,10 @@ def gray_from_lum(y):
     v=max(0,min(255,round(encoded*255))); return (v,v,v)
 
 def verify(root:Path,source:Path,expected_manifest:Path|None=None):
-    root=root.resolve(); source_data=canonical_text_bytes(source); src=json.loads(source_data); roles=src["roles"]; req(len(roles)==8,"roles")
+    root=root.resolve(); source_data=canonical_text_bytes(source); src=json.loads(source_data)
+    req(src.get("schema_version")==1,"source schema")
+    req(src.get("status")==EXPECTED_SOURCE_STATUS,"source status")
+    roles=src["roles"]; req(len(roles)==8,"roles")
     manifest_bytes=(root/"manifest.json").read_bytes(); manifest=json.loads(manifest_bytes); req(manifest["generator"]=="astral-color-calibration-2","generator")
     req(manifest.get("status")==EXPECTED_STATUS,"manifest status")
     req(manifest["source_sha256"]==hashlib.sha256(source_data).hexdigest(),"source hash")
