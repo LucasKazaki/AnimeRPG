@@ -335,26 +335,26 @@ private:
         if (sampleCount_ == 0 || !std::isfinite(latestObservedSeconds_)) return window;
 
         const double cutoff = std::max(0.0, latestObservedSeconds_ - DamageWindowSeconds);
-        bool foundAtOrBeforeCutoff = false;
-        bool foundEarliest = false;
-        DamageSample baseline{};
-        DamageSample earliest{};
+        // Never use a sample older than the actual cutoff as the cumulative
+        // baseline. Doing so would keep pre-window damage in the result while
+        // reporting a clamped 20-second duration. The first retained sample at
+        // or after the cutoff is conservative by at most one sampling interval:
+        // it can omit unsampled in-window damage, but it cannot report stale
+        // out-of-window damage. If observations were too sparse to retain such a
+        // sample, use the current cumulative totals as a zero-length baseline.
+        bool foundAtOrAfterCutoff = false;
+        DamageSample baseline{
+            latestObservedSeconds_,
+            latestDamage_,
+            latestHits_,
+        };
         for (std::size_t index = 0; index < sampleCount_; ++index) {
             const DamageSample& sample = damageSamples_[index];
-            if (!std::isfinite(sample.seconds)) continue;
-            if (!foundEarliest || sample.seconds < earliest.seconds) {
-                earliest = sample;
-                foundEarliest = true;
-            }
-            if (sample.seconds <= cutoff
-                && (!foundAtOrBeforeCutoff || sample.seconds > baseline.seconds)) {
+            if (!std::isfinite(sample.seconds) || sample.seconds < cutoff) continue;
+            if (!foundAtOrAfterCutoff || sample.seconds < baseline.seconds) {
                 baseline = sample;
-                foundAtOrBeforeCutoff = true;
+                foundAtOrAfterCutoff = true;
             }
-        }
-        if (!foundAtOrBeforeCutoff) {
-            if (!foundEarliest) return window;
-            baseline = earliest;
         }
 
         window.valid = true;
