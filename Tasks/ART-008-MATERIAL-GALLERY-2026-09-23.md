@@ -39,11 +39,12 @@ Acceptance:
 - manifest schema version must be a JSON integer exactly equal to 1, not a boolean accepted through Python integer equality;
 - manifest `intent` must exactly equal the generator's source-only intent, preventing runtime/import/art/parity claims from being hidden inside an otherwise approved field;
 - finite triangle geometry with positions, normals, tangents, UVs and bounded indices;
-- every POSITION semantic must reference a FLOAT (`componentType` 5126) `VEC3` accessor before payload decoding;
+- every required vertex/index semantic must use the exact generator-owned glTF accessor format before payload decoding: POSITION FLOAT VEC3, NORMAL FLOAT VEC3, TANGENT FLOAT VEC4, TEXCOORD_0 FLOAT VEC2, and indices UNSIGNED_SHORT SCALAR; FLOAT vertex attributes must not set `normalized=true`;
 - each POSITION accessor declares finite three-component `min` and `max` values matching the decoded payload within the fixture tolerance, so repinned but false culling bounds are rejected;
 - valid outward winding and every indexed vertex normal facing consistently with its geometric triangle face, plus normalized normals/tangents and stable sphere/cube counts;
 - every sphere, cube and floor index payload must exactly match the generator-owned canonical topology, preventing repeated/partial triangles from satisfying only count and extent checks;
-- every vertex tangent must be orthogonal to its paired normal, and every sphere/cube/floor tangent plus reconstructed bitangent must agree with the position/UV derivative orientation, preventing mirrored tangent-space data after repinning;
+- every vertex tangent must be orthogonal to its paired normal, and every sphere/cube/floor tangent plus reconstructed bitangent must agree with the position/UV derivative orientation, preventing mirrored or materially rotated tangent-space data after repinning;
+- non-floor tangent and bitangent alignment against the UV-derived frame must each exceed 0.95; the canonical 12x24 sphere's measured worst-case source alignments are approximately 0.9914 and 0.9588, while the floor keeps the stricter 0.9999 threshold;
 - every sphere station shares one canonical sphere geometry accessor binding, every cube station shares one canonical cube binding, and decoded sphere radius / cube half extent / floor extents match the source specification;
 - gallery meshes contain only `name` and `primitives`, and primitives only `attributes`, `indices`, `material`, and `mode`, rejecting morph targets, mesh weights, and other geometry overrides that can change final rendered shape after base-accessor validation;
 - the gallery is a static calibration scene and rejects top-level glTF `animations`, preventing animation channels from changing station, camera, or light transforms after static source checks;
@@ -53,7 +54,7 @@ Acceptance:
 - camera and directional-light nodes reject scale, matrix, or other transform overrides that can reverse local -Z while preserving the checked quaternion;
 - no images/textures/samplers, preventing accidental baked-lighting review;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions for light, material binding/rendering properties, camera, source/runtime status, source capture intent, supplemental root/nested glTF and manifest runtime claims, exact manifest intent, boolean schema-version rejection, texture insertion, buffer/accessor bounds, POSITION accessor type/component format, declared POSITION metadata bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, tangent/normal orthogonality, sphere/cube/floor tangent-frame orientation, canonical index coverage, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, and camera/light transform overrides;
+- negative regressions for light, material binding/rendering properties, camera, source/runtime status, source capture intent, supplemental root/nested glTF and manifest runtime claims, exact manifest intent, boolean schema-version rejection, texture insertion, buffer/accessor bounds, required semantic accessor type/component/normalized format, declared POSITION metadata bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, tangent/normal orthogonality, sphere/cube/floor tangent-frame orientation including an 80-degree non-floor tangent rotation, canonical index coverage, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, and camera/light transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
 Commands:
