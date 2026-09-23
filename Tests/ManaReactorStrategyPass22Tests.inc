@@ -130,7 +130,7 @@ void TestManaReactorStrategyPass22() {
             && precisionSummary.score == 1446,
         "precision pulses and protocol amplification feed the deterministic completion score without changing first-clear rewards");
 
-    // QOL-023: compact control forecast is exact, non-mutating, and uses the same evaluator as commit.
+    // QOL-023: compact control forecast is exact, non-mutating, and follows committed terminal transitions.
     ManaReactorExpedition previewRun;
     Expect(previewRun.TryBegin(readyGuide, ManaReactorMode::Expedition,
             ManaReactorDifficulty::Standard, ManaReactorProtocol::ThermalSink),
@@ -155,6 +155,107 @@ void TestManaReactorStrategyPass22() {
             && previewRun.ObjectiveProgress() == preview.projectedObjectiveProgress
             && previewRun.PrecisionChain() == preview.projectedPrecisionChain,
         "committing the previewed control lands on the exact forecasted nonterminal state");
+
+    ManaReactorExpedition stageClearPreviewRun;
+    Expect(stageClearPreviewRun.TryBegin(readyGuide, ManaReactorMode::Expedition,
+                ManaReactorDifficulty::Standard, ManaReactorProtocol::ThermalSink)
+            && stageClearPreviewRun.ApplyControl(ManaReactorControl::Balance)
+                == ManaReactorControlResult::Applied,
+        "stage-clear preview fixture reaches one-unit Intake progress");
+    const auto beforeStageClearPreview = stageClearPreviewRun.Snapshot();
+    const auto stageClearPreview = stageClearPreviewRun.PreviewControl(ManaReactorControl::Balance);
+    const auto afterStageClearPreview = stageClearPreviewRun.Snapshot();
+    Expect(stageClearPreview.valid
+            && stageClearPreview.result == ManaReactorControlResult::StageCleared
+            && stageClearPreview.projectedObjectiveProgress == 0
+            && stageClearPreview.projectedHeat == 45
+            && stageClearPreview.projectedStability == 85
+            && stageClearPreview.projectedPrecisionChain == 0,
+        "stage-clear forecast exposes the authoritative next-stage reset state rather than the completed old stage");
+    Expect(afterStageClearPreview.stage == beforeStageClearPreview.stage
+            && afterStageClearPreview.heat == beforeStageClearPreview.heat
+            && afterStageClearPreview.stability == beforeStageClearPreview.stability
+            && afterStageClearPreview.objectiveProgress == beforeStageClearPreview.objectiveProgress
+            && afterStageClearPreview.precisionChain == beforeStageClearPreview.precisionChain,
+        "stage-clear forecast remains non-mutating before commit");
+    Expect(stageClearPreviewRun.ApplyControl(ManaReactorControl::Balance)
+                == stageClearPreview.result
+            && stageClearPreviewRun.Heat() == stageClearPreview.projectedHeat
+            && stageClearPreviewRun.Stability() == stageClearPreview.projectedStability
+            && stageClearPreviewRun.ObjectiveProgress() == stageClearPreview.projectedObjectiveProgress
+            && stageClearPreviewRun.PrecisionChain() == stageClearPreview.projectedPrecisionChain,
+        "stage-clear commit lands on the exact forecasted next-stage state");
+
+    ManaReactorExpedition completionPreviewRun;
+    Expect(completionPreviewRun.TryBegin(readyGuide, ManaReactorMode::Expedition,
+                ManaReactorDifficulty::Standard, ManaReactorProtocol::ThermalSink)
+            && completionPreviewRun.ApplyControl(ManaReactorControl::Stabilize)
+                == ManaReactorControlResult::Applied
+            && completionPreviewRun.ApplyControl(ManaReactorControl::Stabilize)
+                == ManaReactorControlResult::StageCleared
+            && completionPreviewRun.ApplyControl(ManaReactorControl::Stabilize)
+                == ManaReactorControlResult::Applied
+            && completionPreviewRun.ApplyControl(ManaReactorControl::Stabilize)
+                == ManaReactorControlResult::Applied
+            && completionPreviewRun.ApplyControl(ManaReactorControl::Stabilize)
+                == ManaReactorControlResult::StageCleared
+            && completionPreviewRun.ApplyControl(ManaReactorControl::Stabilize)
+                == ManaReactorControlResult::Applied
+            && completionPreviewRun.ApplyControl(ManaReactorControl::Stabilize)
+                == ManaReactorControlResult::Applied,
+        "run-completion preview fixture reaches the final Core objective unit");
+    const auto beforeCompletionPreview = completionPreviewRun.Snapshot();
+    const auto completionPreview = completionPreviewRun.PreviewControl(ManaReactorControl::Stabilize);
+    const auto afterCompletionPreview = completionPreviewRun.Snapshot();
+    Expect(completionPreview.valid
+            && completionPreview.result == ManaReactorControlResult::RunCompleted
+            && completionPreview.projectedObjectiveProgress == 0
+            && completionPreview.projectedPrecisionChain == 0,
+        "run-completion forecast exposes post-completion objective and chain resets");
+    Expect(afterCompletionPreview.stage == beforeCompletionPreview.stage
+            && afterCompletionPreview.heat == beforeCompletionPreview.heat
+            && afterCompletionPreview.stability == beforeCompletionPreview.stability
+            && !afterCompletionPreview.complete,
+        "run-completion forecast remains non-mutating before commit");
+    Expect(completionPreviewRun.ApplyControl(ManaReactorControl::Stabilize)
+                == completionPreview.result
+            && completionPreviewRun.Complete()
+            && completionPreviewRun.Heat() == completionPreview.projectedHeat
+            && completionPreviewRun.Stability() == completionPreview.projectedStability
+            && completionPreviewRun.ObjectiveProgress() == completionPreview.projectedObjectiveProgress
+            && completionPreviewRun.PrecisionChain() == completionPreview.projectedPrecisionChain,
+        "run-completion commit lands on the exact forecasted terminal state");
+
+    ManaReactorExpedition failurePreviewRun;
+    Expect(failurePreviewRun.TryBegin(readyGuide, ManaReactorMode::Expedition,
+                ManaReactorDifficulty::Critical, ManaReactorProtocol::SurgeHarness)
+            && failurePreviewRun.ApplyControl(ManaReactorControl::Overdrive)
+                == ManaReactorControlResult::StageCleared
+            && failurePreviewRun.ApplyControl(ManaReactorControl::Overdrive)
+                == ManaReactorControlResult::Applied,
+        "failure preview fixture reaches high-pressure Cooling state");
+    const auto beforeFailurePreview = failurePreviewRun.Snapshot();
+    const auto failurePreview = failurePreviewRun.PreviewControl(ManaReactorControl::Overdrive);
+    const auto afterFailurePreview = failurePreviewRun.Snapshot();
+    Expect(failurePreview.valid
+            && failurePreview.result == ManaReactorControlResult::Failed
+            && failurePreview.projectedHeat == ManaReactorExpedition::MaximumHeat
+            && failurePreview.projectedPrecisionChain == 0,
+        "failure forecast exposes the committed failed-state chain reset");
+    Expect(afterFailurePreview.heat == beforeFailurePreview.heat
+            && afterFailurePreview.stability == beforeFailurePreview.stability
+            && afterFailurePreview.objectiveProgress == beforeFailurePreview.objectiveProgress
+            && !afterFailurePreview.failed,
+        "failure forecast remains non-mutating before commit");
+    Expect(failurePreviewRun.ApplyControl(ManaReactorControl::Overdrive)
+                == failurePreview.result
+            && failurePreviewRun.Failed()
+            && failurePreviewRun.Heat() == failurePreview.projectedHeat
+            && failurePreviewRun.Stability() == failurePreview.projectedStability
+            && failurePreviewRun.ObjectiveProgress() == failurePreview.projectedObjectiveProgress
+            && failurePreviewRun.PrecisionChain() == failurePreview.projectedPrecisionChain,
+        "failed commit lands on the exact forecasted terminal pressure and chain state");
+
     const auto beforeInvalidPreview = previewRun.Snapshot();
     const auto invalidPreview = previewRun.PreviewControl(static_cast<ManaReactorControl>(255));
     const auto afterInvalidPreview = previewRun.Snapshot();
