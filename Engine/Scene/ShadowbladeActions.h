@@ -86,6 +86,18 @@ struct ShadowbladeActionTuning {
     int activeResonanceFamilies{};
 };
 
+struct ShadowActionReadiness {
+    float resource{};
+    float dashCooldownRemaining{};
+    float fatalStrikeCooldownRemaining{};
+    float dashCooldownNormalized{};
+    float fatalStrikeCooldownNormalized{};
+    bool dashResourceAffordable{};
+    bool fatalStrikeBaseResourceAffordable{};
+    bool guarding{};
+    int shadowMomentum{};
+};
+
 class ShadowbladeActions {
 public:
     static constexpr float MaximumResource = 100.0f;
@@ -105,6 +117,12 @@ public:
     static constexpr float ForgivingPerfectDefenseWindowSeconds = 0.20f;
     static constexpr float DodgeWindowSeconds = 0.35f;
     static constexpr float DefenseCounterWindowSeconds = 0.8f;
+
+    static constexpr int MaximumShadowMomentum = 3;
+    static constexpr int MomentumFatalStrikeDamageBonus = 12;
+    static constexpr float RiftsteelFollowUpCostReduction = 5.0f;
+    static constexpr int CryoEdgePerfectGuardRestore = 20;
+    static constexpr float TrainingBladePerfectDodgeDashCooldownReductionSeconds = 0.5f;
 
     static constexpr int BaselineLoadoutAttackBonus = 4;
     static constexpr int BaselineLoadoutGuardBonus = 1;
@@ -147,6 +165,7 @@ public:
     const ShadowActionReport& LastAction() const { return lastAction_; }
     int PlayerHealth() const { return playerHealth_; }
     int GuardIntegrity() const { return guardIntegrity_; }
+    int ShadowMomentum() const { return shadowMomentum_; }
     bool HasIncomingAttack() const { return incomingAttackActive_; }
     std::uint64_t IncomingAttackGeneration() const { return incomingAttackGeneration_; }
     float IncomingAttackRemaining() const;
@@ -182,6 +201,7 @@ public:
     static ShadowbladeActionTuning ActionTuningForProfile(
         const ShadowbladeLoadoutProfile& profile);
     ShadowbladeActionTuning CurrentLoadoutTuning() const;
+    ShadowActionReadiness CurrentActionReadiness() const;
     LoadoutActionResult PreviewPresetTuning(std::size_t slot,
         const CharacterProgression& progression, ShadowbladeActionTuning& tuning) const;
 
@@ -205,6 +225,7 @@ private:
 
     int playerHealth_{MaximumPlayerHealth};
     int guardIntegrity_{MaximumGuardIntegrity};
+    int shadowMomentum_{};
     bool incomingAttackActive_{};
     std::uint64_t incomingAttackGeneration_{};
     IncomingAttackDefinition incomingAttack_{};
