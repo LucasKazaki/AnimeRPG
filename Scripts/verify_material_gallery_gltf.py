@@ -26,7 +26,7 @@ def canonical_text_bytes(path):
 
 def load_source(path):
     raw=canonical_text_bytes(path); source=json.loads(raw)
-    req(source.get("schema_version")==1,"source schema")
+    req(type(source.get("schema_version")) is int and source.get("schema_version")==1,"source schema")
     req(source.get("status")==SOURCE_STATUS,"source status")
     req(source.get("units")=="metres","source units")
     req(source.get("axes")=={"forward":"+Z","right":"-X per glTF convention","up":"+Y"},"source axes")
