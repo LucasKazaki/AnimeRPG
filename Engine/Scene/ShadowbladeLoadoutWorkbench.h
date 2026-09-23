@@ -133,10 +133,14 @@ public:
             }
 
             const ShadowbladeLoadoutProfile candidateProfile = candidate.Profile();
-            const ShadowbladeLoadoutProfile scoredProfile =
-                scope == LoadoutWorkbenchScope::CurrentSlot
-                ? Difference(candidateProfile, slotBaseline)
-                : candidateProfile;
+            ShadowbladeLoadoutProfile scoredProfile = candidateProfile;
+            if (scope == LoadoutWorkbenchScope::CurrentSlot) {
+                scoredProfile = Difference(candidateProfile, slotBaseline);
+                if (scoredProfile.activeResonanceFamilies > 0) {
+                    RemoveFamilySynergy(ModuleFamily(module), scoredProfile);
+                    scoredProfile.activeResonanceFamilies = 0;
+                }
+            }
             const int score = FocusScore(scoredProfile, focus);
             if (best.available && score < bestScore) continue;
             if (best.available && score == bestScore
@@ -282,6 +286,24 @@ private:
             after.activeResonanceFamilies - before.activeResonanceFamilies;
         difference.readinessScore = after.readinessScore - before.readinessScore;
         return difference;
+    }
+
+    static void RemoveFamilySynergy(ResonanceFamily family,
+        ShadowbladeLoadoutProfile& profile) {
+        switch (family) {
+        case ResonanceFamily::Cooling:
+            profile.guardBonus -= 2;
+            profile.resourceRecoveryBonus -= 2;
+            break;
+        case ResonanceFamily::Rift:
+            profile.attackBonus -= 3;
+            profile.mobilityBonus -= 2;
+            break;
+        case ResonanceFamily::Civic:
+            profile.guardBonus -= 3;
+            profile.resourceRecoveryBonus -= 1;
+            break;
+        }
     }
 
     static int FocusScore(const ShadowbladeLoadoutProfile& profile,
