@@ -775,8 +775,14 @@ bool CloseEditor(HWND window, DWORD processId, DWORD threadId, HANDLE thread,
     const DWORD previousSuspendCount = SuspendThread(thread);
     if (previousSuspendCount == static_cast<DWORD>(-1)) return false;
 
+    bool suspendedContextCaptured = false;
     bool postedClose = false;
-    if (previousSuspendCount == 0
+    if (previousSuspendCount == 0) {
+        CONTEXT context{};
+        context.ContextFlags = CONTEXT_CONTROL;
+        suspendedContextCaptured = GetThreadContext(thread, &context) != FALSE;
+    }
+    if (previousSuspendCount == 0 && suspendedContextCaptured
         && WaitForSingleObject(process, 0) == WAIT_TIMEOUT
         && WaitForSingleObject(thread, 0) == WAIT_TIMEOUT) {
         DWORD pinnedProcessId = 0;
@@ -788,7 +794,8 @@ bool CloseEditor(HWND window, DWORD processId, DWORD threadId, HANDLE thread,
 
     const DWORD resumePreviousCount = ResumeThread(thread);
     if (resumePreviousCount == static_cast<DWORD>(-1)
-        || previousSuspendCount != 0 || resumePreviousCount != 1 || !postedClose) {
+        || previousSuspendCount != 0 || !suspendedContextCaptured
+        || resumePreviousCount != 1 || !postedClose) {
         return false;
     }
 
@@ -969,7 +976,7 @@ int wmain(int argc, wchar_t** argv) {
         << L"every bounded cross-process read and after both normal+narrow resizes; Cube selection stayed synchronized, "
         << L"all direct children remained contained from startup through both resizes, the retained CreateProcess handle "
         << L"remained nonsignaled around PID-based HWND ownership checks, the original window-owning launch thread was "
-        << L"suspended only across the final asynchronous WM_CLOSE enqueue and resumed before any wait, and shutdown "
-        << L"exited cleanly.\n";
+        << L"suspended and a valid suspended thread context was captured before the final asynchronous WM_CLOSE enqueue, "
+        << L"then the thread was resumed before any wait and shutdown exited cleanly.\n";
     return 0;
 }
