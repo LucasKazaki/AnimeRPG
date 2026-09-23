@@ -6,11 +6,12 @@
 #include "Engine/Scene/ManaReactorExpedition.h"
 #include "Engine/Scene/ManaReactorMission.h"
 #include "Engine/Scene/ShadowCryptExpedition.h"
+#include "Engine/Scene/ShadowCryptMission.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
 #include "Engine/Scene/ShadowbladeTrainingPath.h"
 #include "Engine/Scene/ShadowbladeTrainingCoach.h"
 
-// Passes 25-26 need existing out-of-line gameplay implementations in this
+// Passes 25-27 need existing out-of-line gameplay implementations in this
 // registered aggregation target. Shared CMake remains owned by the engine worker,
 // so compile the exact production implementations into this test TU instead of
 // changing target ownership or substituting mocks.
@@ -202,6 +203,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "ShadowbladeTrainingHubPass25Tests.inc"
 #include "ShadowbladeTrainingHubPass25ReviewTests.inc"
 #include "ManaReactorMissionPass26Tests.inc"
+#include "ShadowCryptMissionPass27Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -226,6 +228,7 @@ int main() {
     TestShadowbladeTrainingHubPass25();
     TestShadowbladeTrainingHubPass25ReviewRepairs();
     TestManaReactorMissionPass26();
+    TestShadowCryptMissionPass27();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;
