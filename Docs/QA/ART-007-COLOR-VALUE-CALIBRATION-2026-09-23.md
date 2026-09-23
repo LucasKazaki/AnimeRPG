@@ -10,9 +10,11 @@ The first independent source review found four defects in exact head `e891abe609
 
 Head `5fbb1e8acf9c979702dca9c509d9499fdfda45ae` removed the stale derived `Generated/` pack, made the generator plus `expected-manifest.json` the source contract, added repository-boundary regressions, and required exact UI-screening metadata. Its exact-head Windows CI passed, but the next independent review found two more source-contract issues: raw newline-sensitive hashing/pin comparison could fail on Windows `core.autocrlf=true` checkouts, and a repinned manifest could falsely claim runtime validation because `status` was not semantically checked.
 
-Head `34ed461572de3da860c63fb9a2358210e7ebffb6` canonicalized source and expected-manifest text line endings to LF before hashing or pin comparison and required exact source-only status `art_reference_source_validated_not_runtime`. Its exact-head Windows CI passed. The subsequent independent review found two final evidence defects: the stale-pin regression changed `status`, so the new semantic status check could make the test pass without exercising expected-manifest enforcement, and the durable toolchain table still reported the original seven-test count.
+Head `34ed461572de3da860c63fb9a2358210e7ebffb6` canonicalized source and expected-manifest text line endings to LF before hashing or pin comparison and required exact source-only manifest status `art_reference_source_validated_not_runtime`. Its exact-head Windows CI passed. The subsequent independent review found two evidence defects: the stale-pin regression changed `status`, so the semantic status check could make the test pass without exercising expected-manifest enforcement, and the durable toolchain table still reported the original seven-test count.
 
-The current repair keeps the regression count at sixteen but changes `test_stale_pin` to alter only `color_note`, metadata that remains semantically acceptable to the verifier, and requires the exact `expected manifest pin` failure. This independently proves the expected-manifest gate still rejects valid-but-unpinned metadata. `TOOLCHAIN.md` now reports sixteen regressions consistently with this QA record and `STATE.json`.
+Head `a90be95389e04a5dffa2f31212e3a66c636572ed` changed `test_stale_pin` to alter only `color_note`, metadata that remains semantically acceptable to the verifier, and required the exact `expected manifest pin` failure. `TOOLCHAIN.md` was corrected to sixteen tests. Exact-head Windows CI `35805036809` passed. The next independent review found one remaining boundary defect: the canonical `color-roles.json.status` itself could be changed to a runtime-validation claim and then repinned because the generator and verifier did not require the source contract's own source-only status.
+
+The current repair adds an explicit source-status boundary to both generator and verifier. `color-roles.json.status` must be exactly `proposed_art_reference_not_runtime`. Two new regressions independently prove that the generator rejects a false runtime source status and that the verifier rejects the same false source status even when the source hash and expected manifest are deliberately repinned to match it. No generated PNG bytes or pinned hashes changed.
 
 ## Author verification executed on repaired source fixture
 
@@ -27,7 +29,7 @@ python Scripts/verify_color_value_calibration.py <same-dir> --source Content/Cal
 PASS: {'roles': 8, 'png_files': 3, 'ui_pairs': 4}
 
 python Scripts/test_color_value_calibration.py
-16/16 passed
+18/18 passed
 
 python -m py_compile Scripts/generate_color_value_calibration.py Scripts/verify_color_value_calibration.py Scripts/test_color_value_calibration.py
 PASS
@@ -40,6 +42,6 @@ Fresh generated hashes remain pinned by `expected-manifest.json`:
 - expected manifest: `730bd19f4c1f7cb8296991d3cd868144e403dade1055c0984924159792de3ff4`
 - canonical LF `color-roles.json`: `21e44310b4de21e085736b1a49a17705e6794285db7bede76ff0423322f96a22`
 
-The 16-test suite includes absence of a stale source-tree derived pack, fresh-pack equality with the checked-in pin, a semantically valid but unpinned manifest rejection, CRLF-checkout contract portability, valid temporary output, exact regeneration, overwrite refusal, repinned false runtime-status rejection, contrast rejection, full-pixel semantic corruption in swatch/preview/ramp regions, LUT replacement, oversized-dimension rejection before inflation, corrected vermilion luminance preview, and repinned false UI-screening metadata rejection.
+The 18-test suite includes absence of a stale source-tree derived pack, fresh-pack equality with the checked-in pin, a semantically valid but unpinned manifest rejection, CRLF-checkout contract portability, generator and verifier source-status rejection, valid temporary output, exact regeneration, overwrite refusal, repinned false manifest-runtime-status rejection, contrast rejection, full-pixel semantic corruption in swatch/preview/ramp regions, LUT replacement, oversized-dimension rejection before inflation, corrected vermilion luminance preview, and repinned false UI-screening metadata rejection.
 
 Author inspection of a freshly generated palette confirmed the intended swatches, relative-luminance preview region and 16-step value ladder. This is author inspection only. Fresh exact-head hosted CI and a fresh independent review are required after publication of this repair.
