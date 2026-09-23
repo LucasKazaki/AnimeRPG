@@ -200,7 +200,6 @@ public:
 
     ShadowbladeLoadout& Loadout() { return loadout_; }
     const ShadowbladeLoadout& Loadout() const { return loadout_; }
-    ShadowbladeLoadoutWorkbench& LoadoutWorkbench() { return loadoutWorkbench_; }
     const ShadowbladeLoadoutWorkbench& LoadoutWorkbench() const { return loadoutWorkbench_; }
     LoadoutActionResult ApplyLoadoutPreset(std::size_t slot,
         const CharacterProgression& progression) {
