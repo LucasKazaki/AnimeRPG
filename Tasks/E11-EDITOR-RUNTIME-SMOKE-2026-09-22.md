@@ -6,21 +6,18 @@ Bounded verification-only packet for the already-integrated Win32 `AstralEditor`
 
 Owned branch: `engine/2026-09-22-editor-runtime-smoke`.
 Baseline admitted from `main`: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`.
-Latest independently moving `main` observed during this packet: `1042339ee7052fcbff60b1b8bba6840b43019c4e`.
+Latest independently moving `main` observed during this packet: `977afadb2630bb3d25755d4407992bfab10018f8`.
 Current code candidate: `81e7052f47cab06060ea69c9f9d4f25ec42145e4`.
+Final source/evidence tree reviewed this pass: `727dcf7cef2a01c4be13931db0551247edf929bb`.
 `CMakeLists.txt` blob: `ed6a7f44d87241560faf32a57465befd536b59f9`.
 `Tests/EditorRuntimeSmoke.cpp` blob: `117c101acc9d65e297c3e0f948a6c3724ff2416d`.
 Production editor source is unchanged by this pass.
 
 Allowed paths only: `CMakeLists.txt`, `Tests/EditorRuntimeSmoke.cpp`, this task, `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`, and `Docs/Research/ENGINE-CAPABILITIES.json`. One active writer only. Do not rebase, merge, force-push, or absorb unrelated work.
 
-## Previous evidence gate now clean
-
-Receipt-repair head `973403eeaa93313f0ec68f41d962ef6083eab01e` received a clean Codex re-review completed at `2026-09-23T01:28:13Z` with no new finding. Its exact hosted workflows also completed successfully: Windows build/deterministic tests `35806022252`, profiling capture portability `35806022245`, and release-manifest integrity `35806022278`. This closes the receipt re-review gate for that older exact tree, but it is not independent acceptance of source changed after `973403ee...` and is not native GUI evidence.
-
 ## Selected verification gap and implementation
 
-The E11 smoke previously treated the five pending toolbar buttons as an unordered caption set. `ValidateShellState` searched the current child inventory for `Select (pending)`, `Move (pending)`, `Rotate (pending)`, `Scale (pending)`, and `Play (pending)`, then checked only visibility and disabled state. Because the original child-HWND inventory check is order-independent, two original Button HWNDs could exchange captions/semantic roles while all expected captions still existed and the smoke would pass. The analogous Static-control ambiguity had already been repaired by binding semantic HWNDs, but toolbar semantics were not equivalently bound.
+The E11 smoke previously treated the five pending toolbar buttons as an unordered caption set. `ValidateShellState` searched the current child inventory for `Select (pending)`, `Move (pending)`, `Rotate (pending)`, `Scale (pending)`, and `Play (pending)`, then checked only visibility and disabled state. Because the original child-HWND inventory check is order-independent, two original Button HWNDs could exchange captions/semantic roles while all expected captions still existed and the smoke would pass.
 
 Candidate `81e7052f47cab06060ea69c9f9d4f25ec42145e4` repairs that false-pass path without changing the production editor. At initial capture the smoke now:
 
@@ -37,15 +34,15 @@ This packet deliberately does not enable any toolbar action. The five tools rema
 ## Research basis, rechecked 2026-09-23 UTC
 
 - Epic Games, UE 5.8 Viewport Toolbar: https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar
-  - applicability: Epic documents transform tools as semantically distinct Select/Move/Rotate/Scale workflow controls and says the toolbar keeps features in consistent locations by logical category. Workflow comparison only.
+  - applicability: workflow comparison for semantically distinct Select/Move/Rotate/Scale controls and consistent logical toolbar locations.
+- Unity Technologies, Unity 6 `Tool`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Tool.html
+  - applicability: workflow comparison for distinct Move/Rotate/Scale editor tools.
 - Microsoft Learn, `GetWindowRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect
-  - applicability: retrieves a window/control bounding rectangle in screen coordinates before mapping the retained Button HWNDs into editor-client coordinates.
-- Microsoft Learn, `WM_GETTEXT`: https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-gettext
-  - applicability: for a button, window text is its button name/caption, used here as semantic identity through the existing bounded cross-process text helper.
-- Unity Technologies, Unity 6 `Tool` enum: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Tool.html
-  - applicability: Unity exposes semantically distinct Move/Rotate/Scale editor tools. Workflow comparison only.
+  - applicability: obtains window/control bounding rectangles used by the semantic toolbar slot checks.
+- Git project, core data model: https://git-scm.com/docs/gitdatamodel
+  - applicability: Git objects are immutable and their object IDs hash type plus contents. Evidence commits therefore cannot embed their own not-yet-created commit ID without changing the commit again; the post-write exact head belongs in PR/checkpoint metadata, while durable receipts can anchor the reviewed predecessor tree and its exact workflows.
 
-No proprietary source was copied and no dependency was added.
+Behavior/API/evidence-model references only. No proprietary source was copied and no dependency was added.
 
 ## Portable mutation fixture
 
@@ -69,15 +66,17 @@ ASAN_OPTIONS=detect_leaks=1 /tmp/e11_toolbar_clang
 
 This fixture is source-logic evidence only, not Win32 GUI execution.
 
-## Hosted candidate verification
+## Exact final-tree hosted evidence and independent review
 
-For exact code candidate `81e7052f47cab06060ea69c9f9d4f25ec42145e4`:
+Exact source/evidence tree `727dcf7cef2a01c4be13931db0551247edf929bb` contains the toolbar candidate above and completed all hosted workflows successfully:
 
-- profiling capture portability `35810232976`: `completed/success`;
-- release manifest integrity `35810233015`: `completed/success`;
-- Windows run `35810233080`, job `107019946669`: the substantive safety/configure/Debug build+tests/Release build+tests/dependency/static/clean-tree steps all completed successfully, but the workflow/job was cancelled after a newer evidence commit superseded the head. The cancelled overall conclusion is not counted as a pass.
+- Windows build and deterministic tests `35810545499`, job `107020923389`: `completed/success` on exact head `727dcf7...`, completed `2026-09-23T02:31:22Z`. Repository/R0 safety contracts, Release assertion/CTest safety, VS2022 x64 configure, Debug build/tests, Release build/tests, dependency/prerequisite checks, static verifiers, and clean-tree verification passed.
+- profiling capture portability `35810545487`: `completed/success`.
+- release manifest integrity `35810545457`: `completed/success`.
 
-The next exact evidence head must complete its own Windows workflow successfully before hosted verification is called green. Hosted deterministic CTest intentionally excludes tests whose names end in `RuntimeSmoke`, so even a green hosted build is not native editor GUI evidence.
+Fresh Codex review of exact head `727dcf7...` was submitted at `2026-09-23T02:34:44Z`. It identified one P2 evidence-traceability defect only: the task, QA receipt, and capability map still named the intermediate candidate and cancelled candidate-head Windows run instead of anchoring `727dcf7...` and its successful exact-head workflows. No new runtime-smoke implementation defect was reported in that review. This evidence-only repair updates all three durable records; a re-review of the post-repair head is still required before independent acceptance.
+
+Hosted deterministic CTest intentionally excludes tests whose names end in `RuntimeSmoke`, so these green hosted workflows are not native editor GUI evidence.
 
 ## Retained acceptance surface
 
@@ -87,7 +86,7 @@ All established E11 checks remain required: one stable visible/enabled process-o
 
 ## Registered native handoff
 
-After the current candidate has completed exact-head hosted verification and receives clean independent review, the registered Windows executor should run the exact reviewed branch head on one owned interactive desktop:
+After this evidence-only repair receives clean independent re-review, the registered Windows executor should run the exact reviewed branch head on one owned interactive desktop:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -99,6 +98,10 @@ ctest --test-dir ../AnimeRPG-e11-runtime-build -C Release --output-on-failure -R
 
 Retain exact source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driver identity, commands, full stdout/stderr, exit codes, UTC timestamps, normal plus narrow-window screenshots, and proof that any failure/interruption leaves zero owned contained processes.
 
+## Rollback and stop conditions
+
+Rollback only this evidence-only commit if it misstates the reviewed tree or hosted run association. Stop before any runtime code change, rebase, merge, R0 execution, local scheduler operation, dependency addition, graphics/API change, or game-content work. If the review produces a new runtime finding, admit that finding as the next bounded repair instead of weakening the smoke.
+
 ## Single next useful action
 
-Complete hosted verification on the final evidence head and obtain fresh independent review of the toolbar semantic-binding diff. If both are clean, execute the registered Windows Debug/Release GUI smoke and preserve the complete native receipt set. Do not rebase onto the separately moving `main` within this packet.
+Obtain fresh independent re-review of the evidence-repaired head. If clean, the next substantive gate is the registered Windows Debug/Release GUI smoke with the complete native receipt set.
