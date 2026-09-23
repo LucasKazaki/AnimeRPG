@@ -3,20 +3,20 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-23",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "dbb1121a0b562f5c5d11794e57e383bb47696db4",
+  "last_verified_main_at_pass_start": "747c6837afb6a8993286cc2139fb61931306645b",
   "last_merged_pass": {
-    "id": "GAME-PASS16-SHADOWBLADE-LOADOUT-2026-09-23",
-    "pr": 35,
-    "merge_sha": "dbb1121a0b562f5c5d11794e57e383bb47696db4",
-    "head_sha": "d5816c57339b93d9a9d2806f7082638606c230fd",
+    "id": "GAME-PASS17-LOADOUT-LIVE-EFFECTS-2026-09-23",
+    "pr": 36,
+    "merge_sha": "747c6837afb6a8993286cc2139fb61931306645b",
+    "head_sha": "8dc3ada56d1396a1a57873343a981e5aeb48e289",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-23-loadout-live-effects-pass17",
-  "pass": "GAME-PASS17-LOADOUT-LIVE-EFFECTS-2026-09-23",
-  "task_packet": "Tasks/GAME-PASS17-LOADOUT-LIVE-EFFECTS-2026-09-23.md",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS17.md",
-  "pr": 36,
-  "final_head": "see_pr_36_final_exact_head_receipt_after_gates",
+  "working_branch": "game/2026-09-23-shadowblade-tuning-pass18",
+  "pass": "GAME-PASS18-SHADOWBLADE-TUNING-2026-09-23",
+  "task_packet": "Tasks/GAME-PASS18-SHADOWBLADE-TUNING-2026-09-23.md",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS18.md",
+  "pr": null,
+  "final_head": "pending_exact_final_head_after_gates",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -29,43 +29,26 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-082","title":"Live Shadowblade loadout-to-action bridge","status":"implemented_registered_test_coverage_live_action_domain"},
-    {"id":"GAME-083","title":"Bounded loadout Attack to Fatal Strike damage","status":"implemented_registered_test_coverage_live_action_domain"},
-    {"id":"GAME-084","title":"Bounded loadout Mobility to dash distance","status":"implemented_registered_test_coverage_live_action_domain"},
-    {"id":"GAME-085","title":"Bounded loadout Resource Recovery to Shadow regeneration","status":"implemented_registered_test_coverage_live_action_domain"},
-    {"id":"GAME-086","title":"Bounded Guard and family-resonance action effects","status":"implemented_registered_test_coverage_live_action_domain"},
-    {"id":"QOL-018","title":"Non-mutating saved-preset action-tuning preview","status":"implemented_registered_test_coverage_backend_ui_api_only"}
+    {"id":"GAME-087","title":"Three-rank resonance-module tuning","status":"implemented_registered_test_coverage_live_profile_domain"},
+    {"id":"GAME-088","title":"Three-rank weapon calibration","status":"implemented_registered_test_coverage_live_profile_domain"},
+    {"id":"GAME-089","title":"Exact remaining tuning-material plans","status":"implemented_registered_test_coverage_game_domain_api"},
+    {"id":"GAME-090","title":"Deterministic next-upgrade recommendation","status":"implemented_registered_test_coverage_game_domain_api"},
+    {"id":"GAME-091","title":"Rank-aware enhanced-module salvage recovery","status":"implemented_registered_test_coverage_game_domain"},
+    {"id":"QOL-019","title":"Explicit module salvage protection","status":"implemented_registered_test_coverage_backend_ui_api_only"}
   ],
-  "review_repairs": {
-    "initial_review_head": "f8c5daf26504930b890279a83867fc79a7ab02aa",
-    "persistent_loadout_retry_loss": "repaired_with_ShadowbladeActions_ResetTransientStatePreservingLoadout_used_by_LandmarkEncounter_retry",
-    "unexercised_tuning_caps": "repaired_with_overflow_safe_profile_transform_and_INT_MIN_INT_MAX_exact_cap_regressions",
-    "repaired_candidate_ci_head": "2c0c1aa35ec957058760817cf23a3976756858bc",
-    "repaired_candidate_ci_result": "windows_debug_link_failure_ThoughtCommandsTests_did_not_link_LandmarkEncounter_cpp; not bypassed; no_CMake_change; regression_moved_to_linked_Shadowblade_reset_helper",
-    "green_candidate_before_scope_review": "ea18ef62556d08bc1fd770cd509c8622e312ceaa",
-    "green_candidate_windows_ci": "run_544_success_debug_release_16_of_16_each",
-    "green_candidate_release_integrity": "run_424_success_byte_identical_release_pair_and_exact_package_bytes",
-    "scope_review_result": "fresh_Codex_review_on_ea18ef6_found_one_P1_unrelated_preexisting_guard_assertion_change_in_ThoughtCommandsTests",
-    "scope_repair": "reverted_the_unrelated_guard_assertion_hunk_and_retained_only_pass17_test_include_and_call_registration",
-    "scope_repair_commit": "d21abf40d47a923b04ce20ae24addb9a85662a41",
-    "final_review": "pending_fresh_exact_final_head_after_scope_repair_and_operating_record_updates"
-  },
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
-    "existing_encounter_retry_test_target": "LandmarkEncounterTests_unchanged",
-    "hosted_windows_ci": "ea18ef6_candidate_passed_run_544_but_stale_after_scope_and_record_repairs; exact_final_head_required",
-    "release_manifest": "ea18ef6_candidate_passed_run_424_but_stale_after_scope_and_record_repairs; exact_final_head_required",
+    "hosted_windows_ci": "pending_exact_head",
+    "release_manifest": "pending_exact_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "ea18ef6_review_completed_and_scope_P1_repaired; fresh_exact_final_head_review_required",
-    "integration": "five_gameplay_increments_consumed_by_live_ShadowbladeActions_owner; LandmarkEncounter_retry_calls_tested_persistent_loadout_reset_helper; QOL_preview_has_no_rendered_native_caller",
-    "player_equipment_selection": "not_implemented_not_claimed",
+    "independent_review": "pending_exact_head",
+    "integration": "module_and_weapon_tune_stats_flow_through_existing_ShadowbladeLoadout_Profile_into_live_ShadowbladeActions_CurrentLoadoutTuning; planning_recommendation_and_protection_are_game_domain_APIs_without_rendered_UI",
     "persistent_cross_process_save": "not_implemented_not_claimed"
   },
   "coordination": {
     "engine_pr_13": "separate editor/runtime-smoke ownership; no overlap",
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
-    "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged",
-    "narrow_game_domain_repair": "Engine/Scene/LandmarkEncounter.cpp retry now delegates to persistent-loadout transient reset helper"
+    "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "On PR #36, require exact-final-head hosted Windows Debug/Release and release-integrity gates plus fresh independent Codex review after the scope repair and operating-record updates, resolve repaired review threads only after evidence is current, re-read live main and exact PR head, and merge only the exact tested/reviewed head."
+  "next_action": "Create the bounded pass-18 PR, run the repository's exact-head hosted Windows Debug/Release and release-integrity gates, obtain fresh independent Codex review, repair material findings only within the admitted paths, then re-read live main and exact PR head and merge only the tested/reviewed head."
 }
