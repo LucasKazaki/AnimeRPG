@@ -34,8 +34,8 @@
     {"id":"GAME-138","title":"Focus-aware owned-module recommendation","status":"implemented_registered_regression_pending_exact_head_gates"},
     {"id":"GAME-139","title":"Resonance-family recommendation filter","status":"implemented_registered_regression_pending_exact_head_gates"},
     {"id":"GAME-140","title":"Current-slot versus whole-build recommendation scope","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-141","title":"Last-successful preset recall and reapply","status":"implemented_owner_bound_reset_persistent_registered_regression_pending_exact_head_gates"},
-    {"id":"QOL-029","title":"Human-readable clearable preset labels with spaces","status":"implemented_owner_bound_reset_persistent_registered_regression_pending_exact_head_gates"}
+    {"id":"GAME-141","title":"Last-successful preset recall and reapply","status":"implemented_authoritative_apply_recall_owner_bound_reset_persistent_registered_regression_pending_exact_head_gates"},
+    {"id":"QOL-029","title":"Human-readable clearable preset labels with spaces","status":"implemented_paired_loadout_metadata_owner_bound_reset_persistent_registered_regression_pending_exact_head_gates"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ShadowbladeLoadoutWorkbenchPass28Tests",
@@ -45,17 +45,37 @@
     "known_failed_windows_result": "Debug_build_failed_before_tests_after_owner_API_repair; registered tests still called now-private stateful methods; repaired_on_later_head",
     "known_release_manifest_run": 35930449015,
     "known_release_manifest_result": "success_on_6957ff8_but_not_final_acceptance",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
+    "superseded_green_head": "0b9e6d88bb70070475b052e426b7b25d8f148ff4",
+    "superseded_green_windows_run": 35934146994,
+    "superseded_green_release_manifest_run": 35934146841,
+    "superseded_green_reason": "fresh independent review found stale durable path inventories and review-history records; later documentation-only repairs moved the head",
+    "hosted_windows_ci": "pending_exact_final_head_after_durable_record_repairs",
+    "release_manifest": "pending_exact_final_head_after_durable_record_repairs",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "two_P1_and_two_P2_findings_repaired_threads_resolved_fresh_exact_final_head_review_pending",
-    "integration": "ShadowbladeActions owns/exposes ShadowbladeLoadoutWorkbench beside authoritative ShadowbladeLoadout; stateful preset metadata is owner-bound and preserved by the existing transient-reset helper; native input/UI not wired",
+    "independent_review": "two_P1_and_eight_P2_material_findings_repaired_threads_resolved_fresh_exact_final_head_review_pending",
+    "integration": "ShadowbladeActions exposes a const ShadowbladeLoadoutWorkbench beside authoritative ShadowbladeLoadout; preset labels and last-applied metadata live with ShadowbladeLoadout; successful direct or owner-wrapped preset apply shares authoritative recall bookkeeping; transient reset preserves the loadout; native input/UI not wired",
     "persistent_cross_process_save": "workbench_session_metadata_not_persisted_not_claimed"
   },
   "coordination": {
     "open_engine_and_art_prs": "left_unchanged",
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "ShadowbladeLoadoutWorkbench_h_plus_ShadowbladeActions_h_plus_narrow_existing_ShadowbladeActions_cpp_reset_helper_plus_registered_game_tests_only"
+    "gameplay_paths": "ShadowbladeLoadoutWorkbench_h_plus_ShadowbladeLoadout_h_plus_ShadowbladeActions_h_plus_narrow_existing_ShadowbladeActions_cpp_reset_helper_plus_registered_game_tests_only"
   },
-  "next_action": "Use the final record commit as the exact candidate, require green Windows Debug/Release and Release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
+  "review_history": {
+    "material_findings_repaired": 10,
+    "severity_breakdown": "2_P1_8_P2",
+    "summary": [
+      "CurrentSlot family-synergy leakage repaired.",
+      "Missing bounded task/receipt records repaired.",
+      "Cross-owner stateful metadata path repaired.",
+      "Transient-reset metadata loss repaired.",
+      "Mutable workbench copy-assignment escape repaired.",
+      "Whole-loadout replacement metadata split repaired.",
+      "Direct preset-apply recall bypass repaired.",
+      "Run-receipt ShadowbladeLoadout.h omission repaired.",
+      "Backlog and STATE ShadowbladeLoadout.h inventory omissions repaired.",
+      "Durable independent-review history reconciled across retained records."
+    ]
+  },
+  "next_action": "Use the final durable-record repair commit as the exact candidate, require green Windows Debug/Release and Release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
 }
