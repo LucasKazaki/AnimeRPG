@@ -633,8 +633,8 @@ bool DirectChildrenContained(HWND window, DWORD processId,
         MapWindowPoints(HWND_DESKTOP, window, points, 2);
         if (points[0].x < client.left || points[0].y < client.top
             || points[1].x > client.right || points[1].y > client.bottom
-            || points[1].x < points[0].x || points[1].y < points[0].y) {
-            failure = L"child outside client: " + control.className
+            || points[1].x <= points[0].x || points[1].y <= points[0].y) {
+            failure = L"child outside client or empty: " + control.className
                 + L" child=" + std::to_wstring(points[0].x) + L"," + std::to_wstring(points[0].y)
                 + L".." + std::to_wstring(points[1].x) + L"," + std::to_wstring(points[1].y)
                 + L" client=" + std::to_wstring(client.right) + L"x"
