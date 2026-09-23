@@ -215,8 +215,13 @@ public:
         ShadowbladeTrainingDrillPlan plan{};
         if (ShadowbladeTrainingCoach::PlanForFocus(focus_, pace_, plan)
             && plan.sequence.count > 0) {
+            EnemyAttackPattern guidePattern = plan.sequence.patterns[0];
+            if (state_ == ShadowbladeTrainingHubState::Active
+                && combat.HasPendingEnemyAttack()) {
+                guidePattern = combat.PendingEnemyAttack().pattern;
+            }
             feedback.timingGuideValid = ShadowbladeTrainingCoach::TimingGuide(
-                plan.sequence.patterns[0], timingPreset, feedback.timingGuide);
+                guidePattern, timingPreset, feedback.timingGuide);
         }
         return feedback;
     }
