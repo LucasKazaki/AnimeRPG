@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace Astral::Scene {
 
@@ -201,6 +202,32 @@ public:
     const ShadowbladeLoadout& Loadout() const { return loadout_; }
     ShadowbladeLoadoutWorkbench& LoadoutWorkbench() { return loadoutWorkbench_; }
     const ShadowbladeLoadoutWorkbench& LoadoutWorkbench() const { return loadoutWorkbench_; }
+    LoadoutActionResult ApplyLoadoutPreset(std::size_t slot,
+        const CharacterProgression& progression) {
+        return loadoutWorkbench_.ApplyPreset(loadout_, slot, progression);
+    }
+    LoadoutActionResult ReapplyLastLoadoutPreset(const CharacterProgression& progression) {
+        return loadoutWorkbench_.ReapplyLastPreset(loadout_, progression);
+    }
+    bool HasLastAppliedLoadoutPreset() const {
+        return loadoutWorkbench_.HasLastAppliedPreset();
+    }
+    std::size_t LastAppliedLoadoutPreset() const {
+        return loadoutWorkbench_.LastAppliedPreset();
+    }
+    PresetLabelResult SetLoadoutPresetLabel(std::size_t slot,
+        const std::string& label) {
+        return loadoutWorkbench_.SetPresetLabel(loadout_, slot, label);
+    }
+    PresetLabelResult ClearLoadoutPresetLabel(std::size_t slot) {
+        return loadoutWorkbench_.ClearPresetLabel(loadout_, slot);
+    }
+    bool HasLoadoutPresetLabel(std::size_t slot) const {
+        return loadoutWorkbench_.HasPresetLabel(slot);
+    }
+    std::string LoadoutPresetLabel(std::size_t slot) const {
+        return loadoutWorkbench_.PresetLabel(slot);
+    }
     static ShadowbladeActionTuning ActionTuningForProfile(
         const ShadowbladeLoadoutProfile& profile);
     ShadowbladeActionTuning CurrentLoadoutTuning() const;
