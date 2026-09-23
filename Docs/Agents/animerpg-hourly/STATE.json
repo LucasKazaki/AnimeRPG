@@ -17,7 +17,7 @@
   "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS28-BACKLOG.json",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS28.md",
   "pr": 48,
-  "final_head": "pending_exact_head_gates",
+  "final_head": "record_in_PR_gate_comment_after_exact_head_checks_and_review",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -34,23 +34,28 @@
     {"id":"GAME-138","title":"Focus-aware owned-module recommendation","status":"implemented_registered_regression_pending_exact_head_gates"},
     {"id":"GAME-139","title":"Resonance-family recommendation filter","status":"implemented_registered_regression_pending_exact_head_gates"},
     {"id":"GAME-140","title":"Current-slot versus whole-build recommendation scope","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-141","title":"Last-successful preset recall and reapply","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"QOL-029","title":"Human-readable clearable preset labels with spaces","status":"implemented_registered_regression_pending_exact_head_gates"}
+    {"id":"GAME-141","title":"Last-successful preset recall and reapply","status":"implemented_owner_bound_reset_persistent_registered_regression_pending_exact_head_gates"},
+    {"id":"QOL-029","title":"Human-readable clearable preset labels with spaces","status":"implemented_owner_bound_reset_persistent_registered_regression_pending_exact_head_gates"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ShadowbladeLoadoutWorkbenchPass28Tests",
     "sandbox_cpp17": "not_run_repo_not_materialized_no_product_claim",
+    "known_failed_windows_head": "6957ff8d913e0a70c18df7deb0bc13b572bc304c",
+    "known_failed_windows_run": 35930449020,
+    "known_failed_windows_result": "Debug_build_failed_before_tests_after_owner_API_repair; registered tests still called now-private stateful methods; repaired_on_later_head",
+    "known_release_manifest_run": 35930449015,
+    "known_release_manifest_result": "success_on_6957ff8_but_not_final_acceptance",
     "hosted_windows_ci": "pending_exact_final_head",
     "release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "pending_exact_final_head",
-    "integration": "ShadowbladeActions now owns and exposes ShadowbladeLoadoutWorkbench beside its existing authoritative ShadowbladeLoadout; native input/UI not wired",
+    "independent_review": "two_P1_and_two_P2_findings_repaired_threads_resolved_fresh_exact_final_head_review_pending",
+    "integration": "ShadowbladeActions owns/exposes ShadowbladeLoadoutWorkbench beside authoritative ShadowbladeLoadout; stateful preset metadata is owner-bound and preserved by the existing transient-reset helper; native input/UI not wired",
     "persistent_cross_process_save": "workbench_session_metadata_not_persisted_not_claimed"
   },
   "coordination": {
     "open_engine_and_art_prs": "left_unchanged",
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "ShadowbladeLoadoutWorkbench_h_plus_ShadowbladeActions_h_plus_registered_game_tests_only"
+    "gameplay_paths": "ShadowbladeLoadoutWorkbench_h_plus_ShadowbladeActions_h_plus_narrow_existing_ShadowbladeActions_cpp_reset_helper_plus_registered_game_tests_only"
   },
-  "next_action": "Run exact-head hosted Windows Debug/Release and Release-manifest gates on PR 48, obtain fresh independent authorized review on the same head, repair and rerun if needed, then re-read live main/head/full diff and expected-head merge if clean."
+  "next_action": "Use the final record commit as the exact candidate, require green Windows Debug/Release and Release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
 }
