@@ -1,25 +1,22 @@
 {
   "schema_version": 1,
   "owner": "animerpg-game-hourly",
-  "updated": "2026-09-22",
+  "updated": "2026-09-23",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "977afadb2630bb3d25755d4407992bfab10018f8",
+  "last_verified_main_at_pass_start": "977c5359491b24f729db6886af9b0fef35cea872",
   "last_merged_pass": {
-    "id": "GAME-PASS14-FIELD-OPERATIONS-2026-09-22",
-    "pr": 32,
-    "merge_sha": "977afadb2630bb3d25755d4407992bfab10018f8",
-    "head_sha": "cab01904b01f96c3403128e2c58e0fae30b50931",
-    "hosted_windows_ci": "passed_run_486",
-    "release_manifest": "passed_run_388",
-    "independent_review": "completed_no_unresolved_major_issues",
+    "id": "GAME-PASS15-SHADOW-CRYPT-EXPEDITION-2026-09-22",
+    "pr": 34,
+    "merge_sha": "977c5359491b24f729db6886af9b0fef35cea872",
+    "head_sha": "73f6e86a228dbf87a6b14f020367ebe35fac1a80",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-22-shadow-crypt-pass15",
-  "pass": "GAME-PASS15-SHADOW-CRYPT-EXPEDITION-2026-09-22",
-  "task_packet": "Tasks/GAME-PASS15-SHADOW-CRYPT-EXPEDITION-2026-09-22.md",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS15.md",
-  "pr": 34,
-  "final_head": "pending_self_reference_see_pr_34_final_receipt",
+  "working_branch": "game/2026-09-23-shadowblade-loadout-pass16",
+  "pass": "GAME-PASS16-SHADOWBLADE-LOADOUT-2026-09-23",
+  "task_packet": "Tasks/GAME-PASS16-SHADOWBLADE-LOADOUT-2026-09-23.md",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS16.md",
+  "pr": null,
+  "final_head": "pending_pr_and_exact_head_gates",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -32,26 +29,28 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-072","title":"Shadow Crypt lead-gated expedition entry","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-073","title":"Four-room objective sequence with local defeat retry","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-074","title":"Optional idempotent Cooling Cache side objective","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-075","title":"Bounded Bronze/Silver/Gold completion grading","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-076","title":"Replayable expedition with one-time progression reward","status":"implemented_registered_test_coverage"},
-    {"id":"QOL-016","title":"Explicit safe-suspend boundary and validated resume metadata","status":"implemented_registered_test_coverage"}
+    {"id":"GAME-077","title":"Level-gated Shadowblade weapon frames","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-078","title":"Four typed resonance-module slots","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-079","title":"Bounded equipment-family resonance profile","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-080","title":"Three exact saved loadout slots with atomic switching","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-081","title":"One-time unequipped-module salvage into bounded tuning parts","status":"implemented_registered_test_coverage"},
+    {"id":"QOL-017","title":"Exact-item preset fidelity with atomic stale-item failure","status":"implemented_registered_test_coverage"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
-    "author_source_fixture": "warning_clean_cpp17_compile_and_run_passed_non_hosted_non_native",
+    "author_source_fixture": "minimal_cpp17_compile_run_passed_non_hosted_non_native",
+    "sandbox_full_repo_clone": "not_run_due_sandbox_dns_resolution_failure",
     "hosted_windows_ci": "pending_exact_final_head",
     "release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
     "independent_review": "pending_fresh_exact_final_head",
-    "save_compatibility": "versioned_in_memory_resume_contract_only_no_file_format_or_cross_process_persistence_claimed"
+    "persistent_save": "not_implemented_not_claimed",
+    "combat_stat_application": "not_implemented_not_claimed"
   },
   "coordination": {
-    "engine_pr_13": "separate editor/runtime-smoke ownership; no CMake/editor/generic engine paths touched",
+    "engine_pr_13": "separate editor/runtime-smoke ownership; no overlap",
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
-    "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release deployment and networking unchanged"
+    "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "Require hosted Windows Debug/Release and release-integrity checks plus a fresh independent Codex review on PR #34, repair material findings without weakening acceptance, re-read live main/head, then merge exact reviewed/tested head if all gates are green. Final receipts stay in PR discussion/task output to avoid a self-referential unverified commit chain."
+  "next_action": "Open one scoped PR to main, run exact-head hosted Windows Debug/Release and release-integrity checks, obtain fresh independent Codex review, repair material findings without weakening acceptance, re-read live main/head, then merge only the exact tested and reviewed head."
 }
