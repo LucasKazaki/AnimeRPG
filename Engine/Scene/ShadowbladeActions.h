@@ -209,10 +209,10 @@ public:
         return loadoutWorkbench_.ReapplyLastPreset(loadout_, progression);
     }
     bool HasLastAppliedLoadoutPreset() const {
-        return loadoutWorkbench_.HasLastAppliedPreset();
+        return loadoutWorkbench_.HasLastAppliedPreset(loadout_);
     }
     std::size_t LastAppliedLoadoutPreset() const {
-        return loadoutWorkbench_.LastAppliedPreset();
+        return loadoutWorkbench_.LastAppliedPreset(loadout_);
     }
     PresetLabelResult SetLoadoutPresetLabel(std::size_t slot,
         const std::string& label) {
@@ -222,10 +222,10 @@ public:
         return loadoutWorkbench_.ClearPresetLabel(loadout_, slot);
     }
     bool HasLoadoutPresetLabel(std::size_t slot) const {
-        return loadoutWorkbench_.HasPresetLabel(slot);
+        return loadoutWorkbench_.HasPresetLabel(loadout_, slot);
     }
     std::string LoadoutPresetLabel(std::size_t slot) const {
-        return loadoutWorkbench_.PresetLabel(slot);
+        return loadoutWorkbench_.PresetLabel(loadout_, slot);
     }
     static ShadowbladeActionTuning ActionTuningForProfile(
         const ShadowbladeLoadoutProfile& profile);
