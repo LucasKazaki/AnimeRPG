@@ -53,6 +53,7 @@ public:
     static constexpr double DamageWindowSeconds = 20.0;
     static constexpr double DamageSampleIntervalSeconds = 0.20;
     static constexpr std::size_t MaximumDamageSamples = 128;
+    static constexpr std::size_t MaximumActivitiesPerSample = 16;
 
     bool Unlock() {
         if (state_ != ShadowbladeTrainingHubState::Locked) return false;
@@ -120,7 +121,8 @@ public:
     DefenseReport Defend(CombatSandbox& combat, ShadowbladeActions& actions,
         DefenseInput input) {
         if (state_ != ShadowbladeTrainingHubState::Active
-            || !OwnsOwners(combat, actions)) {
+            || !OwnsOwners(combat, actions)
+            || (input != DefenseInput::Guard && input != DefenseInput::Dodge)) {
             return {DefenseResult::NoThreat, 0, 0, false, 0.0f};
         }
         const DefenseReport report = session_.TryDefend(combat, actions, input);
@@ -175,39 +177,29 @@ public:
             return;
         }
 
-        // An old unflushed burst must never absorb a fresh delta that arrives
-        // after the 20-second cutoff. Flush the stale bucket with its original
-        // activity timestamp first; the fresh delta below then receives `now` as
-        // its own activity time and remains visible in the current window.
-        const double cutoff = now - DamageWindowSeconds;
-        if ((pendingDamage_ > 0 || pendingHits_ > 0)
-            && pendingActivitySeconds_ >= 0.0
-            && pendingActivitySeconds_ < cutoff) {
-            AddDamageSample(now, pendingActivitySeconds_, pendingDamage_, pendingHits_);
-            pendingDamage_ = 0;
-            pendingHits_ = 0;
-            pendingActivitySeconds_ = -1.0;
-        }
-
         const std::int64_t damageDelta = safeDamage - latestDamage_;
         const int hitDelta = safeHits - latestHits_;
         if (damageDelta > 0 || hitDelta > 0) {
-            if (pendingActivitySeconds_ < 0.0) pendingActivitySeconds_ = now;
-            pendingDamage_ += damageDelta;
-            pendingHits_ += hitDelta;
+            if (pendingActivityCount_ < MaximumActivitiesPerSample) {
+                pendingActivities_[pendingActivityCount_++] = {
+                    now,
+                    damageDelta,
+                    hitDelta,
+                };
+            } else {
+                // Do not silently smear more activity into an older timestamp.
+                // A pathological caller that produces more than sixteen distinct
+                // stat changes inside one 200 ms sample bucket makes this run's
+                // telemetry invalid until the next training start/reset.
+                damageTelemetryOverflow_ = true;
+            }
         }
 
         latestObservedSeconds_ = now;
         latestDamage_ = safeDamage;
         latestHits_ = safeHits;
         if (now - lastStoredSampleSeconds_ >= DamageSampleIntervalSeconds) {
-            const double activitySeconds = pendingActivitySeconds_ >= 0.0
-                ? pendingActivitySeconds_
-                : now;
-            AddDamageSample(now, activitySeconds, pendingDamage_, pendingHits_);
-            pendingDamage_ = 0;
-            pendingHits_ = 0;
-            pendingActivitySeconds_ = -1.0;
+            AddDamageSample(now);
         }
     }
 
@@ -291,11 +283,16 @@ public:
     }
 
 private:
-    struct DamageSample {
-        double storedSeconds{};
+    struct DamageActivity {
         double activitySeconds{};
         std::int64_t damage{};
         int hits{};
+    };
+
+    struct DamageSample {
+        double storedSeconds{};
+        std::array<DamageActivity, MaximumActivitiesPerSample> activities{};
+        std::size_t activityCount{};
     };
 
     bool AcceptsOwners(const CombatSandbox& combat,
@@ -338,9 +335,9 @@ private:
         damageWindowStartSeconds_ = 0.0;
         latestDamage_ = 0;
         latestHits_ = 0;
-        pendingDamage_ = 0;
-        pendingHits_ = 0;
-        pendingActivitySeconds_ = -1.0;
+        pendingActivities_ = {};
+        pendingActivityCount_ = 0;
+        damageTelemetryOverflow_ = false;
         const double now = combat.ElapsedSecondsPrecise();
         if (!std::isfinite(now) || now < 0.0) return;
         const TrainingStats& stats = combat.Stats();
@@ -349,25 +346,26 @@ private:
         damageWindowStartSeconds_ = now;
         latestDamage_ = std::max<std::int64_t>(0, stats.totalDamage);
         latestHits_ = std::max(0, stats.hitCount);
-        AddDamageSample(now, now, 0, 0);
+        AddDamageSample(now);
     }
 
-    void AddDamageSample(double storedSeconds, double activitySeconds,
-        std::int64_t damage, int hits) {
-        damageSamples_[nextSample_] = {
-            storedSeconds,
-            activitySeconds,
-            std::max<std::int64_t>(0, damage),
-            std::max(0, hits),
-        };
+    void AddDamageSample(double storedSeconds) {
+        DamageSample sample{};
+        sample.storedSeconds = storedSeconds;
+        sample.activities = pendingActivities_;
+        sample.activityCount = pendingActivityCount_;
+        damageSamples_[nextSample_] = sample;
         nextSample_ = (nextSample_ + 1) % MaximumDamageSamples;
         if (sampleCount_ < MaximumDamageSamples) ++sampleCount_;
         lastStoredSampleSeconds_ = storedSeconds;
+        pendingActivities_ = {};
+        pendingActivityCount_ = 0;
     }
 
     ShadowbladeTrainingDamageWindow RecentDamage() const {
         ShadowbladeTrainingDamageWindow window{};
-        if (sampleCount_ == 0 || !std::isfinite(latestObservedSeconds_)
+        if (sampleCount_ == 0 || damageTelemetryOverflow_
+            || !std::isfinite(latestObservedSeconds_)
             || !std::isfinite(damageWindowStartSeconds_)) {
             return window;
         }
@@ -376,20 +374,28 @@ private:
             latestObservedSeconds_ - DamageWindowSeconds);
         std::int64_t damage = 0;
         int hits = 0;
+        const auto accumulateActivity = [&](const DamageActivity& activity) {
+            if (!std::isfinite(activity.activitySeconds)
+                || activity.activitySeconds < cutoff
+                || activity.activitySeconds > latestObservedSeconds_) {
+                return;
+            }
+            damage += std::max<std::int64_t>(0, activity.damage);
+            hits += std::max(0, activity.hits);
+        };
+
         for (std::size_t index = 0; index < sampleCount_; ++index) {
             const DamageSample& sample = damageSamples_[index];
-            if (!std::isfinite(sample.activitySeconds)
-                || sample.activitySeconds < cutoff
-                || sample.activitySeconds > latestObservedSeconds_) {
-                continue;
+            const std::size_t count = std::min(
+                sample.activityCount, MaximumActivitiesPerSample);
+            for (std::size_t activityIndex = 0; activityIndex < count; ++activityIndex) {
+                accumulateActivity(sample.activities[activityIndex]);
             }
-            damage += sample.damage;
-            hits += sample.hits;
         }
-        if (pendingActivitySeconds_ >= cutoff
-            && pendingActivitySeconds_ <= latestObservedSeconds_) {
-            damage += pendingDamage_;
-            hits += pendingHits_;
+        const std::size_t pendingCount = std::min(
+            pendingActivityCount_, MaximumActivitiesPerSample);
+        for (std::size_t activityIndex = 0; activityIndex < pendingCount; ++activityIndex) {
+            accumulateActivity(pendingActivities_[activityIndex]);
         }
 
         window.valid = true;
@@ -415,9 +421,9 @@ private:
     double damageWindowStartSeconds_{};
     std::int64_t latestDamage_{};
     int latestHits_{};
-    std::int64_t pendingDamage_{};
-    int pendingHits_{};
-    double pendingActivitySeconds_{-1.0};
+    std::array<DamageActivity, MaximumActivitiesPerSample> pendingActivities_{};
+    std::size_t pendingActivityCount_{};
+    bool damageTelemetryOverflow_{};
 };
 
 } // namespace Astral::Scene
