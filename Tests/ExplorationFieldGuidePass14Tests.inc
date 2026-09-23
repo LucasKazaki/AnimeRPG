@@ -23,25 +23,30 @@ void TestExplorationFieldGuidePass14() {
 
     FieldNarrativeSnapshot evidence{};
     evidence.hasRiftResidue = true;
+    evidence.hasCryptSigil = true;
+    guide.SyncNarrativeEvidence(evidence);
+    const FieldOperationProgress oneRiftClue =
+        guide.OperationProgress(FieldOperation::RiftInvestigation);
+    Expect(oneRiftClue.current == 1 && oneRiftClue.required == 2 && !oneRiftClue.Complete(),
+        "Shadow Crypt evidence cannot substitute for the second Rift investigation clue");
+    Expect(guide.OperationProgress(FieldOperation::ShadowCryptLead).current == 1
+            && !guide.OperationProgress(FieldOperation::ShadowCryptLead).Complete(),
+        "Crypt Sigil advances only its separate Shadow Crypt evidence gate without lore");
+
     evidence.hasCoolingAnomaly = true;
     guide.SyncNarrativeEvidence(evidence);
     const FieldOperationProgress rift = guide.OperationProgress(FieldOperation::RiftInvestigation);
     Expect(rift.current == 2 && rift.required == 2 && rift.Complete()
             && guide.HasJournalEntry(FieldJournalEntry::RiftEvidence),
-        "two authoritative dialogue clues complete the rift investigation and unlock its evidence note");
+        "Rift Residue plus Cooling Anomaly complete the Rift investigation and unlock its evidence note");
 
     FieldNarrativeSnapshot staleEvidence{};
     staleEvidence.hasRiftResidue = true;
     guide.SyncNarrativeEvidence(staleEvidence);
     Expect(guide.OperationProgress(FieldOperation::RiftInvestigation).current == 2,
-        "a stale lower evidence snapshot cannot erase already observed clue progress");
+        "a stale lower evidence snapshot cannot erase already observed Rift clue progress");
 
     FieldNarrativeSnapshot cryptEvidence{};
-    cryptEvidence.hasCryptSigil = true;
-    guide.SyncNarrativeEvidence(cryptEvidence);
-    Expect(guide.OperationProgress(FieldOperation::ShadowCryptLead).current == 1
-            && !guide.OperationProgress(FieldOperation::ShadowCryptLead).Complete(),
-        "Shadow Crypt field operation remains incomplete with only the sigil clue");
     cryptEvidence.hasShadowCryptLore = true;
     guide.SyncNarrativeEvidence(cryptEvidence);
     Expect(guide.OperationProgress(FieldOperation::ShadowCryptLead).Complete()
