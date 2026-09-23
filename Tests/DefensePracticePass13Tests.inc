@@ -228,7 +228,8 @@ void TestDefensePracticePass13() {
         "pass13 combat clock reset cannot extend an expired alternating chain");
 
     // A successful defense resolved directly by ShadowbladeActions must produce
-    // the same chain result when the session reconciles it on the next tick.
+    // the same chain result when the session reconciles it on the next tick,
+    // even when that coordinator frame itself is longer than the chain window.
     CombatSandbox externalDefenseCombat;
     ShadowbladeActions externalDefenseActions;
     DefensePracticeSession externalDefenseSession;
@@ -251,10 +252,10 @@ void TestDefensePracticePass13() {
         externalDefenseActions.TryDefend(DefenseInput::Dodge);
     Expect(externalDodge.result == DefenseResult::Evaded
             && externalDefenseSession.AdvanceTime(
-                externalDefenseCombat, externalDefenseActions, 0.01f)
+                externalDefenseCombat, externalDefenseActions, 3.0f)
             && externalDefenseSession.CurrentAlternatingChain() == 2
             && externalDefenseSession.BestAlternatingChain() == 2,
-        "pass13 tick reconciliation preserves externally resolved Guard-Dodge chain");
+        "pass13 reconciliation timestamps external Dodge before a long coordinator frame");
     const DefensePracticePatternStats externalDefenseQuick =
         externalDefenseSession.PatternStats(EnemyAttackPattern::QuickCut);
     Expect(externalDefenseQuick.attempts == 2
