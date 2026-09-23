@@ -175,6 +175,20 @@ public:
             return;
         }
 
+        // An old unflushed burst must never absorb a fresh delta that arrives
+        // after the 20-second cutoff. Flush the stale bucket with its original
+        // activity timestamp first; the fresh delta below then receives `now` as
+        // its own activity time and remains visible in the current window.
+        const double cutoff = now - DamageWindowSeconds;
+        if ((pendingDamage_ > 0 || pendingHits_ > 0)
+            && pendingActivitySeconds_ >= 0.0
+            && pendingActivitySeconds_ < cutoff) {
+            AddDamageSample(now, pendingActivitySeconds_, pendingDamage_, pendingHits_);
+            pendingDamage_ = 0;
+            pendingHits_ = 0;
+            pendingActivitySeconds_ = -1.0;
+        }
+
         const std::int64_t damageDelta = safeDamage - latestDamage_;
         const int hitDelta = safeHits - latestHits_;
         if (damageDelta > 0 || hitDelta > 0) {
