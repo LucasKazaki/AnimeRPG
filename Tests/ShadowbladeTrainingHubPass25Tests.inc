@@ -134,6 +134,78 @@ void TestShadowbladeTrainingHubPass25() {
             && !wrongOwnerFeedback.recentDamage.valid,
         "pass25 mismatched combat owner cannot compose mixed-provenance feedback");
 
+    // Review regression: a run that defeats the player before the requested
+    // attempt cap must end in Debrief rather than becoming permanently Active
+    // with no queueable threat. The same owner pair can then be configured and
+    // restarted, which restores transient player state through the existing API.
+    LandmarkEncounter defeatEncounter;
+    CombatSandbox defeatCombat;
+    ShadowbladeActions defeatActions;
+    Expect(defeatEncounter.TryActivate(discovery, defeatCombat).result
+            == LandmarkEncounterResult::Activated,
+        "pass25 defeat fixture activates encounter");
+    defeatCombat.ApplyDamage(1000);
+    Expect(defeatEncounter.Update(defeatCombat, defeatActions)
+            && defeatEncounter.ConfigureTraining(
+                ShadowbladeTrainingFocus::GuardBreaker,
+                DefensePracticePace::Expert, ShadowbladeTrainingHub::MaximumAttempts)
+            && defeatEncounter.StartTraining(defeatCombat, defeatActions),
+        "pass25 defeat fixture starts a ten-attempt GuardBreaker run");
+    while (defeatEncounter.TrainingHub().Active() && defeatActions.PlayerHealth() > 0) {
+        const EnemyAttackPlan plan = defeatCombat.PendingEnemyAttack();
+        Expect(defeatEncounter.AdvanceTraining(
+                   defeatCombat, defeatActions, plan.windupSeconds + 0.01f),
+            "pass25 missed practice threat resolves through authoritative time advancement");
+        if (defeatEncounter.TrainingHub().Active()
+            && !defeatCombat.HasPendingEnemyAttack()
+            && !defeatActions.HasIncomingAttack()) {
+            defeatEncounter.AdvanceTraining(
+                defeatCombat, defeatActions, plan.recoverySeconds + 0.01f);
+        }
+    }
+    const ShadowbladeTrainingHubFeedback defeatDebrief =
+        defeatEncounter.TrainingFeedback(defeatCombat);
+    Expect(defeatActions.PlayerHealth() == 0
+            && defeatEncounter.TrainingHub().State() == ShadowbladeTrainingHubState::Debrief
+            && defeatDebrief.resolvedAttempts > 0
+            && defeatDebrief.resolvedAttempts < ShadowbladeTrainingHub::MaximumAttempts
+            && defeatDebrief.debrief.valid
+            && defeatDebrief.debrief.hitsTaken == defeatDebrief.resolvedAttempts
+            && !defeatCombat.HasPendingEnemyAttack()
+            && !defeatActions.HasIncomingAttack(),
+        "pass25 player defeat closes a bounded run instead of trapping it active");
+    Expect(defeatEncounter.ConfigureTraining(
+               ShadowbladeTrainingFocus::QuickCut,
+               DefensePracticePace::Learning, 1)
+            && defeatEncounter.StartTraining(defeatCombat, defeatActions)
+            && defeatActions.PlayerHealth() == ShadowbladeActions::MaximumPlayerHealth,
+        "pass25 a defeated run can be reconfigured and restarted on the same owners");
+
+    // Review regression: timing guidance must mirror the timing preset already
+    // active on the exact bound ShadowbladeActions owner.
+    LandmarkEncounter timingEncounter;
+    CombatSandbox timingCombat;
+    ShadowbladeActions timingActions;
+    timingActions.SetDefenseTimingPreset(DefenseTimingPreset::Forgiving);
+    Expect(timingEncounter.TryActivate(discovery, timingCombat).result
+            == LandmarkEncounterResult::Activated,
+        "pass25 timing-guide fixture activates encounter");
+    timingCombat.ApplyDamage(1000);
+    Expect(timingEncounter.Update(timingCombat, timingActions)
+            && timingEncounter.ConfigureTraining(
+                ShadowbladeTrainingFocus::QuickCut,
+                DefensePracticePace::Standard, 1)
+            && timingEncounter.StartTraining(timingCombat, timingActions),
+        "pass25 timing-guide fixture starts with forgiving defense timing preserved");
+    const ShadowbladeTrainingHubFeedback timingFeedback =
+        timingEncounter.TrainingFeedback(timingCombat);
+    Expect(timingFeedback.timingGuideValid
+            && Near(timingFeedback.timingGuide.selectedPerfectWindowSeconds,
+                ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds)
+            && Near(timingActions.PerfectDefenseWindowSeconds(),
+                ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds),
+        "pass25 timing guide matches the exact bound action owner's forgiving window");
+
     // GAME-126: pause/resume freezes the practice-owned combat and Shadowblade
     // clocks. It does not consume a threat, take damage, or fabricate progress.
     LandmarkEncounter pauseEncounter;
