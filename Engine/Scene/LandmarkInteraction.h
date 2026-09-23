@@ -55,9 +55,10 @@ public:
         const WorldBlockout& world, ShadowbladeActions& shadowbladeActions);
     void SetCharacterProgression(CharacterProgression* progression) { progression_ = progression; }
 
-    DialogueBeat TryDialogueChoice(DialogueTopic topic, DialogueChoice choice) {
-        const DialogueBeat beat = dialogue_.Choose(topic, choice,
-            {VisitedCount(), ObjectiveComplete()});
+    DialogueBeat TryDialogueChoice(DialogueTopic topic, DialogueChoice choice,
+        bool allowAdvanceScreening = false) {
+        const DialogueBeat beat = dialogue_.Choose(
+            topic, choice, DialogueContext(allowAdvanceScreening));
         SyncFieldGuideNarrative();
         return beat;
     }
@@ -65,6 +66,18 @@ public:
         const DialogueOutcome outcome = dialogue_.CommitOutcome();
         SyncFieldGuideNarrative();
         return outcome;
+    }
+    DialogueRecommendation RecommendedDialogueTopic(
+        bool allowAdvanceScreening = false) const {
+        return dialogue_.RecommendedTopic(DialogueContext(allowAdvanceScreening));
+    }
+    DialogueSynopsis DialogueSummary() const { return dialogue_.Synopsis(); }
+    bool ShouldPromptForDialogueChoice(DialogueTopic topic,
+        bool allowAdvanceScreening = false) const {
+        return dialogue_.ShouldPromptForChoice(topic, DialogueContext(allowAdvanceScreening));
+    }
+    static constexpr bool DialogueQuickAdvanceSafe(const DialogueBeat& beat) {
+        return LandmarkDialogue::QuickAdvanceSafe(beat);
     }
     const LandmarkDialogue& Dialogue() const { return dialogue_; }
 
@@ -101,6 +114,14 @@ public:
     const LandmarkInteractionReport& LastReport() const { return lastReport_; }
 
 private:
+    LandmarkDialogueContext DialogueContext(bool allowAdvanceScreening) const {
+        const std::size_t visited = static_cast<std::size_t>(visited_[0])
+            + static_cast<std::size_t>(visited_[1])
+            + static_cast<std::size_t>(visited_[2]);
+        const bool objectiveComplete = objectiveStarted_
+            && objectiveVisited_[0] && objectiveVisited_[1] && objectiveVisited_[2];
+        return {visited, objectiveComplete, allowAdvanceScreening};
+    }
     static std::size_t IndexOf(LandmarkKind kind);
     void RecordObjectiveVisit(std::size_t index);
     void ApplyObjectiveRewards(ShadowbladeActions& shadowbladeActions,

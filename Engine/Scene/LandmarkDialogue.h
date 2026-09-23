@@ -68,9 +68,16 @@ enum class DialogueOutcome {
     PursueRift,
 };
 
+enum class DialogueAvailability {
+    Locked,
+    Available,
+    AdvancePreview,
+};
+
 struct LandmarkDialogueContext {
     std::size_t visitedLandmarks{};
     bool objectiveComplete{};
+    bool allowAdvanceScreening{};
 };
 
 struct DialogueBeat {
@@ -81,6 +88,24 @@ struct DialogueBeat {
     bool repeatedTopic{};
     bool clueUnlocked{};
     bool loreUnlocked{};
+    bool previewed{};
+    bool autoAdvanceRecommended{};
+};
+
+struct DialogueSynopsis {
+    std::size_t topicsDiscussed{};
+    std::size_t cluesUnlocked{};
+    std::size_t loreUnlocked{};
+    std::size_t retainedPreviewBeats{};
+    int trust{};
+    DialogueOutcome outcome{DialogueOutcome::None};
+    DialogueResponse latestResponse{DialogueResponse::Invalid};
+};
+
+struct DialogueRecommendation {
+    bool available{};
+    DialogueTopic topic{DialogueTopic::RiftTheory};
+    DialogueAvailability availability{DialogueAvailability::Locked};
 };
 
 class LandmarkDialogue {
@@ -98,10 +123,25 @@ public:
         const std::size_t topicIndex = Index(topic);
         if (topicIndex >= TopicCount || !ValidChoice(choice)) return beat;
 
+        const DialogueAvailability availability = TopicAvailability(topic, context);
+        if (choice != DialogueChoice::EndConversation
+            && availability == DialogueAvailability::Locked) {
+            return beat;
+        }
+
         const bool repeated = discussed_[topicIndex];
         beat.repeatedTopic = repeated;
+        beat.previewed = choice != DialogueChoice::EndConversation
+            && availability == DialogueAvailability::AdvancePreview;
+        beat.autoAdvanceRecommended = choice == DialogueChoice::EndConversation
+            || !ShouldPromptForChoice(topic, context);
         beat.response = ResolveResponse(topic, choice, context, repeated);
         if (beat.response == DialogueResponse::Invalid) return beat;
+
+        if (beat.previewed) {
+            PushHistory(beat);
+            return beat;
+        }
 
         if (repeated) {
             if (choice == DialogueChoice::ShareEvidence) {
@@ -119,6 +159,117 @@ public:
 
         PushHistory(beat);
         return beat;
+    }
+
+    constexpr DialogueAvailability TopicAvailability(DialogueTopic topic,
+        LandmarkDialogueContext context = {}) const {
+        const std::size_t topicIndex = Index(topic);
+        if (topicIndex >= TopicCount) return DialogueAvailability::Locked;
+        if (discussed_[topicIndex]) return DialogueAvailability::Available;
+
+        bool available = false;
+        switch (topic) {
+        case DialogueTopic::RiftTheory:
+        case DialogueTopic::CivilianSafety:
+        case DialogueTopic::LandmarkHistory:
+            available = true;
+            break;
+        case DialogueTopic::ShadowCrypt:
+            available = context.objectiveComplete || UnlockedClueCount() >= 2;
+            break;
+        case DialogueTopic::ManaReactor:
+            available = context.visitedLandmarks >= 3
+                || HasClue(DialogueClue::CoolingAnomaly);
+            break;
+        case DialogueTopic::Count:
+            return DialogueAvailability::Locked;
+        }
+
+        if (available) return DialogueAvailability::Available;
+        return context.allowAdvanceScreening
+            ? DialogueAvailability::AdvancePreview
+            : DialogueAvailability::Locked;
+    }
+
+    constexpr DialogueRecommendation RecommendedTopic(
+        LandmarkDialogueContext context = {}) const {
+        constexpr std::array<DialogueTopic, TopicCount> priority{
+            DialogueTopic::RiftTheory,
+            DialogueTopic::CivilianSafety,
+            DialogueTopic::LandmarkHistory,
+            DialogueTopic::ShadowCrypt,
+            DialogueTopic::ManaReactor,
+        };
+
+        for (DialogueTopic topic : priority) {
+            if (Discussed(topic)) continue;
+            const DialogueAvailability availability = TopicAvailability(topic, context);
+            if (availability == DialogueAvailability::Available) {
+                return {true, topic, availability};
+            }
+        }
+        if (context.allowAdvanceScreening) {
+            for (DialogueTopic topic : priority) {
+                if (Discussed(topic)) continue;
+                const DialogueAvailability availability = TopicAvailability(topic, context);
+                if (availability == DialogueAvailability::AdvancePreview) {
+                    return {true, topic, availability};
+                }
+            }
+        }
+        return {};
+    }
+
+    constexpr bool ShouldPromptForChoice(DialogueTopic topic,
+        LandmarkDialogueContext context = {}) const {
+        if (TopicAvailability(topic, context) == DialogueAvailability::Locked) return false;
+        constexpr std::array<DialogueChoice, 4> choices{
+            DialogueChoice::AskDirectly,
+            DialogueChoice::Reassure,
+            DialogueChoice::Challenge,
+            DialogueChoice::ShareEvidence,
+        };
+        std::array<DialogueResponse, 4> distinct{};
+        std::size_t distinctCount = 0;
+        for (DialogueChoice choice : choices) {
+            const DialogueResponse response = PreviewResponse(topic, choice, context);
+            if (response == DialogueResponse::Invalid) continue;
+            bool seen = false;
+            for (std::size_t index = 0; index < distinctCount; ++index) {
+                if (distinct[index] == response) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (!seen) distinct[distinctCount++] = response;
+        }
+        return distinctCount > 1;
+    }
+
+    static constexpr bool QuickAdvanceSafe(const DialogueBeat& beat) {
+        if (beat.response == DialogueResponse::Invalid
+            || beat.trustDelta != 0 || beat.clueUnlocked || beat.loreUnlocked) {
+            return false;
+        }
+        return beat.response == DialogueResponse::ConversationClosed
+            || beat.response == DialogueResponse::AlreadyDiscussed
+            || beat.autoAdvanceRecommended;
+    }
+
+    constexpr DialogueSynopsis Synopsis() const {
+        DialogueSynopsis synopsis{};
+        for (bool discussed : discussed_) {
+            synopsis.topicsDiscussed += static_cast<std::size_t>(discussed);
+        }
+        synopsis.cluesUnlocked = UnlockedClueCount();
+        synopsis.loreUnlocked = UnlockedLoreCount();
+        for (std::size_t index = 0; index < historyCount_; ++index) {
+            synopsis.retainedPreviewBeats += static_cast<std::size_t>(history_[index].previewed);
+        }
+        synopsis.trust = trust_;
+        synopsis.outcome = outcome_;
+        if (historyCount_ > 0) synopsis.latestResponse = HistoryFromNewest(0).response;
+        return synopsis;
     }
 
     constexpr int Trust() const { return trust_; }
@@ -276,6 +427,17 @@ private:
         return DialogueResponse::Invalid;
     }
 
+    constexpr DialogueResponse PreviewResponse(DialogueTopic topic, DialogueChoice choice,
+        LandmarkDialogueContext context) const {
+        const bool repeated = Discussed(topic);
+        DialogueResponse response = ResolveResponse(topic, choice, context, repeated);
+        if (repeated && choice == DialogueChoice::ShareEvidence
+            && CanUnlockClueFor(topic, choice, context)) {
+            response = EvidenceResponse(topic, context);
+        }
+        return response;
+    }
+
     constexpr DialogueResponse EvidenceResponse(DialogueTopic topic,
         LandmarkDialogueContext context) const {
         switch (topic) {
@@ -300,6 +462,24 @@ private:
             return DialogueResponse::AlreadyDiscussed;
         }
         return DialogueResponse::AlreadyDiscussed;
+    }
+
+    constexpr bool CanUnlockClueFor(DialogueTopic topic, DialogueChoice choice,
+        LandmarkDialogueContext context) const {
+        if (choice != DialogueChoice::ShareEvidence) return false;
+        DialogueClue clue = DialogueClue::RiftResidue;
+        bool qualifies = false;
+        if (topic == DialogueTopic::RiftTheory && context.visitedLandmarks >= 2) {
+            clue = DialogueClue::RiftResidue;
+            qualifies = true;
+        } else if (topic == DialogueTopic::LandmarkHistory && context.objectiveComplete) {
+            clue = DialogueClue::CoolingAnomaly;
+            qualifies = true;
+        } else if (topic == DialogueTopic::ShadowCrypt && trust_ >= 1) {
+            clue = DialogueClue::CryptSigil;
+            qualifies = true;
+        }
+        return qualifies && !HasClue(clue);
     }
 
     constexpr bool UnlockLoreForTopic(DialogueTopic topic) {
@@ -327,25 +507,14 @@ private:
 
     constexpr bool UnlockClueFor(DialogueTopic topic, DialogueChoice choice,
         LandmarkDialogueContext context) {
+        if (!CanUnlockClueFor(topic, choice, context)) return false;
         DialogueClue clue = DialogueClue::RiftResidue;
-        bool qualifies = false;
-        if (topic == DialogueTopic::RiftTheory && choice == DialogueChoice::ShareEvidence
-            && context.visitedLandmarks >= 2) {
-            clue = DialogueClue::RiftResidue;
-            qualifies = true;
-        } else if (topic == DialogueTopic::LandmarkHistory
-            && choice == DialogueChoice::ShareEvidence && context.objectiveComplete) {
+        if (topic == DialogueTopic::LandmarkHistory) {
             clue = DialogueClue::CoolingAnomaly;
-            qualifies = true;
-        } else if (topic == DialogueTopic::ShadowCrypt
-            && choice == DialogueChoice::ShareEvidence && trust_ >= 1) {
+        } else if (topic == DialogueTopic::ShadowCrypt) {
             clue = DialogueClue::CryptSigil;
-            qualifies = true;
         }
-        if (!qualifies) return false;
-        const std::size_t index = Index(clue);
-        if (clues_[index]) return false;
-        clues_[index] = true;
+        clues_[Index(clue)] = true;
         return true;
     }
 
