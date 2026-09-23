@@ -4,6 +4,7 @@
 #include "Engine/Scene/EncounterChallenge.h"
 #include "Engine/Scene/LandmarkInteraction.h"
 #include "Engine/Scene/ShadowbladeActions.h"
+#include "Engine/Scene/ShadowbladeTrainingHub.h"
 
 namespace Astral::Scene {
 
@@ -57,6 +58,38 @@ public:
         challengeTracker_.Configure(difficulty, focus, scoringMode);
     }
 
+    bool ConfigureTraining(ShadowbladeTrainingFocus focus, DefensePracticePace pace,
+        int targetAttempts = ShadowbladeTrainingHub::DefaultAttempts) {
+        return state_ == LandmarkEncounterState::Completed
+            && trainingHub_.Configure(focus, pace, targetAttempts);
+    }
+    bool StartTraining(CombatSandbox& combatSandbox, ShadowbladeActions& shadowbladeActions) {
+        return state_ == LandmarkEncounterState::Completed
+            && activationCombatOwner_ == &combatSandbox
+            && activationActionsOwner_ == &shadowbladeActions
+            && trainingHub_.Start(combatSandbox, shadowbladeActions);
+    }
+    DefenseReport TryTrainingDefense(CombatSandbox& combatSandbox,
+        ShadowbladeActions& shadowbladeActions, DefenseInput input) {
+        if (state_ != LandmarkEncounterState::Completed) {
+            return {DefenseResult::NoThreat, 0, 0, false, 0.0f};
+        }
+        return trainingHub_.Defend(combatSandbox, shadowbladeActions, input);
+    }
+    bool AdvanceTraining(CombatSandbox& combatSandbox,
+        ShadowbladeActions& shadowbladeActions, float deltaSeconds) {
+        return state_ == LandmarkEncounterState::Completed
+            && trainingHub_.Advance(combatSandbox, shadowbladeActions, deltaSeconds);
+    }
+    bool SetTrainingPaused(bool paused) {
+        return state_ == LandmarkEncounterState::Completed
+            && trainingHub_.SetPaused(paused);
+    }
+    ShadowbladeTrainingHubFeedback TrainingFeedback(const CombatSandbox& combatSandbox) const {
+        return trainingHub_.Feedback(combatSandbox);
+    }
+    const ShadowbladeTrainingHub& TrainingHub() const { return trainingHub_; }
+
     LandmarkEncounterState State() const { return state_; }
     bool CompletionRewardGranted() const { return completionRewardGranted_; }
     const LandmarkEncounterReport& LastReport() const { return lastReport_; }
@@ -70,8 +103,11 @@ private:
     LandmarkEncounterReport lastReport_{};
     double activationElapsedSeconds_{};
     TrainingStats activationTrainingStats_{};
+    const CombatSandbox* activationCombatOwner_{};
+    const ShadowbladeActions* activationActionsOwner_{};
     bool completionRewardGranted_{};
     EncounterChallengeTracker challengeTracker_{};
+    ShadowbladeTrainingHub trainingHub_{};
 };
 
 } // namespace Astral::Scene

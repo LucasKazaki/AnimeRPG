@@ -37,6 +37,7 @@ struct LandmarkInteractionReport {
     LandmarkKind landmark{LandmarkKind::LincolnMemorial};
     float rewardApplied{};
     ProgressionRewardReport progressionReward{};
+    const ShadowbladeActions* actionOwner{};
 };
 
 class LandmarkInteraction {

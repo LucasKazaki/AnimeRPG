@@ -64,16 +64,36 @@ LandmarkEncounterReport LandmarkEncounter::TryActivate(
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
     activationTrainingStats_ = combatSandbox.Stats();
+    activationCombatOwner_ = &combatSandbox;
+    activationActionsOwner_ = interaction.actionOwner;
     lastReport_ = {LandmarkEncounterResult::Activated, 0.0f};
     return lastReport_;
 }
 
 bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
     ShadowbladeActions& shadowbladeActions) {
-    if (state_ != LandmarkEncounterState::Active || !combatSandbox.Dummy().IsDefeated()) {
+    // This read-only observation is safe in the current Win32 flow, which has
+    // already advanced the combat clock for the frame. The explicit training
+    // AdvanceTraining path remains the sole owner of practice-session clock steps.
+    trainingHub_.ObserveCombat(combatSandbox);
+
+    if (state_ != LandmarkEncounterState::Active
+        || activationCombatOwner_ != &combatSandbox) {
+        return false;
+    }
+    if (activationActionsOwner_ && activationActionsOwner_ != &shadowbladeActions) {
+        return false;
+    }
+    if (!combatSandbox.Dummy().IsDefeated()) {
+        // Legacy/synthetic callers may not carry the action-owner witness that the
+        // real LandmarkInteraction path supplies. A live nonterminal update can
+        // establish that owner before completion, but an instant terminal update
+        // cannot establish the provenance required for the training unlock.
+        if (!activationActionsOwner_) activationActionsOwner_ = &shadowbladeActions;
         return false;
     }
 
+    const bool trainingUnlockAuthorized = activationActionsOwner_ == &shadowbladeActions;
     state_ = LandmarkEncounterState::Completed;
     const double completionSecondsPrecise = std::max(
         0.0, combatSandbox.ElapsedSecondsPrecise() - activationElapsedSeconds_);
@@ -103,6 +123,15 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
         }
     }
 
+    // GAME pass 25: only an encounter completed by the combat/action pair that
+    // established the live interaction may unlock training. Synthetic legacy
+    // completion without an action witness retains the encounter reward contract
+    // but cannot satisfy the training story gate.
+    if (trainingUnlockAuthorized) {
+        trainingHub_.Unlock();
+        trainingHub_.ObserveCombat(combatSandbox);
+    }
+
     lastReport_ = {LandmarkEncounterResult::Completed, rewardApplied,
         grade, completionSeconds, challenge};
     return true;
@@ -110,16 +139,34 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
 
 LandmarkEncounterReport LandmarkEncounter::Retry(CombatSandbox& combatSandbox,
     ShadowbladeActions& shadowbladeActions) {
-    if (state_ != LandmarkEncounterState::Completed) {
+    if (state_ != LandmarkEncounterState::Completed || trainingHub_.Active()
+        || (trainingHub_.Unlocked()
+            && (activationCombatOwner_ != &combatSandbox
+                || activationActionsOwner_ != &shadowbladeActions))
+        || !trainingHub_.AcceptsOwnerPair(combatSandbox, shadowbladeActions)) {
         lastReport_ = {LandmarkEncounterResult::RetryUnavailable, 0.0f};
         return lastReport_;
     }
 
-    combatSandbox.ResetTrainingSession();
+    // Training practice deliberately uses an Endless target. Returning the same
+    // authoritative owner pair to the landmark encounter must restore the standard
+    // finite target before resetting the encounter. A mismatched pair is rejected
+    // above before either owner can be mutated. Legacy synthetic completions that
+    // never unlocked training retain their historical retry contract.
+    if (combatSandbox.TargetMode() != TrainingTargetMode::Standard) {
+        if (!combatSandbox.SetTrainingTargetMode(TrainingTargetMode::Standard)) {
+            lastReport_ = {LandmarkEncounterResult::RetryUnavailable, 0.0f};
+            return lastReport_;
+        }
+    } else {
+        combatSandbox.ResetTrainingSession();
+    }
     shadowbladeActions.ResetTransientStatePreservingLoadout();
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
     activationTrainingStats_ = combatSandbox.Stats();
+    activationCombatOwner_ = &combatSandbox;
+    activationActionsOwner_ = &shadowbladeActions;
     lastReport_ = {LandmarkEncounterResult::Retried, 0.0f};
     return lastReport_;
 }
