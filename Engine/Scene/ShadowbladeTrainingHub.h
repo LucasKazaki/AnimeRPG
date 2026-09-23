@@ -222,6 +222,14 @@ public:
     int TargetAttempts() const { return targetAttempts_; }
     const DefensePracticeSession& Session() const { return session_; }
 
+    // Encounter transitions may reuse an unbound hub, but once a training run
+    // establishes authoritative owners they must use that exact pair. This
+    // exposes only the ownership predicate, never the stored pointers.
+    bool AcceptsOwnerPair(const CombatSandbox& combat,
+        const ShadowbladeActions& actions) const {
+        return AcceptsOwners(combat, actions);
+    }
+
 private:
     struct DamageSample {
         double seconds{};
