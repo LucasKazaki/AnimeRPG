@@ -3,23 +3,23 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-22",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "1042339ee7052fcbff60b1b8bba6840b43019c4e",
+  "last_verified_main_at_pass_start": "977afadb2630bb3d25755d4407992bfab10018f8",
   "last_merged_pass": {
-    "id": "GAME-PASS13-DEFENSE-SESSION-2026-09-22",
-    "pr": 30,
-    "merge_sha": "1042339ee7052fcbff60b1b8bba6840b43019c4e",
-    "head_sha": "2eb598ac7f3767d5be52e12ce5147ac10b2b0e3d",
-    "hosted_windows_ci": "passed_run_466",
-    "release_manifest": "passed_run_376",
+    "id": "GAME-PASS14-FIELD-OPERATIONS-2026-09-22",
+    "pr": 32,
+    "merge_sha": "977afadb2630bb3d25755d4407992bfab10018f8",
+    "head_sha": "cab01904b01f96c3403128e2c58e0fae30b50931",
+    "hosted_windows_ci": "passed_run_486",
+    "release_manifest": "passed_run_388",
     "independent_review": "completed_no_unresolved_major_issues",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-22-field-guide-pass14",
-  "pass": "GAME-PASS14-FIELD-OPERATIONS-2026-09-22",
-  "task_packet": "Tasks/GAME-PASS14-FIELD-OPERATIONS-2026-09-22.md",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS14.md",
-  "pr": 32,
-  "final_head": "pending_self_reference_see_pr_32_final_receipt",
+  "working_branch": "game/2026-09-22-shadow-crypt-pass15",
+  "pass": "GAME-PASS15-SHADOW-CRYPT-EXPEDITION-2026-09-22",
+  "task_packet": "Tasks/GAME-PASS15-SHADOW-CRYPT-EXPEDITION-2026-09-22.md",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS15.md",
+  "pr": null,
+  "final_head": "pending_self_reference_see_pass15_pr_final_receipt",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -32,37 +32,26 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-067","title":"Bounded field-operation tracking","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-068","title":"Free-order landmark survey chronology","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-069","title":"Authoritative clue-driven investigation progress with Rift and Crypt evidence separation","status":"implemented_review_repaired_registered_test_coverage"},
-    {"id":"GAME-070","title":"Bounded exploration field journal","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-071","title":"Next-unvisited National Mall survey recommendation","status":"implemented_registered_test_coverage"},
-    {"id":"QOL-015","title":"Player-pinned field target with automatic discovery reconciliation","status":"implemented_registered_test_coverage"}
+    {"id":"GAME-072","title":"Shadow Crypt lead-gated expedition entry","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-073","title":"Four-room objective sequence with local defeat retry","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-074","title":"Optional idempotent Cooling Cache side objective","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-075","title":"Bounded Bronze/Silver/Gold completion grading","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-076","title":"Replayable expedition with one-time progression reward","status":"implemented_registered_test_coverage"},
+    {"id":"QOL-016","title":"Explicit safe-suspend boundary and validated resume metadata","status":"implemented_registered_test_coverage"}
   ],
-  "review_repairs": {
-    "invalid_operation_state_preservation": "covered_after_rejected_enum",
-    "invalid_landmark_pin_rejection": "covered_without_replacing_automatic_target",
-    "rift_crypt_evidence_separation": "production_logic_and_regression_repaired",
-    "landmark_interaction_integration": "already_registered_LandmarkInteractionTests_now_cover_real_discovery_and_dialogue_sync",
-    "material_threads": "answered_and_resolved_before_fresh_final_head_review"
-  },
   "verification": {
-    "registered_state_object_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
-    "registered_integration_test_target": "LandmarkInteractionTests_existing_CTest_target",
-    "production_compile_coverage": "LandmarkInteraction_and_AstralGame_build_targets",
-    "local_disposable_fixture_evidence": "historical_pre_repair_not_used_as_final_gate",
+    "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
+    "author_source_fixture": "warning_clean_cpp17_compile_and_run_passed_non_hosted_non_native",
     "hosted_windows_ci": "pending_exact_final_head",
     "release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
     "independent_review": "pending_fresh_exact_final_head",
-    "save_compatibility": "no_persistent_format_changed_cross_process_persistence_not_claimed"
+    "save_compatibility": "versioned_in_memory_resume_contract_only_no_file_format_or_cross_process_persistence_claimed"
   },
   "coordination": {
-    "engine_pr_13": "separate editor/runtime-smoke ownership; no CMake or generic engine paths touched",
-    "art_pr_23": "separate starter-art ownership; no overlap",
-    "art_pr_26": "separate asymmetric glTF calibration ownership; no overlap",
-    "art_pr_28": "separate color/exposure calibration ownership; no overlap",
-    "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release and deployment unchanged"
+    "engine_pr_13": "separate editor/runtime-smoke ownership; no CMake/editor/generic engine paths touched",
+    "art_prs_23_26_28_33": "separate art ownership; no overlap",
+    "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release deployment and networking unchanged"
   },
-  "next_action": "Freeze this state head, require exact-head hosted Windows and release-integrity checks plus a fresh independent Codex review on PR #32, repair any material finding, re-read live main and PR head, then merge with expected-head protection only if every applicable gate is green. Final receipts are recorded in PR discussion/task output without mutating the verified head."
+  "next_action": "Open/reuse one scoped PR for the exact pass-15 head, require hosted Windows Debug/Release and release-integrity checks plus a fresh independent Codex review, repair material findings without weakening acceptance, re-read live main/head, then merge exact reviewed/tested head if all gates are green. Final receipts stay in PR discussion/task output to avoid a self-referential unverified commit chain."
 }
