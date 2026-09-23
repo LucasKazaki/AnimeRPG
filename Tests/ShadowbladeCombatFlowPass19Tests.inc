@@ -48,6 +48,27 @@ void TestShadowbladeCombatFlowPass19() {
             && momentumStrike.ShadowMomentum() == 1
             && Near(momentumStrike.Resource(), ShadowbladeActions::MaximumResource),
         "pass19 rejected Fatal Strike preserves momentum and resource");
+
+    const int invalidPositionHealth = momentumCombat.Dummy().health;
+    const auto nanMomentumStrike = momentumStrike.TryFatalStrike(
+        {std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f}, momentumCombat);
+    Expect(nanMomentumStrike.result == ShadowActionResult::OutOfRange
+            && momentumStrike.ShadowMomentum() == 1
+            && momentumStrike.HasDefenseCounter()
+            && Near(momentumStrike.Resource(), ShadowbladeActions::MaximumResource)
+            && Near(momentumStrike.FatalStrikeCooldownRemaining(), 0.0f)
+            && momentumCombat.Dummy().health == invalidPositionHealth,
+        "pass19 NaN Fatal Strike position is rejected before spending combat state");
+    const auto infiniteMomentumStrike = momentumStrike.TryFatalStrike(
+        {0.0f, std::numeric_limits<float>::infinity(), 0.0f}, momentumCombat);
+    Expect(infiniteMomentumStrike.result == ShadowActionResult::OutOfRange
+            && momentumStrike.ShadowMomentum() == 1
+            && momentumStrike.HasDefenseCounter()
+            && Near(momentumStrike.Resource(), ShadowbladeActions::MaximumResource)
+            && Near(momentumStrike.FatalStrikeCooldownRemaining(), 0.0f)
+            && momentumCombat.Dummy().health == invalidPositionHealth,
+        "pass19 infinite Fatal Strike position is rejected before spending combat state");
+
     const auto boostedStrike =
         momentumStrike.TryFatalStrike({0.0f, 0.0f, 0.0f}, momentumCombat);
     Expect(boostedStrike.result == ShadowActionResult::Activated
