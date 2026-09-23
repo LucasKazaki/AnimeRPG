@@ -103,6 +103,10 @@ public:
             combat.ResetTrainingSession();
         }
         actions.ResetTransientStatePreservingLoadout();
+        actionsTimingPreset_ = actions.PerfectDefenseWindowSeconds()
+                == ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds
+            ? DefenseTimingPreset::Forgiving
+            : DefenseTimingPreset::Standard;
 
         session_ = candidate;
         if (!session_.QueueNextAttack(combat, actions)) {
@@ -125,7 +129,7 @@ public:
         }
         const DefenseReport report = session_.TryDefend(combat, actions, input);
         ObserveCombat(combat);
-        FinishIfTargetReached();
+        FinishIfRunEnded(actions);
         return report;
     }
 
@@ -140,7 +144,7 @@ public:
         }
         const bool resolved = session_.AdvanceTime(combat, actions, deltaSeconds);
         ObserveCombat(combat);
-        if (FinishIfTargetReached()) return true;
+        if (FinishIfRunEnded(actions)) return true;
 
         bool queued = false;
         if (!session_.Paused() && !combat.HasPendingEnemyAttack()
@@ -208,17 +212,6 @@ public:
         return feedback;
     }
 
-    void SetTimingPresetForGuide(DefenseTimingPreset preset) {
-        switch (preset) {
-        case DefenseTimingPreset::Standard:
-        case DefenseTimingPreset::Forgiving:
-            actionsTimingPreset_ = preset;
-            break;
-        default:
-            break;
-        }
-    }
-
     ShadowbladeTrainingHubState State() const { return state_; }
     bool Unlocked() const { return state_ != ShadowbladeTrainingHubState::Locked; }
     bool Active() const { return state_ == ShadowbladeTrainingHubState::Active; }
@@ -256,9 +249,9 @@ private:
             : static_cast<int>(resolved);
     }
 
-    bool FinishIfTargetReached() {
-        if (state_ != ShadowbladeTrainingHubState::Active
-            || ResolvedAttempts() < targetAttempts_) {
+    bool FinishIfRunEnded(const ShadowbladeActions& actions) {
+        if (state_ != ShadowbladeTrainingHubState::Active) return false;
+        if (ResolvedAttempts() < targetAttempts_ && actions.PlayerHealth() > 0) {
             return false;
         }
         state_ = ShadowbladeTrainingHubState::Debrief;
