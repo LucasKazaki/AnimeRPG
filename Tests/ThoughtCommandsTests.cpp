@@ -8,6 +8,7 @@
 #include "Engine/Scene/ShadowCryptExpedition.h"
 #include "Engine/Scene/ShadowCryptMission.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
+#include "Engine/Scene/ShadowbladeLoadoutWorkbench.h"
 #include "Engine/Scene/ShadowbladeTrainingPath.h"
 #include "Engine/Scene/ShadowbladeTrainingCoach.h"
 
@@ -123,7 +124,7 @@ void TestDelegatedRejectionGates() {
     Expect(guarded.reason == ThoughtCommandReason::GuardedConflict
             && Near(actions.Resource(), 100.0f),
         "command dash preserves the existing guard conflict gate");
-    commands.Submit("guard off", {}, actions, combat);
+    commands.Submit("guard off", {}, actions, actions, combat);
 
     commands.Submit("dash", {}, actions, combat);
     const auto cooldown = commands.Submit("dash", {}, actions, combat);
@@ -204,6 +205,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "ShadowbladeTrainingHubPass25ReviewTests.inc"
 #include "ManaReactorMissionPass26Tests.inc"
 #include "ShadowCryptMissionPass27Tests.inc"
+#include "ShadowbladeLoadoutWorkbenchPass28Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -229,6 +231,7 @@ int main() {
     TestShadowbladeTrainingHubPass25ReviewRepairs();
     TestManaReactorMissionPass26();
     TestShadowCryptMissionPass27();
+    TestShadowbladeLoadoutWorkbenchPass28();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;
