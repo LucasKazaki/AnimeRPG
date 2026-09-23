@@ -146,6 +146,20 @@ public:
         return GrantRewards(experience, masteryPoints, enhancementMaterials);
     }
 
+    bool ManaReactorFirstClearClaimed() const { return manaReactorFirstClearClaimed_; }
+
+    ProgressionRewardReport ClaimManaReactorFirstClearReward(int experience,
+        int masteryPoints, int enhancementMaterials, bool& granted) {
+        granted = false;
+        if (manaReactorFirstClearClaimed_
+            || experience < 0 || masteryPoints < 0 || enhancementMaterials < 0) {
+            return {};
+        }
+        manaReactorFirstClearClaimed_ = true;
+        granted = true;
+        return GrantRewards(experience, masteryPoints, enhancementMaterials);
+    }
+
     int GrantExperience(int amount, int& levelsGained) {
         levelsGained = 0;
         if (amount <= 0 || level_ >= MaximumLevel) return 0;
@@ -448,6 +462,7 @@ private:
     std::array<int, SkillCount> targetSkillRanks_{1, 1, 1};
     std::array<bool, JourneyMilestoneCount> journeyMilestoneClaimed_{};
     bool shadowCryptFirstClearClaimed_{};
+    bool manaReactorFirstClearClaimed_{};
 };
 
 } // namespace Astral::Scene
