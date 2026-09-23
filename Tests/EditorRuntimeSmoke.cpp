@@ -16,6 +16,7 @@ constexpr DWORD kCleanupTimeoutMs = 2000;
 constexpr DWORD kWindowPollIntervalMs = 50;
 constexpr DWORD kResizePollIntervalMs = 25;
 constexpr DWORD kResizeTimeoutMs = 1500;
+constexpr DWORD kShowStateTimeoutMs = 3000;
 constexpr ULONGLONG kWorkBudgetMs = 135000;
 constexpr int kStableWindowSamples = 20;
 constexpr wchar_t kSceneRootInspectorText[] =
@@ -706,6 +707,126 @@ bool ResizeAndCheck(HWND window, DWORD processId,
     }
 }
 
+bool MaximizeRestoreAndCheck(HWND window, DWORD processId,
+    const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
+    const ShellButtonHandles& buttons, const wchar_t* expectedInspectorText,
+    int expectedSelection, std::wstring& failure) {
+    if (WorkBudgetExpired()) {
+        failure = L"internal runtime work budget exhausted before maximize";
+        return false;
+    }
+    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+        || !IsWindowEnabled(window)) {
+        failure = L"editor HWND ownership, visibility, or enabled state changed before maximize";
+        return false;
+    }
+    if (IsZoomed(window)) {
+        failure = L"editor unexpectedly already maximized before maximize verification";
+        return false;
+    }
+    RECT normalRect{};
+    if (!GetWindowRect(window, &normalRect)) {
+        failure = L"GetWindowRect failed before maximize verification";
+        return false;
+    }
+    const int normalWidth = normalRect.right - normalRect.left;
+    const int normalHeight = normalRect.bottom - normalRect.top;
+    if (normalWidth <= 0 || normalHeight <= 0) {
+        failure = L"editor normal window rectangle is empty before maximize verification";
+        return false;
+    }
+    if (!ShowWindowAsync(window, SW_MAXIMIZE)) {
+        failure = L"ShowWindowAsync(SW_MAXIMIZE) did not start successfully";
+        return false;
+    }
+
+    std::wstring lastMaximizeFailure;
+    const ULONGLONG maximizeDeadline = GetTickCount64() + kShowStateTimeoutMs;
+    while (true) {
+        if (WorkBudgetExpired()) {
+            failure = L"internal runtime work budget exhausted while waiting for maximized state";
+            return false;
+        }
+        if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+            || !IsWindowEnabled(window)) {
+            failure = L"editor HWND ownership, visibility, or enabled state changed while waiting for maximized state";
+            return false;
+        }
+        if (IsZoomed(window)) {
+            std::wstring stateFailure;
+            if (DirectChildrenContained(window, processId, initialControls, stateFailure)
+                && ValidateShellState(window, processId, initialControls, statics, buttons,
+                    expectedInspectorText, expectedSelection, stateFailure)) {
+                break;
+            }
+            lastMaximizeFailure = std::move(stateFailure);
+        }
+        if (GetTickCount64() >= maximizeDeadline) {
+            failure = IsZoomed(window)
+                ? L"maximized editor shell did not settle before deadline: " + lastMaximizeFailure
+                : L"editor did not enter maximized state before deadline";
+            return false;
+        }
+        const DWORD sleepMs = RemainingWorkBudget(kResizePollIntervalMs);
+        if (sleepMs == 0) {
+            failure = L"internal runtime work budget exhausted while waiting for maximized state";
+            return false;
+        }
+        Sleep(sleepMs);
+    }
+
+    if (!ShowWindowAsync(window, SW_RESTORE)) {
+        failure = L"ShowWindowAsync(SW_RESTORE) did not start successfully";
+        return false;
+    }
+
+    std::wstring lastRestoreFailure;
+    const ULONGLONG restoreDeadline = GetTickCount64() + kShowStateTimeoutMs;
+    while (true) {
+        if (WorkBudgetExpired()) {
+            failure = L"internal runtime work budget exhausted while waiting for restored state";
+            return false;
+        }
+        if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+            || !IsWindowEnabled(window)) {
+            failure = L"editor HWND ownership, visibility, or enabled state changed while waiting for restored state";
+            return false;
+        }
+        RECT restoredRect{};
+        if (!GetWindowRect(window, &restoredRect)) {
+            failure = L"GetWindowRect failed while waiting for restored state";
+            return false;
+        }
+        const bool restoredGeometry = restoredRect.right - restoredRect.left == normalWidth
+            && restoredRect.bottom - restoredRect.top == normalHeight;
+        if (!IsZoomed(window) && restoredGeometry) {
+            std::wstring stateFailure;
+            if (DirectChildrenContained(window, processId, initialControls, stateFailure)
+                && ValidateShellState(window, processId, initialControls, statics, buttons,
+                    expectedInspectorText, expectedSelection, stateFailure)) {
+                return true;
+            }
+            lastRestoreFailure = std::move(stateFailure);
+        }
+        if (GetTickCount64() >= restoreDeadline) {
+            if (IsZoomed(window)) {
+                failure = L"editor did not leave maximized state before restore deadline";
+            } else if (!restoredGeometry) {
+                failure = L"editor did not restore its pre-maximize outer size before deadline";
+            } else {
+                failure = L"restored editor shell did not settle before deadline: " + lastRestoreFailure;
+            }
+            return false;
+        }
+        const DWORD sleepMs = RemainingWorkBudget(kResizePollIntervalMs);
+        if (sleepMs == 0) {
+            failure = L"internal runtime work budget exhausted while waiting for restored state";
+            return false;
+        }
+        Sleep(sleepMs);
+    }
+}
+
 bool SelectCubeAndNotify(HWND window, DWORD processId,
     const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
     const ShellButtonHandles& buttons, std::wstring& failure) {
@@ -925,6 +1046,9 @@ int wmain(int argc, wchar_t** argv) {
     } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics, buttons,
                    1440, 900, kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
+    } else if (!MaximizeRestoreAndCheck(window, process.dwProcessId, initialControls, statics,
+                   buttons, kCubeInspectorText, 3, failure)) {
+        // failure set by maximize/restore validator.
     } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics, buttons,
                    420, 260, kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
@@ -979,8 +1103,8 @@ int wmain(int argc, wchar_t** argv) {
         << L"interaction; the original 12 process-owned child HWND identities, bound semantic Static HWNDs and "
         << L"left-to-right semantic toolbar Button HWNDs, disabled pending tools, enabled Outliner/assets surfaces, "
         << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
-        << L"every bounded cross-process read and after 800x600, 1280x720, 1440x900, and 420x260 resizes; "
-        << L"Cube selection stayed synchronized, all direct children remained contained from startup through every resize, "
+        << L"every bounded cross-process read and after 800x600, 1280x720, 1440x900, maximized+restored, and 420x260 states; "
+        << L"Cube selection stayed synchronized, all direct children remained contained from startup through every size/show-state transition, "
         << L"the retained CreateProcess handle remained nonsignaled around PID-based HWND ownership checks, "
         << L"the original window-owning launch thread was suspended and a valid suspended thread context was captured "
         << L"before the final asynchronous WM_CLOSE enqueue, then the thread was resumed before any wait and shutdown "
