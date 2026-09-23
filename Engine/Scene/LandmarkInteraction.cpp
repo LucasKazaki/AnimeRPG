@@ -37,7 +37,7 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
     UpdateSelection(playerPosition, world);
     if (!HasSelection()) {
         lastReport_ = {LandmarkInteractionResult::OutOfRange,
-            LandmarkKind::LincolnMemorial, 0.0f};
+            LandmarkKind::LincolnMemorial, 0.0f, {}, &shadowbladeActions};
         return lastReport_;
     }
 
@@ -45,7 +45,8 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
     const bool alreadyVisited = visited_[selectedIndex_];
     const bool canAdvanceObjective = objectiveStarted_ && !objectiveVisited_[selectedIndex_];
     if (alreadyVisited && !canAdvanceObjective) {
-        lastReport_ = {LandmarkInteractionResult::AlreadyVisited, kind, 0.0f};
+        lastReport_ = {LandmarkInteractionResult::AlreadyVisited,
+            kind, 0.0f, {}, &shadowbladeActions};
         return lastReport_;
     }
 
@@ -68,7 +69,7 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
         ApplyObjectiveRewards(shadowbladeActions, reward, progressionReward);
     }
 
-    lastReport_ = {result, kind, reward, progressionReward};
+    lastReport_ = {result, kind, reward, progressionReward, &shadowbladeActions};
     return lastReport_;
 }
 
