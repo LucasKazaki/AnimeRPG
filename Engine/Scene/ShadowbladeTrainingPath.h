@@ -133,7 +133,9 @@ public:
 
     bool ApplyCurrentLesson(DefensePracticeSession& session,
         ShadowbladeActions& actions) const {
-        if (Complete() || !LessonUnlocked(currentLesson_)) return false;
+        if (Complete() || !LessonUnlocked(currentLesson_) || actions.HasIncomingAttack()) {
+            return false;
+        }
         const ShadowbladeTrainingLessonPlan plan = PlanForLesson(currentLesson_);
         if (plan.sequence.count == 0) return false;
 
@@ -307,13 +309,35 @@ private:
             EnemyAttackPattern::RiftBurst};
     }
 
+    static bool PlanContainsPattern(const ShadowbladeTrainingLessonPlan& plan,
+        EnemyAttackPattern pattern) {
+        for (std::size_t index = 0; index < plan.sequence.count; ++index) {
+            if (plan.sequence.patterns[index] == pattern) return true;
+        }
+        return false;
+    }
+
+    static bool PatternProvenanceMatchesPlan(const DefensePracticeSession& session,
+        const ShadowbladeTrainingLessonPlan& plan) {
+        for (EnemyAttackPattern pattern : BossPatterns()) {
+            const int attempts = session.PatternStats(pattern).attempts;
+            if (PlanContainsPattern(plan, pattern)) {
+                if (attempts < 1) return false;
+            } else if (attempts != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     bool SessionMatchesCurrentLesson(const DefensePracticeSession& session) const {
         const ShadowbladeTrainingLessonPlan plan = PlanForLesson(currentLesson_);
         return plan.sequence.count > 0
             && session.PracticeSequenceLength() == plan.sequence.count
             && session.Pace() == plan.pace
             && session.Goal() == plan.goal
-            && session.GoalTarget() == plan.goalTarget;
+            && session.GoalTarget() == plan.goalTarget
+            && PatternProvenanceMatchesPlan(session, plan);
     }
 
     static bool CheckpointValid(const ShadowbladeTrainingCheckpoint& checkpoint) {
