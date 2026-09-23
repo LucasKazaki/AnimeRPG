@@ -52,8 +52,10 @@ def normalize(v,msg):
 def tri_normal(a,b,c): return cross(sub(b,a),sub(c,a))
 
 def geometry_binding(mesh):
+    req(set(mesh)=={"name","primitives"},"mesh properties")
     req(len(mesh["primitives"])==1,"primitive count")
     prim=mesh["primitives"][0]
+    req(set(prim)=={"attributes","indices","material","mode"},"primitive properties")
     return prim["attributes"],prim["indices"]
 
 def verify_floor_tangent_frame(pos,normal,tangent,uv,indices):
@@ -71,10 +73,10 @@ def verify_floor_tangent_frame(pos,normal,tangent,uv,indices):
             req(dot(t,tref)>0.9999 and dot(normalize(b,"floor tangent frame"),bref)>0.9999,"floor tangent frame")
 
 def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,verify_floor_frame=False):
-    mesh=g["meshes"][mesh_index]; req(len(mesh["primitives"])==1,"primitive count")
-    prim=mesh["primitives"][0]; req(prim.get("mode",4)==4,"triangle mode"); req(prim["material"]==expected_material,"material binding")
-    attrs=prim["attributes"]; req(set(attrs)=={"POSITION","NORMAL","TANGENT","TEXCOORD_0"},"attributes")
-    pos=read_accessor(g,buf,attrs["POSITION"]); normal=read_accessor(g,buf,attrs["NORMAL"]); tangent=read_accessor(g,buf,attrs["TANGENT"]); uv=read_accessor(g,buf,attrs["TEXCOORD_0"]); indices=read_accessor(g,buf,prim["indices"])
+    mesh=g["meshes"][mesh_index]; attrs,index_accessor=geometry_binding(mesh)
+    prim=mesh["primitives"][0]; req(prim["mode"]==4,"triangle mode"); req(prim["material"]==expected_material,"material binding")
+    req(set(attrs)=={"POSITION","NORMAL","TANGENT","TEXCOORD_0"},"attributes")
+    pos=read_accessor(g,buf,attrs["POSITION"]); normal=read_accessor(g,buf,attrs["NORMAL"]); tangent=read_accessor(g,buf,attrs["TANGENT"]); uv=read_accessor(g,buf,attrs["TEXCOORD_0"]); indices=read_accessor(g,buf,index_accessor)
     req((len(pos),len(indices))==expected_counts,"geometry counts"); req(len(normal)==len(pos) and len(tangent)==len(pos) and len(uv)==len(pos),"attribute counts")
     req(all(math.isfinite(c) for seq in (pos,normal,tangent,uv) for v in seq for c in v),"finite geometry")
     req(all(abs(sum(c*c for c in n)-1.0)<1e-4 for n in normal),"unit normals")
