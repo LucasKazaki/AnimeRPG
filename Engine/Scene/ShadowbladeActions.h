@@ -130,6 +130,7 @@ public:
     DefenseReport TryDefend(DefenseInput input);
     void SetDefenseTimingPreset(DefenseTimingPreset preset) { defenseTimingPreset_ = preset; }
     void ResetDefenseState();
+    void ResetTransientStatePreservingLoadout();
     bool CancelIncomingAttack() {
         if (!incomingAttackActive_) return false;
         incomingAttackActive_ = false;
