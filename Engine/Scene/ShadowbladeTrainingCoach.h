@@ -132,9 +132,12 @@ public:
         const CombatSandbox& combat, const ShadowbladeActions& actions,
         ShadowbladeTrainingFocus focus, DefensePracticePace pace) {
         // A directly queued replacement can exist outside the practice-session
-        // coordinator. Refuse reconfiguration while either authoritative live
-        // owner still carries a threat so setup remains all-or-nothing.
-        if (combat.HasPendingEnemyAttack() || actions.HasIncomingAttack()) return false;
+        // coordinator. First require the exact owners already bound by any prior
+        // practice attack, then reject a live threat on either authoritative owner.
+        if (!session.AcceptsPracticeObjects(combat, actions)
+            || combat.HasPendingEnemyAttack() || actions.HasIncomingAttack()) {
+            return false;
+        }
 
         ShadowbladeTrainingDrillPlan plan{};
         if (!PlanForFocus(focus, pace, plan)) return false;
@@ -257,9 +260,14 @@ public:
 
     static bool RetryDrill(DefensePracticeSession& session,
         const CombatSandbox& combat, const ShadowbladeActions& actions) {
-        // ResetMetrics() can only see threats coordinated by this session. Also
-        // reject direct/replacement threats living on either authoritative owner.
-        if (combat.HasPendingEnemyAttack() || actions.HasIncomingAttack()) return false;
+        // ResetMetrics() can only see threats coordinated by this session. Require
+        // the exact previously bound owners as well as idle authoritative owners
+        // before clearing metrics, so an unrelated idle pair cannot bypass a live
+        // replacement on the session's real pair.
+        if (!session.AcceptsPracticeObjects(combat, actions)
+            || combat.HasPendingEnemyAttack() || actions.HasIncomingAttack()) {
+            return false;
+        }
         return session.ResetMetrics();
     }
 
