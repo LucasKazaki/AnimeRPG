@@ -53,11 +53,26 @@ Pinned SHA-256:
 The generated glTF is 38,604 bytes. It is intentionally not tracked as a second
 derived source; `expected-manifest.json` pins the exact output.
 
+## Publication verification
+
+The branch was compared against ART-007 base `087c673f716800198272915777681c61a748a490`.
+Only the 11 ART-008 allowed paths changed. The remote Git blob IDs for the five
+locally tested contract/tool files match `git hash-object` on the sandbox copies:
+
+- `gallery-spec.json`: `68241ebc51fa00aa90559f8b917fb1a6f8ec7cba`
+- `expected-manifest.json`: `d8b6f84be2f56e07b901742cbab24779d00a37b7`
+- generator: `f22b5ff6ca3a3d22853ecf2125d08e08b9384a81`
+- verifier: `d49aefcdc2c03fc29ac2d215b228e5594e8e9bc6`
+- regression suite: `94831860bdfbef779dce5a33904d532ba7dd756d`
+
+Draft PR #33 is the scoped integration surface. Exact-head hosted CI and fresh
+independent review are separate gates and must be rechecked after the final branch
+head is established.
+
 ## Evidence boundaries
 
-Not run: hosted exact-head CI, independent source review, Blender export
-round-trip, Astral import, Astral rendering, Windows/GPU native capture,
-performance/memory measurement, or independent visual art review.
+Not run: Blender export round-trip, Astral import, Astral rendering, Windows/GPU
+native capture, performance/memory measurement, or independent visual art review.
 
 Therefore this pass establishes only `source -> validated`. It does not establish
 `imported`, `runtime_verified`, `art_approved`, or parity with Unreal, Unity,
