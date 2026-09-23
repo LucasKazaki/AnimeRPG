@@ -33,6 +33,7 @@ Acceptance:
 - independent standard-library verifier;
 - canonical source status is `proposed_art_reference_not_runtime`;
 - generated runtime status stays `source_validated_not_imported`;
+- generated manifest is a closed schema-version-1 contract containing only `schema_version`, `generator`, `runtime_status`, `source_sha256`, `intent`, `counts`, and `files`, so supplemental runtime/art/parity claims are rejected even without `--expected-manifest`;
 - finite triangle geometry with positions, normals, tangents, UVs and bounded indices;
 - valid outward winding and every indexed vertex normal facing consistently with its geometric triangle face, plus normalized normals/tangents and stable sphere/cube counts;
 - every sphere station shares one canonical sphere geometry accessor binding, every cube station shares one canonical cube binding, and decoded sphere radius / cube half extent / floor extents match the source specification;
@@ -45,7 +46,7 @@ Acceptance:
 - camera and directional-light nodes reject scale, matrix, or other transform overrides that can reverse local -Z while preserving the checked quaternion;
 - no images/textures/samplers, preventing accidental baked-lighting review;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions for light, material binding/rendering properties, camera, source/runtime status, supplemental runtime claims, texture insertion, accessor bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, floor tangent direction/handedness, and camera/light transform overrides;
+- negative regressions for light, material binding/rendering properties, camera, source/runtime status, supplemental glTF and manifest runtime claims, texture insertion, accessor bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, floor tangent direction/handedness, and camera/light transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
 Commands:
