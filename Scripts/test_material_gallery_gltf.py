@@ -206,6 +206,11 @@ def test_light_transform_override_semantics(tmp):
 def test_source_status_rejected_by_generator(tmp):
     source=json.loads(SOURCE.read_text()); source["status"]="runtime_verified"; bad=tmp/"bad-source.json"; bad.write_text(json.dumps(source,indent=2,sort_keys=True)+"\n"); p=run([GEN,"--source",bad,"--output",tmp/"bad-out"],ok=False); assert "source status" in p.stderr
 
+def test_source_schema_bool_semantics(tmp):
+    out=generate(tmp); source=json.loads(SOURCE.read_text()); source["schema_version"]=True; bad=tmp/"bad-schema-source.json"; bad.write_text(json.dumps(source,indent=2,sort_keys=True)+"\n")
+    p=run([GEN,"--source",bad,"--output",tmp/"bad-schema-out"],ok=False); assert "source schema" in p.stderr
+    p=run([VER,out/"material_gallery.gltf","--source",bad],ok=False); assert "source schema" in p.stderr
+
 def test_source_capture_intent_semantics(tmp):
     out=generate(tmp); source=json.loads(SOURCE.read_text()); source["capture_intent"]="Astral imported; runtime_verified; art_approved; parity achieved"; bad=tmp/"bad-source.json"; bad.write_text(json.dumps(source,indent=2,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",bad],ok=False); assert "source capture intent" in p.stderr
 
@@ -318,7 +323,7 @@ TESTS=[
     test_nonfloor_tangent_alignment_semantics,test_station_geometry_sharing_semantics,test_sphere_radius_semantics,test_cube_extent_semantics,
     test_canonical_cube_vertex_payload_semantics,test_canonical_index_coverage_semantics,test_mesh_morph_weights_semantics,
     test_primitive_morph_target_semantics,test_animation_transform_override_semantics,test_floor_tangent_handedness,test_floor_tangent_direction_semantics,
-    test_camera_transform_override_semantics,test_light_transform_override_semantics,test_source_status_rejected_by_generator,
+    test_camera_transform_override_semantics,test_light_transform_override_semantics,test_source_status_rejected_by_generator,test_source_schema_bool_semantics,
     test_source_capture_intent_semantics,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,test_nested_extras_claim_semantics,
     test_nested_name_claim_semantics,test_uncontracted_manifest_claim_semantics,test_manifest_intent_semantics,test_manifest_schema_bool_semantics,
     test_reject_embedded_texture_or_baked_lighting_path,test_position_accessor_declared_bounds_semantics,test_position_accessor_format_semantics,
