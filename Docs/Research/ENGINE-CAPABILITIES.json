@@ -28,7 +28,7 @@
     {"id":"E08","title":"Physics and collision","status":"not_found","acceptance":"broad/narrow phase, queries, rigid bodies, collision layers, stable timesteps and 2D/3D stress","native_evidence":[],"independent_acceptance":false},
     {"id":"E09","title":"AI and navigation","status":"partial","acceptance":"behavior/state execution, pathfinding, cancellation/budgets and deterministic agent fixtures","native_evidence":[],"independent_acceptance":false},
     {"id":"E10","title":"Audio engine","status":"not_found","acceptance":"decode/stream/mix, spatialization, latency, underrun/device recovery and procedural-signal budgets","native_evidence":[],"independent_acceptance":false},
-    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_resize_side_effect_gate_repair_hosted_and_review_pending_native_pending","acceptance":"scene/asset inspectors, selection/gizmos, undo/redo, save/reopen, editor/runtime boundaries, stable usable shell across admitted window states","native_evidence":[],"independent_acceptance":false},
+    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_resize_side_effect_gate_repair_hosted_green_review_pending_native_pending","acceptance":"scene/asset inspectors, selection/gizmos, undo/redo, save/reopen, editor/runtime boundaries, stable usable shell across admitted window states","native_evidence":[],"independent_acceptance":false},
     {"id":"E12","title":"Genuine 2D support","status":"partial","acceptance":"sprites/batching/layers, tilemaps, 2D cameras/physics, text and image/runtime tests","native_evidence":[],"independent_acceptance":false},
     {"id":"E13","title":"Networking and multiplayer runtime","status":"not_found","acceptance":"offline schema first; later authorized transport, authority/replication, loss/reorder and disconnect recovery","native_evidence":[],"independent_acceptance":false},
     {"id":"E14","title":"Profiling and budgets","status":"partial","acceptance":"CPU/GPU timelines, p50/p95/p99 frame times, RAM/VRAM, allocations/stalls and reproducible manifests","native_evidence":[],"independent_acceptance":false},
@@ -59,7 +59,7 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "resize_side_effect_gate_repair_hosted_and_independent_review_pending_native_pending",
+      "status": "resize_side_effect_gate_repair_hosted_green_independent_review_pending_native_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_observed_main_revision": "6d22da88402db71843ecd5a35766c0c77e62dca6",
       "reviewed_finding_source_head": "45f459d6e512924ff58227df029a4e52d9918924",
@@ -168,11 +168,12 @@
       "current_source_hosted_evidence": {
         "source_head": "95177d199bedb6195c0d89aa0d05708af04f6512",
         "windows_run": 35928263432,
-        "windows_conclusion_at_record_write": "in_progress",
+        "windows_job": 107408457167,
+        "windows_conclusion": "success",
         "profiling_run": 35928263330,
         "profiling_conclusion": "success",
         "release_manifest_run": 35928263325,
-        "release_manifest_conclusion_at_record_write": "in_progress",
+        "release_manifest_conclusion": "success",
         "interactive_runtime_smoke_executed_by_hosted_suite": false
       },
       "current_source_independent_review": {
