@@ -36,20 +36,27 @@
     {"id":"GAME-086","title":"Bounded Guard and family-resonance action effects","status":"implemented_registered_test_coverage_live_action_domain"},
     {"id":"QOL-018","title":"Non-mutating saved-preset action-tuning preview","status":"implemented_registered_test_coverage_backend_ui_api_only"}
   ],
+  "review_repairs": {
+    "initial_review_head": "f8c5daf26504930b890279a83867fc79a7ab02aa",
+    "persistent_loadout_retry_loss": "repaired_in_LandmarkEncounter_retry_with_registered_production_path_regression",
+    "unexercised_tuning_caps": "repaired_with_overflow_safe_profile_transform_and_INT_MIN_INT_MAX_exact_cap_regressions",
+    "final_review": "pending_fresh_exact_final_head"
+  },
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
+    "hosted_windows_ci": "pending_exact_final_head_after_review_repairs",
+    "release_manifest": "pending_exact_final_head_after_review_repairs",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "pending_fresh_exact_final_head",
-    "integration": "five_gameplay_increments_consumed_by_live_ShadowbladeActions_owner; QOL_preview_has_no_rendered_native_caller",
+    "independent_review": "pending_fresh_exact_final_head_after_review_repairs",
+    "integration": "five_gameplay_increments_consumed_by_live_ShadowbladeActions_owner; LandmarkEncounter_retry_preserves_persistent_loadout; QOL_preview_has_no_rendered_native_caller",
     "player_equipment_selection": "not_implemented_not_claimed",
-    "persistent_save": "not_implemented_not_claimed"
+    "persistent_cross_process_save": "not_implemented_not_claimed"
   },
   "coordination": {
     "engine_pr_13": "separate editor/runtime-smoke ownership; no overlap",
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
-    "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
+    "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged",
+    "narrow_game_domain_repair": "Engine/Scene/LandmarkEncounter.cpp retry preservation only, admitted because pass17 loadout persistence exposed a regression"
   },
-  "next_action": "On PR #36, require exact-head hosted Windows Debug/Release and release-integrity gates plus fresh independent Codex review against the pass-17 task packet, repair any material findings within allowed paths, re-read live main and exact PR head, and merge only the exact tested/reviewed head."
+  "next_action": "On PR #36, require exact-head hosted Windows Debug/Release and release-integrity gates plus fresh independent Codex review after the two P2 repairs, resolve repaired review threads only after evidence is current, re-read live main and exact PR head, and merge only the exact tested/reviewed head."
 }
