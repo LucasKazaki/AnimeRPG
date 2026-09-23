@@ -2,6 +2,7 @@
 #include "Engine/Scene/DefensePracticeSession.h"
 #include "Engine/Scene/ExplorationFieldGuide.h"
 #include "Engine/Scene/ShadowCryptExpedition.h"
+#include "Engine/Scene/ShadowbladeLoadout.h"
 
 #include <cmath>
 #include <iostream>
@@ -174,6 +175,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "DefensePracticePass13Tests.inc"
 #include "ExplorationFieldGuidePass14Tests.inc"
 #include "ShadowCryptExpeditionPass15Tests.inc"
+#include "ShadowbladeLoadoutPass16Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -185,6 +187,7 @@ int main() {
     TestDefensePracticePass13();
     TestExplorationFieldGuidePass14();
     TestShadowCryptExpeditionPass15();
+    TestShadowbladeLoadoutPass16();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;
