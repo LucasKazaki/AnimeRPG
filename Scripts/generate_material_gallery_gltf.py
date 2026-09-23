@@ -159,7 +159,7 @@ def build(source_path):
             "NORMAL": add_accessor(norm,5126,"VEC3",34962),
             "TANGENT": add_accessor(tan,5126,"VEC4",34962),
             "TEXCOORD_0": add_accessor(uv,5126,"VEC2",34962),
-            "indices": add_accessor(idx,5123,"SCALAR",34963,(0,),(len(pos)-1,)),
+            "indices": add_accessor(idx,5123,"SCALAR",34963,(min(idx),),(max(idx),)),
         }
 
     geometry=source["geometry"]
