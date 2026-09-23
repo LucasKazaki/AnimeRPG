@@ -57,6 +57,15 @@ public:
     // over that object later. Unsigned wrap is explicit and well-defined.
     std::uint64_t AssignmentGeneration() const { return assignmentGeneration_.value; }
 
+    // Read-only owner witness for game-domain coordinators layered on top of the
+    // practice session. A fresh/reset session accepts any pair; once a queued
+    // practice attack binds the session, callers must present that exact combat
+    // and actions pair until ResetMetrics clears the binding.
+    bool AcceptsPracticeObjects(const CombatSandbox& combat,
+        const ShadowbladeActions& actions) const {
+        return ObjectsAvailable(combat, actions);
+    }
+
     bool SetPracticeSequence(const DefensePracticeSequence& sequence) {
         if (drill_.HasLinkedAttack() || currentAttackActive_) return false;
         if (sequence.count == 0 || sequence.count > DefensePracticeSequence::MaximumPatterns) {

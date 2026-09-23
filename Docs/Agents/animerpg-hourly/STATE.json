@@ -3,66 +3,63 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-23",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "7dfaeeb340e57d1024a8bc818c65c82cd391d4ae",
+  "last_verified_main_at_pass_start": "3eaeb72d65c98f887e827999a78eabb636120dfe",
   "last_merged_pass": {
-    "id": "GAME-PASS22-REACTOR-STRATEGY-2026-09-23",
-    "pr": 41,
-    "merge_sha": "7dfaeeb340e57d1024a8bc818c65c82cd391d4ae",
-    "head_sha": "ee23ea6d0c2f565308531a22d7eeb3f073a1d1b4",
+    "id": "GAME-PASS23-SHADOWBLADE-TRAINING-PATH-2026-09-23",
+    "pr": 42,
+    "merge_sha": "3eaeb72d65c98f887e827999a78eabb636120dfe",
+    "head_sha": "9078196b8750ad07a4382b6ca8dfb1e75ee28e59",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-23-training-path-pass23",
-  "pass": "GAME-PASS23-SHADOWBLADE-TRAINING-PATH-2026-09-23",
-  "task_packet": "Tasks/GAME-PASS23-SHADOWBLADE-TRAINING-PATH-2026-09-23.md",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS23.md",
-  "pr": 42,
+  "working_branch": "game/2026-09-23-training-coach-pass24",
+  "pass": "GAME-PASS24-SHADOWBLADE-TRAINING-COACH-2026-09-23",
+  "task_packet": "Tasks/GAME-PASS24-SHADOWBLADE-TRAINING-COACH-2026-09-23.md",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS24.md",
+  "pr": 43,
   "final_head": "pending_exact_head_after_this_state_record",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
     "increments_with_explicit_regression_coverage": 6,
-    "increments_integrated_game_domain": 6,
+    "increments_integrated_game_domain": 0,
     "increments_hosted_verified_on_exact_final_head": 0,
     "increments_native_playable_verified": 0,
     "increments_independently_reviewed_clean_on_final_head": 0,
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-112","title":"Sequential Shadowblade lesson curriculum","status":"implemented_registered_test_coverage_game_domain_exact_application_session_and_assignment_generation_binding_repaired"},
-    {"id":"GAME-113","title":"Atomic authored lesson setup","status":"implemented_registered_test_coverage_game_domain_live_threat_lock_repaired"},
-    {"id":"GAME-114","title":"Deterministic lesson mastery medals","status":"implemented_registered_test_coverage_game_domain_normal_and_boss_gold_rules_repaired"},
-    {"id":"GAME-115","title":"Opt-in forgiving defense timing assist","status":"implemented_registered_test_coverage_game_domain"},
-    {"id":"GAME-116","title":"Versioned monotonic training checkpoint","status":"implemented_registered_test_coverage_game_domain_in_memory_only_restore_invalidates_session_binding"},
-    {"id":"QOL-024","title":"Boss-style three-threat rehearsal","status":"implemented_registered_test_coverage_game_domain_pattern_provenance_overflow_and_session_binding_repaired"}
+    {"id":"GAME-117","title":"Selectable focused threat drills","status":"implemented_registered_test_coverage_backend_only_not_wired_to_live_game_flow_owner_binding_repaired"},
+    {"id":"GAME-118","title":"Scored practice debrief","status":"implemented_registered_test_coverage_backend_only_not_wired_to_live_game_flow_score_owner_witness_repaired"},
+    {"id":"GAME-119","title":"Optional mastery challenge status","status":"implemented_registered_test_coverage_backend_only_not_wired_to_live_game_flow_read_only"},
+    {"id":"GAME-120","title":"Deterministic post-session coaching","status":"implemented_registered_test_coverage_backend_only_not_wired_to_live_game_flow_read_only"},
+    {"id":"GAME-121","title":"Quick same-drill retry","status":"implemented_registered_test_coverage_backend_only_not_wired_to_live_game_flow_owner_binding_repaired"},
+    {"id":"QOL-025","title":"Authoritative threat timing guide","status":"implemented_registered_test_coverage_backend_only_not_wired_to_live_game_flow_read_only"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim_including_assignment_copy_regression",
+    "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim_plus_ShadowbladeTrainingCoachPass24Tests",
     "sandbox_cpp17": "not_run_clone_failed_before_source_access_due_container_DNS_no_product_claim",
-    "hosted_windows_ci": "candidate_566282c_passed_run_35876273871_number_712_then_invalidated_by_assignment_bypass_review_repair; pending_exact_final_head",
-    "release_manifest": "candidate_566282c_passed_run_35876273879_number_512_then_invalidated_by_assignment_bypass_review_repair; pending_exact_final_head",
+    "hosted_windows_ci": "candidate_8d091cc_passed_run_35892559525_number_753_then_invalidated_by_owner_binding_code_test_repair; pending_exact_final_head",
+    "release_manifest": "candidate_8d091cc_passed_run_35892559527_number_533_then_invalidated_by_owner_binding_code_test_repair; pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "67f9039_review_found_four_P2s_repaired; 66bd5cd_review_found_P2_boss_gold_and_P3_counter_overflow_repaired; 8568ed8_review_found_P2_stale_metric_binding_repaired; 9114ec9_review_found_P2_cross_session_substitution_repaired; 566282c_review_found_P2_copy_assignment_bypass_repaired; fresh_exact_final_head_review_required",
-    "research": "five_official_reference_mechanics_plus_boss_training_rotation_request_verified_from_2026-02-14_and_2025-08-27_player_threads_with_2026-08-01_and_2026-09-11_fresh_corroboration_and_workaround_counterexamples",
-    "integration": "all_six_increments_layer_on_existing_DefensePracticeSession_and_ShadowbladeActions_authority; final review repair adds only an assignment-generation witness to the game-owned practice session; no parallel combat framework",
-    "persistent_cross_process_save": "not_implemented_not_claimed"
+    "independent_review": "8d091cc_review_found_P2_unrelated_idle_owner_pair_could_bypass_real_bound_replacement_threat; repaired_by_read_only_DefensePracticeSession_owner_witness_plus_apply_retry_checks_and_registered_regression; fresh_exact_final_head_review_required",
+    "research": "five_reference_mechanics_mapped_from_current_or_official_ZZZ_and_Granblue_material_plus_new_2026-09-14_ZZZ_player_request_for_visual_parry_timing_guidance_with_counterpoints",
+    "integration": "backend_only_game_domain_policy_composes_existing_DefensePracticeSession_CombatSandbox_ShadowbladeActions_authority_in_registered_tests_but_has_no_production_call_site_yet; no_parallel_combat_framework",
+    "persistent_cross_process_save": "not_changed_not_claimed"
   },
   "coordination": {
-    "engine_pr_13": "separate editor/runtime-smoke ownership; no overlap",
+    "engine_pr_13": "separate editor_runtime_smoke ownership; no overlap",
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
-    "game_owned_shared_path": "Engine/Scene/DefensePracticeSession.h narrow assignment-generation witness only; introduced by game pass 13 and no current open engine/art PR overlap observed",
-    "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
+    "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged",
+    "defense_practice_session": "game_owned_file; narrow read_only owner_witness_only"
   },
   "review_repairs": [
-    "boss_hit_caps_medal_at_bronze",
-    "nonboss_gold_requires_zero_ordinary_defenses",
-    "lesson_completion_requires_authored_pattern_provenance",
-    "lesson_application_rejects_any_live_action_threat_before_mutation",
-    "boss_gold_requires_zero_ordinary_defenses_per_authored_pattern",
-    "boss_completion_and_success_do_not_add_saturating_int_counters",
-    "lesson_completion_requires_same_path_successful_current_lesson_application_and_commit_restore_invalidate_binding",
-    "lesson_completion_requires_exact_DefensePracticeSession_identity_from_successful_application",
-    "copy_assignment_of_bound_session_changes_assignment_generation_and_invalidates_completion_commit_binding"
+    "apply_drill_rejects_pending_CombatSandbox_or_ShadowbladeActions_threat_before_any_mutation",
+    "retry_drill_rejects_direct_or_replacement_live_owner_threat_before_ResetMetrics",
+    "debrief_requires_score_resolved_attempt_owner_witness_and_fails_whole_report_closed_on_mismatch",
+    "registered_tests_assert_exact_mapping_for_all_five_advertised_training_focus_values",
+    "state_and_receipt_label_all_six_increments_backend_only_until_a_production_game_flow_calls_ShadowbladeTrainingCoach",
+    "apply_and_retry_require_the_exact_owner_pair_already_bound_by_DefensePracticeSession_before_live_threat_checks"
   ],
-  "next_action": "Treat the commit containing this state record as the final candidate unless a repair is required. Inspect the full eight-path diff, require fresh exact-head Windows Debug/Release deterministic tests and release-manifest integrity, request fresh independent Codex review on that exact head, resolve all material threads, re-read live main/head immediately before merge, then merge only the exact tested/reviewed candidate with expected-head checking."
+  "next_action": "Require fresh exact-head hosted Windows Debug/Release deterministic tests and release-manifest integrity for the commit containing this state record, request fresh independent Codex review on that exact head, resolve all material threads, re-read live main/head and full scoped diff immediately before merge, then merge only the exact tested/reviewed candidate with expected-head checking. A later pass should wire the coach into an actual game flow before counting these increments integrated or playable."
 }

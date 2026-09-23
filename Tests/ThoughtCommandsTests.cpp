@@ -6,6 +6,7 @@
 #include "Engine/Scene/ShadowCryptExpedition.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
 #include "Engine/Scene/ShadowbladeTrainingPath.h"
+#include "Engine/Scene/ShadowbladeTrainingCoach.h"
 
 #include <cmath>
 #include <iostream>
@@ -187,6 +188,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "ManaReactorStrategyPass22Tests.inc"
 #include "ShadowbladeTrainingPathPass23Tests.inc"
 #include "ShadowbladeTrainingAssignmentPass23Tests.inc"
+#include "ShadowbladeTrainingCoachPass24Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -207,6 +209,7 @@ int main() {
     TestManaReactorStrategyPass22();
     TestShadowbladeTrainingPathPass23();
     TestShadowbladeTrainingAssignmentPass23();
+    TestShadowbladeTrainingCoachPass24();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;
