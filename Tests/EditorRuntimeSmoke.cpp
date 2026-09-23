@@ -39,6 +39,7 @@ constexpr std::array<const wchar_t*, 5> kPendingButtons{{
     L"Play (pending)"}};
 
 ULONGLONG gWorkDeadlineTick = 0;
+ULONGLONG gMessageDeadlineTick = 0;
 HANDLE gOwnedProcessHandle = nullptr;
 
 DWORD RemainingWorkBudget(DWORD requestedMs) {
@@ -48,6 +49,42 @@ DWORD RemainingWorkBudget(DWORD requestedMs) {
     const ULONGLONG remaining = gWorkDeadlineTick - now;
     return remaining < requestedMs ? static_cast<DWORD>(remaining) : requestedMs;
 }
+
+DWORD RemainingMessageBudget(DWORD requestedMs) {
+    const DWORD workBudget = RemainingWorkBudget(requestedMs);
+    if (workBudget == 0 || gMessageDeadlineTick == 0) return workBudget;
+    const ULONGLONG now = GetTickCount64();
+    if (now >= gMessageDeadlineTick) return 0;
+    const ULONGLONG remaining = gMessageDeadlineTick - now;
+    return remaining < workBudget ? static_cast<DWORD>(remaining) : workBudget;
+}
+
+DWORD RemainingDeadlineBudget(ULONGLONG deadline, DWORD requestedMs) {
+    const DWORD workBudget = RemainingWorkBudget(requestedMs);
+    if (workBudget == 0) return 0;
+    const ULONGLONG now = GetTickCount64();
+    if (now >= deadline) return 0;
+    const ULONGLONG remaining = deadline - now;
+    return remaining < workBudget ? static_cast<DWORD>(remaining) : workBudget;
+}
+
+class ScopedMessageDeadline {
+public:
+    explicit ScopedMessageDeadline(ULONGLONG deadline)
+        : previousDeadline_(gMessageDeadlineTick) {
+        gMessageDeadlineTick = deadline;
+    }
+
+    ~ScopedMessageDeadline() {
+        gMessageDeadlineTick = previousDeadline_;
+    }
+
+    ScopedMessageDeadline(const ScopedMessageDeadline&) = delete;
+    ScopedMessageDeadline& operator=(const ScopedMessageDeadline&) = delete;
+
+private:
+    ULONGLONG previousDeadline_{};
+};
 
 bool WorkBudgetExpired() {
     return gWorkDeadlineTick != 0 && GetTickCount64() >= gWorkDeadlineTick;
@@ -142,7 +179,7 @@ bool ValidatedControlHasStyle(HWND control, HWND parent, DWORD processId,
 
 bool SendMessageBounded(HWND window, UINT message, WPARAM wParam, LPARAM lParam,
     LRESULT& result) {
-    const DWORD timeoutMs = RemainingWorkBudget(kMessageTimeoutMs);
+    const DWORD timeoutMs = RemainingMessageBudget(kMessageTimeoutMs);
     if (timeoutMs == 0) return false;
     DWORD_PTR rawResult = 0;
     const LRESULT sent = SendMessageTimeoutW(window, message, wParam, lParam,
@@ -735,53 +772,73 @@ bool MaximizeRestoreAndCheck(HWND window, DWORD processId,
         failure = L"editor normal window rectangle is empty before maximize verification";
         return false;
     }
+
+    const ULONGLONG maximizeDeadline = GetTickCount64() + kShowStateTimeoutMs;
+    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+        || !IsWindowEnabled(window)) {
+        failure = L"editor HWND ownership, visibility, or enabled state changed immediately before maximize request";
+        return false;
+    }
     if (!ShowWindowAsync(window, SW_MAXIMIZE)) {
         failure = L"ShowWindowAsync(SW_MAXIMIZE) did not start successfully";
         return false;
     }
 
     std::wstring lastMaximizeFailure;
-    const ULONGLONG maximizeDeadline = GetTickCount64() + kShowStateTimeoutMs;
-    while (true) {
-        if (WorkBudgetExpired()) {
-            failure = L"internal runtime work budget exhausted while waiting for maximized state";
-            return false;
-        }
-        if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
-            || !IsWindowEnabled(window)) {
-            failure = L"editor HWND ownership, visibility, or enabled state changed while waiting for maximized state";
-            return false;
-        }
-        if (IsZoomed(window)) {
-            std::wstring stateFailure;
-            if (DirectChildrenContained(window, processId, initialControls, stateFailure)
-                && ValidateShellState(window, processId, initialControls, statics, buttons,
-                    expectedInspectorText, expectedSelection, stateFailure)) {
-                break;
+    {
+        ScopedMessageDeadline phaseDeadline(maximizeDeadline);
+        while (true) {
+            if (WorkBudgetExpired()) {
+                failure = L"internal runtime work budget exhausted while waiting for maximized state";
+                return false;
             }
-            lastMaximizeFailure = std::move(stateFailure);
+            if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+                || !IsWindowEnabled(window)) {
+                failure = L"editor HWND ownership, visibility, or enabled state changed while waiting for maximized state";
+                return false;
+            }
+            if (IsZoomed(window)) {
+                std::wstring stateFailure;
+                if (DirectChildrenContained(window, processId, initialControls, stateFailure)
+                    && ValidateShellState(window, processId, initialControls, statics, buttons,
+                        expectedInspectorText, expectedSelection, stateFailure)) {
+                    if (GetTickCount64() >= maximizeDeadline) {
+                        failure = L"maximized editor shell validation finished after the show-state deadline";
+                        return false;
+                    }
+                    break;
+                }
+                lastMaximizeFailure = std::move(stateFailure);
+            }
+            if (GetTickCount64() >= maximizeDeadline) {
+                failure = IsZoomed(window)
+                    ? L"maximized editor shell did not settle before deadline: " + lastMaximizeFailure
+                    : L"editor did not enter maximized state before deadline";
+                return false;
+            }
+            const DWORD sleepMs = RemainingDeadlineBudget(
+                maximizeDeadline, kResizePollIntervalMs);
+            if (sleepMs == 0) {
+                failure = L"show-state deadline exhausted while waiting for maximized state";
+                return false;
+            }
+            Sleep(sleepMs);
         }
-        if (GetTickCount64() >= maximizeDeadline) {
-            failure = IsZoomed(window)
-                ? L"maximized editor shell did not settle before deadline: " + lastMaximizeFailure
-                : L"editor did not enter maximized state before deadline";
-            return false;
-        }
-        const DWORD sleepMs = RemainingWorkBudget(kResizePollIntervalMs);
-        if (sleepMs == 0) {
-            failure = L"internal runtime work budget exhausted while waiting for maximized state";
-            return false;
-        }
-        Sleep(sleepMs);
     }
 
+    const ULONGLONG restoreDeadline = GetTickCount64() + kShowStateTimeoutMs;
+    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+        || !IsWindowEnabled(window)) {
+        failure = L"editor HWND ownership, visibility, or enabled state changed immediately before restore request";
+        return false;
+    }
     if (!ShowWindowAsync(window, SW_RESTORE)) {
         failure = L"ShowWindowAsync(SW_RESTORE) did not start successfully";
         return false;
     }
 
     std::wstring lastRestoreFailure;
-    const ULONGLONG restoreDeadline = GetTickCount64() + kShowStateTimeoutMs;
+    ScopedMessageDeadline phaseDeadline(restoreDeadline);
     while (true) {
         if (WorkBudgetExpired()) {
             failure = L"internal runtime work budget exhausted while waiting for restored state";
@@ -804,6 +861,10 @@ bool MaximizeRestoreAndCheck(HWND window, DWORD processId,
             if (DirectChildrenContained(window, processId, initialControls, stateFailure)
                 && ValidateShellState(window, processId, initialControls, statics, buttons,
                     expectedInspectorText, expectedSelection, stateFailure)) {
+                if (GetTickCount64() >= restoreDeadline) {
+                    failure = L"restored editor shell validation finished after the show-state deadline";
+                    return false;
+                }
                 return true;
             }
             lastRestoreFailure = std::move(stateFailure);
@@ -818,9 +879,9 @@ bool MaximizeRestoreAndCheck(HWND window, DWORD processId,
             }
             return false;
         }
-        const DWORD sleepMs = RemainingWorkBudget(kResizePollIntervalMs);
+        const DWORD sleepMs = RemainingDeadlineBudget(restoreDeadline, kResizePollIntervalMs);
         if (sleepMs == 0) {
-            failure = L"internal runtime work budget exhausted while waiting for restored state";
+            failure = L"show-state deadline exhausted while waiting for restored state";
             return false;
         }
         Sleep(sleepMs);
@@ -1104,6 +1165,7 @@ int wmain(int argc, wchar_t** argv) {
         << L"left-to-right semantic toolbar Button HWNDs, disabled pending tools, enabled Outliner/assets surfaces, "
         << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
         << L"every bounded cross-process read and after 800x600, 1280x720, 1440x900, maximized+restored, and 420x260 states; "
+        << L"maximize/restore show-state posts were preceded by fresh ownership checks and nested shell-message waits were capped to each show-state deadline; "
         << L"Cube selection stayed synchronized, all direct children remained contained from startup through every size/show-state transition, "
         << L"the retained CreateProcess handle remained nonsignaled around PID-based HWND ownership checks, "
         << L"the original window-owning launch thread was suspended and a valid suspended thread context was captured "
