@@ -18,6 +18,7 @@ Allowed production paths:
 Allowed verification/records paths:
 - `Tests/ExplorationFieldGuidePass14Tests.inc`
 - `Tests/ThoughtCommandsTests.cpp` only as the smallest existing registered-test include/call shim while open engine PR #13 owns CMake
+- `Tests/LandmarkInteractionTests.cpp` for production integration coverage through its already-registered target; no CMake change is allowed
 - this task packet
 - `Docs/Agents/animerpg-hourly/STATE.json`
 - `Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS14.md`
@@ -37,7 +38,7 @@ Sources were accessed/revalidated 2026-09-23 UTC. Reference games provide design
 
 - `GAME-067`: three valid field operations expose bounded current/required progress; tracking a valid operation is explicit; invalid enum values fail closed without changing the tracked operation.
 - `GAME-068`: first discoveries of Lincoln Memorial, Reflecting Pool, and Washington Monument are recorded once in actual discovery order; repeats do not grow the fixed ledger.
-- `GAME-069`: existing `LandmarkDialogue` clue/lore truth is synchronized monotonically into investigation progress; a stale/lower snapshot cannot erase already observed evidence; Shadow Crypt completion requires both its clue and matching lore.
+- `GAME-069`: existing `LandmarkDialogue` clue/lore truth is synchronized monotonically into investigation progress; a stale/lower snapshot cannot erase already observed evidence; Rift Investigation counts only Rift Residue and Cooling Anomaly, while Shadow Crypt completion requires both Crypt Sigil and matching lore.
 - `GAME-070`: first site observations unlock three site notes; Rift evidence and the Shadow Crypt lead unlock only from the corresponding evidence; journal capacity stays fixed at five and repeated inputs are idempotent.
 - `GAME-071`: Mall survey tracking recommends the first unvisited site in the existing Lincoln -> Reflecting Pool -> Washington Monument route, skips visited sites, and exposes no phantom target after all three are observed.
 - `QOL-015`: a player can pin an unvisited landmark as a temporary target; the pin overrides automatic recommendation; discovering it clears the pin exactly once; already visited and invalid landmarks cannot become unfinished pins.
@@ -46,9 +47,9 @@ Sources were accessed/revalidated 2026-09-23 UTC. Reference games provide design
 ## Verification contract
 
 Before merge:
-1. Registered `ThoughtCommandsTests` must compile/run the pass-14 regression include in both Debug and Release through existing hosted Windows CI. Existing `LandmarkInteractionTests` and full repository build/tests must remain green.
+1. Registered `ThoughtCommandsTests` must compile/run the pass-14 state-object regression include and registered `LandmarkInteractionTests` must exercise the production integration path in both Debug and Release through existing hosted Windows CI. Existing full repository build/tests must remain green.
 2. Release-manifest/integrity checks must pass on the exact final head if required by repository policy.
-3. Check invalid operation/landmark enum handling, duplicate discovery idempotency, stale evidence monotonicity, completed-route termination, pin precedence/auto-clear, and existing landmark interaction regressions.
+3. Check invalid operation/landmark enum handling, duplicate discovery idempotency, stale evidence monotonicity, Rift-vs-Crypt evidence separation, completed-route termination, pin precedence/auto-clear, real `TryInteract` discovery integration, dialogue clue/lore integration, and existing landmark interaction regressions.
 4. Obtain a fresh independent Codex review on the exact final head. Self-review and hosted CI are not independent approval. Resolve all material threads before merge.
 5. Re-read `main` and PR head immediately before merge. If `main` moved, reconcile and rerun affected checks. Merge only with expected-head protection.
 
