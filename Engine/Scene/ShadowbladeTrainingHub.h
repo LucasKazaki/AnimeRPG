@@ -103,10 +103,6 @@ public:
             combat.ResetTrainingSession();
         }
         actions.ResetTransientStatePreservingLoadout();
-        actionsTimingPreset_ = actions.PerfectDefenseWindowSeconds()
-                == ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds
-            ? DefenseTimingPreset::Forgiving
-            : DefenseTimingPreset::Standard;
 
         session_ = candidate;
         if (!session_.QueueNextAttack(combat, actions)) {
@@ -202,11 +198,17 @@ public:
         feedback.challenges[2] = ShadowbladeTrainingCoach::ChallengeStatus(
             session_, ShadowbladeTrainingChallenge::PatternMastery);
 
+        DefenseTimingPreset timingPreset = DefenseTimingPreset::Standard;
+        if (boundActions_
+            && boundActions_->PerfectDefenseWindowSeconds()
+                == ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds) {
+            timingPreset = DefenseTimingPreset::Forgiving;
+        }
         ShadowbladeTrainingDrillPlan plan{};
         if (ShadowbladeTrainingCoach::PlanForFocus(focus_, pace_, plan)
             && plan.sequence.count > 0) {
             feedback.timingGuideValid = ShadowbladeTrainingCoach::TimingGuide(
-                plan.sequence.patterns[0], actionsTimingPreset_, feedback.timingGuide);
+                plan.sequence.patterns[0], timingPreset, feedback.timingGuide);
         }
         feedback.recentDamage = RecentDamage();
         return feedback;
@@ -329,7 +331,6 @@ private:
     ShadowbladeTrainingFocus focus_{ShadowbladeTrainingFocus::MixedDefense};
     DefensePracticePace pace_{DefensePracticePace::Standard};
     int targetAttempts_{DefaultAttempts};
-    DefenseTimingPreset actionsTimingPreset_{DefenseTimingPreset::Standard};
     DefensePracticeSession session_{};
     const CombatSandbox* boundCombat_{};
     const ShadowbladeActions* boundActions_{};
