@@ -70,6 +70,11 @@ LandmarkEncounterReport LandmarkEncounter::TryActivate(
 
 bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
     ShadowbladeActions& shadowbladeActions) {
+    // This read-only observation is safe in the current Win32 flow, which has
+    // already advanced the combat clock for the frame. The explicit training
+    // AdvanceTraining path remains the sole owner of practice-session clock steps.
+    trainingHub_.ObserveCombat(combatSandbox);
+
     if (state_ != LandmarkEncounterState::Active || !combatSandbox.Dummy().IsDefeated()) {
         return false;
     }
@@ -103,6 +108,12 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
         }
     }
 
+    // GAME pass 25: the completed live landmark encounter is the production
+    // unlock point for the Shadowblade practice hub. Repeated completions are
+    // idempotent and never reset an existing training configuration or debrief.
+    trainingHub_.Unlock();
+    trainingHub_.ObserveCombat(combatSandbox);
+
     lastReport_ = {LandmarkEncounterResult::Completed, rewardApplied,
         grade, completionSeconds, challenge};
     return true;
@@ -110,7 +121,7 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
 
 LandmarkEncounterReport LandmarkEncounter::Retry(CombatSandbox& combatSandbox,
     ShadowbladeActions& shadowbladeActions) {
-    if (state_ != LandmarkEncounterState::Completed) {
+    if (state_ != LandmarkEncounterState::Completed || trainingHub_.Active()) {
         lastReport_ = {LandmarkEncounterResult::RetryUnavailable, 0.0f};
         return lastReport_;
     }
