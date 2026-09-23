@@ -1,0 +1,22 @@
+{
+  "counts": {
+    "cameras": 1,
+    "cube_nodes": 4,
+    "directional_lights": 2,
+    "materials": 5,
+    "sphere_nodes": 4,
+    "stations": 4
+  },
+  "files": [
+    {
+      "bytes": 38604,
+      "path": "material_gallery.gltf",
+      "sha256": "4ef57da77151c045a69a235246cef90ad85579242edae5ed24fd130b6e2c663a"
+    }
+  ],
+  "generator": "astral-material-gallery-gltf-2",
+  "intent": "Source-only neutral material-response gallery for future Astral import/render and art review.",
+  "runtime_status": "source_validated_not_imported",
+  "schema_version": 1,
+  "source_sha256": "517833a990db74f97d8046aa7fafa2d2d73859538d59c3c41ff4a8a7fb63f530"
+}
