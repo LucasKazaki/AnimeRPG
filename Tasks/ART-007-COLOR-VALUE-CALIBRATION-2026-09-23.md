@@ -9,6 +9,8 @@ Derived PNGs are deliberately generated outside the source tree. `color-roles.js
 
 Text-contract portability rule: source and expected-manifest hashing/comparison canonicalize CRLF or CR line endings to LF before hashing or byte comparison. This keeps the artifact contract stable on Windows checkouts with `core.autocrlf=true` without broadening this packet to repository-wide `.gitattributes` changes. Generated `manifest.json` remains deterministic LF output.
 
+Source-status boundary: `color-roles.json.status` must be exactly `proposed_art_reference_not_runtime`. Both the generator and independent verifier must reject any runtime-validation or approval claim at the source-contract layer, even if a matching manifest is repinned.
+
 ## Acceptance
 
 ```text
@@ -19,4 +21,4 @@ python Scripts/test_color_value_calibration.py
 python -m py_compile Scripts/generate_color_value_calibration.py Scripts/verify_color_value_calibration.py Scripts/test_color_value_calibration.py
 ```
 
-Accept only if all pass, the fresh generated manifest equals the checked-in expected manifest after the documented newline canonicalization, and the regression suite confirms there is no stale source-tree `Generated/` pack. The suite must also prove CRLF-checkout portability and reject a repinned false runtime-validation status. Record fresh generated-file hashes. No runtime color-management or art-approval claim.
+Accept only if all pass, the fresh generated manifest equals the checked-in expected manifest after the documented newline canonicalization, and the regression suite confirms there is no stale source-tree `Generated/` pack. The suite must also prove CRLF-checkout portability, expected-manifest pin enforcement, manifest-status rejection, and independent generator/verifier rejection of a false runtime claim in the canonical source status. Record fresh generated-file hashes. No runtime color-management or art-approval claim.
