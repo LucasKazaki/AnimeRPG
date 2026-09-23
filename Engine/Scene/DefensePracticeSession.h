@@ -51,6 +51,12 @@ public:
     static constexpr int DefaultGoalTarget = CombatDefenseTraining::GoalTarget;
     static constexpr double AlternatingChainWindowSeconds = 2.5;
 
+    // Copy-replacing a live session is observable without copying the witness
+    // itself. Training coordinators can bind completion to one exact applied
+    // session generation and fail closed if another session's state is assigned
+    // over that object later. Unsigned wrap is explicit and well-defined.
+    std::uint64_t AssignmentGeneration() const { return assignmentGeneration_.value; }
+
     bool SetPracticeSequence(const DefensePracticeSequence& sequence) {
         if (drill_.HasLinkedAttack() || currentAttackActive_) return false;
         if (sequence.count == 0 || sequence.count > DefensePracticeSequence::MaximumPatterns) {
@@ -299,6 +305,20 @@ public:
     }
 
 private:
+    struct AssignmentGenerationCounter {
+        std::uint64_t value{};
+
+        AssignmentGenerationCounter() = default;
+        AssignmentGenerationCounter(const AssignmentGenerationCounter&) = default;
+
+        AssignmentGenerationCounter& operator=(const AssignmentGenerationCounter&) {
+            value = value == std::numeric_limits<std::uint64_t>::max()
+                ? 0
+                : value + 1;
+            return *this;
+        }
+    };
+
     enum class SuccessfulDefenseKind {
         None,
         Guard,
@@ -489,6 +509,7 @@ private:
         value = value > maximum - amount ? maximum : value + amount;
     }
 
+    AssignmentGenerationCounter assignmentGeneration_{};
     CombatDefenseTraining drill_{};
     std::array<EnemyAttackPattern, DefensePracticeSequence::MaximumPatterns> practiceSequence_{};
     std::array<DefensePracticePatternStats, 3> patternStats_{};
