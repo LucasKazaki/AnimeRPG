@@ -854,8 +854,10 @@ bool MaximizeRestoreAndCheck(HWND window, DWORD processId,
             failure = L"GetWindowRect failed while waiting for restored state";
             return false;
         }
-        const bool restoredGeometry = restoredRect.right - restoredRect.left == normalWidth
-            && restoredRect.bottom - restoredRect.top == normalHeight;
+        const bool restoredGeometry = restoredRect.left == normalRect.left
+            && restoredRect.top == normalRect.top
+            && restoredRect.right == normalRect.right
+            && restoredRect.bottom == normalRect.bottom;
         if (!IsZoomed(window) && restoredGeometry) {
             std::wstring stateFailure;
             if (DirectChildrenContained(window, processId, initialControls, stateFailure)
@@ -873,7 +875,7 @@ bool MaximizeRestoreAndCheck(HWND window, DWORD processId,
             if (IsZoomed(window)) {
                 failure = L"editor did not leave maximized state before restore deadline";
             } else if (!restoredGeometry) {
-                failure = L"editor did not restore its pre-maximize outer size before deadline";
+                failure = L"editor did not restore its pre-maximize outer rectangle before deadline";
             } else {
                 failure = L"restored editor shell did not settle before deadline: " + lastRestoreFailure;
             }
