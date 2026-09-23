@@ -34,8 +34,11 @@ Acceptance:
 - canonical source status is `proposed_art_reference_not_runtime`;
 - generated runtime status stays `source_validated_not_imported`;
 - generated manifest is a closed schema-version-1 contract containing only `schema_version`, `generator`, `runtime_status`, `source_sha256`, `intent`, `counts`, and `files`, so supplemental runtime/art/parity claims are rejected even without `--expected-manifest`;
+- manifest schema version must be a JSON integer exactly equal to 1, not a boolean accepted through Python integer equality;
+- manifest `intent` must exactly equal the generator's source-only intent, preventing runtime/import/art/parity claims from being hidden inside an otherwise approved field;
 - finite triangle geometry with positions, normals, tangents, UVs and bounded indices;
 - valid outward winding and every indexed vertex normal facing consistently with its geometric triangle face, plus normalized normals/tangents and stable sphere/cube counts;
+- every vertex tangent must be orthogonal to its paired normal, preventing zero-bitangent frames even when tangent length and handedness are otherwise valid;
 - every sphere station shares one canonical sphere geometry accessor binding, every cube station shares one canonical cube binding, and decoded sphere radius / cube half extent / floor extents match the source specification;
 - gallery meshes contain only `name` and `primitives`, and primitives only `attributes`, `indices`, `material`, and `mode`, rejecting morph targets, mesh weights, and other geometry overrides that can change final rendered shape after base-accessor validation;
 - the gallery is a static calibration scene and rejects top-level glTF `animations`, preventing animation channels from changing station, camera, or light transforms after static source checks;
@@ -46,7 +49,7 @@ Acceptance:
 - camera and directional-light nodes reject scale, matrix, or other transform overrides that can reverse local -Z while preserving the checked quaternion;
 - no images/textures/samplers, preventing accidental baked-lighting review;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions for light, material binding/rendering properties, camera, source/runtime status, supplemental glTF and manifest runtime claims, texture insertion, accessor bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, floor tangent direction/handedness, and camera/light transform overrides;
+- negative regressions for light, material binding/rendering properties, camera, source/runtime status, supplemental glTF and manifest runtime claims, exact manifest intent, boolean schema-version rejection, texture insertion, accessor bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, tangent/normal orthogonality, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, floor tangent direction/handedness, and camera/light transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
 Commands:
