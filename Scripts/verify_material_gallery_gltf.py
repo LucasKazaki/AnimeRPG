@@ -53,6 +53,23 @@ def normalize(v,msg):
 
 def tri_normal(a,b,c): return cross(sub(b,a),sub(c,a))
 
+def verify_position_accessor_bounds(g, accessor_index, positions):
+    accessor=g["accessors"][accessor_index]
+    declared_min=accessor.get("min"); declared_max=accessor.get("max")
+    req(
+        isinstance(declared_min,list) and len(declared_min)==3
+        and isinstance(declared_max,list) and len(declared_max)==3
+        and all(type(v) in (int,float) and math.isfinite(v) for v in declared_min+declared_max),
+        "position bounds",
+    )
+    actual_min=[min(p[i] for p in positions) for i in range(3)]
+    actual_max=[max(p[i] for p in positions) for i in range(3)]
+    req(
+        all(abs(declared_min[i]-actual_min[i])<=1e-6 for i in range(3))
+        and all(abs(declared_max[i]-actual_max[i])<=1e-6 for i in range(3)),
+        "position bounds",
+    )
+
 def geometry_binding(mesh):
     req(set(mesh)=={"name","primitives"},"mesh properties")
     req(len(mesh["primitives"])==1,"primitive count")
@@ -78,7 +95,8 @@ def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,verify_floor_
     mesh=g["meshes"][mesh_index]; attrs,index_accessor=geometry_binding(mesh)
     prim=mesh["primitives"][0]; req(prim["mode"]==4,"triangle mode"); req(prim["material"]==expected_material,"material binding")
     req(set(attrs)=={"POSITION","NORMAL","TANGENT","TEXCOORD_0"},"attributes")
-    pos=read_accessor(g,buf,attrs["POSITION"]); normal=read_accessor(g,buf,attrs["NORMAL"]); tangent=read_accessor(g,buf,attrs["TANGENT"]); uv=read_accessor(g,buf,attrs["TEXCOORD_0"]); indices=read_accessor(g,buf,index_accessor)
+    pos=read_accessor(g,buf,attrs["POSITION"]); verify_position_accessor_bounds(g,attrs["POSITION"],pos)
+    normal=read_accessor(g,buf,attrs["NORMAL"]); tangent=read_accessor(g,buf,attrs["TANGENT"]); uv=read_accessor(g,buf,attrs["TEXCOORD_0"]); indices=read_accessor(g,buf,index_accessor)
     req((len(pos),len(indices))==expected_counts,"geometry counts"); req(len(normal)==len(pos) and len(tangent)==len(pos) and len(uv)==len(pos),"attribute counts")
     req(all(math.isfinite(c) for seq in (pos,normal,tangent,uv) for v in seq for c in v),"finite geometry")
     req(all(abs(sum(c*c for c in n)-1.0)<1e-4 for n in normal),"unit normals")
