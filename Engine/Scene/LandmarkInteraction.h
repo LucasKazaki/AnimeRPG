@@ -3,6 +3,7 @@
 #include "Engine/Scene/CharacterProgression.h"
 #include "Engine/Scene/ExplorationFieldGuide.h"
 #include "Engine/Scene/LandmarkDialogue.h"
+#include "Engine/Scene/ManaReactorMission.h"
 #include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/WorldBlockout.h"
 
@@ -89,6 +90,30 @@ public:
     void ClearPinnedFieldTarget() { fieldGuide_.ClearPinnedTarget(); }
     const ExplorationFieldGuide& FieldGuide() const { return fieldGuide_; }
 
+    bool BeginManaReactor(ManaReactorMode mode = ManaReactorMode::Expedition,
+        ManaReactorDifficulty difficulty = ManaReactorDifficulty::Standard,
+        ManaReactorProtocol protocol = ManaReactorProtocol::Baseline) {
+        return manaReactorMission_.Begin(fieldGuide_, mode, difficulty, protocol);
+    }
+    ManaReactorControlResult ApplyManaReactorControl(ManaReactorControl control) {
+        return manaReactorMission_.ApplyControl(control);
+    }
+    bool UseManaReactorEmergencyVent() { return manaReactorMission_.UseEmergencyVent(); }
+    bool RetryManaReactorStage() { return manaReactorMission_.RetryCurrentStage(); }
+    bool ReplayCompletedManaReactor() { return manaReactorMission_.ReplayCompletedRun(); }
+    ManaReactorMissionBriefing ManaReactorBriefing() const {
+        return manaReactorMission_.Briefing();
+    }
+    ManaReactorMissionRecord ManaReactorBestRecord(ManaReactorDifficulty difficulty,
+        ManaReactorProtocol protocol) const {
+        return manaReactorMission_.BestRecord(difficulty, protocol);
+    }
+    ManaReactorRewardReport ClaimManaReactorFirstClearReward() {
+        if (progression_ == nullptr) return {};
+        return manaReactorMission_.ClaimFirstClearReward(*progression_);
+    }
+    const ManaReactorMission& ManaReactor() const { return manaReactorMission_; }
+
     bool SetObjectiveActivationMode(LandmarkObjectiveActivationMode mode);
     bool StartObjective();
     LandmarkObjectiveActivationMode ObjectiveActivationMode() const {
@@ -149,6 +174,7 @@ private:
     CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
     LandmarkDialogue dialogue_{};
     ExplorationFieldGuide fieldGuide_{};
+    ManaReactorMission manaReactorMission_{};
     LandmarkInteractionReport lastReport_{};
 };
 

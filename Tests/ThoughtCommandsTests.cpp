@@ -4,16 +4,19 @@
 #include "Engine/Scene/LandmarkEncounter.h"
 #include "Engine/Scene/LandmarkInteraction.h"
 #include "Engine/Scene/ManaReactorExpedition.h"
+#include "Engine/Scene/ManaReactorMission.h"
 #include "Engine/Scene/ShadowCryptExpedition.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
 #include "Engine/Scene/ShadowbladeTrainingPath.h"
 #include "Engine/Scene/ShadowbladeTrainingCoach.h"
 
-// Pass 25 needs the existing out-of-line LandmarkEncounter implementation in
-// this registered aggregation target. Shared CMake remains owned by the engine
-// worker, so compile the exact production implementation into this test TU
-// instead of changing target ownership or substituting a mock.
+// Passes 25-26 need existing out-of-line gameplay implementations in this
+// registered aggregation target. Shared CMake remains owned by the engine worker,
+// so compile the exact production implementations into this test TU instead of
+// changing target ownership or substituting mocks.
 #include "Engine/Scene/LandmarkEncounter.cpp"
+#include "Engine/Scene/LandmarkInteraction.cpp"
+#include "Engine/Scene/WorldBlockout.cpp"
 
 #include <cmath>
 #include <iostream>
@@ -198,6 +201,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "ShadowbladeTrainingCoachPass24Tests.inc"
 #include "ShadowbladeTrainingHubPass25Tests.inc"
 #include "ShadowbladeTrainingHubPass25ReviewTests.inc"
+#include "ManaReactorMissionPass26Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -221,6 +225,7 @@ int main() {
     TestShadowbladeTrainingCoachPass24();
     TestShadowbladeTrainingHubPass25();
     TestShadowbladeTrainingHubPass25ReviewRepairs();
+    TestManaReactorMissionPass26();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;

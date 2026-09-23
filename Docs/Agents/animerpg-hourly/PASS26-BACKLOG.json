@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS26-MANA-REACTOR-LIVE-2026-09-24",
+  "base_main": "43868c319e8253e146a29d9b3771d545e2c95f99",
+  "target_branch": "main",
+  "research_access_date": "2026-09-24",
+  "features": [
+    {
+      "id": "GAME-127",
+      "title": "Production-owned evidence-gated Mana Reactor launch",
+      "kind": "reference_feature",
+      "source": "https://zenless.hoyoverse.com/m/en-us/news/165921",
+      "source_published": "2026-08-31",
+      "status": "implemented_regression_added_pending_exact_head_gates",
+      "native_playable": false
+    },
+    {
+      "id": "GAME-128",
+      "title": "Authoritative three-control briefing and recommendation",
+      "kind": "reference_feature",
+      "sources": [
+        "https://zenless.hoyoverse.com/m/en-us/news/165921",
+        "https://www.playstation.com/en-us/games/granblue-fantasy-relink/"
+      ],
+      "status": "implemented_regression_added_pending_exact_head_gates",
+      "native_playable": false
+    },
+    {
+      "id": "GAME-129",
+      "title": "Explicit stage-failure recovery",
+      "kind": "reference_feature",
+      "sources": [
+        "https://www.hoyolab.com/article/43362737",
+        "https://www.playstation.com/en-us/games/granblue-fantasy-relink/"
+      ],
+      "source_published": "2026-01-19",
+      "status": "implemented_regression_added_pending_exact_head_gates",
+      "native_playable": false
+    },
+    {
+      "id": "GAME-130",
+      "title": "Per-difficulty/protocol personal-best record",
+      "kind": "reference_feature",
+      "source": "https://zenless.hoyoverse.com/m/zh-tw/news/166073",
+      "source_published": "2026-09-14",
+      "status": "implemented_regression_added_pending_exact_head_gates",
+      "native_playable": false
+    },
+    {
+      "id": "GAME-131",
+      "title": "Live one-time Mana Reactor first-clear progression claim",
+      "kind": "reference_feature",
+      "source": "https://zenless.hoyoverse.com/m/en-us/news/165921",
+      "source_published": "2026-08-31",
+      "status": "implemented_regression_added_pending_exact_head_gates",
+      "native_playable": false
+    },
+    {
+      "id": "QOL-027",
+      "title": "Same-configuration replay from completion",
+      "kind": "community_improvement",
+      "sources": [
+        "https://www.reddit.com/r/Genshin_Impact/comments/km30lp/",
+        "https://www.reddit.com/r/Genshin_Impact/comments/o9ufu0/"
+      ],
+      "source_published": ["2020-12-29", "2021-06-28"],
+      "evidence_quality": "historical corroborated flow preference with contemporary counterexample that retry already existed; no claim of a current unresolved Genshin defect",
+      "status": "implemented_regression_added_pending_exact_head_gates",
+      "native_playable": false
+    }
+  ],
+  "counts_before_exact_head_gates": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "explicit_regression_coverage_added": 6,
+    "game_domain_integrated": 6,
+    "hosted_verified": 0,
+    "native_playable_verified": 0,
+    "independently_reviewed_clean": 0,
+    "merged": 0
+  },
+  "next_action": "Run exact-head hosted Windows Debug/Release tests and Release-manifest integrity, obtain fresh exact-head independent Codex review, repair and rerun if needed, then expected-head merge if all gates remain clean."
+}
