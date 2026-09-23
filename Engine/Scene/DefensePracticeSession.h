@@ -160,10 +160,7 @@ public:
         sessionActions_ = &actions;
         currentPattern_ = combat.PendingEnemyAttack().pattern;
         currentAttackActive_ = true;
-        if (!sessionStarted_) {
-            sessionStarted_ = true;
-            sessionStartSeconds_ = combat.ElapsedSecondsPrecise();
-        }
+        if (!sessionStarted_) sessionStarted_ = true;
         Increment(PatternStatsMutable(currentPattern_).attempts);
 
         if (sequenceLength_ > 0) {
@@ -193,8 +190,14 @@ public:
         float deltaSeconds) {
         if (sessionStarted_ && !ObjectsOwned(combat, actions)) return false;
 
+        const bool countActiveTime = sessionStarted_
+            && ObjectsOwned(combat, actions)
+            && !drill_.Paused()
+            && deltaSeconds > 0.0f
+            && deltaSeconds <= std::numeric_limits<float>::max();
         const DefenseTrainingStats before = drill_.Stats();
         const bool resolved = drill_.AdvanceTime(combat, actions, deltaSeconds);
+        if (countActiveTime) AddActiveSeconds(deltaSeconds);
         if (!resolved || !currentAttackActive_) return resolved;
 
         const DefenseTrainingStats after = drill_.Stats();
@@ -259,15 +262,11 @@ public:
         report.bestAlternatingChain = bestAlternatingChain_;
         report.baseScore = perfect * 300 + ordinary * 150
             + static_cast<std::int64_t>(bestAlternatingChain_) * 50;
-        if (report.baseScore <= 0 || report.resolvedAttempts <= 0) {
-            report.baseScore = std::max<std::int64_t>(0, report.baseScore);
-            return report;
-        }
+        report.baseScore = std::max<std::int64_t>(0, report.baseScore);
+        if (report.resolvedAttempts <= 0) return report;
 
-        const double activeSeconds = std::max(
-            0.0, combat.ElapsedSecondsPrecise() - sessionStartSeconds_);
         const double secondsPerAttempt =
-            activeSeconds / static_cast<double>(report.resolvedAttempts);
+            sessionActiveSeconds_ / static_cast<double>(report.resolvedAttempts);
         report.timeCoefficientPercent = secondsPerAttempt <= 1.5
             ? 125
             : (secondsPerAttempt <= 3.0 ? 100 : 75);
@@ -284,7 +283,7 @@ public:
         lastSuccessfulDefense_ = SuccessfulDefenseKind::None;
         lastSuccessfulDefenseSeconds_ = 0.0;
         sessionStarted_ = false;
-        sessionStartSeconds_ = 0.0;
+        sessionActiveSeconds_ = 0.0;
         sessionCombat_ = nullptr;
         sessionActions_ = nullptr;
         sequenceCursor_ = 0;
@@ -445,6 +444,14 @@ private:
         lastSuccessfulDefenseSeconds_ = 0.0;
     }
 
+    void AddActiveSeconds(float deltaSeconds) {
+        const double delta = static_cast<double>(deltaSeconds);
+        const double maximum = std::numeric_limits<double>::max();
+        sessionActiveSeconds_ = sessionActiveSeconds_ > maximum - delta
+            ? maximum
+            : sessionActiveSeconds_ + delta;
+    }
+
     static void Increment(int& value) {
         if (value < std::numeric_limits<int>::max()) ++value;
     }
@@ -471,7 +478,7 @@ private:
     SuccessfulDefenseKind lastSuccessfulDefense_{SuccessfulDefenseKind::None};
     double lastSuccessfulDefenseSeconds_{};
     bool sessionStarted_{};
-    double sessionStartSeconds_{};
+    double sessionActiveSeconds_{};
 };
 
 } // namespace Astral::Scene
