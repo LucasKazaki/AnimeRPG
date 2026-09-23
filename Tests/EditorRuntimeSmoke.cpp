@@ -706,6 +706,11 @@ bool ResizeAndCheck(HWND window, DWORD processId,
     }
 
     const ULONGLONG deadline = GetTickCount64() + kResizeTimeoutMs;
+    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+        || !IsWindowEnabled(window)) {
+        failure = L"editor HWND ownership, visibility, or enabled state changed immediately before resize request";
+        return false;
+    }
     if (!SetWindowPos(window, nullptr, 0, 0, width, height,
             SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS)) {
         failure = L"SetWindowPos failed";
