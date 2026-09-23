@@ -65,6 +65,8 @@ public:
     }
     bool StartTraining(CombatSandbox& combatSandbox, ShadowbladeActions& shadowbladeActions) {
         return state_ == LandmarkEncounterState::Completed
+            && activationCombatOwner_ == &combatSandbox
+            && activationActionsOwner_ == &shadowbladeActions
             && trainingHub_.Start(combatSandbox, shadowbladeActions);
     }
     DefenseReport TryTrainingDefense(CombatSandbox& combatSandbox,
