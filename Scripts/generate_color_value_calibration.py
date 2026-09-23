@@ -6,6 +6,7 @@ import argparse, hashlib, json, struct, zlib
 from pathlib import Path
 
 VERSION="astral-color-calibration-2"
+SOURCE_STATUS="proposed_art_reference_not_runtime"
 
 
 def canonical_text_bytes(path:Path):
@@ -45,6 +46,7 @@ def build(source_path:Path):
     source_bytes=canonical_text_bytes(source_path)
     source=json.loads(source_bytes.decode("utf-8"))
     if source.get("schema_version")!=1: raise ValueError("source schema")
+    if source.get("status")!=SOURCE_STATUS: raise ValueError("source status")
     roles=source.get("roles")
     if not isinstance(roles,list) or len(roles)!=8: raise ValueError("exactly eight roles required")
     colors=[rgb(r["hex"]) for r in roles]
