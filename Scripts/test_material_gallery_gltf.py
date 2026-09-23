@@ -1,5 +1,5 @@
 from __future__ import annotations
-import hashlib, json, subprocess, sys, tempfile
+import base64, hashlib, json, struct, subprocess, sys, tempfile
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -31,6 +31,20 @@ def mutate_gltf(out,fn):
     path.write_text(json.dumps(g,indent=2,sort_keys=True)+"\n")
     repin(out)
 
+def set_accessor_float(g, accessor_index, vertex_index, component_index, value):
+    accessor=g["accessors"][accessor_index]
+    assert accessor["componentType"]==5126
+    component_counts={"SCALAR":1,"VEC2":2,"VEC3":3,"VEC4":4}
+    components=component_counts[accessor["type"]]
+    view=g["bufferViews"][accessor["bufferView"]]
+    prefix="data:application/octet-stream;base64,"
+    uri=g["buffers"][0]["uri"]
+    assert uri.startswith(prefix)
+    buf=bytearray(base64.b64decode(uri[len(prefix):]))
+    offset=view.get("byteOffset",0)+accessor.get("byteOffset",0)+(vertex_index*components+component_index)*4
+    struct.pack_into("<f",buf,offset,value)
+    g["buffers"][0]["uri"]=prefix+base64.b64encode(buf).decode()
+
 def test_expected_pin_matches_generator(tmp):
     out=generate(tmp)
     assert (out/"manifest.json").read_bytes()==PIN.read_bytes()
@@ -57,6 +71,28 @@ def test_camera_fov_semantics(tmp):
     mutate_gltf(out,lambda g:g["cameras"][0]["perspective"].__setitem__("yfov",0.6))
     p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False)
     assert "camera framing" in p.stderr
+
+def test_camera_rotation_semantics(tmp):
+    out=generate(tmp)
+    mutate_gltf(out,lambda g:g["nodes"][9].__setitem__("rotation",[0.0,0.0,0.0,1.0]))
+    p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False)
+    assert "camera rotation" in p.stderr
+
+def test_light_rotation_semantics(tmp):
+    out=generate(tmp)
+    mutate_gltf(out,lambda g:g["nodes"][10].__setitem__("rotation",[0.0,0.0,0.0,1.0]))
+    p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False)
+    assert "light rotation" in p.stderr
+
+def test_floor_tangent_handedness(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        tangent_accessor=g["meshes"][8]["primitives"][0]["attributes"]["TANGENT"]
+        for vertex in range(g["accessors"][tangent_accessor]["count"]):
+            set_accessor_float(g,tangent_accessor,vertex,3,1.0)
+    mutate_gltf(out,mutate)
+    p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False)
+    assert "tangent handedness" in p.stderr
 
 def test_source_status_rejected_by_generator(tmp):
     source=json.loads(SOURCE.read_text())
@@ -103,6 +139,9 @@ TESTS=[
     test_light_intensity_semantics,
     test_material_binding_semantics,
     test_camera_fov_semantics,
+    test_camera_rotation_semantics,
+    test_light_rotation_semantics,
+    test_floor_tangent_handedness,
     test_source_status_rejected_by_generator,
     test_runtime_status_semantics,
     test_reject_embedded_texture_or_baked_lighting_path,
