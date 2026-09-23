@@ -69,8 +69,8 @@
       "title": "Last-successful preset recall and reapply",
       "source_ids": ["GENSHIN-5.7-UPDATE"],
       "status": "implemented_registered_regression_pending_exact_head_gates",
-      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h", "Engine/Scene/ShadowbladeActions.cpp"],
-      "acceptance": "Only successful owner-bound preset application becomes remembered; failed applies do not replace it; transient encounter/training resets preserve the remembered selection; reapply routes through existing preset validation."
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeLoadout.h", "Engine/Scene/ShadowbladeActions.h", "Engine/Scene/ShadowbladeActions.cpp"],
+      "acceptance": "Only successful authoritative preset application becomes remembered, including the established direct loadout apply path; failed applies do not replace it; transient encounter/training resets preserve the remembered selection; reapply routes through existing preset validation."
     },
     {
       "id": "QOL-029",
@@ -78,8 +78,8 @@
       "title": "Human-readable clearable preset labels with spaces",
       "source_ids": ["ZZZ-PLAYER-PRESET-NAMES-20260711"],
       "status": "implemented_registered_regression_pending_exact_head_gates",
-      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h", "Engine/Scene/ShadowbladeActions.cpp"],
-      "acceptance": "Saved slots accept bounded labels with internal spaces through their paired Shadowblade owner; invalid/cross-owner edits fail atomically; the public workbench view is const-only so its state cannot be copy-assigned across owners; transient resets preserve labels; label clearing does not alter the saved build or current equipment."
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeLoadout.h", "Engine/Scene/ShadowbladeActions.h", "Engine/Scene/ShadowbladeActions.cpp"],
+      "acceptance": "Saved slots accept bounded labels with internal spaces through their paired Shadowblade owner; invalid/cross-owner edits fail atomically; labels remain paired with saved presets across whole-loadout assignment; the public workbench view is const-only; transient resets preserve labels; label clearing does not alter the saved build or current equipment."
     }
   ],
   "counts": {
@@ -94,12 +94,16 @@
     "merged": 0
   },
   "review_repairs": [
-    "CurrentSlot scoring removes newly activated family synergy before focus scoring.",
-    "Bounded task/backlog/receipt records were added before acceptance.",
-    "Stateful preset metadata is accessible only through its paired ShadowbladeActions owner.",
-    "ResetTransientStatePreservingLoadout preserves workbench metadata as persistent loadout session state.",
-    "Registered tests use the owner API and cover cross-owner rejection plus transient-reset persistence.",
-    "The public LoadoutWorkbench accessor is const-only, closing the implicit copy-assignment path that could copy metadata across owners."
+    "P1: CurrentSlot scoring now removes newly activated family synergy before focus scoring.",
+    "P1: The bounded task, backlog, and receipt records were added so allowed paths and gates are reviewable.",
+    "P2: Stateful preset metadata operations are bound to the paired ShadowbladeActions owner rather than accepting an arbitrary foreign loadout.",
+    "P2: ResetTransientStatePreservingLoadout preserves the new persistent preset metadata alongside the authoritative loadout.",
+    "P2: The public LoadoutWorkbench accessor is const-only, closing implicit cross-owner workbench assignment.",
+    "P2: Preset labels and last-applied metadata live in ShadowbladeLoadout so whole-loadout replacement copies or clears them atomically with the saved build.",
+    "P2: Authoritative ShadowbladeLoadout::ApplyPreset records recall on every successful apply, including the established direct mutable-loadout path, with direct-path regression coverage.",
+    "P2: The retained run receipt now lists and describes ShadowbladeLoadout.h and its metadata/bookkeeping changes.",
+    "P2: GAME-141, QOL-029, and durable coordination path inventories now include ShadowbladeLoadout.h.",
+    "P2: Backlog, STATE, and run receipt now consistently retain the complete two-P1/eight-P2 independent-review repair history."
   ],
   "known_failed_gate": {
     "head": "6957ff8d913e0a70c18df7deb0bc13b572bc304c",
@@ -117,5 +121,13 @@
     "release_manifest_result": "success",
     "reason_not_final": "fresh independent review found a const-ownership escape via the non-const workbench accessor; repaired on a later head"
   },
-  "next_action": "Run exact-head hosted Windows Debug/Release and release-manifest gates on the final PR 48 record head, obtain fresh independent review on that same head, repair/rerun if needed, then expected-head merge if all gates are clean."
+  "superseded_green_gate_after_code_repairs": {
+    "head": "0b9e6d88bb70070475b052e426b7b25d8f148ff4",
+    "windows_run": 35934146994,
+    "windows_result": "success",
+    "release_manifest_run": 35934146841,
+    "release_manifest_result": "success",
+    "reason_not_final": "fresh independent review found stale durable path inventories and review-history records; repaired by later documentation-only commits"
+  },
+  "next_action": "Use the final durable-record repair commit as the exact candidate, require green Windows Debug/Release and release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
 }
