@@ -1,0 +1,150 @@
+{
+  "axes": {
+    "forward": "+Z",
+    "right": "-X per glTF convention",
+    "up": "+Y"
+  },
+  "camera": {
+    "aspect_ratio": [
+      16,
+      9
+    ],
+    "pitch_degrees": -12.042574,
+    "translation": [
+      0.0,
+      2.4,
+      7.5
+    ],
+    "vertical_fov_degrees": 50.0,
+    "zfar": 100.0,
+    "znear": 0.1
+  },
+  "capture_intent": "Neutral material-response comparison. Absolute exposure and tonemapping are runtime-owned and are not encoded by glTF.",
+  "floor_material": {
+    "base_color_factor_linear": [
+      0.1,
+      0.1,
+      0.1,
+      1.0
+    ],
+    "material_name": "Floor_Neutral",
+    "metallic": 0.0,
+    "roughness": 0.9
+  },
+  "forbid_baked_lighting": true,
+  "geometry": {
+    "cube_half_extent": 0.5,
+    "sphere_lat_segments": 12,
+    "sphere_lon_segments": 24,
+    "sphere_radius": 0.6
+  },
+  "layout": {
+    "cube_yz": [
+      0.5,
+      -0.85
+    ],
+    "floor_half_extents_xz": [
+      3.5,
+      2.4
+    ],
+    "sphere_yz": [
+      0.65,
+      0.55
+    ],
+    "x_positions": [
+      -2.1,
+      -0.7,
+      0.7,
+      2.1
+    ]
+  },
+  "lights": [
+    {
+      "color_linear": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "intensity_lux": 1000.0,
+      "name": "NeutralKey",
+      "rotation_degrees": {
+        "x": -45.0,
+        "y": 30.0
+      },
+      "type": "directional"
+    },
+    {
+      "color_linear": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "intensity_lux": 250.0,
+      "name": "NeutralFill",
+      "rotation_degrees": {
+        "x": -60.0,
+        "y": -35.0
+      },
+      "type": "directional"
+    }
+  ],
+  "name": "Astral Neutral Material Gallery v0.1",
+  "provenance": "Original procedural calibration fixture authored for AnimeRPG; no third-party asset content.",
+  "schema_version": 1,
+  "stations": [
+    {
+      "base_color_factor_linear": [
+        0.18,
+        0.18,
+        0.18,
+        1.0
+      ],
+      "id": "midgray",
+      "label": "MidGray",
+      "material_name": "MidGray_Dielectric",
+      "metallic": 0.0,
+      "roughness": 0.5
+    },
+    {
+      "base_color_factor_linear": [
+        0.8,
+        0.8,
+        0.8,
+        1.0
+      ],
+      "id": "nearwhite",
+      "label": "NearWhite",
+      "material_name": "NearWhite_Dielectric",
+      "metallic": 0.0,
+      "roughness": 0.5
+    },
+    {
+      "base_color_factor_linear": [
+        0.02,
+        0.02,
+        0.02,
+        1.0
+      ],
+      "id": "nearblack",
+      "label": "NearBlack",
+      "material_name": "NearBlack_Dielectric",
+      "metallic": 0.0,
+      "roughness": 0.5
+    },
+    {
+      "base_color_factor_linear": [
+        0.56,
+        0.57,
+        0.58,
+        1.0
+      ],
+      "id": "chrome",
+      "label": "Chrome",
+      "material_name": "Chrome_Metal",
+      "metallic": 1.0,
+      "roughness": 0.12
+    }
+  ],
+  "status": "proposed_art_reference_not_runtime",
+  "units": "metres"
+}

@@ -1,0 +1,341 @@
+from __future__ import annotations
+import base64, copy, hashlib, json, math, struct, subprocess, sys, tempfile
+from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+GEN=ROOT/"Scripts/generate_material_gallery_gltf.py"
+VER=ROOT/"Scripts/verify_material_gallery_gltf.py"
+SOURCE=ROOT/"Content/Calibration/MaterialGallery/gallery-spec.json"
+PIN=ROOT/"Content/Calibration/MaterialGallery/expected-manifest.json"
+
+def run(args,ok=True):
+    p=subprocess.run([sys.executable,*map(str,args)],capture_output=True,text=True)
+    if ok and p.returncode!=0: raise AssertionError(p.stderr or p.stdout)
+    if not ok and p.returncode==0: raise AssertionError("expected failure")
+    return p
+
+def generate(tmp,source=SOURCE):
+    out=tmp/"out"; run([GEN,"--source",source,"--output",out]); return out
+
+def repin(out):
+    gltf=out/"material_gallery.gltf"; raw=gltf.read_bytes(); manifest=json.loads((out/"manifest.json").read_text())
+    manifest["files"][0]={"path":"material_gallery.gltf","bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()}
+    (out/"manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n"); return out/"manifest.json"
+
+def mutate_gltf(out,fn):
+    path=out/"material_gallery.gltf"; g=json.loads(path.read_text()); fn(g); path.write_text(json.dumps(g,indent=2,sort_keys=True)+"\n"); repin(out)
+
+def set_accessor_float(g, accessor_index, vertex_index, component_index, value):
+    accessor=g["accessors"][accessor_index]; assert accessor["componentType"]==5126
+    component_counts={"SCALAR":1,"VEC2":2,"VEC3":3,"VEC4":4}; components=component_counts[accessor["type"]]; view=g["bufferViews"][accessor["bufferView"]]
+    prefix="data:application/octet-stream;base64,"; uri=g["buffers"][0]["uri"]; assert uri.startswith(prefix)
+    buf=bytearray(base64.b64decode(uri[len(prefix):])); offset=view.get("byteOffset",0)+accessor.get("byteOffset",0)+(vertex_index*components+component_index)*4
+    struct.pack_into("<f",buf,offset,value); g["buffers"][0]["uri"]=prefix+base64.b64encode(buf).decode()
+
+def set_index_payload(g, accessor_index, values):
+    accessor=g["accessors"][accessor_index]; assert accessor["componentType"]==5123 and accessor["type"]=="SCALAR" and len(values)==accessor["count"]
+    view=g["bufferViews"][accessor["bufferView"]]; prefix="data:application/octet-stream;base64,"; uri=g["buffers"][0]["uri"]; assert uri.startswith(prefix)
+    buf=bytearray(base64.b64decode(uri[len(prefix):])); base=view.get("byteOffset",0)+accessor.get("byteOffset",0)
+    for i,value in enumerate(values): struct.pack_into("<H",buf,base+i*2,value)
+    accessor["min"]=[min(values)]; accessor["max"]=[max(values)]; g["buffers"][0]["uri"]=prefix+base64.b64encode(buf).decode()
+
+def scale_position_accessor(g, accessor_index, factor):
+    accessor=g["accessors"][accessor_index]; assert accessor["componentType"]==5126 and accessor["type"]=="VEC3"
+    view=g["bufferViews"][accessor["bufferView"]]; prefix="data:application/octet-stream;base64,"; uri=g["buffers"][0]["uri"]; assert uri.startswith(prefix)
+    buf=bytearray(base64.b64decode(uri[len(prefix):])); base=view.get("byteOffset",0)+accessor.get("byteOffset",0)
+    for vertex in range(accessor["count"]):
+        for component in range(3):
+            offset=base+(vertex*3+component)*4; value=struct.unpack_from("<f",buf,offset)[0]; struct.pack_into("<f",buf,offset,value*factor)
+    g["buffers"][0]["uri"]=prefix+base64.b64encode(buf).decode()
+    if factor>=0:
+        if "min" in accessor: accessor["min"]=[v*factor for v in accessor["min"]]
+        if "max" in accessor: accessor["max"]=[v*factor for v in accessor["max"]]
+    elif "min" in accessor and "max" in accessor:
+        old_min=list(accessor["min"]); old_max=list(accessor["max"])
+        accessor["min"]=[v*factor for v in old_max]; accessor["max"]=[v*factor for v in old_min]
+
+def append_float_accessor(g, values, accessor_type, include_minmax=False):
+    components={"SCALAR":1,"VEC3":3}[accessor_type]; prefix="data:application/octet-stream;base64,"; uri=g["buffers"][0]["uri"]; assert uri.startswith(prefix)
+    buf=bytearray(base64.b64decode(uri[len(prefix):]))
+    while len(buf)%4: buf.append(0)
+    offset=len(buf)
+    for value in values:
+        row=(value,) if accessor_type=="SCALAR" and not isinstance(value,(tuple,list)) else tuple(value)
+        assert len(row)==components; buf.extend(struct.pack("<"+"f"*components,*row))
+    byte_length=len(buf)-offset; g["buffers"][0]["uri"]=prefix+base64.b64encode(buf).decode(); g["buffers"][0]["byteLength"]=len(buf)
+    g["bufferViews"].append({"buffer":0,"byteOffset":offset,"byteLength":byte_length}); accessor={"bufferView":len(g["bufferViews"])-1,"componentType":5126,"count":len(values),"type":accessor_type}
+    if include_minmax:
+        flat=[float(v if accessor_type=="SCALAR" and not isinstance(v,(tuple,list)) else v[0]) for v in values]; accessor["min"]=[min(flat)]; accessor["max"]=[max(flat)]
+    g["accessors"].append(accessor); return len(g["accessors"])-1
+
+def test_expected_pin_matches_generator(tmp):
+    out=generate(tmp); assert (out/"manifest.json").read_bytes()==PIN.read_bytes(); run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json","--expected-manifest",PIN])
+
+def test_exact_check(tmp):
+    out=generate(tmp); run([GEN,"--source",SOURCE,"--output",out,"--check"])
+
+def test_light_intensity_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["extensions"]["KHR_lights_punctual"]["lights"][0].__setitem__("intensity",900.0)); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "lights" in p.stderr
+
+def test_material_binding_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["meshes"][0]["primitives"][0].__setitem__("material",3)); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "material binding" in p.stderr
+
+def test_uncontracted_material_property_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["materials"][0].__setitem__("emissiveFactor",[1.0,1.0,1.0])); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "material properties" in p.stderr
+
+def test_camera_fov_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["cameras"][0]["perspective"].__setitem__("yfov",0.6)); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "camera framing" in p.stderr
+
+def test_camera_rotation_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["nodes"][9].__setitem__("rotation",[0.0,0.0,0.0,1.0])); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "camera rotation" in p.stderr
+
+def test_light_rotation_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["nodes"][10].__setitem__("rotation",[0.0,0.0,0.0,1.0])); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "light rotation" in p.stderr
+
+def test_all_triangle_vertex_normals_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        normal_accessor=g["meshes"][4]["primitives"][0]["attributes"]["NORMAL"]
+        for vertex in (1,2,3): set_accessor_float(g,normal_accessor,vertex,2,-1.0)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "triangle vertex normal" in p.stderr
+
+def test_tangent_normal_orthogonality_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        tangent_accessor=g["meshes"][4]["primitives"][0]["attributes"]["TANGENT"]
+        set_accessor_float(g,tangent_accessor,0,0,0.0); set_accessor_float(g,tangent_accessor,0,1,0.0); set_accessor_float(g,tangent_accessor,0,2,1.0)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "tangent orthogonality" in p.stderr
+
+def test_nonfloor_tangent_handedness_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        tangent_accessor=g["meshes"][4]["primitives"][0]["attributes"]["TANGENT"]
+        for vertex in range(g["accessors"][tangent_accessor]["count"]): set_accessor_float(g,tangent_accessor,vertex,3,-1.0)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "mesh tangent frame" in p.stderr
+
+def test_nonfloor_tangent_alignment_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        tangent_accessor=g["meshes"][4]["primitives"][0]["attributes"]["TANGENT"]
+        c=math.cos(math.radians(80.0)); s=math.sin(math.radians(80.0))
+        for vertex in range(4):
+            set_accessor_float(g,tangent_accessor,vertex,0,c); set_accessor_float(g,tangent_accessor,vertex,1,s); set_accessor_float(g,tangent_accessor,vertex,2,0.0); set_accessor_float(g,tangent_accessor,vertex,3,1.0)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "mesh tangent frame" in p.stderr
+
+def test_station_geometry_sharing_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        original=g["meshes"][0]["primitives"][0]["attributes"]["POSITION"]
+        g["accessors"].append(copy.deepcopy(g["accessors"][original]))
+        g["meshes"][1]["primitives"][0]["attributes"]["POSITION"]=len(g["accessors"])-1
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "matched sphere geometry" in p.stderr
+
+def test_sphere_radius_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        pos_accessor=g["meshes"][0]["primitives"][0]["attributes"]["POSITION"]; scale_position_accessor(g,pos_accessor,0.5)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "sphere radius" in p.stderr
+
+def test_cube_extent_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        pos_accessor=g["meshes"][4]["primitives"][0]["attributes"]["POSITION"]; scale_position_accessor(g,pos_accessor,0.5)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "cube extent" in p.stderr
+
+def test_canonical_cube_vertex_payload_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        attrs=g["meshes"][4]["primitives"][0]["attributes"]; h=json.loads(SOURCE.read_text())["geometry"]["cube_half_extent"]
+        positions=[(-h,-h,h),(h,-h,h),(h,h,h),(-h,h,h)]
+        normals=[(0.0,0.0,1.0)]*4; tangents=[(1.0,0.0,0.0,1.0)]*4
+        for face in range(6):
+            for local in range(4):
+                vertex=face*4+local
+                for component,value in enumerate(positions[local]): set_accessor_float(g,attrs["POSITION"],vertex,component,value)
+                for component,value in enumerate(normals[local]): set_accessor_float(g,attrs["NORMAL"],vertex,component,value)
+                for component,value in enumerate(tangents[local]): set_accessor_float(g,attrs["TANGENT"],vertex,component,value)
+        g["accessors"][attrs["POSITION"]]["min"]=[-h,-h,h]; g["accessors"][attrs["POSITION"]]["max"]=[h,h,h]
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "canonical cube payload" in p.stderr
+
+def test_canonical_index_coverage_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        index_accessor=g["meshes"][4]["primitives"][0]["indices"]; set_index_payload(g,index_accessor,[0,1,2]*12)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "canonical indices" in p.stderr
+
+def test_mesh_morph_weights_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        primitive=g["meshes"][1]["primitives"][0]; primitive["targets"]=[{"POSITION":primitive["attributes"]["POSITION"]}]; g["meshes"][1]["weights"]=[1.0]
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "mesh properties" in p.stderr
+
+def test_primitive_morph_target_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        primitive=g["meshes"][1]["primitives"][0]; primitive["targets"]=[{"POSITION":primitive["attributes"]["POSITION"]}]
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "primitive properties" in p.stderr
+
+def test_animation_transform_override_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        time_accessor=append_float_accessor(g,[0.0],"SCALAR",include_minmax=True); scale_accessor=append_float_accessor(g,[(2.0,2.0,2.0)],"VEC3")
+        g["animations"]=[{"name":"StationScaleBypass","samplers":[{"input":time_accessor,"output":scale_accessor,"interpolation":"STEP"}],"channels":[{"sampler":0,"target":{"node":1,"path":"scale"}}]}]
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "gallery animations unsupported" in p.stderr
+
+def test_floor_tangent_handedness(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        tangent_accessor=g["meshes"][8]["primitives"][0]["attributes"]["TANGENT"]
+        for vertex in range(g["accessors"][tangent_accessor]["count"]): set_accessor_float(g,tangent_accessor,vertex,3,1.0)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "floor tangent frame" in p.stderr
+
+def test_floor_tangent_direction_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        tangent_accessor=g["meshes"][8]["primitives"][0]["attributes"]["TANGENT"]
+        for vertex in range(g["accessors"][tangent_accessor]["count"]):
+            set_accessor_float(g,tangent_accessor,vertex,0,-1.0); set_accessor_float(g,tangent_accessor,vertex,1,0.0); set_accessor_float(g,tangent_accessor,vertex,2,0.0); set_accessor_float(g,tangent_accessor,vertex,3,-1.0)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "floor tangent frame" in p.stderr
+
+def test_camera_transform_override_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["nodes"][9].__setitem__("scale",[1.0,1.0,-1.0])); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "camera transform" in p.stderr
+
+def test_light_transform_override_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["nodes"][10].__setitem__("scale",[1.0,1.0,-1.0])); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "light transform" in p.stderr
+
+def test_source_status_rejected_by_generator(tmp):
+    source=json.loads(SOURCE.read_text()); source["status"]="runtime_verified"; bad=tmp/"bad-source.json"; bad.write_text(json.dumps(source,indent=2,sort_keys=True)+"\n"); p=run([GEN,"--source",bad,"--output",tmp/"bad-out"],ok=False); assert "source status" in p.stderr
+
+def test_source_schema_bool_semantics(tmp):
+    out=generate(tmp); source=json.loads(SOURCE.read_text()); source["schema_version"]=True; bad=tmp/"bad-schema-source.json"; bad.write_text(json.dumps(source,indent=2,sort_keys=True)+"\n")
+    p=run([GEN,"--source",bad,"--output",tmp/"bad-schema-out"],ok=False); assert "source schema" in p.stderr
+    p=run([VER,out/"material_gallery.gltf","--source",bad],ok=False); assert "source schema" in p.stderr
+
+def test_source_capture_intent_semantics(tmp):
+    out=generate(tmp); source=json.loads(SOURCE.read_text()); source["capture_intent"]="Astral imported; runtime_verified; art_approved; parity achieved"; bad=tmp/"bad-source.json"; bad.write_text(json.dumps(source,indent=2,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",bad],ok=False); assert "source capture intent" in p.stderr
+
+def test_runtime_status_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["extras"]["astral_contract"].__setitem__("status","runtime_verified")); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "runtime status" in p.stderr
+
+def test_uncontracted_runtime_claim_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["extras"]["astral_contract"].__setitem__("art_approved",True)); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "runtime contract fields" in p.stderr
+
+def test_nested_extras_claim_semantics(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["cameras"][0].__setitem__("extras",{"runtime_verified":True,"art_approved":True})); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "nested extras unsupported" in p.stderr
+
+def test_nested_name_claim_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["NORMAL"]
+        g["accessors"][accessor]["name"]="Astral imported; runtime_verified; art_approved"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "normal accessor format fields" in p.stderr
+
+def test_uncontracted_manifest_claim_semantics(tmp):
+    out=generate(tmp); manifest=json.loads((out/"manifest.json").read_text()); manifest["runtime_verified"]=True; manifest["art_approved"]=True; (out/"manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "manifest fields" in p.stderr
+
+def test_manifest_intent_semantics(tmp):
+    out=generate(tmp); manifest=json.loads((out/"manifest.json").read_text()); manifest["intent"]="Astral imported, runtime_verified, art_approved, parity achieved"; (out/"manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "manifest intent" in p.stderr
+
+def test_manifest_schema_bool_semantics(tmp):
+    out=generate(tmp); manifest=json.loads((out/"manifest.json").read_text()); manifest["schema_version"]=True; (out/"manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "manifest schema" in p.stderr
+
+def test_reject_embedded_texture_or_baked_lighting_path(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g.__setitem__("images",[{"uri":"data:image/png;base64,"}])); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "must not embed texture lighting" in p.stderr
+
+def test_position_accessor_declared_bounds_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        pos_accessor=g["meshes"][0]["primitives"][0]["attributes"]["POSITION"]
+        g["accessors"][pos_accessor]["min"]=[100.0,100.0,100.0]; g["accessors"][pos_accessor]["max"]=[101.0,101.0,101.0]
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "position bounds" in p.stderr
+
+def test_position_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        pos_accessor=g["meshes"][0]["primitives"][0]["attributes"]["POSITION"]; g["accessors"][pos_accessor]["type"]="VEC4"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "position accessor format" in p.stderr
+
+def test_normal_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["NORMAL"]; g["accessors"][accessor]["type"]="VEC4"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "normal accessor format" in p.stderr
+
+def test_tangent_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["TANGENT"]; g["accessors"][accessor]["type"]="VEC3"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "tangent accessor format" in p.stderr
+
+def test_texcoord_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["TEXCOORD_0"]; g["accessors"][accessor]["type"]="VEC3"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "texcoord accessor format" in p.stderr
+
+def test_index_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["indices"]; g["accessors"][accessor]["type"]="VEC2"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "index accessor format" in p.stderr
+
+def test_float_attribute_normalized_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["NORMAL"]; g["accessors"][accessor]["normalized"]=True
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "normal accessor format" in p.stderr
+
+def test_accessor_bounds(tmp):
+    out=generate(tmp); mutate_gltf(out,lambda g:g["bufferViews"][0].__setitem__("byteLength",4)); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "accessor within bufferView" in p.stderr
+
+def test_boolean_accessor_reference_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        for mesh_index in range(4): g["meshes"][mesh_index]["primitives"][0]["attributes"]["NORMAL"]=True
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "accessor index" in p.stderr
+
+def test_index_accessor_declared_bounds_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["indices"]
+        g["accessors"][accessor]["min"]=[999]; g["accessors"][accessor]["max"]=[1000]
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "index bounds" in p.stderr
+
+def test_accessor_alignment_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        prefix="data:application/octet-stream;base64,"; uri=g["buffers"][0]["uri"]; assert uri.startswith(prefix)
+        buf=b"\x00\x00"+base64.b64decode(uri[len(prefix):])
+        g["buffers"][0]["uri"]=prefix+base64.b64encode(buf).decode(); g["buffers"][0]["byteLength"]=len(buf)
+        for view in g["bufferViews"]: view["byteOffset"]+=2
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "accessor alignment" in p.stderr
+
+def test_expected_pin_negative(tmp):
+    out=generate(tmp); m=json.loads((out/"manifest.json").read_text()); (out/"manifest.json").write_text(json.dumps(m,indent=4,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json","--expected-manifest",PIN],ok=False); assert "expected manifest pin" in p.stderr
+
+def test_crlf_source_and_pin_portability(tmp):
+    source=tmp/"source-crlf.json"; source.write_bytes(SOURCE.read_bytes().replace(b"\n",b"\r\n")); pin=tmp/"pin-crlf.json"; pin.write_bytes(PIN.read_bytes().replace(b"\n",b"\r\n")); out=generate(tmp,source); assert (out/"manifest.json").read_bytes()==PIN.read_bytes(); run([VER,out/"material_gallery.gltf","--source",source,"--manifest",out/"manifest.json","--expected-manifest",pin])
+
+TESTS=[
+    test_expected_pin_matches_generator,test_exact_check,test_light_intensity_semantics,test_material_binding_semantics,
+    test_uncontracted_material_property_semantics,test_camera_fov_semantics,test_camera_rotation_semantics,test_light_rotation_semantics,
+    test_all_triangle_vertex_normals_semantics,test_tangent_normal_orthogonality_semantics,test_nonfloor_tangent_handedness_semantics,
+    test_nonfloor_tangent_alignment_semantics,test_station_geometry_sharing_semantics,test_sphere_radius_semantics,test_cube_extent_semantics,
+    test_canonical_cube_vertex_payload_semantics,test_canonical_index_coverage_semantics,test_mesh_morph_weights_semantics,
+    test_primitive_morph_target_semantics,test_animation_transform_override_semantics,test_floor_tangent_handedness,test_floor_tangent_direction_semantics,
+    test_camera_transform_override_semantics,test_light_transform_override_semantics,test_source_status_rejected_by_generator,test_source_schema_bool_semantics,
+    test_source_capture_intent_semantics,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,test_nested_extras_claim_semantics,
+    test_nested_name_claim_semantics,test_uncontracted_manifest_claim_semantics,test_manifest_intent_semantics,test_manifest_schema_bool_semantics,
+    test_reject_embedded_texture_or_baked_lighting_path,test_position_accessor_declared_bounds_semantics,test_position_accessor_format_semantics,
+    test_normal_accessor_format_semantics,test_tangent_accessor_format_semantics,test_texcoord_accessor_format_semantics,test_index_accessor_format_semantics,
+    test_float_attribute_normalized_semantics,test_accessor_bounds,test_boolean_accessor_reference_semantics,test_index_accessor_declared_bounds_semantics,
+    test_accessor_alignment_semantics,test_expected_pin_negative,test_crlf_source_and_pin_portability,
+]
+
+def main():
+    passed=0
+    for test in TESTS:
+        with tempfile.TemporaryDirectory() as td:
+            test(Path(td)); passed+=1; print("PASS",test.__name__)
+    print(f"PASS: {passed}/{len(TESTS)} material-gallery regressions")
+if __name__=="__main__": main()
