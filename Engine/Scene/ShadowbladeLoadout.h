@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
 
 namespace Astral::Scene {
 
@@ -92,6 +93,8 @@ struct ShadowbladeUpgradeRecommendation {
     int nextCost{};
     bool affordable{};
 };
+
+class ShadowbladeLoadoutWorkbench;
 
 class ShadowbladeLoadout {
 public:
@@ -370,6 +373,8 @@ public:
     }
 
 private:
+    friend class ShadowbladeLoadoutWorkbench;
+
     struct WeaponStats {
         int attack{};
         int guard{};
@@ -606,6 +611,8 @@ private:
     };
     std::array<bool, ModuleSlotCount> moduleOccupied_{};
     std::array<ShadowbladeLoadoutPreset, PresetSlots> presets_{};
+    std::array<std::string, PresetSlots> presetLabels_{};
+    std::size_t lastAppliedPreset_{PresetSlots};
     std::array<std::uint8_t, WeaponCount> weaponTuneRanks_{};
     std::array<std::uint8_t, ModuleCount> moduleTuneRanks_{};
     std::array<bool, ModuleCount> moduleProtected_{};
