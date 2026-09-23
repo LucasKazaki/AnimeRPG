@@ -18,8 +18,8 @@
   "pass": "GAME-PASS15-SHADOW-CRYPT-EXPEDITION-2026-09-22",
   "task_packet": "Tasks/GAME-PASS15-SHADOW-CRYPT-EXPEDITION-2026-09-22.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS15.md",
-  "pr": null,
-  "final_head": "pending_self_reference_see_pass15_pr_final_receipt",
+  "pr": 34,
+  "final_head": "pending_self_reference_see_pr_34_final_receipt",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -53,5 +53,5 @@
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release deployment and networking unchanged"
   },
-  "next_action": "Open/reuse one scoped PR for the exact pass-15 head, require hosted Windows Debug/Release and release-integrity checks plus a fresh independent Codex review, repair material findings without weakening acceptance, re-read live main/head, then merge exact reviewed/tested head if all gates are green. Final receipts stay in PR discussion/task output to avoid a self-referential unverified commit chain."
+  "next_action": "Require hosted Windows Debug/Release and release-integrity checks plus a fresh independent Codex review on PR #34, repair material findings without weakening acceptance, re-read live main/head, then merge exact reviewed/tested head if all gates are green. Final receipts stay in PR discussion/task output to avoid a self-referential unverified commit chain."
 }
