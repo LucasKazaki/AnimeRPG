@@ -75,7 +75,8 @@ def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,verify_floor_
     req(all(abs(sum(c*c for c in t[:3])-1.0)<1e-4 and t[3] in (-1.0,1.0) for t in tangent),"unit tangents")
     req(all(0.0<=u<=1.0 and 0.0<=v<=1.0 for u,v in uv),"uv range"); req(all(0<=i[0]<len(pos) for i in indices),"index range"); req(len(indices)%3==0,"triangle index count")
     for k in range(0,len(indices),3):
-        ia,ib,ic=(indices[k][0],indices[k+1][0],indices[k+2][0]); cr=tri_normal(pos[ia],pos[ib],pos[ic]); req(dot(cr,normal[ia])>1e-8,"triangle winding")
+        ia,ib,ic=(indices[k][0],indices[k+1][0],indices[k+2][0]); cr=tri_normal(pos[ia],pos[ib],pos[ic]); req(length(cr)>1e-12,"triangle area")
+        for vi in (ia,ib,ic): req(dot(cr,normal[vi])>1e-8,"triangle vertex normal")
     if verify_floor_frame: verify_floor_tangent_frame(pos,normal,tangent,uv,indices)
     return pos
 
@@ -103,7 +104,7 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     req(len(g["buffers"])==1,"buffer count"); buf=data_uri(g["buffers"][0]["uri"],"data:application/octet-stream;base64,"); req(len(buf)==g["buffers"][0]["byteLength"],"buffer length")
     material_specs=source["stations"]+[source["floor_material"]]; req(len(g["materials"])==len(material_specs),"material count")
     for material,s in zip(g["materials"],material_specs):
-        req(material["name"]==s["material_name"],"material name"); expected={"baseColorFactor":s["base_color_factor_linear"],"metallicFactor":s["metallic"],"roughnessFactor":s["roughness"]}; req(material["pbrMetallicRoughness"]==expected,"material values")
+        req(set(material)=={"name","pbrMetallicRoughness"},"material properties"); req(material["name"]==s["material_name"],"material name"); expected={"baseColorFactor":s["base_color_factor_linear"],"metallicFactor":s["metallic"],"roughnessFactor":s["roughness"]}; req(material["pbrMetallicRoughness"]==expected,"material values")
     geometry=source["geometry"]; sphere_counts=((geometry["sphere_lat_segments"]+1)*(geometry["sphere_lon_segments"]+1),6*geometry["sphere_lon_segments"]*(geometry["sphere_lat_segments"]-1)); cube_counts=(24,36); floor_counts=(4,6)
     req(len(g["meshes"])==9,"mesh count")
     for i in range(4): verify_mesh(g,buf,i,i,sphere_counts)
