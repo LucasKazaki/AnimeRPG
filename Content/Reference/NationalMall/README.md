@@ -23,6 +23,7 @@ Source measurements remain in the units used by the authoritative page. Convert 
 - National Park Service, Constitution Gardens Cultural Landscape: https://www.nps.gov/articles/600012.htm
 - National Park Service, Vietnam Veterans Memorial overview: https://www.nps.gov/vive/learn/historyculture/vvmoverview.htm
 - National Park Service, World War II Memorial FAQ: https://www.nps.gov/wwii/faqs.htm
+- National Park Service, World War II Memorial place page: https://www.nps.gov/places/national-world-war-ii-memorial.htm
 - National Park Service, The Mall Cultural Landscape: https://www.nps.gov/articles/600213.htm
 - Architect of the Capitol, U.S. Capitol Grounds: https://www.aoc.gov/explore-capitol-campus/buildings-grounds/capitol-grounds
 - Smithsonian Institution, Museum Maps: https://www.si.edu/visit/maps

@@ -32,7 +32,7 @@ def mutate(fn) -> subprocess.CompletedProcess[str]:
 
 def test_valid() -> None:
     proc = run(LEDGER)
-    assert "10 authoritative" in proc.stdout
+    assert "11 authoritative" in proc.stdout
 
 
 def test_schema_bool_rejected() -> None:
