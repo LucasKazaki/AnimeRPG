@@ -6,92 +6,75 @@ Bounded verification-only packet for the already-integrated Win32 `AstralEditor`
 
 Owned branch: `engine/2026-09-22-editor-runtime-smoke`.
 Admitted baseline from `main`: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`.
-Latest observed `main`: `7dfaeeb340e57d1024a8bc818c65c82cd391d4ae`. Separate game-worker work was not absorbed or rebased into this engine branch.
-Current multi-size verification candidate: `d71f5446bfbc7360778101f376a5d6deeaec17a8`.
-Last fully hosted integration receipt before this evidence repair: source/receipt head `0d2bc2f89171282cdaa14f8291e2d37e63a301ad`, synthetic PR merge `3d260d2e1baa726d36993deaf85d6b47f5919f00`, tested base `7dfaeeb340e57d1024a8bc818c65c82cd391d4ae`.
-`Tests/EditorRuntimeSmoke.cpp` blob: `dff48af572093bc99b45ef11a0f1d60390f3d425`.
+Latest observed `main` before this update: `3eaeb72d65c98f887e827999a78eabb636120dfe`. Unrelated game-worker work was not absorbed or rebased into this engine branch.
+Current maximized-state verification candidate: `7c68db8bd58e62cc54c39566723e11fd5385e2da`.
+`Tests/EditorRuntimeSmoke.cpp` blob: `b7d595d509606a4f607914e244d8f1fc01dfb210`.
 `CMakeLists.txt` remains blob `4fd471151acb4b5919ccef4a92f49da12bd8d1f1`.
 
 Allowed paths only: `CMakeLists.txt`, `Tests/EditorRuntimeSmoke.cpp`, this task, `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`, and `Docs/Research/ENGINE-CAPABILITIES.json`. One active writer only. Do not rebase, merge, force-push, or absorb unrelated work.
 
-## Selected verification coverage gap
+## Selected verification gap
 
-The integrated E11 editor-shell packet requires interactive resize acceptance at 800x600, 1280x720, 1440x900, maximized desktop size, and one deliberately short/narrow size if Windows permits it. The later automated runtime smoke had narrowed its executable resize sequence to 800x600 and 420x260 only.
+The admitted E11 shell matrix requires untouched startup, 800x600, 1280x720, 1440x900, maximized desktop state, and a deliberately narrow state. The runtime smoke already automated the four fixed sizes but still left maximized behavior entirely to manual evidence. That left a dependency-ready verification gap: no executable assertion proved that entering the native Windows maximized state preserves shell identity, selection/Inspector synchronization, positive-area containment, and disabled pending-tool state, or that restore returns to a valid normal state.
 
-That was an acceptance-coverage regression. A later verification packet must not silently reduce an already-admitted editor-shell acceptance matrix. This pass restores deterministic automated checks for the two omitted fixed resolutions while keeping maximized-desktop validation as native interactive evidence because the available hosted suite does not provide the owned desktop acceptance context required by project controls.
-
-This is verification hardening, not a new editor feature. It does not enable any pending toolbar action or expand engine architecture.
+This pass hardens verification only. It does not enable editor features or change production runtime behavior.
 
 ## Bounded implementation
 
-Commit `d71f5446bfbc7360778101f376a5d6deeaec17a8` changes only `Tests/EditorRuntimeSmoke.cpp`:
+Commit `7c68db8bd58e62cc54c39566723e11fd5385e2da` changes only `Tests/EditorRuntimeSmoke.cpp`:
 
-- retains startup containment before any resize;
-- retains the existing 800x600 check;
-- adds the previously omitted 1280x720 check using the existing bounded asynchronous `ResizeAndCheck` path;
-- adds the previously omitted 1440x900 check using the same path;
-- retains the deliberately narrow 420x260 check;
-- every fixed-size check still requires the same original 12 child HWND identities, semantic Static/Button bindings, selection/Inspector state, enabled/disabled state, positive child area, and client containment;
-- updates the PASS text so a retained receipt states all four automated resize dimensions explicitly.
+- adds a 3-second bounded show-state deadline;
+- adds `MaximizeRestoreAndCheck(...)` after the retained 1440x900 check and before the 420x260 narrow check;
+- records the pre-maximize outer width/height and rejects an empty normal rectangle;
+- requests maximize with `ShowWindowAsync(..., SW_MAXIMIZE)` and polls until `IsZoomed` is true;
+- while maximized, requires the original child HWND inventory, semantic shell, selection/Inspector state, disabled pending tools, positive child area, and client containment to settle successfully before the deadline;
+- requests `SW_RESTORE`, requires `IsZoomed` to clear, requires the pre-maximize outer width/height to return, and revalidates the same shell/containment invariants;
+- retains startup, 800x600, 1280x720, 1440x900 and 420x260 validation, stable top-level-window checks, process-identity hardening, recovery containment, and safe final close;
+- updates PASS text so retained native output identifies the maximize/restore state explicitly.
 
-GitHub commit inspection reports only this file changed. Production editor source, CMake registration, workflows, dependencies, graphics API, game content, scheduler configuration, release state, and architecture are unchanged.
+No production editor source, CMake registration, workflow, dependency, graphics API, scheduler configuration, game content, release state, or deployment state changed in this implementation commit.
 
-The prior shutdown hardening remains intact: PID/HWND checks require the retained launched-process handle to be live, final close pins the original launch PID/TID, requires a successful suspended-thread `GetThreadContext(CONTEXT_CONTROL)` barrier, posts asynchronous `WM_CLOSE`, and verifies `ResumeThread` returned previous suspend count one before waiting for process exit.
+## Research basis, rechecked 2026-09-23 UTC
 
-## Primary research basis, rechecked 2026-09-23 UTC
-
-- Epic, Unreal Engine 5.8, Viewport Toolbar: https://dev.epicgames.com/documentation/en-us/unreal-engine/viewport-toolbar
-  - documents viewport layout/sizing controls and improved overflow management for smaller viewports. Applicability: editor verification must cover materially different viewport sizes rather than a single convenient size.
-- Epic, Unreal Engine 5.8, Unreal Editor Interface: https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-editor-interface
-  - documents the Level Viewport, Outliner, Details and Content surfaces that Astral's current E11 shell is intentionally approximating at a much smaller scope.
-- Unity 6.0, `EditorWindow.maximized`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html
-  - documents maximized editor-window state. Applicability: the original E11 native acceptance requirement for a maximized desktop state remains valid and is not replaced by fixed pixel sizes.
-- Unity 6.1, Scene view navigation: https://docs.unity3d.com/Manual/SceneViewNavigation.html
-  - documents the Scene view as an interactive authoring camera/view. Applicability: Astral's editor viewport must remain usable across layout changes, even though Astral does not yet claim Unity-equivalent scene tooling.
-- Microsoft Learn `SetWindowPos`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos
-  - `SWP_ASYNCWINDOWPOS` posts the resize request when the caller and target input queues differ. Applicability: the smoke uses this bounded asynchronous path for all four fixed sizes.
-- Microsoft Learn `GetWindowRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect
-  - returns screen-coordinate window bounds with exclusive right/bottom edges. Applicability: the smoke polls for exact completion of each requested outer-window size before validating shell state and containment.
-- Retained Win32 basis: `GetThreadContext`, `SuspendThread`, `ResumeThread`, `PROCESS_INFORMATION`, `PostMessageW`, `GetWindowThreadProcessId`, `WaitForSingleObject`, `TerminateProcess`, Job Objects, and child-window APIs.
+- Microsoft Learn `ShowWindowAsync`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindowasync
+  - posts a show-state request without blocking the caller; success means the operation was started. Applicability: bounded cross-thread maximize/restore request.
+- Microsoft Learn `ShowWindow`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow
+  - defines `SW_MAXIMIZE` / `SW_SHOWMAXIMIZED` and `SW_RESTORE`. Applicability: requested show states.
+- Microsoft Learn `IsZoomed`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-iszoomed
+  - reports whether a window is maximized. Applicability: positive confirmation of native maximized state rather than inferring it from pixel dimensions.
+- Epic, Unreal Engine 5.8, Using Editor Viewports: https://dev.epicgames.com/documentation/unreal-engine/using-editor-viewports-in-unreal-engine
+  - documents perspective 3D and orthographic 2D viewports, multi-viewport layouts, and maximized/immersive viewport workflows. Applicability: editor layout verification includes materially different and maximized authoring states.
+- Epic, Unreal Engine 5.8, Viewport Toolbar: https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar
+  - documents switching between maximized selected viewport and multi-layout workflows.
+- Unity 6.0 `EditorWindow.maximized`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html
+  - exposes maximized editor-window state.
+- Unity 6.0 `FullScreenMode.MaximizedWindow`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/FullScreenMode.MaximizedWindow.html
+  - identifies the OS maximized-window mode on Windows/macOS.
 
 Public documentation is used for behavioral/API comparison only. No proprietary Unreal Engine or Unity source was copied and no dependency was imported.
 
 ## Verification state
 
-Previous clean receipt `6c0bd849c2a5feeb1400d7fc263e155f48ea17b7` completed all three hosted workflows successfully and received a clean fresh Codex review at `2026-09-23T14:29:04.697315Z`. That predates the multi-size source change.
+The content-identical pre-change checkpoint `e0dfdd56013cb8596a658a4737121c37b258f025` had green Windows, profiling and release-manifest workflows plus a fresh Codex review with no major issue. It did not automate maximize/restore.
 
-The first workflow set triggered directly by source candidate `d71f5446...` was superseded by the required evidence commits:
+For candidate `7c68db8...`, GitHub commit inspection reports one changed file, `Tests/EditorRuntimeSmoke.cpp`. A disposable portable C++17 show-state state-machine fixture, SHA-256 `a3a0b46c139470dfd93ca0a630338f02b728c09ee9e362e5997e86eb0cfed2c3`, passed warning-clean GCC and Clang ASan+UBSan with leak detection. That fixture is source-logic evidence only, not Win32 GUI evidence.
 
-- profiling capture portability `35881476543`: PASS;
-- Windows build and deterministic tests `35881476517`: CANCELLED after a newer branch head was pushed;
-- release manifest integrity `35881476562`: CANCELLED after a newer branch head was pushed.
+At the evidence-update checkpoint, profiling run `35895133184` had passed. Windows run `35895133126`, job `107297064090`, had passed repository/R0 safety contracts, VS2022 x64 configure, Debug build, and deterministic Debug tests and was still progressing through Release. Release-manifest run `35895133112` was still in progress. These observations are not promoted to final exact-head acceptance; final workflow conclusions are pinned in PR metadata/checkpoint after the evidence writes.
 
-Those canceled runs are not treated as a pass or failure of the final receipt.
+Hosted deterministic CTest intentionally excludes interactive `EditorRuntimeSmoke`, so hosted green checks can establish compilation and deterministic containment coverage but cannot establish native GUI/GPU acceptance.
 
-Exact integration receipt `0d2bc2f89171282cdaa14f8291e2d37e63a301ad` completed all replacement hosted workflows successfully against synthetic PR merge `3d260d2e1baa726d36993deaf85d6b47f5919f00`, whose merge message records source `0d2bc2f8...` into tested base `7dfaeeb340e57d1024a8bc818c65c82cd391d4ae`:
+## Retained gates
 
-- Windows build and deterministic tests `35881865946`, job `107252459186`: PASS, completed `2026-09-23T15:32:02Z`; every reported safety, VS2022 x64 configure, Debug build/test, Release build/test, runtime/prerequisite, static-verifier, and clean-tree stage passed;
-- profiling capture portability `35881866081`: PASS;
-- release manifest integrity `35881866038`: PASS.
-
-Fresh Codex review of exact `0d2bc2f8...` completed at `2026-09-23T15:33:36.727690Z`. It reported one evidence-only P2: this task, QA receipt, and capability record still described the superseded source-candidate workflow runs as running and did not preserve the exact `0d2bc2f8...` replacement workflow set. No new runtime-code finding was reported by that review. This evidence repair corrects those records. Because the repair itself creates a later content-addressed commit, the post-write receipt head and its own workflow/review state are pinned in PR metadata/checkpoint rather than requiring a document to contain its own not-yet-computed SHA.
-
-Hosted deterministic suites do not execute interactive `EditorRuntimeSmoke`; hosted green checks are not native GUI acceptance.
-
-## Retained E11 hardening and gates
-
-1. `EditorContainmentTests` executes in hosted deterministic suites while interactive `EditorRuntimeSmoke` remains separate.
-2. Containment coverage exercises worker-local `CleanupProcess`, supervisor whole-job cleanup to zero active processes, and rejection of a zero-exit worker that leaves a descendant.
-3. Shell verification retains stable single top-level identity, the original 12 child HWND/class inventory, semantic Static/Button binding, exact Outliner/assets rows, selection/Inspector synchronization, `LBS_NOTIFY`, bounded cross-process messages, positive-area startup containment, and final stable-window revalidation.
-4. Automated fixed-size runtime checks cover 800x600, 1280x720, 1440x900 and 420x260.
-5. Maximized-desktop layout, screenshots and human-visible usability remain native interactive acceptance requirements.
-6. PID-based HWND checks require retained launched-process-handle liveness. Final close requires exact original PID/TID ownership plus a successful suspended-thread context barrier, followed by verified resume before any process wait.
-7. `native_evidence` remains empty. Independent final acceptance remains false until the exact post-repair receipt receives fresh independent review and registered native Windows acceptance is retained.
-8. Issue #7 remains open, so the historical R0 runner is blocked and must not be invoked.
+1. `EditorContainmentTests` remains hosted and deterministic; interactive `EditorRuntimeSmoke` remains a native gate.
+2. The shell smoke requires one stable process-owned top-level window, the original 12 child HWND/class identities, semantic Static/Button bindings, disabled pending tools, exact Outliner/assets rows, `LBS_NOTIFY`, selection/Inspector synchronization, bounded cross-process messages, positive-area containment, and safe shutdown.
+3. Automated runtime states now cover untouched startup, 800x600, 1280x720, 1440x900, native Windows maximized+restored, and 420x260.
+4. Human-visible screenshots and usability at actual maximized desktop dimensions remain native evidence requirements. Automation does not substitute for that visual evidence.
+5. `native_evidence` remains empty. Independent final acceptance remains false until the exact post-evidence receipt receives fresh independent review and registered native Windows acceptance is retained.
+6. Issue #7 remains open, so the historical R0 runner is blocked and must not be invoked.
 
 ## Registered native handoff
 
-Only after green hosted checks and a fresh clean independent review of the exact post-repair receipt tree, the registered Windows executor should use one owned interactive desktop:
+Only after green hosted checks and a fresh clean independent review of the exact post-evidence receipt tree, the registered Windows executor should use one owned interactive desktop:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -105,23 +88,14 @@ ctest --test-dir ../AnimeRPG-e11-runtime-build -C Release --output-on-failure -R
 
 Retain exact reviewed source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driver identity, exact commands, complete stdout/stderr, exit codes, UTC timestamps, and process inspection proving zero owned contained processes after any failure or interruption.
 
-The interactive evidence must preserve the original E11 shell matrix rather than shrinking to the automated subset:
-
-- untouched default startup layout;
-- 800x600;
-- 1280x720;
-- 1440x900;
-- maximized desktop size;
-- 420x260 as the deliberately short/narrow case, or the closest OS-permitted narrow size if window minimum constraints intervene.
-
-Capture screenshots for each state. Confirm panels/controls remain contained, viewport paint does not bleed into adjacent surfaces, selection and Inspector state remain synchronized, pending toolbar actions remain disabled, and final close leaves the launch thread resumed without acting on an unrelated/recycled HWND. Separately launch `AstralGame` from the same exact source/build and record that it remains a distinct executable with no behavior change attributable to this verification packet. That separate launch is a regression check, not a resumption of game-content testing.
+Capture screenshots for untouched startup, 800x600, 1280x720, 1440x900, actual maximized desktop state, and 420x260 or the closest OS-permitted narrow state. Confirm panels/controls remain contained, viewport paint does not bleed into adjacent surfaces, selection/Inspector state remains synchronized, pending toolbar actions remain disabled, maximize restores cleanly, and final close leaves the launch thread resumed without acting on an unrelated/recycled HWND. Separately launch `AstralGame` from the same exact source/build as a no-regression check.
 
 ## Rollback and stop conditions
 
-Rollback only the multi-size additions if native evidence shows an admitted fixed size cannot be established reliably by the existing bounded asynchronous resize contract, or if the added checks introduce a reproducible regression. Do not remove an original E11 acceptance size merely to make the gate pass; preserve the failure and repair the verification path instead.
+Rollback only the maximize/restore verification addition if native evidence shows the OS show-state contract cannot be established reliably under the existing bounded owned-desktop requirements, or if it causes a reproducible regression. Do not drop the maximized acceptance state to make the gate pass. Preserve the failure and repair the verification path instead.
 
 Stop before production-runtime change, workflow edit outside packet authority, rebase, merge, R0 execution, scheduler operation, dependency addition, graphics/API change, or game-content work. Never weaken a native acceptance assertion to make the gate green.
 
 ## Single next useful action
 
-Pin this evidence-repair commit as the post-write receipt in PR metadata, allow its replacement hosted workflows to complete, obtain fresh independent review of that exact post-repair tree, then hand only that reviewed tree to the registered Windows executor for Debug/Release containment plus the full interactive size matrix.
+Pin the post-write evidence receipt in PR metadata, complete its hosted workflows, obtain fresh independent review of that exact receipt tree, then hand only that reviewed tree to the registered Windows executor for Debug/Release containment plus the full interactive state matrix.
