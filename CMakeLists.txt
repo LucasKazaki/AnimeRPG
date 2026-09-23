@@ -624,12 +624,12 @@ int wmain(int argc, wchar_t** argv) {
     astral_add_test(EditorRuntimeSmoke
         $<TARGET_FILE:AstralEditor> ${CMAKE_SOURCE_DIR})
 
-    add_executable(EditorRuntimeSmokeContainmentTests "${ASTRAL_EDITOR_RUNTIME_SUPERVISOR_SOURCE}")
-    target_include_directories(EditorRuntimeSmokeContainmentTests PRIVATE .)
-    target_compile_definitions(EditorRuntimeSmokeContainmentTests PRIVATE
+    add_executable(EditorContainmentTests "${ASTRAL_EDITOR_RUNTIME_SUPERVISOR_SOURCE}")
+    target_include_directories(EditorContainmentTests PRIVATE .)
+    target_compile_definitions(EditorContainmentTests PRIVATE
         UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00)
-    target_link_libraries(EditorRuntimeSmokeContainmentTests PRIVATE user32 kernel32)
-    astral_add_test(EditorRuntimeSmokeContainmentTests --self-test)
+    target_link_libraries(EditorContainmentTests PRIVATE user32 kernel32)
+    astral_add_test(EditorContainmentTests --self-test)
 
     add_executable(AstralSceneTests
         Engine/Assets/StaticMesh.cpp

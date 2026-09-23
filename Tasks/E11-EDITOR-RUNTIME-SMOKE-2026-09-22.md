@@ -2,106 +2,118 @@
 
 ## Scope and ownership
 
-Bounded verification-only packet for the already-integrated Win32 `AstralEditor`. It may harden the native Windows smoke, its recovery supervisor, deterministic containment tests, and evidence. It must not add scene mutation/serialization, gizmos, Play-in-Editor, asset import, rendering/API changes, dependencies, game content, scheduler operations, deployment, release, merge, or R0 execution.
+Bounded verification-only packet for the already-integrated Win32 `AstralEditor`. This packet may harden the native Windows smoke, its recovery supervisor, deterministic containment tests, and evidence. It must not add scene mutation/serialization, gizmos, Play-in-Editor, asset import, rendering/API changes, dependencies, game content, scheduler operations, deployment, release, merge, rebase, or R0 execution.
 
 Owned branch: `engine/2026-09-22-editor-runtime-smoke`.
 Baseline admitted from `main`: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`.
-Latest independently moving `main` observed during this packet: `977afadb2630bb3d25755d4407992bfab10018f8`.
-Current code candidate: `81e7052f47cab06060ea69c9f9d4f25ec42145e4`.
-Final source/evidence tree reviewed this pass: `727dcf7cef2a01c4be13931db0551247edf929bb`.
-`CMakeLists.txt` blob: `ed6a7f44d87241560faf32a57465befd536b59f9`.
-`Tests/EditorRuntimeSmoke.cpp` blob: `117c101acc9d65e297c3e0f948a6c3724ff2416d`.
+Latest independently moving `main` observed this pass: `977c5359491b24f729db6886af9b0fef35cea872`.
+Repair parent: `9aed26fb23d9f88d4ed7c587d191445a3e628016`.
+Runtime-smoke source candidate remains `81e7052f47cab06060ea69c9f9d4f25ec42145e4`.
+`Tests/EditorRuntimeSmoke.cpp` remains blob `117c101acc9d65e297c3e0f948a6c3724ff2416d`.
+Current CMake repair blob: `3f1f769a8920446907728ddb39e18bcfdc440360`.
 Production editor source is unchanged by this pass.
 
 Allowed paths only: `CMakeLists.txt`, `Tests/EditorRuntimeSmoke.cpp`, this task, `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`, and `Docs/Research/ENGINE-CAPABILITIES.json`. One active writer only. Do not rebase, merge, force-push, or absorb unrelated work.
 
-## Selected verification gap and implementation
+## Selected reproducible verification defect
 
-The E11 smoke previously treated the five pending toolbar buttons as an unordered caption set. `ValidateShellState` searched the current child inventory for `Select (pending)`, `Move (pending)`, `Rotate (pending)`, `Scale (pending)`, and `Play (pending)`, then checked only visibility and disabled state. Because the original child-HWND inventory check is order-independent, two original Button HWNDs could exchange captions/semantic roles while all expected captions still existed and the smoke would pass.
+Fresh independent Codex review of exact head `9aed26fb23d9f88d4ed7c587d191445a3e628016`, submitted `2026-09-23T03:29:14Z`, found a P2 false-evidence path in the containment verification registration.
 
-Candidate `81e7052f47cab06060ea69c9f9d4f25ec42145e4` repairs that false-pass path without changing the production editor. At initial capture the smoke now:
-
-1. collects the five original process-owned visible disabled Button HWNDs;
-2. maps their screen rectangles into the editor client coordinate space;
-3. orders them left-to-right and rejects zero-width or overlapping slots;
-4. requires those slots to be exactly Select, Move, Rotate, Scale, Play; and
-5. retains the exact HWND for every semantic toolbar slot.
-
-Every later `ValidateShellState`, including post-selection, both 800x600 and 420x260 resize validations, and the final state validation, rechecks each retained Button HWND for process ownership, direct parent, class, visibility, disabled state, exact semantic caption, positive width, and left-to-right non-overlap/order. The existing original 12-child HWND/class continuity check remains in force, so replacement controls are still rejected separately.
-
-This packet deliberately does not enable any toolbar action. The five tools remain truthful pending/disabled fixtures.
-
-## Research basis, rechecked 2026-09-23 UTC
-
-- Epic Games, UE 5.8 Viewport Toolbar: https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar
-  - applicability: workflow comparison for semantically distinct Select/Move/Rotate/Scale controls and consistent logical toolbar locations.
-- Unity Technologies, Unity 6 `Tool`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Tool.html
-  - applicability: workflow comparison for distinct Move/Rotate/Scale editor tools.
-- Microsoft Learn, `GetWindowRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect
-  - applicability: obtains window/control bounding rectangles used by the semantic toolbar slot checks.
-- Git project, core data model: https://git-scm.com/docs/gitdatamodel
-  - applicability: Git objects are immutable and their object IDs hash type plus contents. Evidence commits therefore cannot embed their own not-yet-created commit ID without changing the commit again; the post-write exact head belongs in PR/checkpoint metadata, while durable receipts can anchor the reviewed predecessor tree and its exact workflows.
-
-Behavior/API/evidence-model references only. No proprietary source was copied and no dependency was added.
-
-## Portable mutation fixture
-
-A disposable C++17 source-logic fixture modeled five stable toolbar handles and semantic slots. It passes the correct Select/Move/Rotate/Scale/Play arrangement and rejects caption swaps, positional swaps, enabled/hidden controls, and overlapping slots.
-
-Fixture SHA-256: `23ae0ee31850aab8df8ddcf68ca4a11137c1b3529ca9c9ced1d589cf6606b210`.
-
-Executed commands/results:
+The Windows hosted workflow invokes deterministic Debug and Release tests with:
 
 ```text
-g++ (Debian 14.2.0-19) 14.2.0
-g++ -std=c++17 -Wall -Wextra -Werror /tmp/e11_toolbar_semantic_fixture.cpp -o /tmp/e11_toolbar_gcc
-/tmp/e11_toolbar_gcc
-=> toolbar semantic binding fixture: PASS
-
-clang version 17.0.0
-clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer /tmp/e11_toolbar_semantic_fixture.cpp -o /tmp/e11_toolbar_clang
-ASAN_OPTIONS=detect_leaks=1 /tmp/e11_toolbar_clang
-=> toolbar semantic binding fixture: PASS
+ctest ... -E "RuntimeSmoke" --no-tests=error
 ```
 
-This fixture is source-logic evidence only, not Win32 GUI execution.
+Before this repair, the deterministic process-tree test was registered by `astral_add_test` as `EditorRuntimeSmokeContainmentTests`. `astral_add_test` gives the CTest test the target name. CTest `-E <regex>` excludes tests whose names match the expression, so the broad `RuntimeSmoke` filter excluded both the interactive `EditorRuntimeSmoke` and the supposedly deterministic `EditorRuntimeSmokeContainmentTests`.
 
-## Exact final-tree hosted evidence and independent review
+Therefore the older green Windows workflows remain valid for the tests they actually executed, but they are **not evidence that the containment self-test ran**. Any durable record claiming hosted Debug/Release containment execution on those older heads is corrected by this packet.
 
-Exact source/evidence tree `727dcf7cef2a01c4be13931db0551247edf929bb` contains the toolbar candidate above and completed all hosted workflows successfully:
+## Bounded implementation
 
-- Windows build and deterministic tests `35810545499`, job `107020923389`: `completed/success` on exact head `727dcf7...`, completed `2026-09-23T02:31:22Z`. Repository/R0 safety contracts, Release assertion/CTest safety, VS2022 x64 configure, Debug build/tests, Release build/tests, dependency/prerequisite checks, static verifiers, and clean-tree verification passed.
-- profiling capture portability `35810545487`: `completed/success`.
-- release manifest integrity `35810545457`: `completed/success`.
+`CMakeLists.txt` now renames only the deterministic containment executable/test:
 
-Fresh Codex review of exact head `727dcf7...` was submitted at `2026-09-23T02:34:44Z`. It identified one P2 evidence-traceability defect only: the task, QA receipt, and capability map still named the intermediate candidate and cancelled candidate-head Windows run instead of anchoring `727dcf7...` and its successful exact-head workflows. No new runtime-smoke implementation defect was reported in that review. This evidence-only repair updates all three durable records; a re-review of the post-repair head is still required before independent acceptance.
+- old: `EditorRuntimeSmokeContainmentTests`
+- new: `EditorContainmentTests`
 
-Hosted deterministic CTest intentionally excludes tests whose names end in `RuntimeSmoke`, so these green hosted workflows are not native editor GUI evidence.
+The generated supervisor implementation, containment test logic, `Tests/EditorRuntimeSmoke.cpp`, and interactive GUI test name `EditorRuntimeSmoke` are unchanged. The hosted `-E "RuntimeSmoke"` filter therefore continues excluding the interactive desktop smoke while allowing `EditorContainmentTests` to participate in the ordinary deterministic Debug and Release suites.
 
-## Retained acceptance surface
+No workflow file, production editor code, graphics API, dependency, game content, or scheduler configuration changed.
 
-All established E11 checks remain required: one stable visible/enabled process-owned top-level editor; original 12-child HWND/class continuity; bound semantic Static controls; bound semantic toolbar Button controls; exact five ordered Outliner rows and four ordered Assets rows; Outliner `LBS_NOTIFY`; exact Scene Root/Cube Inspector fixtures; post-notification Cube synchronization; truthful disabled pending tools; bounded 800x600 and 420x260 resizes with complete-state and containment checks; bounded cross-process messages; clean process-owned normal shutdown; worker-local cleanup; and supervisor-level process-tree cleanup verification.
+## Primary-source basis, rechecked 2026-09-23 UTC
 
-`native_evidence` remains empty. Issue #7 is still open, so the historical R0 runner is blocked and was not invoked. E11 remains partial and is not UE5/Unity parity.
+- CMake 4.4/latest `ctest_test`: https://cmake.org/cmake/help/latest/command/ctest_test.html
+  - applicability: `EXCLUDE <exclude-regex>` excludes tests whose names match the regular expression.
+- CMake 4.4/latest `ctest(1)`: https://cmake.org/cmake/help/latest/manual/ctest.1.html
+  - applicability: command-line `-E` is the test-name exclusion filter used by the hosted workflow; `--no-tests=error` fails only when the resulting selection is empty, not when one intended test was accidentally filtered out among many others.
+- CMake 4.4/latest `add_test`: https://cmake.org/cmake/help/latest/command/add_test.html
+  - applicability: `add_test(NAME <name> ...)` establishes the CTest test name; Astral's `astral_add_test(target)` supplies the target name as that `NAME`.
+
+These are build/test API references only. No proprietary source was copied and no dependency was added.
+
+## Reproduction and coordinator fixture
+
+A disposable CMake selection fixture was run with CMake `3.31.6` in the coordinator sandbox. Fixture script SHA-256:
+
+`65864f2af1d2d447e007baa2a660204e173a452818af0ae04c11fa62da05c6a3`
+
+It created two minimal test registrations and exercised the exact exclusion form:
+
+```text
+BAD:  EditorRuntimeSmoke + EditorRuntimeSmokeContainmentTests
+ctest -N -E RuntimeSmoke
+=> Total Tests: 0
+
+GOOD: EditorRuntimeSmoke + EditorContainmentTests
+ctest -N -E RuntimeSmoke
+=> EditorContainmentTests selected; Total Tests: 1
+
+ctest --output-on-failure -E RuntimeSmoke --no-tests=error
+=> EditorContainmentTests passed
+```
+
+The bad and good fixture `CMakeLists.txt` SHA-256 values were respectively `9a8585228569da4f711fa8561178cd213e5d283de6f2e3fb8d33db2e2b57fe1b` and `59e724e748dbde444d7dfddc141f59ff359586960d0148f0b471782f581e73c9`.
+
+This is CTest-selection evidence only. It is not Windows Job Object execution or GUI evidence.
+
+## Historical hosted evidence corrected
+
+Exact pre-repair head `9aed26fb23d9f88d4ed7c587d191445a3e628016` completed these workflows successfully:
+
+- Windows build and deterministic tests `35814098903`;
+- profiling capture portability `35814099016`;
+- release-manifest integrity `35814098909`.
+
+The Windows workflow's overall success remains true, but both deterministic CTest phases used `-E "RuntimeSmoke"`, so `EditorRuntimeSmokeContainmentTests` was excluded. The earlier exact-head workflows for `727dcf7cef2a01c4be13931db0551247edf929bb` had the same selection behavior. Neither set may be cited as execution evidence for the containment self-test.
+
+The first acceptable hosted containment evidence after this repair must come from a new exact-head Windows run where the renamed `EditorContainmentTests` is part of both deterministic Debug and Release selections. Do not infer that result from this source change alone.
+
+## Retained E11 acceptance surface
+
+The native editor smoke still requires one stable visible/enabled process-owned top-level editor; original 12-child HWND/class continuity; semantic Static and toolbar Button binding; exact five ordered Outliner rows and four ordered Assets rows; `LBS_NOTIFY`; exact Scene Root/Cube Inspector fixtures; post-notification Cube synchronization; truthful disabled pending tools; bounded 800x600 and 420x260 resizes with complete-state and containment checks; bounded cross-process messages; clean process-owned shutdown; worker-local cleanup; and supervisor-level process-tree cleanup verification.
+
+`native_evidence` remains empty. Issue #7 remains open, so the historical R0 runner is blocked and was not invoked. E11 remains partial and is not UE5/Unity parity.
 
 ## Registered native handoff
 
-After this evidence-only repair receives clean independent re-review, the registered Windows executor should run the exact reviewed branch head on one owned interactive desktop:
+After this exact repaired tree is hosted-green and independently re-reviewed, the registered Windows executor should run both the deterministic containment test and the interactive GUI smoke in each configuration on one owned interactive desktop:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
 cmake --build ../AnimeRPG-e11-runtime-build --config Debug --parallel
+ctest --test-dir ../AnimeRPG-e11-runtime-build -C Debug --output-on-failure -R "^EditorContainmentTests$" --no-tests=error
 ctest --test-dir ../AnimeRPG-e11-runtime-build -C Debug --output-on-failure -R "^EditorRuntimeSmoke$" --no-tests=error
 cmake --build ../AnimeRPG-e11-runtime-build --config Release --parallel
+ctest --test-dir ../AnimeRPG-e11-runtime-build -C Release --output-on-failure -R "^EditorContainmentTests$" --no-tests=error
 ctest --test-dir ../AnimeRPG-e11-runtime-build -C Release --output-on-failure -R "^EditorRuntimeSmoke$" --no-tests=error
 ```
 
-Retain exact source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driver identity, commands, full stdout/stderr, exit codes, UTC timestamps, normal plus narrow-window screenshots, and proof that any failure/interruption leaves zero owned contained processes.
+Retain exact source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driver identity, commands, complete stdout/stderr, exit codes, UTC timestamps, normal plus narrow-window screenshots for the GUI smoke, and process inspection proving zero owned contained processes after any failure or interruption.
 
 ## Rollback and stop conditions
 
-Rollback only this evidence-only commit if it misstates the reviewed tree or hosted run association. Stop before any runtime code change, rebase, merge, R0 execution, local scheduler operation, dependency addition, graphics/API change, or game-content work. If the review produces a new runtime finding, admit that finding as the next bounded repair instead of weakening the smoke.
+Rollback only the containment target rename and its evidence corrections if the renamed test does not build/register or changes the intended selection boundary. Stop before any production-runtime change, workflow edit outside packet authority, rebase, merge, R0 execution, scheduler operation, dependency addition, graphics/API change, or game-content work. Never weaken `-E "RuntimeSmoke"`, the containment assertions, or the native acceptance checks merely to turn CI green.
 
 ## Single next useful action
 
-Obtain fresh independent re-review of the evidence-repaired head. If clean, the next substantive gate is the registered Windows Debug/Release GUI smoke with the complete native receipt set.
+Verify the new exact repair head in hosted Windows Debug/Release and confirm `EditorContainmentTests` is actually selected/executed. Then obtain fresh independent review. If both are clean, proceed to the registered native Debug/Release containment plus GUI smoke handoff.
