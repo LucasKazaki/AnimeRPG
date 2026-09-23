@@ -178,6 +178,8 @@ public:
 
     ShadowbladeLoadout& Loadout() { return loadout_; }
     const ShadowbladeLoadout& Loadout() const { return loadout_; }
+    static ShadowbladeActionTuning ActionTuningForProfile(
+        const ShadowbladeLoadoutProfile& profile);
     ShadowbladeActionTuning CurrentLoadoutTuning() const;
     LoadoutActionResult PreviewPresetTuning(std::size_t slot,
         const CharacterProgression& progression, ShadowbladeActionTuning& tuning) const;
