@@ -42,18 +42,18 @@ Acceptance:
 - every POSITION semantic must reference a FLOAT (`componentType` 5126) `VEC3` accessor before payload decoding;
 - each POSITION accessor declares finite three-component `min` and `max` values matching the decoded payload within the fixture tolerance, so repinned but false culling bounds are rejected;
 - valid outward winding and every indexed vertex normal facing consistently with its geometric triangle face, plus normalized normals/tangents and stable sphere/cube counts;
-- every vertex tangent must be orthogonal to its paired normal, preventing zero-bitangent frames even when tangent length and handedness are otherwise valid;
+- every sphere, cube and floor index payload must exactly match the generator-owned canonical topology, preventing repeated/partial triangles from satisfying only count and extent checks;
+- every vertex tangent must be orthogonal to its paired normal, and every sphere/cube/floor tangent plus reconstructed bitangent must agree with the position/UV derivative orientation, preventing mirrored tangent-space data after repinning;
 - every sphere station shares one canonical sphere geometry accessor binding, every cube station shares one canonical cube binding, and decoded sphere radius / cube half extent / floor extents match the source specification;
 - gallery meshes contain only `name` and `primitives`, and primitives only `attributes`, `indices`, `material`, and `mode`, rejecting morph targets, mesh weights, and other geometry overrides that can change final rendered shape after base-accessor validation;
 - the gallery is a static calibration scene and rejects top-level glTF `animations`, preventing animation channels from changing station, camera, or light transforms after static source checks;
-- floor tangent and bitangent orientation must derive consistently from the actual position/UV derivatives, not only `TANGENT.w`;
 - exact station/material/node ownership and camera/light contract;
 - each neutral-review material permits only the approved `name` plus exact `pbrMetallicRoughness` keys, rejecting emissive, alpha, normal/occlusion, extension, or other uncontracted rendering properties;
-- `extras` contains only `astral_contract`, and that contract contains only the approved source-only evidence fields, rejecting supplemental runtime/art/parity approval claims even after repinning;
+- root `extras` contains only `astral_contract`, that contract contains only the approved source-only evidence fields, and nested glTF `extras` are rejected throughout the fixture so unsupported runtime/art/parity claims cannot be hidden on cameras, nodes, materials, accessors or other objects;
 - camera and directional-light nodes reject scale, matrix, or other transform overrides that can reverse local -Z while preserving the checked quaternion;
 - no images/textures/samplers, preventing accidental baked-lighting review;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions for light, material binding/rendering properties, camera, source/runtime status, source capture intent, supplemental glTF and manifest runtime claims, exact manifest intent, boolean schema-version rejection, texture insertion, buffer/accessor bounds, POSITION accessor type/component format, declared POSITION metadata bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, tangent/normal orthogonality, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, floor tangent direction/handedness, and camera/light transform overrides;
+- negative regressions for light, material binding/rendering properties, camera, source/runtime status, source capture intent, supplemental root/nested glTF and manifest runtime claims, exact manifest intent, boolean schema-version rejection, texture insertion, buffer/accessor bounds, POSITION accessor type/component format, declared POSITION metadata bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, tangent/normal orthogonality, sphere/cube/floor tangent-frame orientation, canonical index coverage, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, and camera/light transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
 Commands:
