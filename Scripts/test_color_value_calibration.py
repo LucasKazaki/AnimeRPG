@@ -1,6 +1,6 @@
 import hashlib,json,subprocess,sys,tempfile,unittest,zlib,struct
 from pathlib import Path
-from generate_color_value_calibration import build
+from generate_color_value_calibration import build,canonical_text_bytes
 from verify_color_value_calibration import verify
 
 REPO=Path(__file__).parent.parent
@@ -42,9 +42,20 @@ class Tests(unittest.TestCase):
     def test_no_stale_derived_pack_is_tracked(self):
         self.assertFalse(GENERATED.exists(), "derived PNG pack must be generated outside the source tree")
     def test_fresh_pack_matches_pinned_manifest(self):
-        self.assertEqual(self.manifest,EXPECTED.read_bytes())
+        self.assertEqual(self.manifest,canonical_text_bytes(EXPECTED))
         self.assertEqual(verify(self.root,SOURCE,EXPECTED)["png_files"],3)
     def test_valid(self): self.assertEqual(self.ok()["png_files"],3)
+    def test_crlf_checkout_contract_portability(self):
+        crlf_source=Path(self.t.name)/"source-crlf.json"
+        crlf_pin=Path(self.t.name)/"pin-crlf.json"
+        crlf_source.write_bytes(canonical_text_bytes(SOURCE).replace(b"\n",b"\r\n"))
+        crlf_pin.write_bytes(canonical_text_bytes(EXPECTED).replace(b"\n",b"\r\n"))
+        files,manifest=build(crlf_source)
+        self.assertEqual(manifest,self.manifest)
+        out=Path(self.t.name)/"crlf-out"; out.mkdir()
+        for p,d in files.items(): (out/p).write_bytes(d)
+        (out/"manifest.json").write_bytes(manifest)
+        self.assertEqual(verify(out,crlf_source,crlf_pin)["png_files"],3)
     def test_palette_unsampled_swatch_corruption_even_rehashed(self):
         p=self.root/"palette_card.png"; p.write_bytes(mutate_rgb_pixel(p.read_bytes(),17,45,(1,2,3))); self.rehash("palette_card.png")
         with self.assertRaisesRegex(ValueError,"palette semantic"): self.ok()
@@ -62,7 +73,11 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"png dimensions|png inflate limit"): self.ok()
     def test_stale_pin(self):
         m=json.loads((self.root/"manifest.json").read_text()); m["status"]="changed"; (self.root/"manifest.json").write_text(json.dumps(m,indent=2,sort_keys=True)+"\n")
-        with self.assertRaisesRegex(ValueError,"expected manifest"): self.ok()
+        with self.assertRaisesRegex(ValueError,"manifest status|expected manifest"): self.ok()
+    def test_runtime_status_corruption_even_repinned(self):
+        m=json.loads((self.root/"manifest.json").read_text()); m["status"]="runtime_validated_and_approved"
+        b=(json.dumps(m,indent=2,sort_keys=True)+"\n").encode(); (self.root/"manifest.json").write_bytes(b); self.pin.write_bytes(b)
+        with self.assertRaisesRegex(ValueError,"manifest status"): self.ok()
     def test_ui_screening_manifest_corruption_even_repinned(self):
         m=json.loads((self.root/"manifest.json").read_text()); m["ui_screening"]=[{"foreground":"fake","background":"graphite","ratio":99.0,"minimum_ratio":1.0}]
         b=(json.dumps(m,indent=2,sort_keys=True)+"\n").encode(); (self.root/"manifest.json").write_bytes(b); self.pin.write_bytes(b)
