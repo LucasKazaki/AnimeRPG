@@ -62,6 +62,23 @@ void TestShadowbladeTrainingPathPass23() {
             && atomicSession.Goal() == DefenseTrainingGoal::GuardDiscipline,
         "pass23 rejected mid-threat lesson setup makes no partial mutation");
 
+    // Review regression: an incoming threat owned outside the practice session
+    // still blocks lesson application, including timing-preset synchronization.
+    ShadowbladeTrainingCheckpoint detachedThreatCheckpoint{};
+    detachedThreatCheckpoint.forgivingTimingAssist = true;
+    ShadowbladeTrainingPath detachedThreatPath;
+    DefensePracticeSession detachedThreatSession;
+    ShadowbladeActions detachedThreatActions;
+    Expect(detachedThreatPath.RestoreCheckpoint(detachedThreatCheckpoint)
+            && detachedThreatActions.BeginIncomingAttack({1.0f, 20, 10, true})
+            && !detachedThreatPath.ApplyCurrentLesson(
+                detachedThreatSession, detachedThreatActions)
+            && detachedThreatActions.HasIncomingAttack()
+            && detachedThreatSession.PracticeSequenceLength() == 0
+            && Near(detachedThreatActions.PerfectDefenseWindowSeconds(),
+                ShadowbladeActions::StandardPerfectDefenseWindowSeconds),
+        "pass23 detached live threat rejects setup before session or timing mutation");
+
     // GAME-115: timing assistance is opt-in and only widens the existing perfect
     // window. It cannot be toggled under an active threat.
     ShadowbladeTrainingPath assistPath;
@@ -118,6 +135,78 @@ void TestShadowbladeTrainingPathPass23() {
     Expect(!restored.RestoreCheckpoint(emptyPath.Checkpoint())
             && restored.CompletedLessonCount() == 1,
         "pass23 an older valid checkpoint cannot roll local progress backward");
+
+    // Review regression: a lesson cannot complete from a same-length sequence
+    // that omits one of its authored threat types.
+    ShadowbladeTrainingCheckpoint mixedCheckpoint{};
+    mixedCheckpoint.completedMask = 3;
+    mixedCheckpoint.currentLesson = ShadowbladeTrainingLesson::MixedTiming;
+    mixedCheckpoint.medals[0] = ShadowbladeTrainingMedal::Bronze;
+    mixedCheckpoint.medals[1] = ShadowbladeTrainingMedal::Bronze;
+    ShadowbladeTrainingPath provenancePath;
+    DefensePracticeSession provenanceSession;
+    ShadowbladeActions provenanceActions;
+    CombatSandbox provenanceCombat;
+    DefensePracticeSequence duplicateQuickCuts{};
+    duplicateQuickCuts.patterns[0] = EnemyAttackPattern::QuickCut;
+    duplicateQuickCuts.patterns[1] = EnemyAttackPattern::QuickCut;
+    duplicateQuickCuts.count = 2;
+    Expect(provenancePath.RestoreCheckpoint(mixedCheckpoint)
+            && provenancePath.ApplyCurrentLesson(provenanceSession, provenanceActions)
+            && provenanceSession.ClearPracticeSequence()
+            && provenanceSession.SetPracticeSequence(duplicateQuickCuts),
+        "pass23 provenance regression replaces mixed timing with same-length duplicate threats");
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        Expect(provenanceSession.QueueNextAttack(provenanceCombat, provenanceActions)
+                && provenanceCombat.PendingEnemyAttack().pattern
+                    == EnemyAttackPattern::QuickCut,
+            "pass23 provenance regression queues only the duplicated QuickCut");
+        const EnemyAttackPlan plan = provenanceCombat.PendingEnemyAttack();
+        provenanceSession.AdvanceTime(provenanceCombat, provenanceActions, 0.45f);
+        Expect(provenanceSession.TryDefend(provenanceCombat, provenanceActions,
+                DefenseInput::Dodge).result == DefenseResult::PerfectDodge,
+            "pass23 provenance regression reaches the nominal perfect-defense target");
+        provenanceSession.AdvanceTime(
+            provenanceCombat, provenanceActions, plan.recoverySeconds);
+    }
+    Expect(provenanceSession.GoalStatus().complete
+            && !provenancePath.CurrentLessonComplete(provenanceSession)
+            && !provenancePath.CommitCurrentLesson(provenanceSession)
+            && provenancePath.CurrentLesson() == ShadowbladeTrainingLesson::MixedTiming,
+        "pass23 missing RiftBurst provenance blocks completion despite matching length and goal");
+
+    // Review regression: Gold requires an all-perfect completion. A clean run
+    // containing any ordinary defense earns Silver instead.
+    ShadowbladeTrainingPath mixedMedalPath;
+    DefensePracticeSession mixedMedalSession;
+    ShadowbladeActions mixedMedalActions;
+    CombatSandbox mixedMedalCombat;
+    Expect(mixedMedalPath.RestoreCheckpoint(mixedCheckpoint)
+            && mixedMedalPath.ApplyCurrentLesson(mixedMedalSession, mixedMedalActions)
+            && mixedMedalSession.QueueNextAttack(mixedMedalCombat, mixedMedalActions)
+            && mixedMedalSession.TryDefend(mixedMedalCombat, mixedMedalActions,
+                DefenseInput::Guard).result == DefenseResult::Guarded,
+        "pass23 mixed-medal regression records one clean ordinary defense");
+    EnemyAttackPlan mixedPlan = mixedMedalCombat.PendingEnemyAttack();
+    mixedMedalSession.AdvanceTime(
+        mixedMedalCombat, mixedMedalActions, mixedPlan.recoverySeconds);
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        Expect(mixedMedalSession.QueueNextAttack(mixedMedalCombat, mixedMedalActions),
+            "pass23 mixed-medal regression queues a canonical follow-up");
+        mixedPlan = mixedMedalCombat.PendingEnemyAttack();
+        const float perfectLead = mixedPlan.windupSeconds - 0.10f;
+        mixedMedalSession.AdvanceTime(
+            mixedMedalCombat, mixedMedalActions, perfectLead);
+        Expect(mixedMedalSession.TryDefend(mixedMedalCombat, mixedMedalActions,
+                DefenseInput::Dodge).result == DefenseResult::PerfectDodge,
+            "pass23 mixed-medal regression records a perfect defense");
+        mixedMedalSession.AdvanceTime(
+            mixedMedalCombat, mixedMedalActions, mixedPlan.recoverySeconds);
+    }
+    Expect(mixedMedalPath.CurrentLessonComplete(mixedMedalSession)
+            && mixedMedalPath.CurrentMedal(mixedMedalSession)
+                == ShadowbladeTrainingMedal::Silver,
+        "pass23 ordinary plus perfect clean completion cannot receive Gold");
 
     // QOL-024: player-requested boss-style rehearsal uses the existing three
     // canonical threat types so all three can be practiced in one bounded loop.
@@ -184,6 +273,44 @@ void TestShadowbladeTrainingPathPass23() {
             && bossPath.CurrentLesson() == ShadowbladeTrainingLesson::Complete
             && bossPath.CompletedLessonCount() == 5,
         "pass23 boss rehearsal completes the curriculum with a deterministic silver medal");
+
+    // Review regression: any hit during a completed boss rehearsal caps mastery
+    // at Bronze even if the other authored threats are successfully defended.
+    ShadowbladeTrainingPath bossMissPath;
+    DefensePracticeSession bossMissSession;
+    ShadowbladeActions bossMissActions;
+    CombatSandbox bossMissCombat;
+    Expect(bossMissPath.RestoreCheckpoint(bossCheckpoint)
+            && bossMissPath.ApplyCurrentLesson(bossMissSession, bossMissActions)
+            && bossMissSession.QueueNextAttack(bossMissCombat, bossMissActions),
+        "pass23 boss-miss regression starts the authored rehearsal");
+    EnemyAttackPlan bossMissPlan = bossMissCombat.PendingEnemyAttack();
+    Expect(bossMissSession.AdvanceTime(
+            bossMissCombat, bossMissActions, bossMissPlan.windupSeconds)
+            && bossMissSession.PatternStats(EnemyAttackPattern::QuickCut).hitsTaken == 1,
+        "pass23 boss-miss regression records the first threat as a hit");
+    bossMissSession.AdvanceTime(
+        bossMissCombat, bossMissActions, bossMissPlan.recoverySeconds);
+    Expect(bossMissSession.QueueNextAttack(bossMissCombat, bossMissActions),
+        "pass23 boss-miss regression queues GuardBreaker");
+    bossMissPlan = bossMissCombat.PendingEnemyAttack();
+    Expect(bossMissSession.TryDefend(bossMissCombat, bossMissActions,
+            DefenseInput::Guard).result == DefenseResult::Guarded,
+        "pass23 boss-miss regression resolves GuardBreaker successfully");
+    bossMissSession.AdvanceTime(
+        bossMissCombat, bossMissActions, bossMissPlan.recoverySeconds);
+    Expect(bossMissSession.QueueNextAttack(bossMissCombat, bossMissActions),
+        "pass23 boss-miss regression queues RiftBurst");
+    bossMissPlan = bossMissCombat.PendingEnemyAttack();
+    bossMissSession.AdvanceTime(
+        bossMissCombat, bossMissActions, bossMissPlan.windupSeconds - 0.10f);
+    Expect(bossMissSession.TryDefend(bossMissCombat, bossMissActions,
+            DefenseInput::Dodge).result == DefenseResult::PerfectDodge,
+        "pass23 boss-miss regression resolves RiftBurst successfully");
+    Expect(bossMissPath.CurrentLessonComplete(bossMissSession)
+            && bossMissPath.CurrentMedal(bossMissSession)
+                == ShadowbladeTrainingMedal::Bronze,
+        "pass23 any boss-rehearsal hit prevents Silver or Gold mastery");
 
     ShadowbladeTrainingCheckpoint malformedBoss = bossPath.Checkpoint();
     malformedBoss.medals[2] = static_cast<ShadowbladeTrainingMedal>(99);
