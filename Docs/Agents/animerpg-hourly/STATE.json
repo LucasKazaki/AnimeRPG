@@ -16,7 +16,7 @@
   "task_packet": "Tasks/GAME-PASS22-REACTOR-STRATEGY-2026-09-23.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS22.md",
   "pr": 41,
-  "final_head": "pending_exact_final_head_after_repair_records",
+  "final_head": "pending_exact_final_head_after_second_review_repair_records",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -31,7 +31,7 @@
   "increments": [
     {"id":"GAME-107","title":"Selectable Mana Reactor pressure presets","status":"implemented_registered_test_coverage_game_domain"},
     {"id":"GAME-108","title":"Opt-in Mana Reactor control protocols","status":"implemented_registered_test_coverage_game_domain"},
-    {"id":"GAME-109","title":"Bounded once-per-stage emergency vent","status":"implemented_registered_test_coverage_game_domain"},
+    {"id":"GAME-109","title":"Bounded once-per-stage emergency vent","status":"implemented_registered_test_coverage_game_domain_exact_cooling_repaired"},
     {"id":"GAME-110","title":"Optional-target protocol amplification","status":"implemented_registered_test_coverage_game_domain"},
     {"id":"GAME-111","title":"Bounded precision control chains and pulses","status":"implemented_registered_test_coverage_game_domain"},
     {"id":"QOL-023","title":"Exact non-mutating reactor control forecast","status":"implemented_registered_test_coverage_game_domain_terminal_equivalence_repaired"}
@@ -39,12 +39,12 @@
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
     "sandbox_cpp17_probe": "passed_initial_header_syntax_and_key_behavior_probe_not_repository_or_native_evidence",
-    "hosted_windows_ci": "initial_candidate_d03897bf_passed_run_35856834409_but_invalidated_by_review_repair; pending_exact_final_head",
-    "release_manifest": "initial_candidate_d03897bf_passed_run_35856834443_but_invalidated_by_review_repair; pending_exact_final_head",
+    "hosted_windows_ci": "candidate_d03897bf_passed_run_35856834409_then_invalidated_by_P1_repair; candidate_01276f1b_passed_run_35858642121_then_invalidated_by_P2_repair; pending_exact_final_head",
+    "release_manifest": "candidate_d03897bf_passed_run_35856834443_then_invalidated_by_P1_repair; candidate_01276f1b_passed_run_35858642091_then_invalidated_by_P2_repair; pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "candidate_d03897bf_review_found_P1_terminal_preview_mismatch; production_and_regression_repair_applied; pending_fresh_exact_final_head_review",
-    "research_revalidation": "official_stygian_difficulty_three_phase_mechanic_revalidated_2026-09-23_against_hoyolab_article_43362737; other packet sources retained",
-    "integration": "all_six_increments_deepen_existing_ManaReactorExpedition; Standard_Baseline_preserves_pass21_behavior; QOL preview now forecasts post_commit_exposed_state; no_rendered_scene_or_UI_claimed",
+    "independent_review": "candidate_d03897bf_P1_terminal_preview_mismatch_repaired; candidate_01276f1b_P2_partial_emergency_vent_cooling_repaired; pending_fresh_exact_final_head_review",
+    "research_revalidation": "official_stygian_difficulty_three_phase_mechanic_revalidated_2026-09-23_against_hoyolab_article_43362737; original_player_WutheringWaves_2025-03-13_thread_rechecked_with_counterexample_short_details_view; other packet sources retained",
+    "integration": "all_six_increments_deepen_existing_ManaReactorExpedition; Standard_Baseline_preserves_pass21_behavior; QOL preview forecasts post_commit_exposed_state; GAME_109 successful vent now guarantees_exact_25_cooling; no_rendered_scene_or_UI_claimed",
     "persistent_cross_process_save": "not_implemented_not_claimed"
   },
   "coordination": {
@@ -52,5 +52,5 @@
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "Freeze the repaired branch after the companion run receipt update, then require hosted Windows Debug/Release deterministic tests, release-manifest integrity, and fresh independent review on that exact head. Resolve the repaired P1 thread only after exact-head evidence, re-read live main/head/full diff, and merge only the exact tested/reviewed head."
+  "next_action": "Freeze the branch after the companion run receipt records the second review repair. Require hosted Windows Debug/Release deterministic tests, release-manifest integrity, and fresh independent review on that exact head. Repair any new material finding, resolve both review threads only after exact-head evidence, re-read live main/head/full diff, and merge only the exact tested/reviewed head."
 }
