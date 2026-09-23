@@ -9,7 +9,9 @@ Implementation candidate: `b2c836013c8212e9432e8c2e861551b5c8f3646b`.
 Latest observed `main`: `7dfaeeb340e57d1024a8bc818c65c82cd391d4ae`.
 Production editor source is unchanged.
 
-Fresh independent review of prior receipt head `d2748b64fc606df4ea78fa668b2ac0512b15383a` completed with one new P2 on `Tests/EditorRuntimeSmoke.cpp`: `SuspendThread` success alone did not establish a barrier proving the owner thread had actually reached a suspended state before HWND revalidation and `PostMessageW`. That review is not acceptance of the changed code.
+Fresh independent review of prior receipt head `d2748b64fc606df4ea78fa668b2ac0512b15383a` completed with one runtime-verification P2 on `Tests/EditorRuntimeSmoke.cpp`: `SuspendThread` success alone did not establish a barrier proving the owner thread had actually reached a suspended state before HWND revalidation and `PostMessageW`. That runtime finding was repaired in `b2c836...`.
+
+Fresh independent review of exact post-repair receipt head `d7ccec1e43500e0409e8ff93811fe3390c4ea266` completed at `2026-09-23T13:38:07Z` with one evidence-only P2: the authoritative task recorded the `b2c836...` diff as 7 additions and 0 deletions. GitHub's commit response reports 11 additions and 4 deletions, all in `Tests/EditorRuntimeSmoke.cpp`. No new runtime-code defect was reported in that review. This receipt records the correction; a fresh review of the repaired exact head is still required before independent acceptance.
 
 ## Repair
 
@@ -17,7 +19,7 @@ Commit `b2c836013c8212e9432e8c2e861551b5c8f3646b` changes only `Tests/EditorRunt
 
 Failure of the context barrier, retained liveness, PID/TID identity, enqueue, or resume verification fails closed and preserves the owned-process/job cleanup path. No synchronous window procedure call, production-engine operation, or wait on a target-owned resource occurs while the target thread is suspended.
 
-GitHub commit inspection confirms this source commit changes only `Tests/EditorRuntimeSmoke.cpp`. No production editor code, CMake registration, workflow, dependency, graphics API, scheduler configuration, content, merge, release, or deployment changed.
+GitHub commit inspection confirms `b2c836013c8212e9432e8c2e861551b5c8f3646b` changes only `Tests/EditorRuntimeSmoke.cpp`, with 11 additions and 4 deletions, 15 changed lines total. The close-logic hunks contain 9 additions and 2 deletions; the PASS-text hunk contributes 2 additions and 2 deletions. No production editor code, CMake registration, workflow, dependency, graphics API, scheduler configuration, content, merge, release, or deployment changed.
 
 ## Primary-source research
 
@@ -31,9 +33,11 @@ Accessed 2026-09-23 UTC:
   - `hThread` and `dwThreadId` identify the newly created process's primary thread and are retained by this smoke.
 - Microsoft Learn `ResumeThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-resumethread
   - previous count one verifies removal of the one harness suspension.
+- GitHub REST `Get a commit`: https://docs.github.com/en/rest/commits/commits#get-a-commit
+  - commit-level `stats` and per-file additions/deletions/changes are used for exact diff evidence. For `b2c836...`, GitHub reports 11 additions and 4 deletions.
 - Existing retained basis: Microsoft `PostMessageW`, `GetWindowThreadProcessId`, `WaitForSingleObject`, and `DestroyWindow` documentation.
 
-Public Win32 API semantics only. No proprietary Unreal Engine or Unity source was copied and no dependency was imported.
+Public Win32 API and GitHub API semantics only. No proprietary Unreal Engine or Unity source was copied and no dependency was imported.
 
 ## Portable regression evidence
 
@@ -65,7 +69,13 @@ The pull-request workflows associated with source candidate `b2c836013c8212e9432
 - profiling capture portability: run `35866993020`, PASS;
 - release manifest integrity: run `35866993023`, PASS.
 
-The synthetic merge identity is recorded separately from the source head because pull-request CI tests GitHub's integration tree. Hosted deterministic tests are not native interactive `EditorRuntimeSmoke` evidence.
+Exact prior receipt head `d7ccec1e43500e0409e8ff93811fe3390c4ea266` also completed successful hosted workflows:
+
+- Windows build and deterministic tests: run `35867571050`, job `107202971156`, PASS at `2026-09-23T13:32:57Z`;
+- profiling capture portability: run `35867571034`, PASS;
+- release manifest integrity: run `35867571047`, PASS.
+
+The synthetic merge identity is recorded separately from the source head because pull-request CI tests GitHub's integration tree. Hosted deterministic tests are not native interactive `EditorRuntimeSmoke` evidence. Evidence-only receipt commits after `d7ccec...` require their own hosted/review observation before final acceptance; they do not change the runtime-smoke implementation candidate.
 
 ## Retained hardening and acceptance state
 
@@ -78,7 +88,9 @@ The synthetic merge identity is recorded separately from the source head because
 Portable GCC fixture: PASS.
 Portable Clang ASan+UBSan fixture: PASS.
 Hosted workflows for `b2c836...`: PASS.
-Fresh independent review of this changed source/evidence tree: pending.
+Hosted workflows for prior receipt `d7ccec...`: PASS.
+Independent review of `d7ccec...`: completed with one evidence-only diff-count P2; corrected in receipt records.
+Fresh independent review of the corrected receipt tree: pending.
 Native interactive Windows: pending.
 `native_evidence`: empty.
 Independent final acceptance: false.
@@ -92,4 +104,4 @@ Issue #7 remains open. The historical R0 runner was not invoked. Clean-machine p
 
 ## Single next action
 
-Obtain fresh independent review of the exact post-receipt tree containing `b2c836013c8212e9432e8c2e861551b5c8f3646b` and these updated records. If clean, hand that exact reviewed tree to the registered Windows executor for native Debug/Release containment plus interactive editor-smoke acceptance.
+Obtain fresh independent review of the corrected exact receipt tree. If clean, hand that exact reviewed tree to the registered Windows executor for native Debug/Release containment plus interactive editor-smoke acceptance.
