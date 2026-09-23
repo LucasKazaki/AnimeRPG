@@ -205,6 +205,63 @@ void TestDefensePracticePass13() {
             && invalidInputSession.BestAlternatingChain() == 1,
         "pass13 malformed defense input cannot fabricate a Dodge-to-Guard chain");
 
+    // The chain clock is session-owned and monotonic. Resetting the combat
+    // sandbox clock after the chain window elapsed cannot revive an old link.
+    CombatSandbox resetChainCombat;
+    ShadowbladeActions resetChainActions;
+    DefensePracticeSession resetChainSession;
+    Expect(resetChainSession.SetPracticeSequence(quickOnly)
+            && resetChainSession.QueueNextAttack(resetChainCombat, resetChainActions)
+            && resetChainSession.TryDefend(resetChainCombat, resetChainActions,
+                DefenseInput::Guard).result == DefenseResult::Guarded
+            && resetChainSession.CurrentAlternatingChain() == 1,
+        "pass13 reset-chain regression records its first guard");
+    resetChainSession.AdvanceTime(resetChainCombat, resetChainActions, 3.0f);
+    resetChainCombat.ResetTrainingSession();
+    Expect(resetChainSession.QueueNextAttack(resetChainCombat, resetChainActions),
+        "pass13 reset-chain regression can queue after combat clock reset");
+    resetChainSession.AdvanceTime(resetChainCombat, resetChainActions, 0.25f);
+    Expect(resetChainSession.TryDefend(resetChainCombat, resetChainActions,
+            DefenseInput::Dodge).result == DefenseResult::Evaded
+            && resetChainSession.CurrentAlternatingChain() == 1
+            && resetChainSession.BestAlternatingChain() == 1,
+        "pass13 combat clock reset cannot extend an expired alternating chain");
+
+    // A successful defense resolved directly by ShadowbladeActions must produce
+    // the same chain result when the session reconciles it on the next tick.
+    CombatSandbox externalDefenseCombat;
+    ShadowbladeActions externalDefenseActions;
+    DefensePracticeSession externalDefenseSession;
+    Expect(externalDefenseSession.SetPracticeSequence(quickOnly)
+            && externalDefenseSession.QueueNextAttack(
+                externalDefenseCombat, externalDefenseActions)
+            && externalDefenseSession.TryDefend(
+                externalDefenseCombat, externalDefenseActions,
+                DefenseInput::Guard).result == DefenseResult::Guarded
+            && externalDefenseSession.CurrentAlternatingChain() == 1,
+        "pass13 external-defense regression records its first guard");
+    externalDefenseSession.AdvanceTime(
+        externalDefenseCombat, externalDefenseActions, 0.85f);
+    Expect(externalDefenseSession.QueueNextAttack(
+            externalDefenseCombat, externalDefenseActions),
+        "pass13 external-defense regression queues the alternating attempt");
+    externalDefenseSession.AdvanceTime(
+        externalDefenseCombat, externalDefenseActions, 0.25f);
+    const DefenseReport externalDodge =
+        externalDefenseActions.TryDefend(DefenseInput::Dodge);
+    Expect(externalDodge.result == DefenseResult::Evaded
+            && externalDefenseSession.AdvanceTime(
+                externalDefenseCombat, externalDefenseActions, 0.01f)
+            && externalDefenseSession.CurrentAlternatingChain() == 2
+            && externalDefenseSession.BestAlternatingChain() == 2,
+        "pass13 tick reconciliation preserves externally resolved Guard-Dodge chain");
+    const DefensePracticePatternStats externalDefenseQuick =
+        externalDefenseSession.PatternStats(EnemyAttackPattern::QuickCut);
+    Expect(externalDefenseQuick.attempts == 2
+            && externalDefenseQuick.ordinaryDefenses == 2
+            && externalDefenseQuick.hitsTaken == 0,
+        "pass13 externally reconciled defense updates per-pattern analytics exactly once");
+
     // GAME-065: score separates original execution points from a bounded time
     // coefficient and accumulates only valid, unpaused session time.
     CombatSandbox scoreCombat;
