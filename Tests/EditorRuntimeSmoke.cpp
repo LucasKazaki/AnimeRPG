@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <string>
@@ -72,6 +73,16 @@ struct ShellStaticHandles {
     HWND inspector{};
     HWND assetsLabel{};
     HWND status{};
+};
+
+struct ShellButtonHandles {
+    std::array<HWND, 5> tools{};
+};
+
+struct ButtonGeometry {
+    HWND handle{};
+    LONG left{};
+    LONG right{};
 };
 
 bool WindowOwnedByProcess(HWND window, DWORD processId) {
@@ -379,6 +390,91 @@ bool CaptureInitialStaticHandles(const std::vector<ChildControl>& controls, HWND
     return true;
 }
 
+bool CaptureInitialButtonHandles(const std::vector<ChildControl>& controls, HWND parent,
+    DWORD processId, ShellButtonHandles& buttons, std::wstring& failure) {
+    std::vector<ButtonGeometry> ordered;
+    ordered.reserve(kPendingButtons.size());
+    for (const auto& control : controls) {
+        if (control.className != L"Button") continue;
+        if (!DirectVisibleChildOwnedByProcessAndParent(
+                control.handle, parent, processId, L"Button")
+            || IsWindowEnabled(control.handle)) {
+            failure = L"initial toolbar button is hidden, replaced, or unexpectedly enabled";
+            return false;
+        }
+        RECT rect{};
+        if (!GetWindowRect(control.handle, &rect)) {
+            failure = L"GetWindowRect failed while binding initial toolbar buttons";
+            return false;
+        }
+        POINT points[2]{{rect.left, rect.top}, {rect.right, rect.bottom}};
+        MapWindowPoints(HWND_DESKTOP, parent, points, 2);
+        ordered.push_back({control.handle, points[0].x, points[1].x});
+    }
+    if (ordered.size() != kPendingButtons.size()) {
+        failure = L"expected five initial toolbar buttons, observed "
+            + std::to_wstring(ordered.size());
+        return false;
+    }
+    std::sort(ordered.begin(), ordered.end(), [](const ButtonGeometry& a, const ButtonGeometry& b) {
+        return a.left < b.left;
+    });
+    for (std::size_t index = 0; index < ordered.size(); ++index) {
+        if (ordered[index].right <= ordered[index].left
+            || (index != 0 && ordered[index - 1].right > ordered[index].left)) {
+            failure = L"initial toolbar button slots are empty, overlapping, or not left-to-right";
+            return false;
+        }
+        std::wstring caption;
+        if (!ReadValidatedChildText(
+                ordered[index].handle, parent, processId, L"Button", caption)
+            || caption != kPendingButtons[index]) {
+            failure = L"initial toolbar semantic slot mismatch at index "
+                + std::to_wstring(index);
+            return false;
+        }
+        buttons.tools[index] = ordered[index].handle;
+    }
+    return true;
+}
+
+bool ValidateBoundButtonSemantics(const ShellButtonHandles& buttons, HWND parent,
+    DWORD processId, std::wstring& failure) {
+    LONG previousRight = 0;
+    for (std::size_t index = 0; index < buttons.tools.size(); ++index) {
+        const HWND button = buttons.tools[index];
+        if (!DirectVisibleChildOwnedByProcessAndParent(button, parent, processId, L"Button")
+            || IsWindowEnabled(button)) {
+            failure = L"bound toolbar tool is hidden, replaced, or unexpectedly enabled: "
+                + std::wstring(kPendingButtons[index]);
+            return false;
+        }
+        std::wstring caption;
+        if (!ReadValidatedChildText(button, parent, processId, L"Button", caption)
+            || caption != kPendingButtons[index]) {
+            failure = L"bound toolbar tool changed semantic caption: "
+                + std::wstring(kPendingButtons[index]);
+            return false;
+        }
+        RECT rect{};
+        if (!GetWindowRect(button, &rect)) {
+            failure = L"GetWindowRect failed for bound toolbar tool: "
+                + std::wstring(kPendingButtons[index]);
+            return false;
+        }
+        POINT points[2]{{rect.left, rect.top}, {rect.right, rect.bottom}};
+        MapWindowPoints(HWND_DESKTOP, parent, points, 2);
+        if (points[1].x <= points[0].x
+            || (index != 0 && previousRight > points[0].x)) {
+            failure = L"bound toolbar semantic order/geometry changed: "
+                + std::wstring(kPendingButtons[index]);
+            return false;
+        }
+        previousRight = points[1].x;
+    }
+    return true;
+}
+
 bool ValidateBoundStaticText(HWND control, HWND parent, DWORD processId,
     const wchar_t* expectedText, const wchar_t* semanticName, std::wstring& failure) {
     std::wstring observed;
@@ -392,7 +488,8 @@ bool ValidateBoundStaticText(HWND control, HWND parent, DWORD processId,
 
 bool ValidateShellState(HWND window, DWORD processId,
     const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
-    const wchar_t* expectedInspectorText, int expectedSelection, std::wstring& failure) {
+    const ShellButtonHandles& buttons, const wchar_t* expectedInspectorText,
+    int expectedSelection, std::wstring& failure) {
     if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
         || !IsWindowEnabled(window)) {
         failure = L"editor top-level ownership, visibility, or enabled state changed";
@@ -424,18 +521,7 @@ bool ValidateShellState(HWND window, DWORD processId,
         failure = L"unexpected child-control class counts";
         return false;
     }
-
-    for (const wchar_t* caption : kPendingButtons) {
-        const HWND button = FindDirectVisibleChildByText(
-            controls, window, processId, L"Button", caption);
-        if (!button || !DirectVisibleChildOwnedByProcessAndParent(
-                button, window, processId, L"Button")
-            || IsWindowEnabled(button)) {
-            failure = L"pending tool is missing, hidden, replaced, relabeled, or enabled: "
-                + std::wstring(caption);
-            return false;
-        }
-    }
+    if (!ValidateBoundButtonSemantics(buttons, window, processId, failure)) return false;
 
     if (!ValidateBoundStaticText(statics.outlinerLabel, window, processId,
             kOutlinerLabelText, L"Outliner label", failure)
@@ -561,8 +647,8 @@ bool DirectChildrenContained(HWND window, DWORD processId,
 
 bool ResizeAndCheck(HWND window, DWORD processId,
     const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
-    int width, int height, const wchar_t* expectedInspectorText,
-    int expectedSelection, std::wstring& failure) {
+    const ShellButtonHandles& buttons, int width, int height,
+    const wchar_t* expectedInspectorText, int expectedSelection, std::wstring& failure) {
     if (WorkBudgetExpired()) {
         failure = L"internal runtime work budget exhausted before resize";
         return false;
@@ -600,7 +686,7 @@ bool ResizeAndCheck(HWND window, DWORD processId,
         }
         if (rect.right - rect.left == width && rect.bottom - rect.top == height) {
             if (!DirectChildrenContained(window, processId, initialControls, failure)) return false;
-            return ValidateShellState(window, processId, initialControls, statics,
+            return ValidateShellState(window, processId, initialControls, statics, buttons,
                 expectedInspectorText, expectedSelection, failure);
         }
         if (GetTickCount64() >= deadline) {
@@ -618,7 +704,7 @@ bool ResizeAndCheck(HWND window, DWORD processId,
 
 bool SelectCubeAndNotify(HWND window, DWORD processId,
     const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
-    std::wstring& failure) {
+    const ShellButtonHandles& buttons, std::wstring& failure) {
     if (WorkBudgetExpired()) {
         failure = L"internal runtime work budget exhausted before selection";
         return false;
@@ -665,7 +751,7 @@ bool SelectCubeAndNotify(HWND window, DWORD processId,
     }
 
     return ValidateShellState(
-        window, processId, initialControls, statics, kCubeInspectorText, 3, failure);
+        window, processId, initialControls, statics, buttons, kCubeInspectorText, 3, failure);
 }
 
 bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) {
@@ -741,6 +827,7 @@ int wmain(int argc, wchar_t** argv) {
     DWORD exitCode = 1;
     std::vector<ChildControl> initialControls;
     ShellStaticHandles statics{};
+    ShellButtonHandles buttons{};
 
     if (WorkBudgetExpired()) {
         failure = L"135-second internal work budget exhausted during editor launch";
@@ -775,16 +862,19 @@ int wmain(int argc, wchar_t** argv) {
     } else if (!CaptureInitialStaticHandles(
                    initialControls, window, process.dwProcessId, statics, failure)) {
         // failure set by semantic-control capture helper.
+    } else if (!CaptureInitialButtonHandles(
+                   initialControls, window, process.dwProcessId, buttons, failure)) {
+        // failure set by semantic-toolbar capture helper.
     } else if (!ValidateShellState(window, process.dwProcessId, initialControls, statics,
-                   kSceneRootInspectorText, 0, failure)) {
+                   buttons, kSceneRootInspectorText, 0, failure)) {
         // failure set by validator.
     } else if (!SelectCubeAndNotify(
-                   window, process.dwProcessId, initialControls, statics, failure)) {
+                   window, process.dwProcessId, initialControls, statics, buttons, failure)) {
         // failure set by selector/validator.
-    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics,
+    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics, buttons,
                    800, 600, kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
-    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics,
+    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics, buttons,
                    420, 260, kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
     } else {
@@ -801,7 +891,7 @@ int wmain(int argc, wchar_t** argv) {
                     + std::to_wstring(finalVisibleTopLevelCount);
             }
         } else if (!ValidateShellState(window, process.dwProcessId, initialControls, statics,
-                       kCubeInspectorText, 3, failure)) {
+                       buttons, kCubeInspectorText, 3, failure)) {
             // failure set by validator.
         } else if (CloseEditor(window, process.dwProcessId, process.hProcess, exitCode)
             && exitCode == 0) {
@@ -833,10 +923,10 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wcout << L"EDITOR AUTOMATED NATIVE RUNTIME SMOKE: PASS\n"
         << L"Observed one stable visible, enabled, process-owned top-level editor window before and after "
-        << L"interaction; the original 12 process-owned child HWND identities, bound semantic Static HWNDs, "
-        << L"disabled pending tools, enabled Outliner/assets surfaces, required Outliner LBS_NOTIFY style, "
-        << L"exact row identities, and Inspector state were revalidated around every bounded cross-process "
-        << L"read and after both normal+narrow resizes; Cube selection stayed synchronized, all direct children "
-        << L"remained contained, and shutdown exited cleanly.\n";
+        << L"interaction; the original 12 process-owned child HWND identities, bound semantic Static HWNDs and "
+        << L"left-to-right semantic toolbar Button HWNDs, disabled pending tools, enabled Outliner/assets surfaces, "
+        << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
+        << L"every bounded cross-process read and after both normal+narrow resizes; Cube selection stayed synchronized, "
+        << L"all direct children remained contained, and shutdown exited cleanly.\n";
     return 0;
 }
