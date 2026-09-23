@@ -349,6 +349,7 @@ public:
         equippedWeapon_ = preset.weapon;
         equippedModules_ = preset.modules;
         moduleOccupied_ = preset.occupied;
+        lastAppliedPreset_ = slot;
         return LoadoutActionResult::Success;
     }
 
