@@ -107,3 +107,22 @@ Rollback only this verification repair if native evidence proves the phase-budge
 ## Single next useful action
 
 Run the registered native Debug/Release `EditorContainmentTests` and interactive `EditorRuntimeSmoke` handoff on exact reviewed SHA `0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d`, retain the required machine/toolchain/GPU/desktop/process evidence and screenshots, then launch `AstralGame` separately as the same-build no-regression check. Do not start another dependent editor feature while this native QA gate is unresolved.
+
+## Bounded continuation: exact restore placement, 2026-09-23
+
+This continuation supersedes the earlier handoff SHA above until the new source is independently reviewed. While auditing the already-automated maximize/restore acceptance path, the coordinator reproduced a false-pass condition in the test logic: after `SW_RESTORE`, the smoke accepted any window with the original width and height, even if the restored top-left position was wrong. Microsoft documents `SW_RESTORE` as restoring a maximized/minimized/arranged window to its original **size and position**, and `GetWindowRect` returns the screen-space bounding rectangle, so width/height alone was weaker than the Windows behavior being claimed.
+
+Source repair `3020590f091c68cc802016c02fcbbe54e5c7cebf` changes only `Tests/EditorRuntimeSmoke.cpp`, 5 additions and 3 deletions. New smoke blob: `3bb8774e33113e3e50357ed77c7054f486d339a9`. The restore poll now requires all four `GetWindowRect` members, left/top/right/bottom, to equal the pre-maximize rectangle before it accepts restored state. The timeout diagnostic now says `outer rectangle` rather than `outer size`. No production editor source, CMake, workflow, dependency, graphics API, scheduler configuration, game content, release/deployment state, or R0 code changed.
+
+Primary sources rechecked for this continuation:
+
+- Microsoft `ShowWindow` / `SW_RESTORE`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow . `SW_RESTORE` restores the original size and position.
+- Microsoft `GetWindowRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect . The returned rectangle contains screen-coordinate upper-left and lower-right corners, making an exact outer-rectangle comparison directly measurable.
+- Microsoft `ShowWindowAsync`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindowasync . The asynchronous request still requires the existing bounded positive completion poll.
+- Epic Unreal Engine 5.8 `Using Editor Viewports` and Unity 6.0 `EditorWindow.maximized` remain workflow references for maximized/restored editor use. This repair copies no proprietary source and adds no dependency.
+
+Disposable C++17 restore-rectangle fixture SHA-256 `ab2d1952a2e30036e396b4652bcff0a3190fdf629c9c43606ed760eb7cbe4d15` passed warning-clean GCC C++17 and Clang C++17 with ASan+UBSan plus leak detection. The fixture demonstrates that the previous same-size predicate accepts shifted rectangles while the new exact-rectangle predicate rejects them. This is source-logic evidence only, not native Win32 GUI evidence.
+
+Source-associated hosted workflows for `3020590f...` were started as runs `35915703271` (Windows), `35915703261` (profiling), and `35915703309` (release manifest). At this checkpoint profiling had completed successfully; Windows and release-manifest were still running, so they are not counted as passed yet. The prior clean review of `0e756498...` does not cover this new source change. Fresh independent review is required before any native handoff may treat `3020590f...` or a later evidence-only descendant as reviewed.
+
+Updated stop condition: do not run the registered native handoff on the superseded `0e756498...` if the goal is to accept current E11. First require hosted checks plus fresh independent review on the new exact-restoration source/evidence tree. After those gates are clean, the registered Windows executor should run the same Debug/Release `EditorContainmentTests` and interactive `EditorRuntimeSmoke` matrix and specifically retain evidence that maximize followed by restore returns the editor to the same pre-maximize outer screen rectangle, in addition to the existing containment, semantic continuity, screenshots, cleanup, and `AstralGame` no-regression evidence.
