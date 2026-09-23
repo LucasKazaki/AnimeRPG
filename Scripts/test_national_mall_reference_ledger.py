@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import json
 import subprocess
 import sys
@@ -61,6 +60,31 @@ def test_washington_derived_measurement_mismatch_rejected() -> None:
     assert "derived measurement value" in proc.stderr
 
 
+def test_lincoln_derived_measurement_unit_rejected() -> None:
+    def change(d):
+        entry = next(e for e in d["entries"] if e["id"] == "lincoln-memorial-materials")
+        entry["measurements"][0]["unit"] = "inches"
+    proc = mutate(change)
+    assert "derived measurement unit" in proc.stderr
+
+
+def test_lincoln_derived_measurement_identity_rejected() -> None:
+    def change(d):
+        entry = next(e for e in d["entries"] if e["id"] == "lincoln-memorial-materials")
+        entry["measurements"][0]["label"] = "height_above_grade_at_terrace"
+    proc = mutate(change)
+    assert "derived measurement identity" in proc.stderr
+
+
+def test_fractional_count_rejected() -> None:
+    def change(d):
+        entry = next(e for e in d["entries"] if e["id"] == "wwii-memorial-massing")
+        measurement = next(m for m in entry["measurements"] if m["label"] == "pillar_count")
+        measurement["value"] = 56.5
+    proc = mutate(change)
+    assert "count measurement integral" in proc.stderr
+
+
 def test_schema_bool_rejected() -> None:
     proc = mutate(lambda d: d.__setitem__("schema_version", True))
     assert "schema_version" in proc.stderr
@@ -86,7 +110,6 @@ def test_non_https_rejected() -> None:
 def test_unapproved_host_rejected() -> None:
     proc = mutate(lambda d: d["entries"][0].__setitem__("url", "https://example.com/mall"))
     assert "authoritative https url" in proc.stderr
-
 
 
 def test_pdf_kind_requires_pdf_url() -> None:
@@ -130,6 +153,9 @@ TESTS = [
     test_unknown_entry_field_rejected,
     test_lincoln_derived_measurement_mismatch_rejected,
     test_washington_derived_measurement_mismatch_rejected,
+    test_lincoln_derived_measurement_unit_rejected,
+    test_lincoln_derived_measurement_identity_rejected,
+    test_fractional_count_rejected,
     test_schema_bool_rejected,
     test_false_runtime_status_rejected,
     test_duplicate_id_rejected,
