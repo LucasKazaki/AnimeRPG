@@ -350,6 +350,96 @@ bool SupervisorTerminateJobAndVerifyEmpty(SupervisorContainedProcess& child,
     return true;
 }
 
+bool SupervisorRunNormalWorkerAcceptance(SupervisorContainedProcess& worker,
+    DWORD workerTimeoutMs, DWORD cleanupTimeoutMs, std::wstring& failure) {
+    const DWORD waitState = WaitForSingleObject(worker.process, workerTimeoutMs);
+    if (waitState != WAIT_OBJECT_0) {
+        failure = waitState == WAIT_TIMEOUT
+            ? L"contained worker exceeded the supervisor deadline"
+            : SupervisorWin32Failure(L"WaitForSingleObject(worker)", GetLastError());
+        DWORD cleanupExit = STILL_ACTIVE;
+        std::wstring cleanupFailure;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                worker, cleanupTimeoutMs, cleanupExit, cleanupFailure)
+            && !cleanupFailure.empty()) {
+            failure += L"; cleanup verification failed: " + cleanupFailure;
+        }
+        SupervisorCloseProcessHandles(worker);
+        return false;
+    }
+
+    DWORD workerExitCode = STILL_ACTIVE;
+    if (!GetExitCodeProcess(worker.process, &workerExitCode)
+        || workerExitCode == STILL_ACTIVE) {
+        failure = SupervisorWin32Failure(L"GetExitCodeProcess(worker)", GetLastError());
+        DWORD cleanupExit = STILL_ACTIVE;
+        std::wstring cleanupFailure;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                worker, cleanupTimeoutMs, cleanupExit, cleanupFailure)
+            && !cleanupFailure.empty()) {
+            failure += L"; cleanup verification failed: " + cleanupFailure;
+        }
+        SupervisorCloseProcessHandles(worker);
+        return false;
+    }
+
+    if (workerExitCode != 0) {
+        const DWORD reportedWorkerExit = workerExitCode;
+        DWORD cleanupExit = workerExitCode;
+        std::wstring cleanupFailure;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                worker, cleanupTimeoutMs, cleanupExit, cleanupFailure)) {
+            failure = L"worker exit " + std::to_wstring(reportedWorkerExit)
+                + L"; cleanup verification failed: " + cleanupFailure;
+        } else {
+            failure = L"worker exit " + std::to_wstring(reportedWorkerExit)
+                + L"; contained job verified empty";
+        }
+        SupervisorCloseProcessHandles(worker);
+        return false;
+    }
+
+    if (!CloseHandle(worker.process)) {
+        failure = SupervisorWin32Failure(L"CloseHandle(completed worker)", GetLastError());
+        DWORD cleanupExit = workerExitCode;
+        std::wstring cleanupFailure;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                worker, cleanupTimeoutMs, cleanupExit, cleanupFailure)
+            && !cleanupFailure.empty()) {
+            failure += L"; cleanup verification failed: " + cleanupFailure;
+        }
+        SupervisorCloseProcessHandles(worker);
+        return false;
+    }
+    worker.process = nullptr;
+
+    const ULONGLONG emptyDeadline = GetTickCount64() + cleanupTimeoutMs;
+    std::wstring emptyFailure;
+    if (!SupervisorWaitForJobEmpty(worker.job, emptyDeadline, emptyFailure)) {
+        failure = L"successful worker left contained process tree non-empty: " + emptyFailure;
+        std::wstring cleanupFailure;
+        DWORD ignoredExit = STILL_ACTIVE;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                worker, cleanupTimeoutMs, ignoredExit, cleanupFailure)) {
+            if (!cleanupFailure.empty()) {
+                failure += L"; forced cleanup also failed: " + cleanupFailure;
+            }
+        } else {
+            failure += L"; forced cleanup verified job empty";
+        }
+        SupervisorCloseProcessHandles(worker);
+        return false;
+    }
+
+    if (!CloseHandle(worker.job)) {
+        failure = SupervisorWin32Failure(L"CloseHandle(verified empty job)", GetLastError());
+        SupervisorCloseProcessHandles(worker);
+        return false;
+    }
+    worker.job = nullptr;
+    return true;
+}
+
 int SupervisorRunContainedSelfTestChild(const std::wstring& selfPath) {
     std::wstring descendantCommand = SupervisorQuoteArgument(selfPath.c_str())
         + L" --contained-self-test-grandchild";
@@ -448,97 +538,28 @@ int SupervisorRunContainmentSelfTest(const std::wstring& selfPath) {
         return 1;
     }
 
-    const DWORD completedWait = WaitForSingleObject(
-        successParent.process, kSupervisorSelfTestTreeReadyMs);
-    if (completedWait != WAIT_OBJECT_0) {
-        failure = completedWait == WAIT_TIMEOUT
-            ? L"contained success-parent did not exit within self-test deadline"
-            : SupervisorWin32Failure(L"WaitForSingleObject(success-parent)", GetLastError());
-        DWORD ignoredExit = STILL_ACTIVE;
-        std::wstring cleanupFailure;
-        if (!SupervisorTerminateJobAndVerifyEmpty(
-                successParent, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
-            && !cleanupFailure.empty()) {
-            failure += L"; " + cleanupFailure;
-        }
-        SupervisorCloseProcessHandles(successParent);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
-                   << failure << L"\n";
-        return 1;
-    }
-
-    DWORD successExit = STILL_ACTIVE;
-    if (!GetExitCodeProcess(successParent.process, &successExit)
-        || successExit != 0) {
-        failure = !GetExitCodeProcess(successParent.process, &successExit)
-            ? SupervisorWin32Failure(L"GetExitCodeProcess(success-parent)", GetLastError())
-            : L"contained success-parent returned nonzero exit " + std::to_wstring(successExit);
-        DWORD ignoredExit = successExit;
-        std::wstring cleanupFailure;
-        if (!SupervisorTerminateJobAndVerifyEmpty(
-                successParent, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
-            && !cleanupFailure.empty()) {
-            failure += L"; " + cleanupFailure;
-        }
-        SupervisorCloseProcessHandles(successParent);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
-                   << failure << L"\n";
-        return 1;
-    }
-
-    if (!CloseHandle(successParent.process)) {
-        failure = SupervisorWin32Failure(L"CloseHandle(success-parent)", GetLastError());
-        successParent.process = nullptr;
-        SupervisorCloseProcessHandles(successParent);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
-                   << failure << L"\n";
-        return 1;
-    }
-    successParent.process = nullptr;
-
-    DWORD activeAfterParentExit = 0;
-    if (!SupervisorQueryActiveProcesses(
-            successParent.job, activeAfterParentExit, failure)
-        || activeAfterParentExit == 0) {
-        if (failure.empty()) {
-            failure = L"success-parent did not leave a contained descendant for leak detection";
-        }
-        DWORD ignoredExit = STILL_ACTIVE;
-        std::wstring cleanupFailure;
-        if (!SupervisorTerminateJobAndVerifyEmpty(
-                successParent, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
-            && !cleanupFailure.empty()) {
-            failure += L"; " + cleanupFailure;
-        }
-        SupervisorCloseProcessHandles(successParent);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
-                   << failure << L"\n";
-        return 1;
-    }
-
-    std::wstring expectedNonEmptyFailure;
-    const ULONGLONG nonEmptyDeadline = GetTickCount64() + kSupervisorSelfTestAliveMs;
-    if (SupervisorWaitForJobEmpty(
-            successParent.job, nonEmptyDeadline, expectedNonEmptyFailure)) {
-        failure = L"success-parent descendant unexpectedly disappeared before leak detection";
-        SupervisorCloseProcessHandles(successParent);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
-                   << failure << L"\n";
-        return 1;
-    }
-
-    DWORD cleanupExit = STILL_ACTIVE;
-    if (!SupervisorTerminateJobAndVerifyEmpty(
-            successParent, kSupervisorCleanupTimeoutMs, cleanupExit, failure)) {
-        SupervisorCloseProcessHandles(successParent);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
-                   << failure << L"\n";
-        return 1;
-    }
+    std::wstring normalAcceptanceFailure;
+    const bool normalAccepted = SupervisorRunNormalWorkerAcceptance(
+        successParent, kSupervisorSelfTestTreeReadyMs,
+        kSupervisorCleanupTimeoutMs, normalAcceptanceFailure);
     SupervisorCloseProcessHandles(successParent);
+    if (normalAccepted) {
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << L"normal success path accepted a worker that left a contained descendant\n";
+        return 1;
+    }
+    if (normalAcceptanceFailure.find(
+            L"successful worker left contained process tree non-empty") == std::wstring::npos
+        || normalAcceptanceFailure.find(
+            L"forced cleanup verified job empty") == std::wstring::npos) {
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << L"normal success path failed for an unexpected reason: "
+                   << normalAcceptanceFailure << L"\n";
+        return 1;
+    }
 
     std::wcout << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: PASS "
-               << L"(live tree and successful-parent descendant leak both cleaned)\n";
+               << L"(live tree cleanup and shared normal-success rejection verified)\n";
     return 0;
 }
 } // namespace
@@ -582,85 +603,15 @@ int wmain(int argc, wchar_t** argv) {
         return 1;
     }
 
-    const DWORD waitState = WaitForSingleObject(worker.process, kSupervisorWorkerTimeoutMs);
-    if (waitState != WAIT_OBJECT_0) {
-        failure = waitState == WAIT_TIMEOUT
-            ? L"contained worker exceeded the 150-second supervisor deadline"
-            : SupervisorWin32Failure(L"WaitForSingleObject(worker)", GetLastError());
-        DWORD cleanupExit = STILL_ACTIVE;
-        std::wstring cleanupFailure;
-        if (!SupervisorTerminateJobAndVerifyEmpty(
-                worker, kSupervisorCleanupTimeoutMs, cleanupExit, cleanupFailure)) {
-            failure += L"; " + cleanupFailure;
-        }
+    if (!SupervisorRunNormalWorkerAcceptance(
+            worker, kSupervisorWorkerTimeoutMs, kSupervisorCleanupTimeoutMs, failure)) {
         SupervisorCloseProcessHandles(worker);
         std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL\nReason: " << failure << L"\n";
         return 1;
     }
 
-    DWORD workerExitCode = 1;
-    if (!GetExitCodeProcess(worker.process, &workerExitCode)
-        || workerExitCode == STILL_ACTIVE) {
-        failure = SupervisorWin32Failure(L"GetExitCodeProcess(worker)", GetLastError());
-        DWORD cleanupExit = STILL_ACTIVE;
-        std::wstring cleanupFailure;
-        if (!SupervisorTerminateJobAndVerifyEmpty(
-                worker, kSupervisorCleanupTimeoutMs, cleanupExit, cleanupFailure)) {
-            failure += L"; " + cleanupFailure;
-        }
-        SupervisorCloseProcessHandles(worker);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL\nReason: " << failure << L"\n";
-        return 1;
-    }
-
-    if (workerExitCode != 0) {
-        const DWORD reportedWorkerExit = workerExitCode;
-        DWORD cleanupExit = workerExitCode;
-        if (!SupervisorTerminateJobAndVerifyEmpty(
-                worker, kSupervisorCleanupTimeoutMs, cleanupExit, failure)) {
-            SupervisorCloseProcessHandles(worker);
-            std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL (worker exit "
-                       << reportedWorkerExit << L"; cleanup verification failed: "
-                       << failure << L")\n";
-            return 1;
-        }
-        SupervisorCloseProcessHandles(worker);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL (worker exit "
-                   << reportedWorkerExit << L"; contained job verified empty)\n";
-        return 1;
-    }
-
-    if (!CloseHandle(worker.process)) {
-        failure = SupervisorWin32Failure(L"CloseHandle(completed worker)", GetLastError());
-        SupervisorCloseProcessHandles(worker);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL\nReason: " << failure << L"\n";
-        return 1;
-    }
-    worker.process = nullptr;
-
-    const ULONGLONG emptyDeadline = GetTickCount64() + kSupervisorCleanupTimeoutMs;
-    if (!SupervisorWaitForJobEmpty(worker.job, emptyDeadline, failure)) {
-        std::wstring cleanupFailure;
-        DWORD ignoredExit = STILL_ACTIVE;
-        if (!SupervisorTerminateJobAndVerifyEmpty(
-                worker, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
-            && !cleanupFailure.empty()) {
-            failure += L"; forced cleanup also failed: " + cleanupFailure;
-        }
-        SupervisorCloseProcessHandles(worker);
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL\nReason: " << failure << L"\n";
-        return 1;
-    }
-
-    if (!CloseHandle(worker.job)) {
-        failure = SupervisorWin32Failure(L"CloseHandle(verified empty job)", GetLastError());
-        worker.job = nullptr;
-        std::wcerr << L"EDITOR RUNTIME SUPERVISOR: FAIL\nReason: " << failure << L"\n";
-        return 1;
-    }
-    worker.job = nullptr;
-
-    std::wcout << L"EDITOR RUNTIME SUPERVISOR: PASS (worker completed; contained job verified empty)\n";
+    std::wcout << L"EDITOR RUNTIME SUPERVISOR: PASS "
+               << L"(worker completed; contained job verified empty)\n";
     return 0;
 }
 ]=])
