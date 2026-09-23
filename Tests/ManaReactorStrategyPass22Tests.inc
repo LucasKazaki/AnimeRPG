@@ -62,7 +62,7 @@ void TestManaReactorStrategyPass22() {
         "emergency-vent fixture reaches deterministic pre-vent state");
     Expect(ventRun.UseEmergencyVent() && ventRun.Heat() == 1 && ventRun.Stability() == 85
             && !ventRun.EmergencyVentAvailable() && ventRun.EmergencyVentsUsed() == 1,
-        "emergency vent cools by 25, costs five stability, and consumes the stage use");
+        "emergency vent cools by exactly 25, costs five stability, and consumes the stage use");
     const auto afterVent = ventRun.Snapshot();
     Expect(!ventRun.UseEmergencyVent() && ventRun.Heat() == afterVent.heat
             && ventRun.Stability() == afterVent.stability
@@ -72,6 +72,21 @@ void TestManaReactorStrategyPass22() {
                 == ManaReactorControlResult::StageCleared
             && ventRun.EmergencyVentAvailable() && ventRun.EmergencyVentsUsed() == 1,
         "the next stage receives a fresh vent while run-level usage remains accountable");
+
+    ManaReactorExpedition lowHeatVent;
+    Expect(lowHeatVent.TryBegin(readyGuide)
+            && lowHeatVent.ApplyControl(ManaReactorControl::Stabilize)
+                == ManaReactorControlResult::Applied
+            && lowHeatVent.Heat() == 16 && lowHeatVent.Stability() == 98,
+        "low-heat vent fixture reaches less than the declared 25-point cooling amount");
+    const auto beforeLowHeatVent = lowHeatVent.Snapshot();
+    Expect(!lowHeatVent.UseEmergencyVent()
+            && lowHeatVent.Heat() == beforeLowHeatVent.heat
+            && lowHeatVent.Stability() == beforeLowHeatVent.stability
+            && lowHeatVent.ObjectiveProgress() == beforeLowHeatVent.objectiveProgress
+            && lowHeatVent.EmergencyVentAvailable()
+            && lowHeatVent.EmergencyVentsUsed() == 0,
+        "vent rejects insufficient heat without partial cooling, stability cost, use consumption, or objective mutation");
 
     // GAME-110: completing the optional stage target amplifies the selected protocol for later stages.
     ManaReactorExpedition amplified;
