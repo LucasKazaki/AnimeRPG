@@ -2,90 +2,110 @@
 
 ## Scope and ownership
 
-Bounded verification-only packet for the integrated Win32 `AstralEditor`. Owned branch: `engine/2026-09-22-editor-runtime-smoke`. Admitted baseline: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`. Allowed paths only: `CMakeLists.txt`, `Tests/EditorRuntimeSmoke.cpp`, this task, `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`, and `Docs/Research/ENGINE-CAPABILITIES.json`.
+Bounded verification-only packet for the integrated Win32 `AstralEditor`. Owned branch: `engine/2026-09-22-editor-runtime-smoke`. Admitted baseline: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`.
 
-Do not add editor/game features, change rendering/API architecture, add dependencies, alter scheduler/runtime state, merge/rebase, deploy/release, invoke R0, or restart paused content. One active writer only. Issue #7 remains open, so the historical R0 runner is blocked.
+Allowed paths only:
 
-## Current selected finding
+- `CMakeLists.txt`
+- `Tests/EditorRuntimeSmoke.cpp`
+- this task
+- `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`
+- `Docs/Research/ENGINE-CAPABILITIES.json`
 
-Fresh independent Codex review of exact evidence head `3f093a98f5af4257ab180dcc15183aa47073a7df` completed at `2026-09-23T22:33:42Z` and identified a P2 HWND-reuse race in `ResizeAndCheck`.
+Do not add editor/game features, change rendering or graphics API architecture, add dependencies, alter scheduler/runtime state, merge/rebase, deploy/release, invoke R0, or restart paused engine-worker content. One active writer only. Issue #7 is still open, so the historical R0 runner remains blocked.
 
-The prior source `95177d199bedb6195c0d89aa0d05708af04f6512` repeated launched-process ownership immediately before `SetWindowPos`, but that validation still returned before the subsequent visibility/enabled checks and side-effecting `SetWindowPos(..., SWP_ASYNCWINDOWPOS)`. The launched editor could exit in that interval, Windows could recycle the HWND, and an unrelated visible/enabled window could receive the resize.
+## Selected finding and reproducible failure model
 
-The same review also found that this task and the QA receipt were stale relative to the current source/evidence chain. This file is the current authoritative task record and supersedes stale handoff SHAs embedded in earlier continuation text.
+The latest unresolved current independent-review thread is `PRRT_kwDOTo2Ig86lXSlD`, top-level comment `4087994063`, P2: **Pin the HWND owner through show-state posts**.
 
-## Bounded repair
+The show-state code present through branch head `bb2d903c022c996ab69f692a673e0759efc684f9` checked launched-process HWND ownership, visibility and enabled state immediately before `ShowWindowAsync(SW_MAXIMIZE)` and `ShowWindowAsync(SW_RESTORE)`, but the checks returned before the side effect. Because `ShowWindowAsync` posts a show-state event instead of waiting for completion, the launched owner could exit after validation and Windows could recycle the cached HWND before the enqueue. An unrelated window could then receive the show-state request.
 
-Implementation commit: `9b3aa8ebe320649b9319ba653838db53dde38dde`.
+A disposable source-logic state-machine fixture reproduces this failure class by changing the owner after the initial check but before the post. The repaired predicate rejects that transition and never issues the side effect.
 
-`Tests/EditorRuntimeSmoke.cpp` blob: `97d374db438a1f8b4f0d161e9de6f823da0c792d`.
+## Bounded implementation
 
-GitHub commit diff: one changed file, `Tests/EditorRuntimeSmoke.cpp`, 64 additions and 14 deletions.
+Source repair: `f097819e2904a5a24e45f98e8bd4813f1af2c58e`.
 
-The repair adds `PostResizeWhileOwnerPinned(...)` and passes the retained `CreateProcessW` primary-thread ID/handle plus process handle into every resize. Before a resize post, the helper:
+Parent: `bb2d903c022c996ab69f692a673e0759efc684f9`.
 
-1. requires the launched process and primary thread handles to remain nonsignaled;
-2. requires the cached top-level HWND to remain visible, enabled, and owned by the exact launched PID/TID;
-3. suspends only that exact primary owner thread and requires a zero prior suspend count;
-4. requires `GetThreadContext(..., CONTEXT_CONTROL)` to succeed as a post-suspend execution barrier;
-5. while that creator thread is stopped, rechecks process/thread liveness, HWND PID/TID ownership, visibility, and enabled state;
-6. issues only the asynchronous `SetWindowPos(..., SWP_ASYNCWINDOWPOS)` resize;
-7. immediately resumes the thread and requires `ResumeThread` to report a previous count of one before any completion poll or wait.
+`Tests/EditorRuntimeSmoke.cpp` blob: `8b0d633e0c4f34fcf8ccd836468b06e46e8d81be`.
 
-The helper fails closed on liveness or identity mismatch, pre-existing suspension, context failure, post failure, or unexpected resume state. The existing 1.5-second resize phase deadline, scoped cross-process message deadlines, containment/shell checks, exact maximize/restore placement, semantic shell assertions, Cube selection/Inspector synchronization, cleanup, and hardened final close remain in force.
+GitHub compare: one changed file, `Tests/EditorRuntimeSmoke.cpp`, 62 additions and 21 deletions. No production editor/game source, CMake registration, workflow, dependency, graphics API, scheduler configuration, release/deployment state, or game content changed.
 
-No production editor/game source, CMake registration, workflow, dependency, graphics API, scheduler configuration, release/deployment state, or game content changed.
+The repair adds `PostShowStateWhileOwnerPinned(...)` and passes the retained `CreateProcessW` primary-thread ID/handle plus process handle into `MaximizeRestoreAndCheck`. For both `SW_MAXIMIZE` and `SW_RESTORE`, the helper:
+
+1. requires the retained process and primary-thread handles to remain nonsignaled;
+2. requires the cached top-level HWND to remain visible, enabled and owned by the exact launched PID/TID;
+3. suspends only that exact primary owner thread and rejects any nonzero prior suspend count;
+4. requires `GetThreadContext(..., CONTEXT_CONTROL)` to succeed as the post-suspend execution barrier;
+5. while the creator thread is stopped, rechecks process/thread liveness, exact HWND PID/TID ownership, visibility and enabled state;
+6. issues only the asynchronous `ShowWindowAsync` request;
+7. immediately calls `ResumeThread` and requires a previous suspend count of one before any show-state poll, shell validation, containment check or wait.
+
+The helper fails closed on identity/liveness change, pre-existing suspension, context failure, enqueue failure, or unexpected resume state. It performs no target-dependent wait while the target thread is suspended.
+
+The prior resize owner pin, 1.5-second resize phase deadline, show-state phase deadlines, bounded message waits, semantic shell checks, exact pre-maximize rectangle restore, containment checks, Cube selection/Inspector synchronization, cleanup, and hardened final close remain in force.
 
 ## Primary-source basis, rechecked 2026-09-23
 
-- Microsoft `SetWindowPos`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos . `SWP_ASYNCWINDOWPOS` can post the request to the target window's owning thread rather than blocking the caller.
-- Microsoft `GetWindowThreadProcessId`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid . It returns the creating thread and optional process ID and returns zero for an invalid HWND.
-- Microsoft `SuspendThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-suspendthread . It suspends user-mode execution and returns the prior suspend count. Microsoft cautions that it is primarily a debugger facility, so this harness uses it only for the short owner-pin interval and performs no target-dependent wait while suspended.
-- Microsoft `GetThreadContext`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadcontext . A valid context cannot be obtained for a running thread, so a successful context capture is used as the post-suspend barrier before identity revalidation and the asynchronous post.
-- Microsoft `ResumeThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-resumethread . It decrements the suspend count and restarts execution when the count reaches zero.
-- Epic Unreal Engine 5.8, Using Editor Viewports: https://dev.epicgames.com/documentation/unreal-engine/using-editor-viewports-in-unreal-engine . Perspective 3D, orthographic 2D, multi-viewport, maximized, and immersive authoring remain comparison workflows.
-- Unity 6.0, `EditorWindow.maximized`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html . Maximized editor-window state remains a comparison workflow property.
+- Microsoft `ShowWindowAsync`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindowasync . It sets a window's show state without waiting for completion and posts a show-window event to the target window's message queue.
+- Microsoft `GetWindowThreadProcessId`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid . It returns the thread that created the window and optionally its process ID; an invalid HWND returns zero.
+- Microsoft `SuspendThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-suspendthread . It stops user-mode execution and returns the previous suspend count. Microsoft warns it is primarily a debugger facility and not general synchronization, so this harness confines it to a short verification-only owner-pin interval and does not wait on target-owned work while suspended.
+- Microsoft `GetThreadContext`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadcontext . Microsoft states a valid context cannot be obtained for a running thread, so successful `CONTEXT_CONTROL` capture after suspension is the execution barrier before final identity validation and enqueue.
+- Microsoft `ResumeThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-resumethread . A return value of one means the suspended thread was restarted.
+- Epic Unreal Engine 5.8, Using Editor Viewports: https://dev.epicgames.com/documentation/unreal-engine/using-editor-viewports-in-unreal-engine . Perspective 3D, orthographic 2D, multiple viewport layouts, maximized viewports and immersive editing remain comparison workflows.
+- Epic Unreal Engine 5.8, `FMaximizeViewportCommand`: https://dev.epicgames.com/documentation/unreal-engine/API/Editor/LevelEditor/FLevelViewportLayout/FMaximizeViewportCommand . Maximize/immersive commands can be queued until the first tick when the parent window exists, reinforcing that maximize is lifecycle-sensitive asynchronous editor behavior.
+- Unity 6.0, `EditorWindow.maximized`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html . Maximized docked editor-window state remains a comparison workflow property.
 
-Public behavioral/API documentation only. No proprietary engine source copied and no dependency imported.
+These are public behavioral/API references only. No proprietary Epic/Unity source was copied and no dependency was imported.
 
 ## Portable source-logic evidence
 
-Disposable C++17 owner-pin state-machine fixture SHA-256 `a092dedb8ba74fb0df0e967d0d2465f7229532b6a73edabb0b8a3e1e83fa5432` covers the valid path plus recycled-owner-after-barrier, process death, missing context barrier, pre-suspended thread, post failure, and bad resume count. It passed:
+Disposable fixture: `/mnt/data/e11_show_state_owner_pin_fixture.cpp` during this coordinator run only.
+
+SHA-256: `6110abf51993b7c2666bc95ef3089989fa448f84b0933c14b67984633c4f1ce1`.
+
+Executed successfully:
 
 ```text
-g++ 14.2.0: -std=c++17 -Wall -Wextra -Werror -pedantic
-clang++ 17.0.0: -std=c++17 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer
-ASAN_OPTIONS=detect_leaks=1
+g++ (Debian 14.2.0-19) 14.2.0
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic e11_show_state_owner_pin_fixture.cpp
+result: e11 show-state owner pin fixture: PASS
+
+clang version 17.0.0
+clang++ -std=c++17 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer e11_show_state_owner_pin_fixture.cpp
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+result: e11 show-state owner pin fixture: PASS
 ```
 
-Both executions printed `e11 resize owner pin fixture: PASS`. This is source-logic evidence only, not native Win32 GUI evidence.
+The fixture covers the accepted path plus owner recycling after the barrier, process death, thread death, missing context barrier, pre-existing suspension, visibility/enabled loss after the pin, enqueue failure, and bad resume count. This is source-logic evidence only, not native Win32 GUI evidence. No MinGW cross-compiler was available in the sandbox, so no sandbox compile of the production Win32 source is claimed.
 
 ## Hosted source verification
 
-Source commit `9b3aa8ebe320649b9319ba653838db53dde38dde` is green in hosted verification:
+Exact source `f097819e2904a5a24e45f98e8bd4813f1af2c58e` is green in all three currently associated hosted workflows:
 
-- Windows build and deterministic tests: run `35929455430`, job `107412305793`, `success`;
-- profiling capture portability: run `35929455501`, `success`;
-- release manifest integrity: run `35929455423`, `success`.
+- Windows build and deterministic tests: run `35931194787`, job `107417915549`, `success`, completed `2026-09-23T23:00:47Z`;
+- profiling capture portability: run `35931194699`, `success`;
+- release manifest integrity: run `35931194743`, `success`.
 
-The Windows job passed repository/R0 safety contracts, VS2022 x64 configure, Debug build/tests, Release build/tests, release dependency/prerequisite/runtime checks, static milestone verifiers, and clean tracked-tree verification.
+The Windows job passed repository/R0 safety contracts, Visual Studio 2022 x64 configuration, Debug build and deterministic tests, Release build and deterministic tests, runtime dependency/prerequisite checks, static milestone verifiers, and clean tracked-tree verification.
 
-GitHub synthetic pull-request merge tested for this source: `90175bb0edf372473056374a0f30cacb684defbe`, whose parents are base `6d22da88402db71843ecd5a35766c0c77e62dca6` and source `9b3aa8ebe320649b9319ba653838db53dde38dde`.
-
-Hosted CTest still intentionally excludes interactive `EditorRuntimeSmoke`. These runs establish hosted compilation/deterministic/integration evidence only, not native GUI/GPU acceptance.
+Hosted CTest still intentionally excludes interactive `EditorRuntimeSmoke`. These runs establish hosted compilation/deterministic/integration evidence only, not native desktop, GPU, screenshot, packaging, performance, stress/recovery or soak acceptance.
 
 ## Retained acceptance gates
 
-`native_evidence` remains empty. E11 final acceptance remains false. Fresh independent review is required on the exact post-evidence head after task, QA, and capability records are current. Same-author review is not independent acceptance.
+`native_evidence` remains empty. E11 final acceptance remains false. A fresh independent review is required on the exact post-evidence head after task, QA and capability records are synchronized. Review by the implementation author is not independent acceptance.
 
-The registered Windows executor must then run Debug and Release `EditorContainmentTests` plus interactive `EditorRuntimeSmoke` on that exact clean-reviewed SHA, retain machine/Windows/MSVC/CMake/GPU/driver identity, exact commands, complete stdout/stderr, exit codes, UTC timestamps, screenshots, and zero-owned-process cleanup proof. The state matrix remains untouched startup, 800x600, 1280x720, 1440x900, actual maximized desktop followed by exact restore to the pre-maximize outer rectangle, and 420x260 or closest OS-permitted narrow state. Evidence must show each resize post targets the exact launched editor owner, each resize acceptance completes within 1.5 seconds, semantic/containment state remains valid, and final close is safe. Separately launch `AstralGame` from the same source/build as a no-regression check.
+After that exact head is clean-reviewed, the registered Windows executor must use one owned interactive desktop and run Debug and Release `EditorContainmentTests` plus interactive `EditorRuntimeSmoke`, retaining source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driver identity, exact commands, complete stdout/stderr, exit codes, UTC timestamps, screenshots and zero-owned-process cleanup proof.
 
-Clean-machine packaging, comparative frame/RAM/VRAM measurement, wider stress/recovery, the remaining E00-E17 capability catalogue, and the required 24-hour soak remain unresolved.
+The native matrix remains: untouched startup, 800x600, 1280x720, 1440x900, actual maximized desktop followed by exact restore to the pre-maximize outer screen rectangle, and 420x260 or closest OS-permitted narrow state. Evidence must show resize, maximize and restore side effects are issued only while the exact launched window-owner thread is pinned, the owner thread is resumed before any completion polling, all deadlines and shell/containment assertions hold, and final close is safe. Separately launch `AstralGame` from the same source/build as a no-regression check.
+
+Clean-machine packaging, comparative frame/RAM/VRAM measurement, broader stress/recovery, all remaining E00-E17 capability gaps, and the required 24-hour soak remain unresolved.
 
 ## Rollback and stop conditions
 
-Rollback only this verification repair if native evidence proves the owner-pin contract invalid under the existing owned-desktop requirements. Do not weaken the acceptance tests to make them green. Stop before production-runtime changes, dependency/API changes, unrelated workflow changes, rebase/merge, R0 execution, scheduler operations, release/deployment, or game-content work.
+Rollback only this verification repair if native evidence proves the owner-pin contract invalid under the existing owned-desktop requirements. Never weaken the acceptance test to obtain green results. Stop before production-runtime changes, dependency/API changes, unrelated workflow changes, rebase/merge, R0 execution, scheduler operations, release/deployment, or game-content work.
 
 ## Single next useful action
 
-Bring the QA and capability records onto this exact source, obtain clean hosted checks and fresh independent review for the final evidence head, then hand that exact reviewed SHA to the registered Windows executor for the retained native Debug/Release matrix and separate `AstralGame` launch. Do not start another dependent editor feature while this native QA gate remains unresolved.
+Synchronize the QA and capability records to source `f097819e2904a5a24e45f98e8bd4813f1af2c58e`, verify the final evidence-head hosted checks, obtain fresh independent review on that exact final head, then hand that reviewed SHA to the registered Windows executor for the retained native Debug/Release matrix and separate `AstralGame` launch. Do not start another dependent editor feature while this QA gate is unresolved.
