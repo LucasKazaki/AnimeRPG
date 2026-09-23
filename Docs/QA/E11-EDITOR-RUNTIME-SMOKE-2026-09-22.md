@@ -89,3 +89,38 @@ Clean-machine packaging, comparative frame-time/RAM/VRAM evidence, wider stress/
 ## Single next action
 
 Execute the registered native Debug/Release containment and interactive editor smoke handoff on exact reviewed SHA `0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d`, retain the required evidence and screenshots, then separately launch `AstralGame` from the same build. Do not admit another dependent editor feature before this native QA gate resolves.
+
+## Continuation evidence: exact restore placement repair
+
+This section supersedes the earlier current handoff until the new source receives fresh hosted and independent review evidence.
+
+Finding: the maximize/restore smoke retained the pre-maximize `GetWindowRect`, but its restore predicate compared only width and height. A shifted restored window with the same dimensions therefore passed. This under-tested the Win32 contract because Microsoft documents `SW_RESTORE` as restoring the original size **and position**, while `GetWindowRect` returns the screen-coordinate upper-left and lower-right corners.
+
+Repair commit: `3020590f091c68cc802016c02fcbbe54e5c7cebf`.
+New `Tests/EditorRuntimeSmoke.cpp` blob: `3bb8774e33113e3e50357ed77c7054f486d339a9`.
+GitHub compare `0de9892a...` -> `3020590f...`: exactly one changed file, `Tests/EditorRuntimeSmoke.cpp`, 5 additions, 3 deletions. The new predicate requires left, top, right, and bottom to match the pre-maximize outer rectangle; failure output names the `outer rectangle`. CMake and production editor/game source are unchanged.
+
+Primary-source basis, rechecked in this pass:
+
+- Microsoft Learn `ShowWindow`, `SW_RESTORE`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow . Restores original size and position.
+- Microsoft Learn `GetWindowRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect . Returns screen-coordinate upper-left/lower-right outer-window bounds.
+- Microsoft Learn `ShowWindowAsync`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindowasync . Starts the asynchronous show-state operation without waiting, so the bounded positive polling remains necessary.
+- Epic Unreal Engine 5.8 `Using Editor Viewports`: https://dev.epicgames.com/documentation/unreal-engine/using-editor-viewports-in-unreal-engine . Maximized/restored viewport workflows remain a behavioral comparison point.
+- Unity 6.0 `EditorWindow.maximized`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html . Maximized editor state remains a first-class workflow property.
+
+No proprietary source or dependency was imported.
+
+Portable reproduction fixture SHA-256: `ab2d1952a2e30036e396b4652bcff0a3190fdf629c9c43606ed760eb7cbe4d15`. It passed:
+
+```text
+g++ -std=c++17 -Wall -Wextra -Werror -pedantic e11_restore_rect_fixture.cpp -o e11_restore_rect_fixture_gcc
+./e11_restore_rect_fixture_gcc
+clang++ -std=c++17 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer e11_restore_rect_fixture.cpp -o e11_restore_rect_fixture_clang
+ASAN_OPTIONS=detect_leaks=1 ./e11_restore_rect_fixture_clang
+```
+
+Both executions printed `e11 restore-rectangle fixture: PASS`. The fixture proves the old same-size predicate accepts shifted same-size rectangles and the new exact-rectangle predicate rejects them. It is source-logic evidence only.
+
+Source-associated hosted runs: Windows `35915703271`, profiling `35915703261`, release manifest `35915703309`. Profiling completed `success`; Windows and release manifest were still in progress at the evidence-write checkpoint and are not recorded as passed here. The earlier clean Codex review on `0e756498...` does not review this new source change. `native_evidence` remains empty, current-source independent review is pending, and E11 final acceptance remains false.
+
+Native acceptance for the current source must additionally prove that after the actual maximize state, restore returns the editor to the same pre-maximize outer screen rectangle before continuing to the narrow-state check. The existing machine/toolchain/GPU identity, complete outputs/exits/timestamps, screenshots, zero-contained-process cleanup proof, and separate `AstralGame` launch requirements remain unchanged.
