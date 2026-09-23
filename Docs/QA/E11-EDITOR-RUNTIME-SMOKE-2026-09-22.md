@@ -2,81 +2,88 @@
 
 ## Checkpoint
 
-Bounded verification-only work on `engine/2026-09-22-editor-runtime-smoke`. This pass found a process-identity false-pass in the native smoke: HWND ownership was trusted from numeric PID equality alone. Windows PIDs are only valid for a process lifetime and may later be reused. If the launched editor exited during the smoke and another process acquired the same PID, the old predicate could accept and interact with an unrelated window.
+Bounded verification-only work on `engine/2026-09-22-editor-runtime-smoke`. Fresh independent review of receipt head `c86387c73c3311a6a2ba045de13b35ee8b683cf0` found one remaining shutdown-side-effect race: the smoke could complete its final PID/process-liveness ownership check, then the launched editor could exit before `PostMessageW(WM_CLOSE)`. If Windows reused the PID and HWND value in that interval, the old final close could target an unrelated window while the original process had already exited cleanly.
 
-PID-reuse hardening implementation candidate: `b9eebe721b7907245caaad5771bc9e96bac20680`.
-`Tests/EditorRuntimeSmoke.cpp` blob: `8cb031fe7ddcf50af1d95be8b7086456a42d32f1`.
+Current shutdown-ownership implementation candidate: `89a0eb0ac0d56cef9a76b83876aa4ecab31c0a6f`.
+`Tests/EditorRuntimeSmoke.cpp` blob: `8937ef0de9560a3a3c5fce104ad4a255c4bf783a`.
 `CMakeLists.txt` remains blob `4fd471151acb4b5919ccef4a92f49da12bd8d1f1`.
 Production editor source is unchanged.
 
 ## Reproduced defect and repair
 
-Before `b9eebe721...`, `WindowOwnedByProcess` accepted an HWND when `GetWindowThreadProcessId` returned the expected numeric PID. Top-level enumeration also directly compared that PID. This did not establish that the process launched by the smoke was still alive when the PID was observed.
+Before `89a0eb0...`, `CloseEditor` performed `WindowOwnedByProcess(window, processId)` and then separately called `PostMessageW(window, WM_CLOSE, ...)`. The prior `b9eebe721...` liveness checks prevented acceptance after the retained process handle had already signaled, but they did not bind the HWND identity through the later close side effect.
 
-Commit `b9eebe721b7907245caaad5771bc9e96bac20680` retains the `CreateProcessW` process HANDLE in `gOwnedProcessHandle` and adds `OwnedProcessStillRunning()`, using zero-time `WaitForSingleObject`. `WindowOwnedByProcess` now requires that retained handle to be nonsignaled before and after the HWND PID lookup. Top-level enumeration uses the same hardened predicate. The retained global reference is cleared before the process handle is closed.
+Commit `89a0eb0ac0d56cef9a76b83876aa4ecab31c0a6f` retains the original primary-thread handle and thread ID already returned by `CreateProcessW`, verifies that the final top-level HWND belongs to that exact launched PID and exact launched thread, suspends only that verified owner thread, rechecks process/thread liveness and PID/TID ownership while it cannot execute user-mode code, enqueues only the asynchronous `WM_CLOSE`, and immediately resumes before any wait. A nonzero prior suspend count, failed enqueue, unexpected resume count, dead process/thread, or PID/TID mismatch fails closed and falls back to the existing owned-process/job cleanup path.
 
-The before-and-after liveness checks matter because termination may race with the PID lookup itself. A matching numeric PID is accepted only while the retained launched-process handle still reports `WAIT_TIMEOUT`.
+No target window procedure is invoked synchronously and no resource wait or production-engine operation occurs while the editor UI thread is suspended. Microsoft explicitly warns that `SuspendThread` is debugger-oriented and unsuitable as general synchronization because waiting on resources held by a suspended thread can deadlock. This use is therefore restricted to the verification harness and the minimal final asynchronous enqueue interval.
 
-GitHub commit inspection shows exactly 15 additions and 6 deletions, all in `Tests/EditorRuntimeSmoke.cpp`. No production source, CMake, workflow, dependency, graphics API, game content, scheduler configuration, release state, or architecture changed.
+GitHub commit metadata records 38 additions and 5 deletions, all in `Tests/EditorRuntimeSmoke.cpp`. No production source, CMake, workflow, dependency, graphics API, game content, scheduler configuration, release state, or architecture changed.
+
+Historical receipt correction: GitHub metadata for prior commit `b9eebe721b7907245caaad5771bc9e96bac20680` records 13 additions and 6 deletions, not 15 additions and 6 deletions. Its retained process-handle liveness behavior and previous hosted results are unchanged.
 
 ## Primary research
 
 Accessed 2026-09-23 UTC:
 
-- Microsoft Learn, `Process Handles and Identifiers`: https://learn.microsoft.com/en-us/windows/win32/procthread/process-handles-and-identifiers
-  - `CreateProcess` returns process handles valid until closed; process identifiers are valid only from process creation until process termination.
+- Microsoft Learn, `SuspendThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-suspendthread
+  - successful suspension stops the specified thread's user-mode execution and returns its previous suspend count; Microsoft warns against general synchronization use.
+- Microsoft Learn, `ResumeThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-resumethread
+  - decrements the suspend count; return value one means the one suspension was removed and execution is resumed.
+- Microsoft Learn, `PostMessageW`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postmessagew
+  - posts to the message queue associated with the thread that created the target window and returns without waiting for processing.
+- Microsoft Learn, `DestroyWindow`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-destroywindow
+  - a thread cannot use `DestroyWindow` to destroy a window created by another thread.
 - Microsoft Learn, `GetWindowThreadProcessId`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid
-  - returns the PID of the process that created a specified window.
+  - identifies both the creating thread and owning process for an HWND.
 - Microsoft Learn, `WaitForSingleObject`: https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject
-  - process handles are waitable; a zero timeout returns immediately; `WAIT_TIMEOUT` means nonsignaled and `WAIT_OBJECT_0` means signaled.
-- Microsoft Learn, `TerminateProcess`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess
-  - cross-process termination is asynchronous and waiting on the process handle is the verification mechanism when termination must be confirmed.
+  - retained process/thread handles are waitable and permit zero-time liveness checks.
 
-Win32 API semantics only. No proprietary UE/Unity source was copied and no dependency was imported.
+Public Win32 API semantics only. No proprietary UE/Unity source was copied and no dependency was imported.
 
 ## Portable regression evidence
 
-Disposable fixture SHA-256: `3cff1d8e63622d5943c61ee9e1827c12e7dc63a7d46b17aeae7a9e7793c70ad6`.
+Disposable C++17 shutdown-pin state-machine fixture SHA-256: `b13727b0264e2c54f0303939c1effca5c0d56eca4ea6922d1616ff29ef1e9127`.
 
 ```text
-g++ -std=c++17 -Wall -Wextra -Werror /tmp/e11_pid_reuse_fixture.cpp -o /tmp/e11_pid_reuse_fixture_gcc
-/tmp/e11_pid_reuse_fixture_gcc
-# exit 0, pid-reuse ownership fixture: PASS
+g++ -std=c++17 -Wall -Wextra -Werror /tmp/e11_shutdown_pin_fixture.cpp -o /tmp/e11_gcc
+/tmp/e11_gcc
+# exit 0
 
-clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer /tmp/e11_pid_reuse_fixture.cpp -o /tmp/e11_pid_reuse_fixture_clang
-ASAN_OPTIONS=detect_leaks=1 /tmp/e11_pid_reuse_fixture_clang
-# exit 0, pid-reuse ownership fixture: PASS
+clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer /tmp/e11_shutdown_pin_fixture.cpp -o /tmp/e11_clang
+ASAN_OPTIONS=detect_leaks=1 /tmp/e11_clang
+# exit 0
 ```
 
-Covered cases: live retained process with matching PID accepted; exited original process with same PID reused is accepted by the old predicate and rejected by the new predicate; process alive before lookup but terminated before final acceptance is rejected by the new predicate; mismatched PID is rejected. This is source-logic evidence only, not Win32 runtime evidence.
+Covered cases: valid live PID/TID ownership with one suspend/resume cycle accepted; dead process rejected; dead thread rejected; PID mismatch rejected; TID mismatch rejected; pre-existing suspend count rejected; enqueue failure rejected; unexpected resume count rejected. This is source-logic evidence only, not Win32 runtime evidence.
 
-Sandbox repository checkout was attempted but failed with `Could not resolve host: github.com`. No MinGW cross compiler or usable Windows SDK/interactive desktop was available, so no sandbox production Win32 build or GUI result is claimed.
+Sandbox repository checkout was attempted but failed because `github.com` could not be resolved. No usable Windows SDK/interactive desktop was available, so no sandbox production Win32 compile or GUI execution is claimed.
 
 ## Hosted verification state
 
-Source implementation candidate: `b9eebe721b7907245caaad5771bc9e96bac20680`.
-Synthetic PR integration commit: `1968d7d40a3c9199bbd53a4bcce7027cdcc98e70`.
+Source implementation candidate: `89a0eb0ac0d56cef9a76b83876aa4ecab31c0a6f`.
+Synthetic PR integration commit: `76b9edbfb8351d4223f042efe5a57a98746ba17d`.
 Tested base parent of that synthetic merge: `3c3babd46c4539d474b7ea78ab01d5ed71dde7ac`.
-Source parent of that synthetic merge: `b9eebe721b7907245caaad5771bc9e96bac20680`.
+Source parent of that synthetic merge: `89a0eb0ac0d56cef9a76b83876aa4ecab31c0a6f`.
 
-- Windows build and deterministic tests: run `35854249505`, job `107158864423`, PASS. Every reported job step passed, including R0/repository safety contracts, PE/prerequisite/runtime checks, Release assertion/CTest safety, VS2022 x64 configure, Debug build and deterministic tests, Release build and deterministic tests, static milestone verifiers, and clean tracked tree.
-- profiling capture portability: run `35854249577`, PASS.
-- release manifest integrity: run `35854249522`, PASS.
+- Windows build and deterministic tests: run `35859925271`, job `107177344930`, PASS, completed 2026-09-23T12:23:39Z. Every reported job step passed, including R0/repository safety contracts, Release assertion/CTest safety, VS2022 x64 configure, Debug build and deterministic tests, Release build and deterministic tests, prerequisite/runtime checks, static milestone verifiers, and clean tracked-tree verification.
+- profiling capture portability: run `35859925269`, PASS.
+- release manifest integrity: run `35859925251`, PASS.
 
-These are `pull_request` workflows and validate GitHub's synthetic merge. They are not raw-head execution evidence. Later receipt-only commits must be distinguished from this implementation candidate and its tested synthetic merge.
+These hosted checks establish compile and deterministic-suite compatibility for the PR integration tree. They do not execute the interactive GUI smoke and are not native workstation acceptance.
 
 ## Retained hardening
 
 - `EditorContainmentTests` remains selected by hosted deterministic suites while interactive `EditorRuntimeSmoke` remains excluded;
-- deterministic containment executes real worker-local `CleanupProcess`, verifies direct-process cleanup plus supervisor whole-job cleanup to zero active processes;
-- shared normal-success containment rejects a zero-exit worker that leaves a descendant;
-- every cross-process shell read is bounded and revalidates expected ownership/identity;
+- deterministic containment executes real worker-local `CleanupProcess` and verifies direct-process plus supervisor whole-job cleanup to zero active processes;
+- normal-success containment rejects a zero-exit worker that leaves a descendant;
+- every cross-process shell read remains bounded and revalidates expected ownership/identity;
 - original shell HWND/class identity, semantic Static/Button bindings, Outliner rows and selection, complete Inspector fixtures, `LBS_NOTIFY`, stable single top-level-window identity, owned cleanup, startup containment, positive width/height, normal resize, and narrow resize checks remain required;
-- every accepted process-owned HWND now additionally requires the retained launched-editor process handle to remain nonsignaled around the numeric PID ownership lookup.
+- accepted HWND ownership requires retained launched-process liveness around the PID lookup;
+- final close additionally requires exact original PID/TID ownership and pins that verified creating thread only across the asynchronous close enqueue, then resumes before waiting.
 
 ## Deferred native acceptance
 
-`native_evidence` remains empty. After the receipt tree has a fresh clean independent review, the registered Windows executor must still run `EditorContainmentTests` and interactive `EditorRuntimeSmoke` in Debug and Release on one owned desktop. Retain:
+`native_evidence` remains empty. After the final receipt tree has a fresh clean independent review, the registered Windows executor must still run `EditorContainmentTests` and interactive `EditorRuntimeSmoke` in Debug and Release on one owned desktop. Retain:
 
 - exact reviewed source/receipt SHA;
 - Windows/machine identity;
@@ -85,16 +92,17 @@ These are `pull_request` workflows and validate GitHub's synthetic merge. They a
 - exact commands, complete stdout/stderr, exit codes, UTC timestamps;
 - default-startup, normal-size, and 420x260 narrow-window screenshots;
 - process inspection proving zero owned contained processes after failure/interruption;
-- evidence that no unrelated HWND is accepted once the retained launched-editor process handle has signaled.
+- evidence that the top-level editor HWND belongs to the retained launch thread at final close;
+- evidence that the final close path leaves the launch thread resumed and does not act on an unrelated HWND after the launched process/thread terminates.
 
 Issue #7 remains open. The historical R0 runner was not invoked. Clean-machine packaging, comparative frame/RAM/VRAM evidence, broader stress/recovery, and the required 24-hour soak remain unresolved outside this E11 repair.
 
 ## Acceptance state
 
-Portable PID-reuse ownership fixture under GCC: PASS.
-Portable PID-reuse ownership fixture under Clang ASan+UBSan: PASS.
-Implementation candidate `b9eebe721...`: implemented; exact one-file diff verified.
-Hosted PR-integration checks for implementation candidate: PASS through synthetic merge `1968d7...` on base `3c3babd...`.
+Portable shutdown-pin state-machine fixture under GCC: PASS.
+Portable shutdown-pin fixture under Clang ASan+UBSan: PASS.
+Implementation candidate `89a0eb0...`: implemented; exact one-file 38-addition/5-deletion diff verified.
+Hosted PR-integration checks for implementation candidate: PASS through synthetic merge `76b9edb...` on base `3c3babd...`.
 Fresh independent review of the final receipt head: pending.
 Native interactive Windows: deferred to registered local executor.
 Independent final acceptance: false.
@@ -102,4 +110,4 @@ UE5/Unity parity claim: false.
 
 ## Single next action
 
-Update the capability map, request fresh independent review of the final receipt head, and if clean hand that exact reviewed tree to the registered Windows executor for the Debug/Release containment and interactive GUI acceptance packet.
+Request fresh independent review of the exact final receipt head containing this repair and corrected evidence. If clean, hand that exact reviewed tree to the registered Windows executor for Debug/Release containment and interactive GUI acceptance.
