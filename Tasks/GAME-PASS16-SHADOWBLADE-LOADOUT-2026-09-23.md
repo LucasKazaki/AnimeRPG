@@ -20,7 +20,7 @@ Allowed verification/records paths:
 - `Docs/Agents/animerpg-hourly/STATE.json`
 - `Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS16.md`
 
-No shared engine path is admitted by this packet.
+No shared engine path is admitted by this packet. Because this packet admits no live game-flow owner/call-site path, its six behaviors are **backend-only** for accounting purposes. They may count as implemented and regression-covered when verified, but they must count as 0 integrated/playable until a later bounded packet constructs/calls `ShadowbladeLoadout` from an actual game flow and verifies that integration.
 
 ## Research map
 
@@ -50,5 +50,6 @@ Before merge:
 3. Cover ownership/level gates, malformed enum values, wrong-slot rejection, family-bonus thresholds, profile bounds, valid save/switch, empty/out-of-range presets, equipped-salvage rejection, one-time salvage, and stale exact-item preset atomicity.
 4. Obtain fresh independent Codex review on the exact final head. Self-review and hosted CI are separate evidence. Resolve material findings before merge.
 5. Re-read `main` and PR head immediately before merge. If `main` moved, reconcile and rerun affected checks. Merge only the exact reviewed/tested head.
+6. Report all six behaviors as backend-only unless this exact packet is explicitly expanded with an allowed live game-flow integration path, that path is verified free of ownership conflicts, and the resulting integration is covered by production-path regression tests. No such expansion is currently authorized by this packet.
 
 Native equipment UI, inventory menus, rendered icons/models, controller/menu wiring, combat-stat application, disk-save persistence, cross-process load, GPU/performance evidence, art/audio, and hands-on native playtesting are outside this packet and must not be claimed.
