@@ -1,6 +1,14 @@
 void TestShadowbladeTrainingHubPass25() {
     using namespace Astral::Scene;
 
+    const auto TrainingDiscovery = [](ShadowbladeActions& owner) {
+        LandmarkInteractionReport report{};
+        report.result = LandmarkInteractionResult::Discovered;
+        report.landmark = LandmarkEncounter::EncounterLandmark;
+        report.actionOwner = &owner;
+        return report;
+    };
+
     // GAME-122: the live Lincoln encounter completion is the only production
     // unlock point. Configuration/start attempts before completion fail closed.
     LandmarkEncounter encounter;
@@ -14,10 +22,7 @@ void TestShadowbladeTrainingHubPass25() {
             && !encounter.StartTraining(combat, actions),
         "pass25 training cannot be configured or started before encounter completion");
 
-    LandmarkInteractionReport discovery{};
-    discovery.result = LandmarkInteractionResult::Discovered;
-    discovery.landmark = LandmarkEncounter::EncounterLandmark;
-    Expect(encounter.TryActivate(discovery, combat).result
+    Expect(encounter.TryActivate(TrainingDiscovery(actions), combat).result
             == LandmarkEncounterResult::Activated,
         "pass25 fixture activates the live Lincoln encounter");
     combat.ApplyDamage(1000);
@@ -198,7 +203,7 @@ void TestShadowbladeTrainingHubPass25() {
     LandmarkEncounter defeatEncounter;
     CombatSandbox defeatCombat;
     ShadowbladeActions defeatActions;
-    Expect(defeatEncounter.TryActivate(discovery, defeatCombat).result
+    Expect(defeatEncounter.TryActivate(TrainingDiscovery(defeatActions), defeatCombat).result
             == LandmarkEncounterResult::Activated,
         "pass25 defeat fixture activates encounter");
     defeatCombat.ApplyDamage(1000);
@@ -245,7 +250,7 @@ void TestShadowbladeTrainingHubPass25() {
     CombatSandbox timingCombat;
     ShadowbladeActions timingActions;
     timingActions.SetDefenseTimingPreset(DefenseTimingPreset::Forgiving);
-    Expect(timingEncounter.TryActivate(discovery, timingCombat).result
+    Expect(timingEncounter.TryActivate(TrainingDiscovery(timingActions), timingCombat).result
             == LandmarkEncounterResult::Activated,
         "pass25 timing-guide fixture activates encounter");
     timingCombat.ApplyDamage(1000);
@@ -281,7 +286,7 @@ void TestShadowbladeTrainingHubPass25() {
     LandmarkEncounter pauseEncounter;
     CombatSandbox pauseCombat;
     ShadowbladeActions pauseActions;
-    Expect(pauseEncounter.TryActivate(discovery, pauseCombat).result
+    Expect(pauseEncounter.TryActivate(TrainingDiscovery(pauseActions), pauseCombat).result
             == LandmarkEncounterResult::Activated,
         "pass25 pause fixture activates encounter");
     pauseCombat.ApplyDamage(1000);
@@ -314,7 +319,7 @@ void TestShadowbladeTrainingHubPass25() {
     LandmarkEncounter damageEncounter;
     CombatSandbox damageCombat;
     ShadowbladeActions damageActions;
-    Expect(damageEncounter.TryActivate(discovery, damageCombat).result
+    Expect(damageEncounter.TryActivate(TrainingDiscovery(damageActions), damageCombat).result
             == LandmarkEncounterResult::Activated,
         "pass25 damage-window fixture activates encounter");
     damageCombat.ApplyDamage(1000);
