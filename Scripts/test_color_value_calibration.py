@@ -56,6 +56,21 @@ class Tests(unittest.TestCase):
         for p,d in files.items(): (out/p).write_bytes(d)
         (out/"manifest.json").write_bytes(manifest)
         self.assertEqual(verify(out,crlf_source,crlf_pin)["png_files"],3)
+    def test_generator_rejects_runtime_source_status(self):
+        bad=Path(self.t.name)/"bad-source-generator.json"
+        s=json.loads(canonical_text_bytes(SOURCE)); s["status"]="runtime_validated_and_approved"
+        bad.write_text(json.dumps(s,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+        with self.assertRaisesRegex(ValueError,"source status"): build(bad)
+    def test_verifier_rejects_runtime_source_status_even_repinned(self):
+        bad=Path(self.t.name)/"bad-source-verifier.json"
+        s=json.loads(canonical_text_bytes(SOURCE)); s["status"]="runtime_validated_and_approved"
+        bad.write_text(json.dumps(s,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+        source_bytes=canonical_text_bytes(bad)
+        m=json.loads((self.root/"manifest.json").read_text())
+        m["source_sha256"]=hashlib.sha256(source_bytes).hexdigest()
+        b=(json.dumps(m,indent=2,sort_keys=True)+"\n").encode()
+        (self.root/"manifest.json").write_bytes(b); self.pin.write_bytes(b)
+        with self.assertRaisesRegex(ValueError,"source status"): verify(self.root,bad,self.pin)
     def test_palette_unsampled_swatch_corruption_even_rehashed(self):
         p=self.root/"palette_card.png"; p.write_bytes(mutate_rgb_pixel(p.read_bytes(),17,45,(1,2,3))); self.rehash("palette_card.png")
         with self.assertRaisesRegex(ValueError,"palette semantic"): self.ok()
