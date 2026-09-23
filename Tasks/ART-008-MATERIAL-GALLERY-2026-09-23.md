@@ -38,10 +38,13 @@ Forbidden: `Engine/`, renderer, editor, gameplay, CMake, workflow, dependencies,
 - generated runtime status stays `source_validated_not_imported`;
 - canonical source `capture_intent` and generated manifest `intent` must equal their exact source-only sentences;
 - generated manifest is a closed schema-version-1 contract, and schema version must be a JSON integer exactly equal to 1;
+- all glTF index/reference fields used by the fixture must be real JSON integers, not booleans that Python could otherwise treat as integers;
 - exact generator-owned glTF profile for required semantics: POSITION FLOAT VEC3, NORMAL FLOAT VEC3, TANGENT FLOAT VEC4, TEXCOORD_0 FLOAT VEC2, and indices UNSIGNED_SHORT SCALAR;
 - deterministic accessor, bufferView, buffer, camera, perspective, extension, mesh, primitive, material and scene object key sets are closed to the generator-owned profile, so optional text or metadata fields cannot carry unsupported runtime/import/art/parity claims;
 - all required accessors and bufferViews are referenced by the calibration geometry, with no unused metadata containers admitted;
 - each POSITION accessor declares finite three-component `min` and `max` values matching decoded payload;
+- each index accessor declares one-component integer `min` and `max` values matching the decoded index payload;
+- bufferView/accessor byte offsets satisfy component-size alignment and the glTF 4-byte vertex-attribute alignment requirement;
 - finite triangle geometry, bounded indices, exact generator-owned index topology, outward winding and consistent indexed vertex normals;
 - every vertex tangent is normalized, normal-orthogonal, and its tangent plus reconstructed bitangent agrees with position/UV derivatives; non-floor alignment must exceed 0.95 and floor alignment 0.9999;
 - all sphere stations share one canonical sphere binding and all cube stations share one canonical cube binding;
@@ -55,7 +58,7 @@ Forbidden: `Engine/`, renderer, editor, gameplay, CMake, workflow, dependencies,
 - camera and directional-light nodes reject scale, matrix or other transform overrides and use source-derived rotations;
 - no images/textures/samplers;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions cover material/light/camera contracts, statuses and evidence claims, nested `extras`, nested accessor `name` evidence claims, manifest schema/intent, texture insertion, bounds and semantic formats, topology, full canonical cube payload, geometry dimensions/sharing, normals/tangent frames, morphs/animation and transform overrides;
+- negative regressions cover material/light/camera contracts, statuses and evidence claims, nested `extras`, nested accessor `name` evidence claims, manifest schema/intent, texture insertion, bounds and semantic formats, canonical index bounds, boolean accessor references, accessor alignment, topology, full canonical cube payload, geometry dimensions/sharing, normals/tangent frames, morphs/animation and transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
 ## Verification commands
@@ -70,4 +73,6 @@ python -m py_compile Scripts/generate_material_gallery_gltf.py Scripts/verify_ma
 
 ## Current bounded repair
 
-The thirteenth independent review of PR #33 found two P2 gaps at head `49ef9d92057a577f55095f31d7d0f201c70bcb0d`: a cube could collapse to six copies of one face while preserving counts/extents/topology, and optional nested `name` metadata could carry unsupported evidence claims. The repair compares complete decoded sphere/cube/floor payloads with generator-owned geometry and closes deterministic object key sets plus referenced accessor/bufferView coverage. Two focused negatives raise the suite definition from 42 to 44 tests.
+The fourteenth independent review of PR #33 at `5baec92ac55329f4f462386c6fb113d2eb15b452` found three P2 gaps: JSON booleans could satisfy accessor references because Python treats `True` as an integer; index accessors only required `min`/`max` keys rather than truthful payload bounds; and a repinned embedded buffer could shift every bufferView by two bytes while preserving decoded payloads but violating glTF alignment rules.
+
+The current repair introduces exact integer index/reference validation, verifies decoded index minima/maxima against declared accessor bounds, enforces component-size and 4-byte vertex-attribute alignment before decoding, emits truthful generator index bounds with `min(idx)` / `max(idx)`, and adds three dedicated negative regressions. The focused suite definition is now 47 tests. Exact-head hosted Windows workflow `35881340721` passed on code head `00f3d3e4fc5f946841174a324a6fbfa186787faf`. A fresh 47-test focused source-suite execution is not claimed in this pass because the available sandbox could not resolve GitHub for a clean checkout; hosted CI does not substitute for that suite or for independent re-review.
