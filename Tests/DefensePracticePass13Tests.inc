@@ -455,4 +455,31 @@ void TestDefensePracticePass13() {
     Expect(inputInterruptSession.ResetMetrics()
             && inputInterruptSession.SetPace(DefensePracticePace::Learning),
         "pass13 TryDefend interruption clears session ownership for reset and reconfiguration");
+
+    // Extremely large finite frame deltas must fail closed before reaching the
+    // CombatSandbox microsecond clock. Rejection must not mutate the live threat,
+    // and ordinary bounded time must continue to resolve the attempt afterward.
+    CombatSandbox overflowCombat;
+    ShadowbladeActions overflowActions;
+    DefensePracticeSession overflowSession;
+    Expect(overflowSession.SetPracticeSequence(quickOnly)
+            && overflowSession.QueueNextAttack(overflowCombat, overflowActions),
+        "pass13 clock-overflow regression queues an owned QuickCut");
+    const EnemyAttackPlan overflowPlan = overflowCombat.PendingEnemyAttack();
+    const double elapsedBeforeOverflow = overflowCombat.ElapsedSecondsPrecise();
+    const float remainingBeforeOverflow = overflowActions.IncomingAttackRemaining();
+    Expect(!overflowSession.AdvanceTime(overflowCombat, overflowActions,
+            std::numeric_limits<float>::max())
+            && overflowCombat.ElapsedSecondsPrecise() == elapsedBeforeOverflow
+            && Near(overflowActions.IncomingAttackRemaining(), remainingBeforeOverflow)
+            && overflowSession.Stats().hitsTaken == 0,
+        "pass13 oversized finite delta is rejected without corrupting combat timing");
+    Expect(overflowSession.AdvanceTime(
+            overflowCombat, overflowActions, overflowPlan.windupSeconds)
+            && overflowActions.PlayerHealth() == 82,
+        "pass13 bounded time still resolves QuickCut after oversized delta rejection");
+    overflowSession.AdvanceTime(
+        overflowCombat, overflowActions, overflowPlan.recoverySeconds);
+    Expect(overflowSession.QueueNextAttack(overflowCombat, overflowActions),
+        "pass13 oversized delta rejection preserves later recovery and queueing");
 }
