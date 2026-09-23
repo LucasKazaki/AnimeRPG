@@ -56,8 +56,8 @@
       "id": "ART-008",
       "title": "Neutral material-response gallery source fixture",
       "status": "source_validated_pending_review",
-      "dependency": "fresh exact-head hosted CI and independent review after thirteenth-review canonical-payload/metadata-keyset repairs; Astral glTF/material/light import later",
-      "next_acceptance": "generated static gallery imports and renders in Astral with generator-owned full sphere/cube/floor payloads, immutable matched station geometry, exact semantic/accessor profile, closed deterministic metadata fields, truthful POSITION bounds, UV-derived tangent frames, source-only evidence contracts, correct camera/material/light behavior, and no unsupported runtime/art claims"
+      "dependency": "fresh focused 47-test execution plus exact-head independent review after fourteenth-review integer-reference/index-bounds/alignment repairs and expected-manifest repin; Astral glTF/material/light import later",
+      "next_acceptance": "generated static gallery passes its exact pin and 47-test source suite, then imports and renders in Astral with canonical sphere/cube/floor payloads, truthful accessor bounds/alignment, source-only evidence contracts, correct camera/material/light behavior, and no unsupported runtime/art claims"
     }
   ]
 }
