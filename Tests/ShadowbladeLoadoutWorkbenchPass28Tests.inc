@@ -126,6 +126,20 @@ void TestShadowbladeLoadoutWorkbenchPass28() {
             && loadout.EquippedModule(ResonanceSlot::Edge) == ResonanceModule::CoolingEdge,
         "pass28 one-action reapply restores the exact remembered preset");
 
+    ShadowbladeActions directApplyOwner;
+    Expect(directApplyOwner.Loadout().SavePreset(0) == LoadoutActionResult::Success
+            && directApplyOwner.Loadout().SavePreset(1) == LoadoutActionResult::Success,
+        "pass28 direct-apply fixture saves two presets");
+    Expect(directApplyOwner.Loadout().ApplyPreset(0, progression)
+            == LoadoutActionResult::Success
+            && directApplyOwner.HasLastAppliedLoadoutPreset()
+            && directApplyOwner.LastAppliedLoadoutPreset() == 0,
+        "pass28 authoritative direct preset apply records recall metadata");
+    Expect(directApplyOwner.Loadout().ApplyPreset(1, progression)
+            == LoadoutActionResult::Success
+            && directApplyOwner.LastAppliedLoadoutPreset() == 1,
+        "pass28 later authoritative direct preset apply updates recall metadata");
+
     // QOL-029: saved presets can carry short human-readable labels with spaces.
     // Metadata lives with the authoritative loadout, so assignment/replacement cannot
     // leave labels or last-applied state paired with an unrelated build.
