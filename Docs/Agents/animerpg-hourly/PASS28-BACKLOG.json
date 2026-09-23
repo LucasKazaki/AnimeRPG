@@ -79,7 +79,7 @@
       "source_ids": ["ZZZ-PLAYER-PRESET-NAMES-20260711"],
       "status": "implemented_registered_regression_pending_exact_head_gates",
       "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h", "Engine/Scene/ShadowbladeActions.cpp"],
-      "acceptance": "Saved slots accept bounded labels with internal spaces through their paired Shadowblade owner; invalid/cross-owner edits fail atomically; transient resets preserve labels; label clearing does not alter the saved build or current equipment."
+      "acceptance": "Saved slots accept bounded labels with internal spaces through their paired Shadowblade owner; invalid/cross-owner edits fail atomically; the public workbench view is const-only so its state cannot be copy-assigned across owners; transient resets preserve labels; label clearing does not alter the saved build or current equipment."
     }
   ],
   "counts": {
@@ -98,7 +98,8 @@
     "Bounded task/backlog/receipt records were added before acceptance.",
     "Stateful preset metadata is accessible only through its paired ShadowbladeActions owner.",
     "ResetTransientStatePreservingLoadout preserves workbench metadata as persistent loadout session state.",
-    "Registered tests use the owner API and cover cross-owner rejection plus transient-reset persistence."
+    "Registered tests use the owner API and cover cross-owner rejection plus transient-reset persistence.",
+    "The public LoadoutWorkbench accessor is const-only, closing the implicit copy-assignment path that could copy metadata across owners."
   ],
   "known_failed_gate": {
     "head": "6957ff8d913e0a70c18df7deb0bc13b572bc304c",
@@ -107,6 +108,14 @@
     "cause": "registered tests still called stateful workbench methods after those methods became private owner-only APIs; repaired on a later head",
     "release_manifest_run": 35930449015,
     "release_manifest_result": "success"
+  },
+  "superseded_green_gate": {
+    "head": "768185c95c5478e12fe6859dfe33d2055fd688f3",
+    "windows_run": 35931582989,
+    "windows_result": "success",
+    "release_manifest_run": 35931582978,
+    "release_manifest_result": "success",
+    "reason_not_final": "fresh independent review found a const-ownership escape via the non-const workbench accessor; repaired on a later head"
   },
   "next_action": "Run exact-head hosted Windows Debug/Release and release-manifest gates on the final PR 48 record head, obtain fresh independent review on that same head, repair/rerun if needed, then expected-head merge if all gates are clean."
 }
