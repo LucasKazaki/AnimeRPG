@@ -15,7 +15,7 @@
   "pass": "GAME-PASS23-SHADOWBLADE-TRAINING-PATH-2026-09-23",
   "task_packet": "Tasks/GAME-PASS23-SHADOWBLADE-TRAINING-PATH-2026-09-23.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS23.md",
-  "pr": null,
+  "pr": 42,
   "final_head": "pending_exact_final_head_after_state_record",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -52,5 +52,5 @@
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "Open one scoped PR, inspect the full diff, require hosted Windows Debug/Release deterministic tests and release-manifest integrity on the exact frozen head, request fresh independent Codex review on that exact head, repair any material finding and rerun affected gates, then merge only that exact tested/reviewed head after re-reading live main."
+  "next_action": "PR 42 is open. Freeze the branch, inspect the full diff, require hosted Windows Debug/Release deterministic tests and release-manifest integrity on the exact final head, request fresh independent Codex review on that exact head, repair any material finding and rerun affected gates, then merge only that exact tested/reviewed head after re-reading live main."
 }
