@@ -105,6 +105,7 @@ public:
         }
 
         briefing.emergencyVentSuggested = expedition_.Active()
+            && !expedition_.Failed()
             && expedition_.EmergencyVentAvailable()
             && expedition_.Heat() >= 75
             && expedition_.Stability() > ManaReactorExpedition::EmergencyVentStabilityCost;
@@ -161,7 +162,12 @@ private:
 
     void RecordCompletion() {
         const ManaReactorCompletion completion = expedition_.CompletionSummary();
-        if (completion.grade == ManaReactorGrade::Unranked) return;
+        // Calibration is a consequence-free practice mode. It must never replace
+        // an Expedition personal best even when it uses the same difficulty/protocol.
+        if (completion.mode != ManaReactorMode::Expedition
+            || completion.grade == ManaReactorGrade::Unranked) {
+            return;
+        }
         const std::size_t index = RecordIndex(completion.difficulty, completion.protocol);
         if (index >= records_.size()) return;
         ManaReactorMissionRecord& record = records_[index];
