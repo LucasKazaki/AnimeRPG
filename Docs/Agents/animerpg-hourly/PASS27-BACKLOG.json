@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS27-SHADOW-CRYPT-LIVE-2026-09-24",
+  "baseline": "40311ba7dcf1035656b6b2d0dbeb589030071dc7",
+  "target_branch": "main",
+  "branch": "game/2026-09-24-shadow-crypt-live-pass27",
+  "researched": {
+    "reference_features": 5,
+    "community_improvements": 1,
+    "accessed": "2026-09-24"
+  },
+  "features": [
+    {
+      "id": "GAME-132",
+      "title": "Production-owned Shadow Crypt entry",
+      "status": "implemented_pending_exact_head_gates",
+      "source": "https://zenless.hoyoverse.com/m/en-us/news/165921",
+      "acceptance": "Live LandmarkInteraction evidence gates exactly one active run."
+    },
+    {
+      "id": "GAME-133",
+      "title": "Authoritative room objective briefing",
+      "status": "implemented_pending_exact_head_gates",
+      "source": "https://www.hoyolab.com/article/44074876",
+      "acceptance": "Room, objective, progress, cache, damage, defeat and safe-suspend state mirror the authoritative expedition."
+    },
+    {
+      "id": "GAME-134",
+      "title": "Safe boundary suspend and one-shot resume",
+      "status": "implemented_pending_exact_head_gates",
+      "source": "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "acceptance": "Only room boundaries suspend; fresh-run overwrite and double-resume fail closed."
+    },
+    {
+      "id": "GAME-135",
+      "title": "Monotonic Shadow Crypt best-clear record",
+      "status": "implemented_pending_exact_head_gates",
+      "source": "https://www.hoyolab.com/article/44074876",
+      "acceptance": "Deterministic best score/grade survives replay and is not replaced by a worse clear."
+    },
+    {
+      "id": "GAME-136",
+      "title": "Live first-clear reward and immediate full replay",
+      "status": "implemented_pending_exact_head_gates",
+      "source": "https://www.playstation.com/en-us/games/genshin-impact/",
+      "acceptance": "Persistent progression grants first-clear once; completed run can replay; active run cannot reset itself."
+    },
+    {
+      "id": "QOL-028",
+      "title": "Authoritative Shadow Crypt next-objective guidance",
+      "status": "implemented_pending_exact_head_gates",
+      "source": "https://www.reddit.com/r/WutheringWaves/comments/1k2pg14",
+      "corroboration": "https://www.reddit.com/r/WutheringWaves/comments/1ukhiae/",
+      "published": "2025-04-19",
+      "later_context": "2026-07-01 players praise broader objective-tracker QOL while noting some hidden objectives remain hard to locate",
+      "sentiment": "specific player request with later positive corroboration, not consensus or a claimed current defect",
+      "acceptance": "Guidance follows authoritative main objective, optional cache, resume and replay state."
+    }
+  ],
+  "allowed_production_paths": [
+    "Engine/Scene/ShadowCryptMission.h",
+    "Engine/Scene/LandmarkInteraction.h"
+  ],
+  "verification": {
+    "registered_aggregate": "ThoughtCommandsTests",
+    "new_regression": "Tests/ShadowCryptMissionPass27Tests.inc",
+    "hosted_windows": "pending",
+    "release_manifest": "pending",
+    "independent_review": "pending",
+    "native_interactive": "not_run_not_claimed"
+  },
+  "next_action": "Publish the bounded PR, obtain exact-head hosted Windows and Release-manifest success plus fresh independent review, repair if needed, then expected-head merge if all gates remain clean."
+}
