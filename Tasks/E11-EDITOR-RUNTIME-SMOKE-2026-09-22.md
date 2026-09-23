@@ -37,13 +37,13 @@ This packet deliberately does not enable any toolbar action. The five tools rema
 ## Research basis, rechecked 2026-09-23 UTC
 
 - Epic Games, UE 5.8 Viewport Toolbar: https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar
-  - applicability: Epic documents transform tools as ordered, semantically distinct Select/Move/Rotate/Scale workflow controls and says the newer toolbar keeps features in consistent locations by logical category. This is a workflow comparison only.
+  - applicability: Epic documents transform tools as semantically distinct Select/Move/Rotate/Scale workflow controls and says the toolbar keeps features in consistent locations by logical category. Workflow comparison only.
 - Microsoft Learn, `GetWindowRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect
-  - applicability: retrieves a window/control bounding rectangle in screen coordinates, used before mapping the retained Button HWNDs into editor-client coordinates.
+  - applicability: retrieves a window/control bounding rectangle in screen coordinates before mapping the retained Button HWNDs into editor-client coordinates.
 - Microsoft Learn, `WM_GETTEXT`: https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-gettext
-  - applicability: button window text is the button name/caption, which is the semantic identity checked through the existing bounded cross-process text helper.
+  - applicability: for a button, window text is its button name/caption, used here as semantic identity through the existing bounded cross-process text helper.
 - Unity Technologies, Unity 6 `Tool` enum: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Tool.html
-  - applicability: Unity exposes semantically distinct Move/Rotate/Scale editor tools; workflow comparison only.
+  - applicability: Unity exposes semantically distinct Move/Rotate/Scale editor tools. Workflow comparison only.
 
 No proprietary source was copied and no dependency was added.
 
@@ -53,7 +53,7 @@ A disposable C++17 source-logic fixture modeled five stable toolbar handles and 
 
 Fixture SHA-256: `23ae0ee31850aab8df8ddcf68ca4a11137c1b3529ca9c9ced1d589cf6606b210`.
 
-Commands/results in the coordinator sandbox:
+Executed commands/results:
 
 ```text
 g++ (Debian 14.2.0-19) 14.2.0
@@ -62,21 +62,22 @@ g++ -std=c++17 -Wall -Wextra -Werror /tmp/e11_toolbar_semantic_fixture.cpp -o /t
 => toolbar semantic binding fixture: PASS
 
 clang version 17.0.0
-a clang++ C++17 -Wall -Wextra -Werror ASan+UBSan build of the same fixture
+clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer /tmp/e11_toolbar_semantic_fixture.cpp -o /tmp/e11_toolbar_clang
+ASAN_OPTIONS=detect_leaks=1 /tmp/e11_toolbar_clang
 => toolbar semantic binding fixture: PASS
 ```
 
-The leading `a` in the prose above is not a command; the exact executed sanitizer command was `clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer /tmp/e11_toolbar_semantic_fixture.cpp -o /tmp/e11_toolbar_clang`, followed by `ASAN_OPTIONS=detect_leaks=1 /tmp/e11_toolbar_clang`. This fixture is source-logic evidence only, not Win32 GUI execution.
+This fixture is source-logic evidence only, not Win32 GUI execution.
 
 ## Hosted candidate verification
 
-GitHub Actions triggered for exact code candidate `81e7052f47cab06060ea69c9f9d4f25ec42145e4`:
+For exact code candidate `81e7052f47cab06060ea69c9f9d4f25ec42145e4`:
 
-- Windows build and deterministic tests run `35810233080`, job `107019946669`: in progress at this receipt write;
-- profiling capture portability run `35810232976`: in progress at this receipt write;
-- release manifest integrity run `35810233015`: in progress at this receipt write.
+- profiling capture portability `35810232976`: `completed/success`;
+- release manifest integrity `35810233015`: `completed/success`;
+- Windows run `35810233080`, job `107019946669`: the substantive safety/configure/Debug build+tests/Release build+tests/dependency/static/clean-tree steps all completed successfully, but the workflow/job was cancelled after a newer evidence commit superseded the head. The cancelled overall conclusion is not counted as a pass.
 
-No pending workflow is counted as passed. Hosted deterministic CTest intentionally excludes tests whose names end in `RuntimeSmoke`, so even a green hosted build will not be native editor GUI evidence.
+The next exact evidence head must complete its own Windows workflow successfully before hosted verification is called green. Hosted deterministic CTest intentionally excludes tests whose names end in `RuntimeSmoke`, so even a green hosted build is not native editor GUI evidence.
 
 ## Retained acceptance surface
 
@@ -86,7 +87,7 @@ All established E11 checks remain required: one stable visible/enabled process-o
 
 ## Registered native handoff
 
-After the current candidate has completed hosted verification and receives clean independent review, the registered Windows executor should run the exact reviewed branch head on one owned interactive desktop:
+After the current candidate has completed exact-head hosted verification and receives clean independent review, the registered Windows executor should run the exact reviewed branch head on one owned interactive desktop:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -100,4 +101,4 @@ Retain exact source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driv
 
 ## Single next useful action
 
-Finish exact-candidate hosted verification, then obtain fresh independent review of the toolbar semantic-binding diff. If clean, execute the registered Windows Debug/Release GUI smoke and preserve the complete native receipt set. Do not rebase onto the separately moving `main` within this packet.
+Complete hosted verification on the final evidence head and obtain fresh independent review of the toolbar semantic-binding diff. If both are clean, execute the registered Windows Debug/Release GUI smoke and preserve the complete native receipt set. Do not rebase onto the separately moving `main` within this packet.
