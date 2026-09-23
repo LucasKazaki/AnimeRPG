@@ -51,6 +51,15 @@ enum class LoadoutActionResult : std::uint8_t {
     Equipped,
     EmptyPreset,
     MissingPresetItem,
+    InsufficientParts,
+    MaximumRank,
+    Protected,
+};
+
+enum class LoadoutUpgradeKind : std::uint8_t {
+    None,
+    Weapon,
+    Module,
 };
 
 struct ShadowbladeLoadoutProfile {
@@ -74,6 +83,16 @@ struct ShadowbladeLoadoutPreset {
     std::array<bool, 4> occupied{};
 };
 
+struct ShadowbladeUpgradeRecommendation {
+    bool available{};
+    LoadoutUpgradeKind kind{LoadoutUpgradeKind::None};
+    ShadowbladeWeapon weapon{ShadowbladeWeapon::TrainingBlade};
+    ResonanceModule module{ResonanceModule::CoolingEdge};
+    int currentRank{};
+    int nextCost{};
+    bool affordable{};
+};
+
 class ShadowbladeLoadout {
 public:
     static constexpr std::size_t WeaponCount =
@@ -84,6 +103,7 @@ public:
         static_cast<std::size_t>(ResonanceSlot::Count);
     static constexpr std::size_t PresetSlots = 3;
     static constexpr int MaximumTuningParts = 999;
+    static constexpr int MaximumTuneRank = 3;
 
     ShadowbladeLoadout() {
         ownedWeapons_[WeaponIndex(ShadowbladeWeapon::TrainingBlade)] = true;
@@ -152,6 +172,102 @@ public:
         return LoadoutActionResult::Success;
     }
 
+    int WeaponTuneRank(ShadowbladeWeapon weapon) const {
+        return IsValidWeapon(weapon) ? weaponTuneRanks_[WeaponIndex(weapon)] : -1;
+    }
+
+    int ModuleTuneRank(ResonanceModule module) const {
+        return IsValidModule(module) ? moduleTuneRanks_[ModuleIndex(module)] : -1;
+    }
+
+    int RemainingWeaponTuneCost(ShadowbladeWeapon weapon) const {
+        if (!IsValidWeapon(weapon) || !OwnsWeapon(weapon)) return 0;
+        return RemainingTuneCost(weaponTuneRanks_[WeaponIndex(weapon)], true);
+    }
+
+    int RemainingModuleTuneCost(ResonanceModule module) const {
+        if (!IsValidModule(module) || !OwnsModule(module)) return 0;
+        return RemainingTuneCost(moduleTuneRanks_[ModuleIndex(module)], false);
+    }
+
+    LoadoutActionResult TryTuneWeapon(
+        ShadowbladeWeapon weapon, const CharacterProgression& progression) {
+        if (!IsValidWeapon(weapon)) return LoadoutActionResult::Invalid;
+        if (!OwnsWeapon(weapon)) return LoadoutActionResult::NotOwned;
+        if (progression.Level() < RequiredLevel(weapon)) return LoadoutActionResult::Locked;
+        const std::size_t index = WeaponIndex(weapon);
+        const int rank = weaponTuneRanks_[index];
+        if (rank >= MaximumTuneRank) return LoadoutActionResult::MaximumRank;
+        const int cost = WeaponTuneCost(rank);
+        if (tuningParts_ < cost) return LoadoutActionResult::InsufficientParts;
+        tuningParts_ -= cost;
+        ++weaponTuneRanks_[index];
+        return LoadoutActionResult::Success;
+    }
+
+    LoadoutActionResult TryTuneModule(ResonanceModule module) {
+        if (!IsValidModule(module)) return LoadoutActionResult::Invalid;
+        if (!OwnsModule(module)) return LoadoutActionResult::NotOwned;
+        const std::size_t index = ModuleIndex(module);
+        const int rank = moduleTuneRanks_[index];
+        if (rank >= MaximumTuneRank) return LoadoutActionResult::MaximumRank;
+        const int cost = ModuleTuneCost(rank);
+        if (tuningParts_ < cost) return LoadoutActionResult::InsufficientParts;
+        tuningParts_ -= cost;
+        ++moduleTuneRanks_[index];
+        return LoadoutActionResult::Success;
+    }
+
+    bool ModuleProtected(ResonanceModule module) const {
+        return IsValidModule(module) && moduleProtected_[ModuleIndex(module)];
+    }
+
+    LoadoutActionResult SetModuleProtected(ResonanceModule module, bool protect) {
+        if (!IsValidModule(module)) return LoadoutActionResult::Invalid;
+        if (!OwnsModule(module)) return LoadoutActionResult::NotOwned;
+        moduleProtected_[ModuleIndex(module)] = protect;
+        return LoadoutActionResult::Success;
+    }
+
+    ShadowbladeUpgradeRecommendation RecommendedUpgrade() const {
+        ShadowbladeUpgradeRecommendation best{};
+
+        auto considerWeapon = [&](ShadowbladeWeapon weapon) {
+            if (!OwnsWeapon(weapon)) return;
+            const int rank = WeaponTuneRank(weapon);
+            if (rank < 0 || rank >= MaximumTuneRank) return;
+            const int cost = WeaponTuneCost(rank);
+            if (!best.available || cost < best.nextCost) {
+                best.available = true;
+                best.kind = LoadoutUpgradeKind::Weapon;
+                best.weapon = weapon;
+                best.currentRank = rank;
+                best.nextCost = cost;
+            }
+        };
+
+        auto considerModule = [&](ResonanceModule module) {
+            if (!OwnsModule(module)) return;
+            const int rank = ModuleTuneRank(module);
+            if (rank < 0 || rank >= MaximumTuneRank) return;
+            const int cost = ModuleTuneCost(rank);
+            if (!best.available || cost < best.nextCost) {
+                best.available = true;
+                best.kind = LoadoutUpgradeKind::Module;
+                best.module = module;
+                best.currentRank = rank;
+                best.nextCost = cost;
+            }
+        };
+
+        considerWeapon(equippedWeapon_);
+        for (std::size_t slot = 0; slot < ModuleSlotCount; ++slot) {
+            if (moduleOccupied_[slot]) considerModule(equippedModules_[slot]);
+        }
+        if (best.available) best.affordable = tuningParts_ >= best.nextCost;
+        return best;
+    }
+
     ShadowbladeLoadoutProfile Profile() const {
         ShadowbladeLoadoutProfile profile{};
         const WeaponStats weapon = StatsFor(equippedWeapon_);
@@ -159,6 +275,7 @@ public:
         profile.guardBonus += weapon.guard;
         profile.resourceRecoveryBonus += weapon.resource;
         profile.mobilityBonus += weapon.mobility;
+        ApplyWeaponTuneBonus(weaponTuneRanks_[WeaponIndex(equippedWeapon_)], profile);
 
         std::array<int, 3> familyCounts{};
         for (std::size_t slot = 0; slot < ModuleSlotCount; ++slot) {
@@ -169,6 +286,8 @@ public:
             profile.guardBonus += stats.guard;
             profile.resourceRecoveryBonus += stats.resource;
             profile.mobilityBonus += stats.mobility;
+            ApplyModuleTuneBonus(static_cast<ResonanceSlot>(slot),
+                moduleTuneRanks_[ModuleIndex(module)], profile);
             ++familyCounts[FamilyIndex(FamilyFor(module))];
         }
 
@@ -237,10 +356,16 @@ public:
         if (!OwnsModule(module)) return LoadoutActionResult::NotOwned;
         if (IsEquipped(module)) return LoadoutActionResult::Equipped;
         const std::size_t index = ModuleIndex(module);
+        if (moduleProtected_[index]) return LoadoutActionResult::Protected;
+
+        const int recovered = SalvageValue(module)
+            + ModuleInvestment(moduleTuneRanks_[index]) / 2;
         ownedModules_[index] = false;
         salvagedModules_[index] = true;
+        moduleProtected_[index] = false;
+        moduleTuneRanks_[index] = 0;
         const int room = MaximumTuningParts - tuningParts_;
-        tuningParts_ += std::min(SalvageValue(module), std::max(0, room));
+        tuningParts_ += std::min(recovered, std::max(0, room));
         return LoadoutActionResult::Success;
     }
 
@@ -364,6 +489,41 @@ private:
         return {};
     }
 
+    static int WeaponTuneCost(int currentRank) {
+        switch (currentRank) {
+        case 0: return 6;
+        case 1: return 10;
+        case 2: return 14;
+        default: return 0;
+        }
+    }
+
+    static int ModuleTuneCost(int currentRank) {
+        switch (currentRank) {
+        case 0: return 4;
+        case 1: return 8;
+        case 2: return 12;
+        default: return 0;
+        }
+    }
+
+    static int RemainingTuneCost(int currentRank, bool weapon) {
+        if (currentRank < 0 || currentRank >= MaximumTuneRank) return 0;
+        int total = 0;
+        for (int rank = currentRank; rank < MaximumTuneRank; ++rank) {
+            total += weapon ? WeaponTuneCost(rank) : ModuleTuneCost(rank);
+        }
+        return total;
+    }
+
+    static int ModuleInvestment(int rank) {
+        int total = 0;
+        for (int current = 0; current < std::clamp(rank, 0, MaximumTuneRank); ++current) {
+            total += ModuleTuneCost(current);
+        }
+        return total;
+    }
+
     static int SalvageValue(ResonanceModule module) {
         switch (module) {
         case ResonanceModule::CoolingEdge:
@@ -380,6 +540,33 @@ private:
             return 0;
         }
         return 0;
+    }
+
+    static void ApplyWeaponTuneBonus(int rank, ShadowbladeLoadoutProfile& profile) {
+        const int bounded = std::clamp(rank, 0, MaximumTuneRank);
+        profile.attackBonus += bounded;
+        profile.guardBonus += bounded / 2;
+    }
+
+    static void ApplyModuleTuneBonus(
+        ResonanceSlot slot, int rank, ShadowbladeLoadoutProfile& profile) {
+        const int bounded = std::clamp(rank, 0, MaximumTuneRank);
+        switch (slot) {
+        case ResonanceSlot::Edge:
+            profile.attackBonus += bounded;
+            break;
+        case ResonanceSlot::Ward:
+            profile.guardBonus += bounded;
+            break;
+        case ResonanceSlot::Flow:
+            profile.resourceRecoveryBonus += bounded;
+            break;
+        case ResonanceSlot::Insight:
+            profile.mobilityBonus += bounded;
+            break;
+        case ResonanceSlot::Count:
+            break;
+        }
     }
 
     static void ApplyFamilyBonus(
@@ -419,6 +606,9 @@ private:
     };
     std::array<bool, ModuleSlotCount> moduleOccupied_{};
     std::array<ShadowbladeLoadoutPreset, PresetSlots> presets_{};
+    std::array<std::uint8_t, WeaponCount> weaponTuneRanks_{};
+    std::array<std::uint8_t, ModuleCount> moduleTuneRanks_{};
+    std::array<bool, ModuleCount> moduleProtected_{};
     int tuningParts_{};
 };
 
