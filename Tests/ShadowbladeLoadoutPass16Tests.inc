@@ -22,7 +22,8 @@ void TestShadowbladeLoadoutPass16() {
             && loadout.TryEquipModule(ResonanceSlot::Edge, invalidModule)
                 == LoadoutActionResult::Invalid
             && loadout.TryEquipModule(invalidSlot, ResonanceModule::CoolingEdge)
-                == LoadoutActionResult::Invalid,
+                == LoadoutActionResult::Invalid
+            && loadout.UnequipModule(invalidSlot) == LoadoutActionResult::Invalid,
         "pass16 malformed module and slot ids fail closed");
 
     Expect(loadout.TryEquipWeapon(ShadowbladeWeapon::RiftsteelSabre, progression)
@@ -37,6 +38,40 @@ void TestShadowbladeLoadoutPass16() {
                 == LoadoutActionResult::Locked
             && loadout.EquippedWeapon() == ShadowbladeWeapon::TrainingBlade,
         "pass16 level-gated weapon failures preserve current equipment");
+
+    CharacterProgression boundaryProgression;
+    ShadowbladeLoadout boundaryLoadout;
+    Expect(boundaryLoadout.AcquireWeapon(ShadowbladeWeapon::RiftsteelSabre)
+            && boundaryLoadout.AcquireWeapon(ShadowbladeWeapon::CryoEdge),
+        "pass16 boundary fixture owns both gated weapon frames");
+    int boundaryLevels = 0;
+    boundaryProgression.GrantExperience(2799, boundaryLevels);
+    Expect(boundaryProgression.Level() == 7
+            && boundaryLoadout.TryEquipWeapon(
+                   ShadowbladeWeapon::RiftsteelSabre, boundaryProgression)
+                == LoadoutActionResult::Locked,
+        "pass16 Riftsteel remains locked one experience point below level 8");
+    boundaryProgression.GrantExperience(1, boundaryLevels);
+    Expect(boundaryProgression.Level() == 8
+            && boundaryLoadout.TryEquipWeapon(
+                   ShadowbladeWeapon::RiftsteelSabre, boundaryProgression)
+                == LoadoutActionResult::Success
+            && boundaryLoadout.TryEquipWeapon(ShadowbladeWeapon::CryoEdge, boundaryProgression)
+                == LoadoutActionResult::Locked
+            && boundaryLoadout.EquippedWeapon() == ShadowbladeWeapon::RiftsteelSabre,
+        "pass16 Riftsteel unlocks exactly at level 8 while Cryo Edge remains locked");
+    boundaryProgression.GrantExperience(6299, boundaryLevels);
+    Expect(boundaryProgression.Level() == 13
+            && boundaryLoadout.TryEquipWeapon(ShadowbladeWeapon::CryoEdge, boundaryProgression)
+                == LoadoutActionResult::Locked
+            && boundaryLoadout.EquippedWeapon() == ShadowbladeWeapon::RiftsteelSabre,
+        "pass16 Cryo Edge remains locked one experience point below level 14");
+    boundaryProgression.GrantExperience(1, boundaryLevels);
+    Expect(boundaryProgression.Level() == 14
+            && boundaryLoadout.TryEquipWeapon(ShadowbladeWeapon::CryoEdge, boundaryProgression)
+                == LoadoutActionResult::Success
+            && boundaryLoadout.EquippedWeapon() == ShadowbladeWeapon::CryoEdge,
+        "pass16 Cryo Edge unlocks exactly at level 14");
 
     int levelsGained = 0;
     progression.GrantExperience(100000, levelsGained);
@@ -69,6 +104,32 @@ void TestShadowbladeLoadoutPass16() {
             == LoadoutActionResult::Invalid
             && !loadout.ModuleSlotOccupied(ResonanceSlot::Ward),
         "pass16 module slot typing rejects a wrong-slot equip without mutation");
+
+    ShadowbladeLoadout replacementLoadout;
+    Expect(replacementLoadout.AcquireModule(ResonanceModule::CoolingEdge)
+            && replacementLoadout.AcquireModule(ResonanceModule::RiftEdge)
+            && replacementLoadout.AcquireModule(ResonanceModule::CoolingWard)
+            && replacementLoadout.TryEquipModule(
+                   ResonanceSlot::Edge, ResonanceModule::CoolingEdge)
+                == LoadoutActionResult::Success
+            && replacementLoadout.TryEquipModule(
+                   ResonanceSlot::Ward, ResonanceModule::CoolingWard)
+                == LoadoutActionResult::Success
+            && replacementLoadout.TryEquipModule(ResonanceSlot::Edge, ResonanceModule::RiftEdge)
+                == LoadoutActionResult::Success
+            && replacementLoadout.EquippedModule(ResonanceSlot::Edge)
+                == ResonanceModule::RiftEdge
+            && replacementLoadout.EquippedModule(ResonanceSlot::Ward)
+                == ResonanceModule::CoolingWard,
+        "pass16 replacing one typed slot preserves every other equipped slot");
+    Expect(replacementLoadout.UnequipModule(ResonanceSlot::Ward)
+            == LoadoutActionResult::Success
+            && !replacementLoadout.ModuleSlotOccupied(ResonanceSlot::Ward)
+            && replacementLoadout.UnequipModule(ResonanceSlot::Ward)
+                == LoadoutActionResult::Invalid
+            && replacementLoadout.EquippedModule(ResonanceSlot::Edge)
+                == ResonanceModule::RiftEdge,
+        "pass16 explicit unequip only clears the requested occupied slot");
 
     Expect(loadout.TryEquipModule(ResonanceSlot::Edge, ResonanceModule::CoolingEdge)
             == LoadoutActionResult::Success,
@@ -194,4 +255,30 @@ void TestShadowbladeLoadoutPass16() {
                 == stateBeforeStaleApply.activeResonanceFamilies
             && afterStaleApply.readinessScore == stateBeforeStaleApply.readinessScore,
         "pass16 stale exact-item preset failure is fully atomic across equipment, parts, and derived profile");
+
+    ShadowbladeLoadout salvageCatalogue;
+    const std::array<ResonanceModule, 8> allModules{
+        ResonanceModule::CoolingEdge,
+        ResonanceModule::RiftEdge,
+        ResonanceModule::CoolingWard,
+        ResonanceModule::CivicWard,
+        ResonanceModule::RiftFlow,
+        ResonanceModule::CoolingFlow,
+        ResonanceModule::CivicInsight,
+        ResonanceModule::RiftInsight,
+    };
+    bool catalogueAcquired = true;
+    bool catalogueSalvaged = true;
+    for (ResonanceModule module : allModules) {
+        catalogueAcquired = salvageCatalogue.AcquireModule(module) && catalogueAcquired;
+    }
+    for (ResonanceModule module : allModules) {
+        catalogueSalvaged = salvageCatalogue.TrySalvageModule(module)
+                == LoadoutActionResult::Success
+            && catalogueSalvaged;
+    }
+    Expect(catalogueAcquired && catalogueSalvaged
+            && salvageCatalogue.TuningParts() == 108
+            && salvageCatalogue.TuningParts() <= ShadowbladeLoadout::MaximumTuningParts,
+        "pass16 salvaging the complete bounded unique catalogue remains deterministic and under the tuning-parts cap");
 }
