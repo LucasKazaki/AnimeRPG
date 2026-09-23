@@ -11,10 +11,10 @@
     {
       "bytes": 38604,
       "path": "material_gallery.gltf",
-      "sha256": "4ef57da77151c045a69a235246cef90ad85579242edae5ed24fd130b6e2c663a"
+      "sha256": "d0bca093cfc52b59816a14ff98cc90b8684e7e7f664d0b687b394be5aa166af1"
     }
   ],
-  "generator": "astral-material-gallery-gltf-2",
+  "generator": "astral-material-gallery-gltf-3",
   "intent": "Source-only neutral material-response gallery for future Astral import/render and art review.",
   "runtime_status": "source_validated_not_imported",
   "schema_version": 1,
