@@ -6,9 +6,11 @@ void TestExplorationFieldGuidePass14() {
     Expect(initialSurvey.current == 0 && initialSurvey.required == 3 && !initialSurvey.Complete(),
         "field-operation board begins with a bounded three-site Mall survey");
     Expect(guide.TrackOperation(FieldOperation::RiftInvestigation)
-            && guide.TrackedOperation() == FieldOperation::RiftInvestigation
-            && !guide.TrackOperation(static_cast<FieldOperation>(999)),
-        "tracked operations can change explicitly while invalid operation ids fail closed");
+            && guide.TrackedOperation() == FieldOperation::RiftInvestigation,
+        "tracked operations can change explicitly to a valid field operation");
+    Expect(!guide.TrackOperation(static_cast<FieldOperation>(999))
+            && guide.TrackedOperation() == FieldOperation::RiftInvestigation,
+        "invalid operation ids fail closed without changing the tracked operation");
 
     Expect(guide.RecordLandmark(LandmarkKind::WashingtonMonument)
             && !guide.RecordLandmark(LandmarkKind::WashingtonMonument)
@@ -70,6 +72,11 @@ void TestExplorationFieldGuidePass14() {
         "discovering the pinned site automatically reconciles the pin instead of leaving stale cleanup work");
     Expect(!route.PinTarget(LandmarkKind::LincolnMemorial),
         "already completed landmarks cannot be repinned as unfinished targets");
+    Expect(!route.PinTarget(static_cast<LandmarkKind>(999))
+            && !route.HasPinnedTarget()
+            && route.CurrentTarget().source == FieldTargetSource::Recommended
+            && route.CurrentTarget().landmark == LandmarkKind::ReflectingPool,
+        "invalid landmark ids fail closed without fabricating or replacing an unfinished pin");
 
     Expect(route.RecordLandmark(LandmarkKind::ReflectingPool)
             && route.OperationProgress(FieldOperation::MallSurvey).Complete()
