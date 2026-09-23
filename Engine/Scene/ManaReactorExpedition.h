@@ -209,7 +209,17 @@ public:
     }
 
     ManaReactorControlPreview PreviewControl(ManaReactorControl control) const {
-        return EvaluateControl(control);
+        ManaReactorControlPreview preview = EvaluateControl(control);
+        if (!preview.valid) return preview;
+
+        ManaReactorExpedition projected = *this;
+        preview.result = projected.ApplyControl(control);
+        const ManaReactorSnapshot projectedState = projected.Snapshot();
+        preview.projectedObjectiveProgress = projectedState.objectiveProgress;
+        preview.projectedHeat = projectedState.heat;
+        preview.projectedStability = projectedState.stability;
+        preview.projectedPrecisionChain = projectedState.precisionChain;
+        return preview;
     }
 
     ManaReactorControlResult ApplyControl(ManaReactorControl control) {
