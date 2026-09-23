@@ -60,7 +60,7 @@ void TestShadowbladeTrainingHubPass25() {
     // GAME-124: starting training switches the existing combat owner to endless
     // practice, preserves persistent Shadowblade loadout state, and queues the
     // selected coach drill through the existing defense-practice bridge.
-    const ShadowbladeLoadoutSnapshot loadoutBefore = actions.Loadout().Snapshot();
+    const ShadowbladeWeapon weaponBefore = actions.Loadout().EquippedWeapon();
     Expect(encounter.StartTraining(combat, actions)
             && encounter.TrainingHub().State() == ShadowbladeTrainingHubState::Active
             && combat.TargetMode() == TrainingTargetMode::Endless
@@ -70,7 +70,7 @@ void TestShadowbladeTrainingHubPass25() {
             && combat.PendingEnemyAttack().pattern == EnemyAttackPattern::QuickCut
             && encounter.TrainingHub().Session().PracticeSequenceLength() == 3
             && encounter.TrainingHub().Session().Pace() == DefensePracticePace::Expert
-            && actions.Loadout().Snapshot().equippedWeapon == loadoutBefore.equippedWeapon,
+            && actions.Loadout().EquippedWeapon() == weaponBefore,
         "pass25 start routes the selected coach drill through live combat and Shadowblade owners");
     Expect(encounter.Retry(combat, actions).result
             == LandmarkEncounterResult::RetryUnavailable
@@ -95,8 +95,9 @@ void TestShadowbladeTrainingHubPass25() {
     // configured target instead of running forever.
     for (int attempt = 0; attempt < 4; ++attempt) {
         const EnemyAttackPlan plan = combat.PendingEnemyAttack();
-        Expect(encounter.AdvanceTraining(
-                   combat, actions, plan.windupSeconds - 0.10f),
+        const float beforeWindup = actions.IncomingAttackRemaining();
+        encounter.AdvanceTraining(combat, actions, plan.windupSeconds - 0.10f);
+        Expect(actions.IncomingAttackRemaining() < beforeWindup,
             "pass25 active training advances the authoritative practice clocks");
         const DefenseInput input = plan.blockable ? DefenseInput::Guard : DefenseInput::Dodge;
         const DefenseReport defense = encounter.TryTrainingDefense(combat, actions, input);
@@ -158,9 +159,10 @@ void TestShadowbladeTrainingHubPass25() {
             && pauseActions.PlayerHealth() == pausedHealth
             && pauseEncounter.TrainingFeedback(pauseCombat).paused,
         "pass25 paused training freezes combat threat and player state");
-    Expect(pauseEncounter.SetTrainingPaused(false)
-            && pauseEncounter.AdvanceTraining(pauseCombat, pauseActions, 0.10f)
-            && pauseCombat.ElapsedSecondsPrecise() > pausedCombatSeconds
+    Expect(pauseEncounter.SetTrainingPaused(false),
+        "pass25 pause fixture resumes the same training session");
+    pauseEncounter.AdvanceTraining(pauseCombat, pauseActions, 0.10f);
+    Expect(pauseCombat.ElapsedSecondsPrecise() > pausedCombatSeconds
             && pauseActions.IncomingAttackRemaining() < pausedThreatSeconds,
         "pass25 resuming training advances the same authoritative threat");
 
