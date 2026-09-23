@@ -4,13 +4,12 @@
   "original_baseline": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
   "latest_observed_main": "7dfaeeb340e57d1024a8bc818c65c82cd391d4ae",
   "run_date": "2026-09-23",
-  "focus": "ART-008 twelfth independent-review tangent-alignment and accessor-format repair",
+  "focus": "ART-008 thirteenth independent-review canonical-payload and metadata-keyset repair",
   "delivered": [
-    "read live main, PR #33, exact-head workflow state, all current review threads, AGENTS.md, GAME_DEVELOPMENT_CONTROL.md, ART-008 task and current art continuation records before writing",
-    "tightened non-floor tangent and reconstructed-bitangent derivative alignment from an ineffective 1e-4 threshold to 0.95 while preserving the floor 0.9999 threshold",
-    "qualified the 0.95 threshold against canonical 12x24 sphere source geometry: minimum tangent dot about 0.9914448614 and minimum reconstructed-bitangent dot about 0.9588133133; an 80-degree rotated tangent is about 0.1736481777",
-    "required exact generator-owned accessor formats before decoding: POSITION FLOAT VEC3, NORMAL FLOAT VEC3, TANGENT FLOAT VEC4, TEXCOORD_0 FLOAT VEC2 and UNSIGNED_SHORT SCALAR indices, rejecting normalized=true on the exact-format FLOAT vertex attributes",
-    "added six focused negative regression definitions for severe non-floor tangent rotation, NORMAL/TANGENT/TEXCOORD/index format corruption and FLOAT normalized misuse",
+    "read live main, PR #33, exact-head workflow state, current review threads, AGENTS.md, GAME_DEVELOPMENT_CONTROL.md, ART-008 task and current art continuation records before writing",
+    "reconstructed generator-owned sphere, hard-edged cube and floor geometry inside the independent verifier and compared complete decoded POSITION/NORMAL/TANGENT/TEXCOORD_0/index payloads with the canonical procedural result",
+    "closed deterministic root, buffer, bufferView, accessor, camera/perspective, extension and mesh-name field sets and required complete referenced accessor/bufferView coverage, preventing optional name or unused metadata containers from carrying unsupported evidence claims",
+    "added focused negative regressions for a six-times-repeated cube face with self-consistent bounds and for an unsupported approval claim hidden in a referenced accessor name",
     "preserved the canonical source, generator and expected-manifest bytes, so the derived glTF/source pins remain unchanged"
   ],
   "verification": {
@@ -20,13 +19,16 @@
     "art008_pr": 33,
     "art008_pr_state": "draft_unmerged",
     "art008_base": "087c673f716800198272915777681c61a748a490",
-    "art008_twelfth_reviewed_head": "3c6b56a4bef3d0152598e40bc18c7b5a5464e456",
-    "art008_twelfth_review_findings": "two P2 findings: non-floor tangent-frame alignment accepted nearly perpendicular frames, and required NORMAL/TANGENT/TEXCOORD_0/index accessor formats were not independently constrained before decoding",
-    "art008_regression_tests": "42 defined after twelfth-review repair; full fresh 42/42 execution not yet claimed in this pass",
-    "art008_targeted_threshold_check": "pass: canonical sphere minimum tangent dot 0.9914448614, minimum reconstructed-bitangent dot 0.9588133133, 80-degree rotation dot 0.1736481777; selected non-floor threshold 0.95",
-    "art008_previous_exact_head_hosted_ci": "3c6b56a4bef3d0152598e40bc18c7b5a5464e456 passed workflow 35859627983 before twelfth-review repairs",
-    "art008_current_exact_head_hosted_ci": "pending_after_twelfth-review repair and final documentation head",
-    "art008_current_exact_head_independent_review": "pending_after_twelfth-review repair and final documentation head",
+    "art008_thirteenth_reviewed_head": "49ef9d92057a577f55095f31d7d0f201c70bcb0d",
+    "art008_thirteenth_review_findings": "two P2 findings: cube vertex payload could collapse to repeated copies of one face while preserving counts/extents/topology, and optional nested name metadata could carry unsupported evidence claims",
+    "art008_repair_code_head_before_docs": "f2645801b6e9b518d178781888e8f1d99f634f5e",
+    "art008_regression_tests": "44/44 passed across two bounded isolated sandbox batches, tests 1-22 and 23-44; one uninterrupted 44-test process is not claimed",
+    "art008_generation_check": "pass: fresh generation, exact --check, pinned independent verification and Python compilation",
+    "art008_verifier_git_blob": "ad5b3e34052cb987321178b270df3fe0d517d251",
+    "art008_tests_git_blob": "78d8471f36422b0e07b93e73fa68f6a37e1426b8",
+    "art008_previous_exact_head_hosted_ci": "49ef9d92057a577f55095f31d7d0f201c70bcb0d passed workflow 35865932556 before thirteenth-review repairs",
+    "art008_current_exact_head_hosted_ci": "pending_after_thirteenth-review repair and final documentation head",
+    "art008_current_exact_head_independent_review": "pending_after_thirteenth-review repair and final documentation head",
     "art008_source_sha256": "517833a990db74f97d8046aa7fafa2d2d73859538d59c3c41ff4a8a7fb63f530",
     "art008_gltf_bytes": 38604,
     "art008_gltf_sha256": "d0bca093cfc52b59816a14ff98cc90b8684e7e7f664d0b687b394be5aa166af1",
@@ -38,5 +40,5 @@
     "native_gpu_measurement": "not_run",
     "independent_visual_art_review": "not_run"
   },
-  "next_action": "establish the final exact head, run fresh hosted CI and a fresh independent source review, and execute the complete 42-test focused source suite when an execution surface is available; only after clean gates mark PR #33 ready for review without merging"
+  "next_action": "establish the final documentation head, run fresh hosted CI and fresh independent source review there, then mark PR #33 ready for review only if those gates are clean; do not merge under ART-008"
 }
