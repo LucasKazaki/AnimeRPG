@@ -9,7 +9,7 @@
   "controls": {
     "production_repository": "LucasKazaki/AnimeRPG",
     "default_branch": "main",
-    "latest_observed_main": "40311ba7dcf1035656b6b2d0dbeb589030071dc7",
+    "latest_observed_main": "6d22da88402db71843ecd5a35766c0c77e62dca6",
     "engine_branch": "engine/2026-09-22-editor-runtime-smoke",
     "company_runtime_is_sole_local_executor": true,
     "historical_r0_runner_allowed": false,
@@ -28,7 +28,7 @@
     {"id":"E08","title":"Physics and collision","status":"not_found","acceptance":"broad/narrow phase, queries, rigid bodies, collision layers, stable timesteps and 2D/3D stress","native_evidence":[],"independent_acceptance":false},
     {"id":"E09","title":"AI and navigation","status":"partial","acceptance":"behavior/state execution, pathfinding, cancellation/budgets and deterministic agent fixtures","native_evidence":[],"independent_acceptance":false},
     {"id":"E10","title":"Audio engine","status":"not_found","acceptance":"decode/stream/mix, spatialization, latency, underrun/device recovery and procedural-signal budgets","native_evidence":[],"independent_acceptance":false},
-    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_resize_phase_deadline_repair_hosted_and_review_pending_native_pending","acceptance":"scene/asset inspectors, selection/gizmos, undo/redo, save/reopen, editor/runtime boundaries, stable usable shell across admitted window states","native_evidence":[],"independent_acceptance":false},
+    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_resize_side_effect_gate_repair_hosted_and_review_pending_native_pending","acceptance":"scene/asset inspectors, selection/gizmos, undo/redo, save/reopen, editor/runtime boundaries, stable usable shell across admitted window states","native_evidence":[],"independent_acceptance":false},
     {"id":"E12","title":"Genuine 2D support","status":"partial","acceptance":"sprites/batching/layers, tilemaps, 2D cameras/physics, text and image/runtime tests","native_evidence":[],"independent_acceptance":false},
     {"id":"E13","title":"Networking and multiplayer runtime","status":"not_found","acceptance":"offline schema first; later authorized transport, authority/replication, loss/reorder and disconnect recovery","native_evidence":[],"independent_acceptance":false},
     {"id":"E14","title":"Profiling and budgets","status":"partial","acceptance":"CPU/GPU timelines, p50/p95/p99 frame times, RAM/VRAM, allocations/stalls and reproducible manifests","native_evidence":[],"independent_acceptance":false},
@@ -59,19 +59,20 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "resize_phase_deadline_repair_hosted_and_independent_review_pending_native_pending",
+      "status": "resize_side_effect_gate_repair_hosted_and_independent_review_pending_native_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
-      "latest_observed_main_revision": "40311ba7dcf1035656b6b2d0dbeb589030071dc7",
-      "reviewed_finding_source_head": "72d8b59724ae6c5a50765520578bc53ba3d6c6d5",
+      "latest_observed_main_revision": "6d22da88402db71843ecd5a35766c0c77e62dca6",
+      "reviewed_finding_source_head": "45f459d6e512924ff58227df029a4e52d9918924",
       "previous_clean_reviewed_receipt_source_head": "0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d",
-      "current_source_candidate": "ca34b451246f6eb8808fcbcec01dfaf1292df07d",
-      "runtime_smoke_blob": "5e4b01f9b755fbeb1688e8600a7f4c85555dd71f",
+      "current_source_candidate": "95177d199bedb6195c0d89aa0d05708af04f6512",
+      "runtime_smoke_blob": "58e353a5a4ee1bf4a138afa03e48221f3a58b08e",
       "cmake_blob": "4fd471151acb4b5919ccef4a92f49da12bd8d1f1",
       "review_findings": [
         "maximize/restore shell validation could complete after the advertised three-second phase deadline because nested message waits used only the global work budget",
         "new ShowWindowAsync maximize/restore side effects lacked a fresh launched-process ownership revalidation immediately before each post",
         "restore acceptance compared only width and height, allowing a same-size wrong-position window to pass even though SW_RESTORE promises original size and position",
-        "ResizeAndCheck accepted requested dimensions before checking its 1.5-second deadline and did not scope nested shell-message waits or post-validation acceptance to the remaining resize phase budget"
+        "ResizeAndCheck accepted requested dimensions before checking its 1.5-second deadline and did not scope nested shell-message waits or post-validation acceptance to the remaining resize phase budget",
+        "ResizeAndCheck read the child inventory and then called side-effecting SetWindowPos without revalidating the cached top-level HWND against the still-running launched process immediately before the post, allowing a recycled HWND to receive an unintended resize"
       ],
       "repair": [
         "add scoped local message deadlines and cap SendMessageTimeoutW waits to the remaining show-state phase budget",
@@ -82,13 +83,16 @@
         "require the complete GetWindowRect screen-space outer rectangle to match the pre-maximize rectangle before accepting restored state",
         "establish the resize phase deadline before SetWindowPos and apply ScopedMessageDeadline to resize containment/shell validation",
         "reject requested resize geometry observed at or after the 1.5-second deadline and recheck the deadline after containment and shell validation",
-        "cap resize polling sleeps to RemainingDeadlineBudget so the advertised resize phase deadline cannot be exceeded by the polling loop"
+        "cap resize polling sleeps to RemainingDeadlineBudget so the advertised resize phase deadline cannot be exceeded by the polling loop",
+        "repeat launched-process ownership plus visibility/enabled validation immediately before each side-effecting SetWindowPos resize request after child-inventory inspection"
       ],
       "latest_implementation_diff": {
-        "commit": "ca34b451246f6eb8808fcbcec01dfaf1292df07d",
+        "commit": "95177d199bedb6195c0d89aa0d05708af04f6512",
         "file": "Tests/EditorRuntimeSmoke.cpp",
         "changed_files": 1,
-        "source": "GitHub commit diff against parent 72d8b59724ae6c5a50765520578bc53ba3d6c6d5"
+        "additions": 5,
+        "deletions": 0,
+        "source": "GitHub commit diff against parent 45f459d6e512924ff58227df029a4e52d9918924"
       },
       "portable_fixtures": [
         {
@@ -108,6 +112,12 @@
           "gcc_warning_clean": true,
           "clang_asan_ubsan_leak_detection": true,
           "scope": "source-logic resize-deadline regression evidence only; reproduces late-geometry and late-validation false passes and remaining-phase budget capping; not Win32 GUI evidence"
+        },
+        {
+          "sha256": "5155078196847989c416e6bcac146e264b5a02cdcb9fefe82824a89466db2193",
+          "gcc_warning_clean": true,
+          "clang_asan_ubsan_leak_detection": true,
+          "scope": "source-logic resize side-effect gate evidence only; reproduces the old post-after-ownership-change path and verifies the new immediate ownership gate prevents the post; not Win32 GUI evidence"
         }
       ],
       "automated_state_matrix": [
@@ -142,29 +152,42 @@
         "new_inline_findings_for_exact_head": 0,
         "superseded_for_current_source_acceptance": true
       },
-      "current_source_hosted_evidence": {
-        "source_head": "ca34b451246f6eb8808fcbcec01dfaf1292df07d",
-        "windows_run": 35922670722,
-        "windows_conclusion_at_record_write": "in_progress",
-        "profiling_run": 35922670747,
+      "immediately_prior_receipt_evidence": {
+        "source_head": "45f459d6e512924ff58227df029a4e52d9918924",
+        "windows_run": 35923112744,
+        "windows_conclusion": "success",
+        "profiling_run": 35923112568,
         "profiling_conclusion": "success",
-        "release_manifest_run": 35922670819,
+        "release_manifest_run": 35923112570,
+        "release_manifest_conclusion": "success",
+        "independent_review_completed_at": "2026-09-23T21:38:02Z",
+        "independent_review_result": "p2_resize_side_effect_gate_finding",
+        "review_thread": "PRRT_kwDOTo2Ig86lWO4t",
+        "superseded_for_current_source_acceptance": true
+      },
+      "current_source_hosted_evidence": {
+        "source_head": "95177d199bedb6195c0d89aa0d05708af04f6512",
+        "windows_run": 35928263432,
+        "windows_conclusion_at_record_write": "in_progress",
+        "profiling_run": 35928263330,
+        "profiling_conclusion": "success",
+        "release_manifest_run": 35928263325,
         "release_manifest_conclusion_at_record_write": "in_progress",
         "interactive_runtime_smoke_executed_by_hosted_suite": false
       },
       "current_source_independent_review": {
-        "source_head": "ca34b451246f6eb8808fcbcec01dfaf1292df07d",
+        "source_head": "95177d199bedb6195c0d89aa0d05708af04f6512",
         "status": "required_pending"
       },
       "research": [
-        {"source":"Microsoft Learn SetWindowPos","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos","accessed":"2026-09-23","applicability":"SWP_ASYNCWINDOWPOS posts the resize request to the window-owning thread when input queues differ, so completion and the complete acceptance phase must be positively bounded"},
+        {"source":"Microsoft Learn SetWindowPos","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos","accessed":"2026-09-23","applicability":"SWP_ASYNCWINDOWPOS can post a resize request to the thread that owns the target HWND, so the harness must revalidate ownership immediately before that side effect and then positively bound completion"},
         {"source":"Microsoft Learn SendMessageTimeoutW","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw","accessed":"2026-09-23","applicability":"uTimeout bounds an individual cross-thread message wait; the remaining resize/show-state phase budget must cap nested message waits"},
         {"source":"Microsoft Learn ShowWindowAsync","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindowasync","accessed":"2026-09-23","applicability":"asynchronous show-state requests require positive bounded completion checks"},
         {"source":"Microsoft Learn ShowWindow SW_RESTORE","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow","accessed":"2026-09-23","applicability":"SW_RESTORE restores the original window size and position, so a same-size wrong-position result must not pass"},
         {"source":"Microsoft Learn GetWindowRect","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect","accessed":"2026-09-23","applicability":"screen-space left/top/right/bottom outer-window coordinates provide a directly measurable exact restore predicate"},
-        {"source":"Microsoft Learn GetWindowThreadProcessId","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid","accessed":"2026-09-23","applicability":"fail-closed HWND process/thread identity checks around side effects"},
+        {"source":"Microsoft Learn GetWindowThreadProcessId","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid","accessed":"2026-09-23","applicability":"returns the creating thread and optional process identity for a specified HWND and returns zero for an invalid HWND; used with the retained process handle to fail closed before side effects"},
         {"source":"Epic Unreal Engine 5.8 Using Editor Viewports","url":"https://dev.epicgames.com/documentation/unreal-engine/using-editor-viewports-in-unreal-engine","accessed":"2026-09-23","applicability":"3D perspective, 2D orthographic, multi-layout and maximized/immersive authoring are editor comparison workflows"},
-        {"source":"Epic Unreal Engine 5.8 Viewport Toolbar","url":"https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar","accessed":"2026-09-23","applicability":"viewport layout tooling includes a quick toggle between the selected layout and a maximized viewport"},
+        {"source":"Epic Unreal Engine 5.8 Unreal Editor Interface","url":"https://dev.epicgames.com/documentation/unreal-engine/unreal-editor-interface","accessed":"2026-09-23","applicability":"the Level Viewport explicitly supports perspective 3D and orthographic 2D editing views"},
         {"source":"Unity 6.0 EditorWindow.maximized","url":"https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html","accessed":"2026-09-23","applicability":"maximized editor-window state is a first-class editor workflow property"}
       ],
       "licensing_constraints": "Public Epic, Unity and Microsoft documentation used for behavioral/API comparison only. No proprietary engine source copied and no dependency imported.",
