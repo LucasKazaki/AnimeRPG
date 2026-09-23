@@ -176,6 +176,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "ExplorationFieldGuidePass14Tests.inc"
 #include "ShadowCryptExpeditionPass15Tests.inc"
 #include "ShadowbladeLoadoutPass16Tests.inc"
+#include "ShadowbladeLoadoutEffectsPass17Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -188,6 +189,7 @@ int main() {
     TestExplorationFieldGuidePass14();
     TestShadowCryptExpeditionPass15();
     TestShadowbladeLoadoutPass16();
+    TestShadowbladeLoadoutEffectsPass17();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;

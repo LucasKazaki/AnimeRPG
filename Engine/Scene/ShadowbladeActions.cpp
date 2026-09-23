@@ -6,6 +6,61 @@
 
 namespace Astral::Scene {
 
+ShadowbladeActionTuning ShadowbladeActions::ActionTuningForProfile(
+    const ShadowbladeLoadoutProfile& profile) {
+    const int maximumAttackPoints =
+        MaximumLoadoutAttackDamageBonus / LoadoutAttackDamagePerPoint;
+    const int maximumGuardPoints =
+        MaximumLoadoutGuardDamageMitigation / LoadoutGuardMitigationPerPoint;
+    const int maximumResourcePoints = static_cast<int>(
+        MaximumLoadoutResourceRegenerationBonus / LoadoutResourceRegenerationPerPoint);
+    const int maximumMobilityPoints = static_cast<int>(
+        MaximumLoadoutDashDistanceBonus / LoadoutMobilityDistancePerPoint);
+
+    const int cappedAttackPoints = std::clamp(profile.attackBonus,
+        BaselineLoadoutAttackBonus, BaselineLoadoutAttackBonus + maximumAttackPoints)
+        - BaselineLoadoutAttackBonus;
+    const int cappedGuardPoints = std::clamp(profile.guardBonus,
+        BaselineLoadoutGuardBonus, BaselineLoadoutGuardBonus + maximumGuardPoints)
+        - BaselineLoadoutGuardBonus;
+    const int cappedResourcePoints = std::clamp(profile.resourceRecoveryBonus,
+        BaselineLoadoutResourceRecoveryBonus,
+        BaselineLoadoutResourceRecoveryBonus + maximumResourcePoints)
+        - BaselineLoadoutResourceRecoveryBonus;
+    const int cappedMobilityPoints = std::clamp(profile.mobilityBonus,
+        BaselineLoadoutMobilityBonus, BaselineLoadoutMobilityBonus + maximumMobilityPoints)
+        - BaselineLoadoutMobilityBonus;
+
+    return {
+        FatalStrikeDamage + cappedAttackPoints * LoadoutAttackDamagePerPoint,
+        DashDistance + static_cast<float>(cappedMobilityPoints)
+            * LoadoutMobilityDistancePerPoint,
+        ResourceRegenerationPerSecond + static_cast<float>(cappedResourcePoints)
+            * LoadoutResourceRegenerationPerPoint,
+        cappedGuardPoints * LoadoutGuardMitigationPerPoint,
+        std::clamp(profile.readinessScore, 0, 100),
+        std::clamp(profile.activeResonanceFamilies, 0, 3),
+    };
+}
+
+ShadowbladeActionTuning ShadowbladeActions::BuildLoadoutTuning(
+    const ShadowbladeLoadout& loadout) {
+    return ActionTuningForProfile(loadout.Profile());
+}
+
+ShadowbladeActionTuning ShadowbladeActions::CurrentLoadoutTuning() const {
+    return BuildLoadoutTuning(loadout_);
+}
+
+LoadoutActionResult ShadowbladeActions::PreviewPresetTuning(std::size_t slot,
+    const CharacterProgression& progression, ShadowbladeActionTuning& tuning) const {
+    ShadowbladeLoadout preview = loadout_;
+    const LoadoutActionResult result = preview.ApplyPreset(slot, progression);
+    if (result != LoadoutActionResult::Success) return result;
+    tuning = BuildLoadoutTuning(preview);
+    return LoadoutActionResult::Success;
+}
+
 double ShadowbladeActions::FloatHalfUlpSeconds(float seconds) {
     if (!std::isfinite(seconds) || seconds <= 0.0f) return 0.0;
     const float next = std::nextafter(seconds, std::numeric_limits<float>::infinity());
@@ -67,8 +122,9 @@ double ShadowbladeActions::StartDefenseCounterDeadline() {
 void ShadowbladeActions::AdvanceTime(float deltaSeconds) {
     if (deltaSeconds <= 0.0f || !std::isfinite(deltaSeconds)) return;
 
+    const ShadowbladeActionTuning tuning = CurrentLoadoutTuning();
     resource_ = std::min(MaximumResource,
-        resource_ + ResourceRegenerationPerSecond * deltaSeconds);
+        resource_ + tuning.resourceRegenerationPerSecond * deltaSeconds);
     dashCooldownRemaining_ = std::max(0.0f, dashCooldownRemaining_ - deltaSeconds);
     fatalStrikeCooldownRemaining_ = std::max(0.0f,
         fatalStrikeCooldownRemaining_ - deltaSeconds);
@@ -149,12 +205,13 @@ ShadowActionReport ShadowbladeActions::TryDash(const Math::Vec3& position,
         directionY *= inverseLength;
     }
 
+    const ShadowbladeActionTuning tuning = CurrentLoadoutTuning();
     resource_ -= DashCost;
     dashCooldownRemaining_ = DashCooldownSeconds;
     lastAction_.result = ShadowActionResult::Activated;
     lastAction_.resourceSpent = DashCost;
-    lastAction_.dashDestination.x += directionX * DashDistance;
-    lastAction_.dashDestination.y += directionY * DashDistance;
+    lastAction_.dashDestination.x += directionX * tuning.dashDistance;
+    lastAction_.dashDestination.y += directionY * tuning.dashDistance;
     return lastAction_;
 }
 
@@ -195,6 +252,7 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
         return lastAction_;
     }
 
+    const ShadowbladeActionTuning tuning = CurrentLoadoutTuning();
     resource_ -= resourceCost;
     fatalStrikeCooldownRemaining_ = FatalStrikeCooldownSeconds;
     lastAction_.result = ShadowActionResult::Activated;
@@ -207,7 +265,7 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
         defenseCounterEndSeconds_ = 0.0;
         defenseCounterDeadlineUncertaintySeconds_ = 0.0;
     }
-    lastAction_.damageApplied = combatSandbox.ApplyDamage(FatalStrikeDamage);
+    lastAction_.damageApplied = combatSandbox.ApplyDamage(tuning.fatalStrikeDamage);
     if (lastAction_.damageApplied > 0) {
         combatSandbox.RegisterSuccessfulAttackHit();
     }
@@ -284,7 +342,9 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
         return lastDefense_;
     }
 
-    if (incomingAttack_.guardDamage >= guardIntegrity_) {
+    const int mitigation = CurrentLoadoutTuning().guardDamageMitigation;
+    const int guardDamage = std::max(0, incomingAttack_.guardDamage - mitigation);
+    if (guardDamage >= guardIntegrity_) {
         const int guardLost = guardIntegrity_;
         guardIntegrity_ = 0;
         const int previousHealth = playerHealth_;
@@ -295,9 +355,9 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
         return lastDefense_;
     }
 
-    guardIntegrity_ -= incomingAttack_.guardDamage;
+    guardIntegrity_ -= guardDamage;
     RebaseDefenseClock();
-    lastDefense_ = {DefenseResult::Guarded, 0, incomingAttack_.guardDamage, false, remaining};
+    lastDefense_ = {DefenseResult::Guarded, 0, guardDamage, false, remaining};
     return lastDefense_;
 }
 
@@ -313,6 +373,14 @@ void ShadowbladeActions::ResetDefenseState() {
     defenseCounterDeadlineUncertaintySeconds_ = 0.0;
     defenseTimingPreset_ = DefenseTimingPreset::Standard;
     lastDefense_ = {};
+}
+
+void ShadowbladeActions::ResetTransientStatePreservingLoadout() {
+    const ShadowbladeLoadout persistentLoadout = loadout_;
+    const DefenseTimingPreset timingPreset = defenseTimingPreset_;
+    *this = ShadowbladeActions{};
+    loadout_ = persistentLoadout;
+    defenseTimingPreset_ = timingPreset;
 }
 
 float ShadowbladeActions::IncomingAttackRemaining() const {
