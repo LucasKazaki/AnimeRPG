@@ -124,3 +124,28 @@ Both executions printed `e11 restore-rectangle fixture: PASS`. The fixture prove
 Source-associated hosted runs: Windows `35915703271`, profiling `35915703261`, release manifest `35915703309`. Profiling completed `success`; Windows and release manifest were still in progress at the evidence-write checkpoint and are not recorded as passed here. The earlier clean Codex review on `0e756498...` does not review this new source change. `native_evidence` remains empty, current-source independent review is pending, and E11 final acceptance remains false.
 
 Native acceptance for the current source must additionally prove that after the actual maximize state, restore returns the editor to the same pre-maximize outer screen rectangle before continuing to the narrow-state check. The existing machine/toolchain/GPU identity, complete outputs/exits/timestamps, screenshots, zero-contained-process cleanup proof, and separate `AstralGame` launch requirements remain unchanged.
+
+## Continuation evidence: resize phase deadline repair
+
+Fresh independent Codex review of `72d8b59724ae6c5a50765520578bc53ba3d6c6d5` found one P2 false pass in `ResizeAndCheck`. Requested dimensions could be accepted before checking the 1.5-second resize deadline, and `ValidateShellState` could consume individually bounded cross-process waits after that phase deadline because resize had no scoped message deadline. Poll sleeps were also bounded only by the global work budget.
+
+Repair commit: `ca34b451246f6eb8808fcbcec01dfaf1292df07d`.
+New `Tests/EditorRuntimeSmoke.cpp` blob: `5e4b01f9b755fbeb1688e8600a7f4c85555dd71f`.
+GitHub's commit diff reports exactly one changed file, `Tests/EditorRuntimeSmoke.cpp`. The repair starts the resize deadline before `SetWindowPos`, installs `ScopedMessageDeadline(deadline)` for polling and shell-message validation, rejects matching geometry observed at or after the deadline, rechecks the deadline after containment and after complete shell validation, and caps poll sleeps with `RemainingDeadlineBudget`. The PASS text now states that each asynchronous resize plus containment/shell validation stayed inside its 1.5-second phase deadline. No production editor/game source, CMake, workflow, dependency, graphics API, architecture, scheduler configuration, release/deploy state, or R0 code changed.
+
+Primary-source basis rechecked 2026-09-23:
+
+- Microsoft Learn `SetWindowPos`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos . `SWP_ASYNCWINDOWPOS` may post the request to the owner thread instead of blocking the caller, so completion and acceptance need a positive external deadline.
+- Microsoft Learn `SendMessageTimeoutW`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw . `uTimeout` is an individual message wait bound, so the remaining overall resize budget has to cap nested calls.
+- Epic Unreal Engine 5.8 `Using Editor Viewports` and `Viewport Toolbar`: perspective/orthographic views, layout switching and maximized/immersive workflows remain behavioral editor comparison points.
+- Unity 6.0 `EditorWindow.maximized`: maximized state remains a first-class editor-window property.
+
+Public behavioral/API documentation only. No proprietary source copied and no dependency imported.
+
+Disposable C++17 resize-deadline fixture SHA-256 `11cf52f815ceb3a83294c514fa4d2b478d54a3b27c0082651de7e99b71010de0` passed `g++ -std=c++17 -Wall -Wextra -Werror -pedantic` and Clang C++17 with ASan+UBSan plus leak detection. It demonstrates the old false pass for geometry first observed at 1501 ms against a 1500 ms deadline, the old false pass for geometry at 1400 ms with validation completing at 1600 ms, a valid in-budget acceptance, and remaining-phase wait/sleep capping. This is source-logic evidence only, not Win32 GUI evidence.
+
+Source-associated hosted runs: Windows `35922670722`, profiling `35922670747`, release-manifest `35922670819`. At this evidence write, profiling is `success`; Windows and release-manifest remain `in_progress` and are not claimed as passed. The P2 review thread `PRRT_kwDOTo2Ig86lU6AM` was answered with exact implementation/fixture evidence and resolved after the source diff was verified. A fresh independent review of the current source/evidence tree is still required. Hosted CTest still excludes interactive `EditorRuntimeSmoke`.
+
+Latest observed `main`: `40311ba7dcf1035656b6b2d0dbeb589030071dc7`. Issue #7 remains open, R0 was not invoked, `native_evidence` remains empty, E11 final acceptance is false, and `parity_claim` remains false.
+
+The current native handoff is blocked until the exact current source/evidence head has clean hosted checks and a fresh independent review. Once clean, the registered Windows executor must retain the existing Debug/Release containment and interactive smoke evidence plus screenshots, zero-owned-process cleanup proof, exact restore placement, and evidence that each 800x600, 1280x720, 1440x900 and 420x260 acceptance completes within its 1.5-second resize phase deadline. It must still launch `AstralGame` separately from the same source/build.
