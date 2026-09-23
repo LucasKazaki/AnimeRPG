@@ -115,16 +115,8 @@ LandmarkEncounterReport LandmarkEncounter::Retry(CombatSandbox& combatSandbox,
         return lastReport_;
     }
 
-    const DefenseTimingPreset timingPreset =
-        shadowbladeActions.PerfectDefenseWindowSeconds()
-            == ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds
-        ? DefenseTimingPreset::Forgiving
-        : DefenseTimingPreset::Standard;
-    const ShadowbladeLoadout persistentLoadout = shadowbladeActions.Loadout();
     combatSandbox.ResetTrainingSession();
-    shadowbladeActions = ShadowbladeActions{};
-    shadowbladeActions.Loadout() = persistentLoadout;
-    shadowbladeActions.SetDefenseTimingPreset(timingPreset);
+    shadowbladeActions.ResetTransientStatePreservingLoadout();
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
     activationTrainingStats_ = combatSandbox.Stats();
