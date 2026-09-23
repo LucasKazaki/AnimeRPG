@@ -134,6 +134,18 @@ void TestShadowbladeTrainingHubPass25() {
             && !wrongOwnerFeedback.recentDamage.valid,
         "pass25 mismatched combat owner cannot compose mixed-provenance feedback");
 
+    // Review regression: a debrief stays bound to the exact owner pair. Retry
+    // with a different action owner must fail before either owner is reset.
+    ShadowbladeActions unrelatedRetryActions;
+    const TrainingTargetMode retryTargetModeBefore = combat.TargetMode();
+    const int unrelatedRetryHealthBefore = unrelatedRetryActions.PlayerHealth();
+    Expect(encounter.Retry(combat, unrelatedRetryActions).result
+            == LandmarkEncounterResult::RetryUnavailable
+            && encounter.State() == LandmarkEncounterState::Completed
+            && combat.TargetMode() == retryTargetModeBefore
+            && unrelatedRetryActions.PlayerHealth() == unrelatedRetryHealthBefore,
+        "pass25 retry rejects a mismatched action owner without partial mutation");
+
     // Review regression: leaving a completed training run for encounter retry
     // must restore the finite target. Endless practice mode otherwise makes the
     // retried landmark target impossible to defeat and strands the encounter.
@@ -219,7 +231,9 @@ void TestShadowbladeTrainingHubPass25() {
             && Near(timingActions.PerfectDefenseWindowSeconds(),
                 ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds),
         "pass25 timing guide matches the exact bound action owner's forgiving window");
-    Expect(timingActions.SetDefenseTimingPreset(DefenseTimingPreset::Standard),
+    timingActions.SetDefenseTimingPreset(DefenseTimingPreset::Standard);
+    Expect(Near(timingActions.PerfectDefenseWindowSeconds(),
+               ShadowbladeActions::StandardPerfectDefenseWindowSeconds),
         "pass25 timing fixture supports a post-start timing assist change");
     const ShadowbladeTrainingHubFeedback changedTimingFeedback =
         timingEncounter.TrainingFeedback(timingCombat);
