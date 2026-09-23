@@ -56,8 +56,8 @@
       "id": "ART-008",
       "title": "Neutral material-response gallery source fixture",
       "status": "source_validated_pending_review",
-      "dependency": "exact-head hosted CI and independent review now; Astral glTF/material/light import later",
-      "next_acceptance": "generated gallery imports and renders in Astral with correct camera, geometry, material response and neutral light contract"
+      "dependency": "fresh exact-head hosted CI and independent review after third-review repairs; Astral glTF/material/light import later",
+      "next_acceptance": "generated gallery imports and renders in Astral with correct camera, geometry, every-vertex normal orientation, closed material contract and neutral light contract"
     }
   ]
 }
