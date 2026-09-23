@@ -17,6 +17,10 @@ CANONICAL_FLOAT_TOL=1e-6
 def req(cond,msg):
     if not cond: raise ValueError(msg)
 
+def exact_index(value,count,msg):
+    req(type(value) is int and 0<=value<count,msg)
+    return value
+
 def canonical_text_bytes(path):
     return Path(path).read_bytes().replace(b"\r\n",b"\n").replace(b"\r",b"\n")
 
@@ -91,31 +95,40 @@ def plane_geometry(half_x,half_z):
     )
 
 def read_accessor(g,buf,index):
-    req(isinstance(index,int) and 0<=index<len(g["accessors"]),"accessor index")
+    index=exact_index(index,len(g["accessors"]),"accessor index")
     a=g["accessors"][index]; req("sparse" not in a,"sparse accessor unsupported")
-    vi=a["bufferView"]; req(isinstance(vi,int) and 0<=vi<len(g["bufferViews"]),"accessor bufferView")
-    view=g["bufferViews"][vi]; req(view.get("buffer",0)==0,"bufferView buffer"); req("byteStride" not in view,"strided source fixture unsupported")
+    vi=exact_index(a["bufferView"],len(g["bufferViews"]),"accessor bufferView")
+    view=g["bufferViews"][vi]
+    req(type(view.get("buffer",0)) is int and view.get("buffer",0)==0,"bufferView buffer"); req("byteStride" not in view,"strided source fixture unsupported")
     vo=view.get("byteOffset",0); vl=view["byteLength"]; ao=a.get("byteOffset",0)
-    req(all(isinstance(v,int) and v>=0 for v in (vo,vl,ao)),"accessor offsets"); req(vo+vl<=len(buf),"bufferView bounds")
+    req(all(type(v) is int and v>=0 for v in (vo,vl,ao)),"accessor offsets"); req(vo+vl<=len(buf),"bufferView bounds")
     ctype=a["componentType"]; atype=a["type"]; count=a["count"]
-    req(isinstance(count,int) and count>0,"accessor count")
-    comps={"SCALAR":1,"VEC2":2,"VEC3":3,"VEC4":4}; req(atype in comps and ctype in (5126,5123),"accessor format")
+    req(type(count) is int and count>0,"accessor count")
+    comps={"SCALAR":1,"VEC2":2,"VEC3":3,"VEC4":4}; req(atype in comps and type(ctype) is int and ctype in (5126,5123),"accessor format")
+    component_size=4 if ctype==5126 else 2
+    req((vo+ao)%component_size==0,"accessor alignment")
+    if view.get("target")==34962: req((vo+ao)%4==0,"accessor alignment")
     ncomp=comps[atype]; code="f" if ctype==5126 else "H"; size=struct.calcsize("<"+code*ncomp); span=count*size
     req(ao+span<=vl,"accessor within bufferView")
     return [struct.unpack_from("<"+code*ncomp,buf,vo+ao+i*size) for i in range(count)]
 
 def verify_accessor_contract(g, accessor_index, component_type, accessor_type, msg, require_bounds=False):
-    req(isinstance(accessor_index,int) and 0<=accessor_index<len(g["accessors"]),"accessor index")
+    accessor_index=exact_index(accessor_index,len(g["accessors"]),"accessor index")
     accessor=g["accessors"][accessor_index]
     expected_fields={"bufferView","componentType","count","type"} | ({"min","max"} if require_bounds else set())
     req(set(accessor)==expected_fields,msg+" fields")
-    req(accessor.get("componentType")==component_type and accessor.get("type")==accessor_type,msg)
-    vi=accessor["bufferView"]; req(isinstance(vi,int) and 0<=vi<len(g["bufferViews"]),"accessor bufferView")
+    req(type(accessor.get("componentType")) is int and accessor.get("componentType")==component_type and accessor.get("type")==accessor_type,msg)
+    req(type(accessor.get("count")) is int and accessor["count"]>0,msg+" count")
+    vi=exact_index(accessor["bufferView"],len(g["bufferViews"]),"accessor bufferView")
     view=g["bufferViews"][vi]
     req(set(view)=={"buffer","byteOffset","byteLength","target"},"bufferView fields")
-    req(view["buffer"]==0,"bufferView buffer")
+    req(type(view["buffer"]) is int and view["buffer"]==0,"bufferView buffer")
+    req(type(view["byteOffset"]) is int and view["byteOffset"]>=0 and type(view["byteLength"]) is int and view["byteLength"]>0,"bufferView bounds")
     expected_target=34963 if component_type==5123 else 34962
-    req(view["target"]==expected_target,"bufferView target")
+    req(type(view["target"]) is int and view["target"]==expected_target,"bufferView target")
+    component_size=4 if component_type==5126 else 2
+    req(view["byteOffset"]%component_size==0,"accessor alignment")
+    if expected_target==34962: req(view["byteOffset"]%4==0,"accessor alignment")
 
 def verify_position_accessor_contract(g, accessor_index):
     verify_accessor_contract(g,accessor_index,5126,"VEC3","position accessor format",True)
@@ -136,6 +149,18 @@ def verify_position_accessor_bounds(g, accessor_index, positions):
         and all(abs(declared_max[i]-actual_max[i])<=1e-6 for i in range(3)),
         "position bounds",
     )
+
+def verify_index_accessor_bounds(g, accessor_index, indices):
+    accessor=g["accessors"][accessor_index]
+    declared_min=accessor.get("min"); declared_max=accessor.get("max")
+    req(
+        isinstance(declared_min,list) and len(declared_min)==1
+        and isinstance(declared_max,list) and len(declared_max)==1
+        and type(declared_min[0]) is int and type(declared_max[0]) is int,
+        "index bounds",
+    )
+    actual=[i[0] for i in indices]
+    req(declared_min==[min(actual)] and declared_max==[max(actual)],"index bounds")
 
 def geometry_binding(mesh):
     req(set(mesh)=={"name","primitives"},"mesh properties")
@@ -161,7 +186,7 @@ def verify_tangent_frame(pos,normal,tangent,uv,indices,msg,strict=False):
 def verify_mesh(g,buf,mesh_index,expected_name,expected_material,expected_counts,expected_indices,frame_msg="mesh tangent frame",strict_frame=False):
     mesh=g["meshes"][mesh_index]; attrs,index_accessor=geometry_binding(mesh)
     req(mesh["name"]==expected_name,"mesh name")
-    prim=mesh["primitives"][0]; req(prim["mode"]==4,"triangle mode"); req(prim["material"]==expected_material,"material binding")
+    prim=mesh["primitives"][0]; req(type(prim["mode"]) is int and prim["mode"]==4,"triangle mode"); req(type(prim["material"]) is int and prim["material"]==expected_material,"material binding")
     req(set(attrs)=={"POSITION","NORMAL","TANGENT","TEXCOORD_0"},"attributes")
     verify_position_accessor_contract(g,attrs["POSITION"])
     verify_accessor_contract(g,attrs["NORMAL"],5126,"VEC3","normal accessor format")
@@ -169,7 +194,7 @@ def verify_mesh(g,buf,mesh_index,expected_name,expected_material,expected_counts
     verify_accessor_contract(g,attrs["TEXCOORD_0"],5126,"VEC2","texcoord accessor format")
     verify_accessor_contract(g,index_accessor,5123,"SCALAR","index accessor format",True)
     pos=read_accessor(g,buf,attrs["POSITION"]); verify_position_accessor_bounds(g,attrs["POSITION"],pos)
-    normal=read_accessor(g,buf,attrs["NORMAL"]); tangent=read_accessor(g,buf,attrs["TANGENT"]); uv=read_accessor(g,buf,attrs["TEXCOORD_0"]); indices=read_accessor(g,buf,index_accessor)
+    normal=read_accessor(g,buf,attrs["NORMAL"]); tangent=read_accessor(g,buf,attrs["TANGENT"]); uv=read_accessor(g,buf,attrs["TEXCOORD_0"]); indices=read_accessor(g,buf,index_accessor); verify_index_accessor_bounds(g,index_accessor,indices)
     req((len(pos),len(indices))==expected_counts,"geometry counts"); req(len(normal)==len(pos) and len(tangent)==len(pos) and len(uv)==len(pos),"attribute counts")
     req(all(math.isfinite(c) for seq in (pos,normal,tangent,uv) for v in seq for c in v),"finite geometry")
     req(all(abs(sum(c*c for c in n)-1.0)<1e-4 for n in normal),"unit normals")
@@ -225,7 +250,9 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
         if key!="extras": reject_nested_extras(value)
     req(set(g)==TOP_LEVEL_KEYS,"top-level fields")
     req(g["asset"]=={"generator":VERSION,"version":"2.0"},"asset header"); req(g["extensionsUsed"]==["KHR_lights_punctual"],"extensions used")
-    req(g["scene"]==0 and g["scenes"]==[{"name":"AstralNeutralMaterialGallery","nodes":list(range(12))}],"scene"); req(len(g["nodes"])==12,"node count")
+    req(type(g["scene"]) is int and g["scene"]==0,"scene")
+    req(len(g["scenes"])==1 and set(g["scenes"][0])=={"name","nodes"} and g["scenes"][0]["name"]=="AstralNeutralMaterialGallery","scene")
+    scene_nodes=g["scenes"][0]["nodes"]; req(scene_nodes==list(range(12)) and all(type(i) is int for i in scene_nodes),"scene"); req(len(g["nodes"])==12,"node count")
     req(set(g["extensions"])=={"KHR_lights_punctual"} and set(g["extensions"]["KHR_lights_punctual"])=={"lights"},"extensions fields")
     req(set(g.get("extras",{}))=={"astral_contract"},"runtime extras")
     contract=g["extras"]["astral_contract"]; req(set(contract)==CONTRACT_KEYS,"runtime contract fields"); req(contract["status"]==RUNTIME_STATUS,"runtime status")
@@ -233,6 +260,7 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     req(contract["forbid_baked_lighting"] is True,"baked-lighting rule")
     labels=tuple(s["label"] for s in source["stations"]); req(tuple(contract["station_order"])==labels,"station order"); req(contract["capture_intent"]==CAPTURE_INTENT,"capture intent"); req(contract["source_sha256"]==hashlib.sha256(source_raw).hexdigest(),"source hash")
     req(len(g["buffers"])==1 and set(g["buffers"][0])=={"byteLength","uri"},"buffer fields")
+    req(type(g["buffers"][0]["byteLength"]) is int and g["buffers"][0]["byteLength"]>=0,"buffer length")
     buf=data_uri(g["buffers"][0]["uri"],"data:application/octet-stream;base64,"); req(len(buf)==g["buffers"][0]["byteLength"],"buffer length")
     material_specs=source["stations"]+[source["floor_material"]]; req(len(g["materials"])==len(material_specs),"material count")
     for material,s in zip(g["materials"],material_specs):
@@ -270,16 +298,20 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     req(referenced_views==set(range(len(g["bufferViews"]))),"bufferView coverage")
     xs=source["layout"]["x_positions"]; sy,sz=source["layout"]["sphere_yz"]; cy,cz=source["layout"]["cube_yz"]; req(len(xs)==4,"layout count")
     for i,(label,x) in enumerate(zip(labels,xs)):
-        req(g["nodes"][i]=={"name":f"{label}_Sphere","mesh":i,"translation":[x,sy,sz]},"sphere station node"); req(g["nodes"][4+i]=={"name":f"{label}_Cube","mesh":4+i,"translation":[x,cy,cz]},"cube station node")
-    req(g["nodes"][8]=={"name":"NeutralFloor","mesh":8},"floor node")
+        sphere_node=g["nodes"][i]; cube_node=g["nodes"][4+i]
+        req(type(sphere_node.get("mesh")) is int and sphere_node=={"name":f"{label}_Sphere","mesh":i,"translation":[x,sy,sz]},"sphere station node")
+        req(type(cube_node.get("mesh")) is int and cube_node=={"name":f"{label}_Cube","mesh":4+i,"translation":[x,cy,cz]},"cube station node")
+    req(type(g["nodes"][8].get("mesh")) is int and g["nodes"][8]=={"name":"NeutralFloor","mesh":8},"floor node")
     camera=source["camera"]; req(len(g["cameras"])==1,"camera count"); cam=g["cameras"][0]
     req(set(cam)=={"name","type","perspective"},"camera fields"); req(cam["name"]=="NeutralReviewCamera" and cam["type"]=="perspective","camera")
     p=cam["perspective"]; req(set(p)=={"aspectRatio","yfov","znear","zfar"},"camera perspective fields")
     aspect=camera["aspect_ratio"][0]/camera["aspect_ratio"][1]; req(abs(p["aspectRatio"]-aspect)<1e-12 and abs(p["yfov"]-math.radians(camera["vertical_fov_degrees"]))<1e-12,"camera framing"); req(p["znear"]==camera["znear"] and p["zfar"]==camera["zfar"],"camera clip")
-    cam_node=g["nodes"][9]; req(set(cam_node)=={"name","camera","translation","rotation"},"camera transform"); req(cam_node["name"]=="ReviewCamera" and cam_node["camera"]==0 and cam_node["translation"]==camera["translation"],"camera node"); req(quat_close(cam_node["rotation"],quat_x(camera["pitch_degrees"])),"camera rotation")
+    cam_node=g["nodes"][9]; req(set(cam_node)=={"name","camera","translation","rotation"},"camera transform"); req(type(cam_node["camera"]) is int and cam_node["name"]=="ReviewCamera" and cam_node["camera"]==0 and cam_node["translation"]==camera["translation"],"camera node"); req(quat_close(cam_node["rotation"],quat_x(camera["pitch_degrees"])),"camera rotation")
     lights=g["extensions"]["KHR_lights_punctual"]["lights"]; expected_lights=[{"color":s["color_linear"],"intensity":s["intensity_lux"],"name":s["name"],"type":s["type"]} for s in source["lights"]]; req(lights==expected_lights,"lights")
     for j,s in enumerate(source["lights"]):
-        node=g["nodes"][10+j]; req(set(node)=={"name","rotation","extensions"},"light transform"); req(node["name"]==s["name"] and node["extensions"]=={"KHR_lights_punctual":{"light":j}},"light node")
+        node=g["nodes"][10+j]; req(set(node)=={"name","rotation","extensions"},"light transform")
+        light_ref=node.get("extensions",{}).get("KHR_lights_punctual",{}).get("light")
+        req(type(light_ref) is int and node["name"]==s["name"] and node["extensions"]=={"KHR_lights_punctual":{"light":j}},"light node")
         rot=s["rotation_degrees"]; req(quat_close(node["rotation"],quat_xy(rot["x"],rot["y"])),"light rotation")
     if manifest_path:
         manifest_raw=Path(manifest_path).read_bytes(); m=json.loads(manifest_raw); req(set(m)==MANIFEST_KEYS,"manifest fields"); req(type(m["schema_version"]) is int and m["schema_version"]==1,"manifest schema"); req(m["generator"]==VERSION and m["runtime_status"]==RUNTIME_STATUS,"manifest status"); req(m["intent"]==MANIFEST_INTENT,"manifest intent"); req(m["source_sha256"]==hashlib.sha256(source_raw).hexdigest(),"manifest source hash")
