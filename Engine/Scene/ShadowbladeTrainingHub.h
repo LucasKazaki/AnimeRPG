@@ -323,7 +323,8 @@ private:
         }
 
         window.valid = true;
-        window.windowSeconds = std::max(0.0, latestObservedSeconds_ - baseline.seconds);
+        window.windowSeconds = std::min(DamageWindowSeconds,
+            std::max(0.0, latestObservedSeconds_ - baseline.seconds));
         window.damage = latestDamage_ >= baseline.totalDamage
             ? latestDamage_ - baseline.totalDamage
             : 0;
