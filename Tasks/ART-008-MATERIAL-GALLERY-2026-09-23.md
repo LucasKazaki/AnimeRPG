@@ -2,9 +2,7 @@
 
 Loop: `astral-art-hourly-20260922`
 
-Objective: create and independently validate one original neutral material-response
-gallery source fixture that can become the first repeatable Astral material-review
-scene after the engine worker provides a solid-mesh/material/light import path.
+Objective: create and independently validate one original neutral material-response gallery source fixture that can become the first repeatable Astral material-review scene after the engine worker provides a solid-mesh/material/light import path.
 
 Base dependency: PR #28 exact head `087c673f716800198272915777681c61a748a490`.
 This task is stacked on that art branch and does not merge or modify engine/game work.
@@ -20,9 +18,7 @@ Allowed paths:
 - `Scripts/test_material_gallery_gltf.py`
 - this task
 
-Forbidden: `Engine/`, renderer, editor, gameplay, CMake, workflow, dependencies,
-software installs, local Company Runtime execution, R0, releases, deployment,
-paid services, force-pushes, or merging another worker's changes.
+Forbidden: `Engine/`, renderer, editor, gameplay, CMake, workflow, dependencies, software installs, local Company Runtime execution, R0, releases, deployment, paid services, force-pushes, or merging another worker's changes.
 
 Source decisions:
 - glTF 2.0.1 source scene, metres, +Y up / +Z forward / -X right;
@@ -39,13 +35,15 @@ Acceptance:
 - generated runtime status stays `source_validated_not_imported`;
 - finite triangle geometry with positions, normals, tangents, UVs and bounded indices;
 - valid outward winding and every indexed vertex normal facing consistently with its geometric triangle face, plus normalized normals/tangents and stable sphere/cube counts;
+- every sphere station shares one canonical sphere geometry accessor binding, every cube station shares one canonical cube binding, and decoded sphere radius / cube half extent / floor extents match the source specification;
 - floor tangent and bitangent orientation must derive consistently from the actual position/UV derivatives, not only `TANGENT.w`;
 - exact station/material/node ownership and camera/light contract;
 - each neutral-review material permits only the approved `name` plus exact `pbrMetallicRoughness` keys, rejecting emissive, alpha, normal/occlusion, extension, or other uncontracted rendering properties;
+- `extras` contains only `astral_contract`, and that contract contains only the approved source-only evidence fields, rejecting supplemental runtime/art/parity approval claims even after repinning;
 - camera and directional-light nodes reject scale, matrix, or other transform overrides that can reverse local -Z while preserving the checked quaternion;
 - no images/textures/samplers, preventing accidental baked-lighting review;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions for light, material binding and rendering properties, camera, source/runtime status, texture insertion, accessor bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, floor tangent direction/handedness, and camera/light transform overrides;
+- negative regressions for light, material binding/rendering properties, camera, source/runtime status, supplemental runtime claims, texture insertion, accessor bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, canonical station geometry sharing/source dimensions, floor tangent direction/handedness, and camera/light transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
 Commands:
