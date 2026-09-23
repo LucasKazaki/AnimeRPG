@@ -1,5 +1,5 @@
 from __future__ import annotations
-import base64, copy, hashlib, json, struct, subprocess, sys, tempfile
+import base64, copy, hashlib, json, math, struct, subprocess, sys, tempfile
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -50,14 +50,13 @@ def scale_position_accessor(g, accessor_index, factor):
     if factor>=0:
         if "min" in accessor: accessor["min"]=[v*factor for v in accessor["min"]]
         if "max" in accessor: accessor["max"]=[v*factor for v in accessor["max"]]
-    else:
-        if "min" in accessor and "max" in accessor:
-            old_min=list(accessor["min"]); old_max=list(accessor["max"])
-            accessor["min"]=[v*factor for v in old_max]; accessor["max"]=[v*factor for v in old_min]
+    elif "min" in accessor and "max" in accessor:
+        old_min=list(accessor["min"]); old_max=list(accessor["max"])
+        accessor["min"]=[v*factor for v in old_max]; accessor["max"]=[v*factor for v in old_min]
 
 def append_float_accessor(g, values, accessor_type, include_minmax=False):
     components={"SCALAR":1,"VEC3":3}[accessor_type]; prefix="data:application/octet-stream;base64,"; uri=g["buffers"][0]["uri"]; assert uri.startswith(prefix)
-    buf=bytearray(base64.b64decode(uri[len(prefix):]));
+    buf=bytearray(base64.b64decode(uri[len(prefix):]))
     while len(buf)%4: buf.append(0)
     offset=len(buf)
     for value in values:
@@ -112,6 +111,15 @@ def test_nonfloor_tangent_handedness_semantics(tmp):
     def mutate(g):
         tangent_accessor=g["meshes"][4]["primitives"][0]["attributes"]["TANGENT"]
         for vertex in range(g["accessors"][tangent_accessor]["count"]): set_accessor_float(g,tangent_accessor,vertex,3,-1.0)
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "mesh tangent frame" in p.stderr
+
+def test_nonfloor_tangent_alignment_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        tangent_accessor=g["meshes"][4]["primitives"][0]["attributes"]["TANGENT"]
+        c=math.cos(math.radians(80.0)); s=math.sin(math.radians(80.0))
+        for vertex in range(4):
+            set_accessor_float(g,tangent_accessor,vertex,0,c); set_accessor_float(g,tangent_accessor,vertex,1,s); set_accessor_float(g,tangent_accessor,vertex,2,0.0); set_accessor_float(g,tangent_accessor,vertex,3,1.0)
     mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "mesh tangent frame" in p.stderr
 
 def test_station_geometry_sharing_semantics(tmp):
@@ -211,16 +219,44 @@ def test_position_accessor_declared_bounds_semantics(tmp):
     out=generate(tmp)
     def mutate(g):
         pos_accessor=g["meshes"][0]["primitives"][0]["attributes"]["POSITION"]
-        g["accessors"][pos_accessor]["min"]=[100.0,100.0,100.0]
-        g["accessors"][pos_accessor]["max"]=[101.0,101.0,101.0]
+        g["accessors"][pos_accessor]["min"]=[100.0,100.0,100.0]; g["accessors"][pos_accessor]["max"]=[101.0,101.0,101.0]
     mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "position bounds" in p.stderr
 
 def test_position_accessor_format_semantics(tmp):
     out=generate(tmp)
     def mutate(g):
-        pos_accessor=g["meshes"][0]["primitives"][0]["attributes"]["POSITION"]
-        g["accessors"][pos_accessor]["type"]="VEC4"
+        pos_accessor=g["meshes"][0]["primitives"][0]["attributes"]["POSITION"]; g["accessors"][pos_accessor]["type"]="VEC4"
     mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "position accessor format" in p.stderr
+
+def test_normal_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["NORMAL"]; g["accessors"][accessor]["type"]="VEC4"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "normal accessor format" in p.stderr
+
+def test_tangent_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["TANGENT"]; g["accessors"][accessor]["type"]="VEC3"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "tangent accessor format" in p.stderr
+
+def test_texcoord_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["TEXCOORD_0"]; g["accessors"][accessor]["type"]="VEC3"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "texcoord accessor format" in p.stderr
+
+def test_index_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["indices"]; g["accessors"][accessor]["type"]="VEC2"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "index accessor format" in p.stderr
+
+def test_float_attribute_normalized_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["NORMAL"]; g["accessors"][accessor]["normalized"]=True
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "normal accessor format" in p.stderr
 
 def test_accessor_bounds(tmp):
     out=generate(tmp); mutate_gltf(out,lambda g:g["bufferViews"][0].__setitem__("byteLength",4)); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "accessor within bufferView" in p.stderr
@@ -231,7 +267,19 @@ def test_expected_pin_negative(tmp):
 def test_crlf_source_and_pin_portability(tmp):
     source=tmp/"source-crlf.json"; source.write_bytes(SOURCE.read_bytes().replace(b"\n",b"\r\n")); pin=tmp/"pin-crlf.json"; pin.write_bytes(PIN.read_bytes().replace(b"\n",b"\r\n")); out=generate(tmp,source); assert (out/"manifest.json").read_bytes()==PIN.read_bytes(); run([VER,out/"material_gallery.gltf","--source",source,"--manifest",out/"manifest.json","--expected-manifest",pin])
 
-TESTS=[test_expected_pin_matches_generator,test_exact_check,test_light_intensity_semantics,test_material_binding_semantics,test_uncontracted_material_property_semantics,test_camera_fov_semantics,test_camera_rotation_semantics,test_light_rotation_semantics,test_all_triangle_vertex_normals_semantics,test_tangent_normal_orthogonality_semantics,test_nonfloor_tangent_handedness_semantics,test_station_geometry_sharing_semantics,test_sphere_radius_semantics,test_cube_extent_semantics,test_canonical_index_coverage_semantics,test_mesh_morph_weights_semantics,test_primitive_morph_target_semantics,test_animation_transform_override_semantics,test_floor_tangent_handedness,test_floor_tangent_direction_semantics,test_camera_transform_override_semantics,test_light_transform_override_semantics,test_source_status_rejected_by_generator,test_source_capture_intent_semantics,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,test_nested_extras_claim_semantics,test_uncontracted_manifest_claim_semantics,test_manifest_intent_semantics,test_manifest_schema_bool_semantics,test_reject_embedded_texture_or_baked_lighting_path,test_position_accessor_declared_bounds_semantics,test_position_accessor_format_semantics,test_accessor_bounds,test_expected_pin_negative,test_crlf_source_and_pin_portability]
+TESTS=[
+    test_expected_pin_matches_generator,test_exact_check,test_light_intensity_semantics,test_material_binding_semantics,
+    test_uncontracted_material_property_semantics,test_camera_fov_semantics,test_camera_rotation_semantics,test_light_rotation_semantics,
+    test_all_triangle_vertex_normals_semantics,test_tangent_normal_orthogonality_semantics,test_nonfloor_tangent_handedness_semantics,
+    test_nonfloor_tangent_alignment_semantics,test_station_geometry_sharing_semantics,test_sphere_radius_semantics,test_cube_extent_semantics,
+    test_canonical_index_coverage_semantics,test_mesh_morph_weights_semantics,test_primitive_morph_target_semantics,test_animation_transform_override_semantics,
+    test_floor_tangent_handedness,test_floor_tangent_direction_semantics,test_camera_transform_override_semantics,test_light_transform_override_semantics,
+    test_source_status_rejected_by_generator,test_source_capture_intent_semantics,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,
+    test_nested_extras_claim_semantics,test_uncontracted_manifest_claim_semantics,test_manifest_intent_semantics,test_manifest_schema_bool_semantics,
+    test_reject_embedded_texture_or_baked_lighting_path,test_position_accessor_declared_bounds_semantics,test_position_accessor_format_semantics,
+    test_normal_accessor_format_semantics,test_tangent_accessor_format_semantics,test_texcoord_accessor_format_semantics,test_index_accessor_format_semantics,
+    test_float_attribute_normalized_semantics,test_accessor_bounds,test_expected_pin_negative,test_crlf_source_and_pin_portability,
+]
 
 def main():
     passed=0
