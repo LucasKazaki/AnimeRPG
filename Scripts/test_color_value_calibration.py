@@ -72,8 +72,9 @@ class Tests(unittest.TestCase):
         p=self.root/"value_ramp_16.png"; p.write_bytes(replace_ihdr_dims(p.read_bytes(),4096,4096)); self.rehash("value_ramp_16.png")
         with self.assertRaisesRegex(ValueError,"png dimensions|png inflate limit"): self.ok()
     def test_stale_pin(self):
-        m=json.loads((self.root/"manifest.json").read_text()); m["status"]="changed"; (self.root/"manifest.json").write_text(json.dumps(m,indent=2,sort_keys=True)+"\n")
-        with self.assertRaisesRegex(ValueError,"manifest status|expected manifest"): self.ok()
+        m=json.loads((self.root/"manifest.json").read_text()); m["color_note"]=m["color_note"]+"; stale unpinned metadata"
+        (self.root/"manifest.json").write_text(json.dumps(m,indent=2,sort_keys=True)+"\n")
+        with self.assertRaisesRegex(ValueError,"expected manifest pin"): self.ok()
     def test_runtime_status_corruption_even_repinned(self):
         m=json.loads((self.root/"manifest.json").read_text()); m["status"]="runtime_validated_and_approved"
         b=(json.dumps(m,indent=2,sort_keys=True)+"\n").encode(); (self.root/"manifest.json").write_bytes(b); self.pin.write_bytes(b)

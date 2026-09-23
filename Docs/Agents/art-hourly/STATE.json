@@ -4,23 +4,22 @@
   "original_baseline": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
   "latest_observed_main": "dece8fbb47b6a937b9bafafa3faea837a359fb4d",
   "run_date": "2026-09-23",
-  "focus": "repair exact-head ART-007 CRLF portability and unsupported runtime-status certification findings",
+  "focus": "repair final ART-007 exact-head review findings for expected-manifest pin coverage and durable test-count evidence",
   "delivered": [
-    "canonicalized source and expected-manifest text newlines before hashing/pin comparison for Windows autocrlf portability",
-    "added CRLF-checkout regression proving identical generated manifest and successful verification",
-    "required exact source-only manifest status art_reference_source_validated_not_runtime",
-    "added repinned false runtime-validation status rejection regression",
-    "expanded ART-007 regression suite from fourteen to sixteen tests"
+    "changed the stale-pin regression to mutate semantically valid metadata and require the expected manifest pin failure specifically",
+    "corrected the durable ART-007 toolchain regression count from seven to sixteen tests",
+    "re-ran fresh generation, exact regeneration, independent validation, all sixteen regressions, and Python compilation in an isolated sandbox fixture"
   ],
   "verification": {
     "art003_pr_state": "ready_for_review_unmerged",
-    "prior_art007_exact_head_hosted_ci": "passed: workflow 35796517245 at 5fbb1e8acf9c979702dca9c509d9499fdfda45ae; superseded by current repair",
-    "prior_art007_independent_review": "completed at 5fbb1e8 with two findings: CRLF portability and unchecked manifest status; both addressed in current repair",
+    "prior_art007_exact_head_hosted_ci": "passed: workflow 35800823163 at 34ed461572de3da860c63fb9a2358210e7ebffb6; superseded by current repair",
+    "prior_art007_independent_review": "completed at 34ed461 with two findings: stale-pin test no longer isolated expected-manifest enforcement and TOOLCHAIN.md still reported seven regressions; both addressed in current repair",
     "color_fresh_generation": "passed locally: 3 PNGs, astral-color-calibration-2",
     "color_fresh_exact_regeneration_check": "passed locally",
     "color_fresh_validator": "passed locally: 8 roles, 3 PNGs, 4 UI screening pairs",
     "color_regression_tests": "passed locally: 16/16",
     "color_python_compile": "passed locally",
+    "expected_manifest_negative_test": "passed locally: semantically valid color_note drift rejected specifically as expected manifest pin",
     "crlf_checkout_simulation": "passed locally: generated manifest unchanged and CRLF expected pin verified",
     "runtime_status_negative_test": "passed locally: repinned runtime_validated_and_approved rejected",
     "derived_source_tree_pack": "removed_by_design_to_prevent_stale_binary_drift",
@@ -34,5 +33,5 @@
     "native_astral_color_management": "not_run_engine_unsupported",
     "independent_art_review": "not_run"
   },
-  "next_action": "run exact-head hosted checks and fresh independent review of the CRLF/status repair; keep PR #28 draft and unmerged until both are clean"
+  "next_action": "run exact-head hosted checks and fresh independent review of the final ART-007 repair; keep PR #28 draft and unmerged until both are clean"
 }
