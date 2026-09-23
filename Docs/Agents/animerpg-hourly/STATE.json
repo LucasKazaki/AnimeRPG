@@ -18,8 +18,8 @@
   "pass": "GAME-PASS14-FIELD-OPERATIONS-2026-09-22",
   "task_packet": "Tasks/GAME-PASS14-FIELD-OPERATIONS-2026-09-22.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS14.md",
-  "pr": null,
-  "final_head": "pending_self_reference_see_pr_final_receipt",
+  "pr": 32,
+  "final_head": "pending_self_reference_see_pr_32_final_receipt",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -57,5 +57,5 @@
     "art_pr_28": "separate color/exposure calibration ownership; no overlap",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release and deployment unchanged"
   },
-  "next_action": "Open one scoped pass-14 PR, require exact-head hosted Windows and release-integrity checks plus a fresh independent Codex review, repair any material findings, re-read live main and PR head, then merge with expected-head protection only if every applicable gate is green."
+  "next_action": "Require exact-head hosted Windows and release-integrity checks plus a fresh independent Codex review on PR #32, repair any material findings, re-read live main and PR head, then merge with expected-head protection only if every applicable gate is green."
 }
