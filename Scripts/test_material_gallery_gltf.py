@@ -142,6 +142,21 @@ def test_cube_extent_semantics(tmp):
         pos_accessor=g["meshes"][4]["primitives"][0]["attributes"]["POSITION"]; scale_position_accessor(g,pos_accessor,0.5)
     mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "cube extent" in p.stderr
 
+def test_canonical_cube_vertex_payload_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        attrs=g["meshes"][4]["primitives"][0]["attributes"]; h=json.loads(SOURCE.read_text())["geometry"]["cube_half_extent"]
+        positions=[(-h,-h,h),(h,-h,h),(h,h,h),(-h,h,h)]
+        normals=[(0.0,0.0,1.0)]*4; tangents=[(1.0,0.0,0.0,1.0)]*4
+        for face in range(6):
+            for local in range(4):
+                vertex=face*4+local
+                for component,value in enumerate(positions[local]): set_accessor_float(g,attrs["POSITION"],vertex,component,value)
+                for component,value in enumerate(normals[local]): set_accessor_float(g,attrs["NORMAL"],vertex,component,value)
+                for component,value in enumerate(tangents[local]): set_accessor_float(g,attrs["TANGENT"],vertex,component,value)
+        g["accessors"][attrs["POSITION"]]["min"]=[-h,-h,h]; g["accessors"][attrs["POSITION"]]["max"]=[h,h,h]
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "canonical cube payload" in p.stderr
+
 def test_canonical_index_coverage_semantics(tmp):
     out=generate(tmp)
     def mutate(g):
@@ -202,6 +217,13 @@ def test_uncontracted_runtime_claim_semantics(tmp):
 
 def test_nested_extras_claim_semantics(tmp):
     out=generate(tmp); mutate_gltf(out,lambda g:g["cameras"][0].__setitem__("extras",{"runtime_verified":True,"art_approved":True})); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "nested extras unsupported" in p.stderr
+
+def test_nested_name_claim_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        accessor=g["meshes"][4]["primitives"][0]["attributes"]["NORMAL"]
+        g["accessors"][accessor]["name"]="Astral imported; runtime_verified; art_approved"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "normal accessor format fields" in p.stderr
 
 def test_uncontracted_manifest_claim_semantics(tmp):
     out=generate(tmp); manifest=json.loads((out/"manifest.json").read_text()); manifest["runtime_verified"]=True; manifest["art_approved"]=True; (out/"manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "manifest fields" in p.stderr
@@ -272,10 +294,11 @@ TESTS=[
     test_uncontracted_material_property_semantics,test_camera_fov_semantics,test_camera_rotation_semantics,test_light_rotation_semantics,
     test_all_triangle_vertex_normals_semantics,test_tangent_normal_orthogonality_semantics,test_nonfloor_tangent_handedness_semantics,
     test_nonfloor_tangent_alignment_semantics,test_station_geometry_sharing_semantics,test_sphere_radius_semantics,test_cube_extent_semantics,
-    test_canonical_index_coverage_semantics,test_mesh_morph_weights_semantics,test_primitive_morph_target_semantics,test_animation_transform_override_semantics,
-    test_floor_tangent_handedness,test_floor_tangent_direction_semantics,test_camera_transform_override_semantics,test_light_transform_override_semantics,
-    test_source_status_rejected_by_generator,test_source_capture_intent_semantics,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,
-    test_nested_extras_claim_semantics,test_uncontracted_manifest_claim_semantics,test_manifest_intent_semantics,test_manifest_schema_bool_semantics,
+    test_canonical_cube_vertex_payload_semantics,test_canonical_index_coverage_semantics,test_mesh_morph_weights_semantics,
+    test_primitive_morph_target_semantics,test_animation_transform_override_semantics,test_floor_tangent_handedness,test_floor_tangent_direction_semantics,
+    test_camera_transform_override_semantics,test_light_transform_override_semantics,test_source_status_rejected_by_generator,
+    test_source_capture_intent_semantics,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,test_nested_extras_claim_semantics,
+    test_nested_name_claim_semantics,test_uncontracted_manifest_claim_semantics,test_manifest_intent_semantics,test_manifest_schema_bool_semantics,
     test_reject_embedded_texture_or_baked_lighting_path,test_position_accessor_declared_bounds_semantics,test_position_accessor_format_semantics,
     test_normal_accessor_format_semantics,test_tangent_accessor_format_semantics,test_texcoord_accessor_format_semantics,test_index_accessor_format_semantics,
     test_float_attribute_normalized_semantics,test_accessor_bounds,test_expected_pin_negative,test_crlf_source_and_pin_portability,
