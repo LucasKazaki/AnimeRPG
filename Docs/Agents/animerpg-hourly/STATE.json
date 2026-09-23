@@ -20,7 +20,7 @@
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS13.md",
   "pr": 30,
   "reviewed_initial_head": "ca187fb9c03d6e2ffe873599bf28da6f75b43880",
-  "latest_review_repair_checkpoint": "1ae99759c55b5ec11c700e5b6ee93252f67bcdee",
+  "latest_review_repair_checkpoint": "9f85badef954bb969b42db618f2cd9ac55c38647",
   "final_head": "pending_self_reference_see_pr_30_final_receipt",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -35,7 +35,7 @@
   "increments": [
     {"id":"GAME-062","title":"Bounded configurable practice pattern sequence","status":"implemented_registered_test_coverage"},
     {"id":"GAME-063","title":"Learning Standard Expert practice pace","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-064","title":"Alternating Guard Dodge defense chain with monotonic timing and reconciliation","status":"implemented_review_repaired_registered_test_coverage"},
+    {"id":"GAME-064","title":"Alternating Guard Dodge defense chain with monotonic timing and pre-frame external-success reconciliation","status":"implemented_review_repaired_registered_test_coverage"},
     {"id":"GAME-065","title":"Bounded execution score with session-owned active-time coefficient","status":"implemented_review_repaired_registered_test_coverage"},
     {"id":"GAME-066","title":"Configurable drill target count 1 through 10","status":"implemented_registered_test_coverage"},
     {"id":"QOL-014","title":"Per-pattern practice analytics","status":"implemented_review_repaired_registered_test_coverage"}
@@ -52,7 +52,9 @@
     "third_review_head": "6755593d22d888a15e5712c8a8e6a45c16c93e69",
     "chain_monotonic_clock": "use_session_owned_active_time_for_chain_window_so_CombatSandbox_reset_cannot_revive_expired_chain",
     "external_success_reconciliation": "AdvanceTime_reconciliation_uses_actions_LastDefense_authoritative_result_and_normal_chain_path_for_perfect_or_ordinary_success",
-    "focused_regressions": "added_for_all_material_review_findings_including_hit_only_clock_reset_chain_reset_and_external_success_reconciliation",
+    "fourth_review_head": "b9bbd2f98df69928369d52d48e95fa0b9455c18c",
+    "external_success_preframe_timestamp": "reconcile_already_resolved_success_at_pre_frame_session_time_then_accumulate_current_coordinator_delta",
+    "focused_regressions": "added_for_all_material_review_findings_including_hit_only_clock_reset_chain_reset_external_success_reconciliation_and_long_frame_pre_resolved_success_timing",
     "fresh_final_head_review": "pending"
   },
   "verification": {
@@ -65,10 +67,12 @@
     "pre_second_review_head_release_manifest": "passed_run_348_on_126b6eee_but_not_final_after_second_review_repairs",
     "third_review_head_windows_ci": "passed_run_445_on_6755593_but_not_final_after_third_review_repairs",
     "third_review_head_release_manifest": "passed_run_356_on_6755593_but_not_final_after_third_review_repairs",
+    "fourth_review_head_windows_ci": "passed_run_453_on_b9bbd2f_but_not_final_after_fourth_review_repair",
+    "fourth_review_head_release_manifest": "passed_run_364_on_b9bbd2f_but_not_final_after_fourth_review_repair",
     "latest_review_repair_commits": [
-      "a9bf867bc4e9107b566b9556bd8139ce142db76c",
-      "1ae99759c55b5ec11c700e5b6ee93252f67bcdee",
-      "27096257d572874f553b821336419befba752bd5"
+      "24dacdf76c6cd71640eec3cf0c714872c40c690f",
+      "b467874c4be49c2eddda0bcfa5d2c273836f1709",
+      "9f85badef954bb969b42db618f2cd9ac55c38647"
     ],
     "final_records_head_hosted_windows_ci": "pending_exact_final_head",
     "final_records_head_release_manifest": "pending_exact_final_head",
