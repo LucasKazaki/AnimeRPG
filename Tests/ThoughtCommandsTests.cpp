@@ -124,7 +124,7 @@ void TestDelegatedRejectionGates() {
     Expect(guarded.reason == ThoughtCommandReason::GuardedConflict
             && Near(actions.Resource(), 100.0f),
         "command dash preserves the existing guard conflict gate");
-    commands.Submit("guard off", {}, actions, actions, combat);
+    commands.Submit("guard off", {}, actions, combat);
 
     commands.Submit("dash", {}, actions, combat);
     const auto cooldown = commands.Submit("dash", {}, actions, combat);
