@@ -56,8 +56,8 @@
       "id": "ART-008",
       "title": "Neutral material-response gallery source fixture",
       "status": "source_validated_pending_review",
-      "dependency": "fresh exact-head hosted CI and independent review after animation-override repair; Astral glTF/material/light import later",
-      "next_acceptance": "generated static gallery imports and renders in Astral with immutable matched station geometry, source dimensions, correct camera/normal/tangent/material/light contracts, no animation transform overrides, and no unsupported runtime/art evidence claims"
+      "dependency": "fresh exact-head hosted CI and independent review after manifest evidence repair; Astral glTF/material/light import later",
+      "next_acceptance": "generated static gallery imports and renders in Astral with immutable matched station geometry, source dimensions, correct camera/normal/tangent/material/light contracts, no animation transform overrides, and no unsupported runtime/art evidence claims in either glTF or manifest"
     }
   ]
 }
