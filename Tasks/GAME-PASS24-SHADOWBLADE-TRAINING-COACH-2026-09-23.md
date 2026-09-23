@@ -12,6 +12,7 @@ This is a bounded GAME-only follow-up to the merged Shadowblade defense-practice
 
 Allowed paths for this packet:
 - `Engine/Scene/ShadowbladeTrainingCoach.h`
+- `Engine/Scene/DefensePracticeSession.h`, narrowly to expose the existing private practice-owner availability witness as a read-only public query after independent review found that the coach could otherwise be given an unrelated idle owner pair. This game-owned practice-session file was introduced and previously modified by the GAME worker; no engine/editor/art facility behavior is changed.
 - `Tests/ShadowbladeTrainingCoachPass24Tests.inc`
 - `Tests/ThoughtCommandsTests.cpp` only for registering this pass's production header/test function
 - `Tasks/GAME-PASS24-SHADOWBLADE-TRAINING-COACH-2026-09-23.md`
@@ -43,7 +44,7 @@ Community request, new to the backlog this pass:
 ### GAME-117: Selectable focused threat drills
 Gap: the curriculum is sequential, but players cannot select a bounded single-pattern or mixed drill from one game-domain policy.  
 Adaptation: expose QuickCut, GuardBreaker, RiftBurst, Mixed Defense, and Boss Cycle plans using only the existing three authoritative patterns and existing pace/goal controls.  
-Acceptance: exact sequence/goal/pace mapping; invalid focus/pace fail closed; reconfiguration during an active threat makes no mutation.
+Acceptance: exact sequence/goal/pace mapping; invalid focus/pace fail closed; reconfiguration during an active threat makes no mutation; once a practice session has bound combat/actions owners, an unrelated idle pair cannot be substituted to bypass the live-owner gate.
 
 ### GAME-118: Scored practice debrief
 Gap: score, grade, pattern stats, accuracy inputs, streak, and time coefficient exist separately.  
@@ -63,7 +64,7 @@ Acceptance: deterministic, bounded, read-only, ratio comparison avoids floating-
 ### GAME-121: Quick drill retry
 Gap: players can reset metrics through a lower-level session call, but the new training policy should expose explicit same-drill retry semantics.  
 Adaptation: clear session metrics and restart sequence cursor while retaining selected sequence, pace, goal, and target.  
-Acceptance: active threat rejects retry atomically; successful retry preserves configuration and clears results.
+Acceptance: active threat rejects retry atomically; a previously bound session rejects an unrelated owner pair; successful retry preserves configuration and clears results.
 
 ### QOL-025: Authoritative timing guide
 Gap: exact attack windup/blockability and defense-window constants are split across production owners.  
@@ -72,7 +73,7 @@ Acceptance: values are read from production `CombatSandbox` threat definitions a
 
 ## Verification requirements
 
-Registered regression coverage must execute through the existing `ThoughtCommandsTests` target and exercise production code, including invalid enums, active-threat atomicity, actual queued threat definitions, real perfect/ordinary/hit resolution, challenge completion, recommendation behavior, retry state, and timing-guide values.
+Registered regression coverage must execute through the existing `ThoughtCommandsTests` target and exercise production code, including invalid enums, active-threat atomicity, bound-owner substitution rejection, actual queued threat definitions, real perfect/ordinary/hit resolution, challenge completion, recommendation behavior, retry state, and timing-guide values.
 
 Required before merge:
 - exact-head hosted Windows Debug build/tests;
