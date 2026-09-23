@@ -28,7 +28,7 @@
     {"id":"E08","title":"Physics and collision","status":"not_found","depends_on":["E01","E02"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E09","title":"AI and navigation","status":"partial","depends_on":["E02","E08"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E10","title":"Audio engine","status":"not_found","depends_on":["E01","E03"],"native_evidence":[],"independent_acceptance":false},
-    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_final_close_suspension_context_barrier_hosted_pass_review_pending_native_pending","depends_on":["E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
+    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_final_close_suspension_context_barrier_hosted_pass_review_diff_count_repaired_recheck_pending_native_pending","depends_on":["E02","E03","E04"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E12","title":"Genuine 2D support","status":"partial","depends_on":["E02","E03","E04","E08"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E13","title":"Networking and multiplayer runtime","status":"not_found","depends_on":["E01","E02"],"native_evidence":[],"independent_acceptance":false},
     {"id":"E14","title":"Profiling and budgets","status":"partial","depends_on":["E00","E01"],"native_evidence":[],"independent_acceptance":false},
@@ -59,10 +59,11 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "final_close_suspension_context_barrier_hosted_pass_review_pending_native_pending",
+      "status": "final_close_suspension_context_barrier_hosted_pass_review_diff_count_repaired_recheck_pending_native_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_observed_main_revision": "7dfaeeb340e57d1024a8bc818c65c82cd391d4ae",
-      "reviewed_receipt_with_new_finding": "d2748b64fc606df4ea78fa668b2ac0512b15383a",
+      "reviewed_receipt_runtime_finding": "d2748b64fc606df4ea78fa668b2ac0512b15383a",
+      "reviewed_receipt_evidence_finding": "d7ccec1e43500e0409e8ff93811fe3390c4ea266",
       "positive_area_candidate": "2c1d2315c0e0f4bf915a3b11d27d8088f4af6429",
       "startup_containment_candidate": "6f1ad24ab6b394bd69bebc940fde2ddf5fe8eefb",
       "pid_reuse_ownership_candidate": "b9eebe721b7907245caaad5771bc9e96bac20680",
@@ -72,6 +73,15 @@
       "cmake_blob": "4fd471151acb4b5919ccef4a92f49da12bd8d1f1",
       "verification_gap": "SuspendThread success increments the suspend count but did not itself provide an explicit barrier before the final HWND PID/TID revalidation and WM_CLOSE enqueue, leaving a reviewed race with in-flight owner-thread kernel work and HWND destruction/reuse",
       "repair": "After SuspendThread returns prior count zero, require GetThreadContext with CONTEXT_CONTROL to succeed before retained process/thread liveness, exact HWND PID/TID revalidation, and asynchronous WM_CLOSE; then require ResumeThread previous count one before any process wait",
+      "implementation_diff": {
+        "commit": "b2c836013c8212e9432e8c2e861551b5c8f3646b",
+        "file": "Tests/EditorRuntimeSmoke.cpp",
+        "additions": 11,
+        "deletions": 4,
+        "changes": 15,
+        "source": "GitHub REST Get a commit"
+      },
+      "evidence_repair": "Independent review of d7ccec1e43500e0409e8ff93811fe3390c4ea266 found that the authoritative task misstated the b2c836 commit as 7 additions and 0 deletions. GitHub commit metadata reports 11 additions and 4 deletions. The task, QA receipt, and capability map were reconciled without changing runtime code.",
       "portable_fixture": {
         "sha256": "df17c2d0cbb8f1c8cd853d8adb5e0108b6b5a4b9755e9a6bcfc4c97f26d792ae",
         "gcc_warning_clean": true,
@@ -89,6 +99,14 @@
         "profiling_conclusion": "success",
         "release_manifest_run": 35866993023,
         "release_manifest_conclusion": "success",
+        "prior_receipt_source_head": "d7ccec1e43500e0409e8ff93811fe3390c4ea266",
+        "prior_receipt_windows_run": 35867571050,
+        "prior_receipt_windows_job": 107202971156,
+        "prior_receipt_windows_conclusion": "success",
+        "prior_receipt_profiling_run": 35867571034,
+        "prior_receipt_profiling_conclusion": "success",
+        "prior_receipt_release_manifest_run": 35867571047,
+        "prior_receipt_release_manifest_conclusion": "success",
         "interactive_runtime_smoke_executed_by_hosted_suite": false
       },
       "retained_hardening": {
@@ -109,19 +127,23 @@
         "target_thread_resumed_before_process_wait": true
       },
       "independent_review": {
-        "reviewed_receipt": "d2748b64fc606df4ea78fa668b2ac0512b15383a",
-        "review_result": "one P2: SuspendThread return did not prove target thread had actually reached suspended state before final HWND revalidation/PostMessageW",
+        "runtime_reviewed_receipt": "d2748b64fc606df4ea78fa668b2ac0512b15383a",
+        "runtime_review_result": "one P2: SuspendThread return did not prove target thread had actually reached suspended state before final HWND revalidation/PostMessageW",
         "changed_source_head": "b2c836013c8212e9432e8c2e861551b5c8f3646b",
-        "fresh_final_receipt_review": "pending",
+        "evidence_reviewed_receipt": "d7ccec1e43500e0409e8ff93811fe3390c4ea266",
+        "evidence_review_submitted_at": "2026-09-23T13:38:07Z",
+        "evidence_review_result": "one evidence-only P2: task misstated b2c836 source diff as 7 additions and 0 deletions; GitHub commit metadata reports 11 additions and 4 deletions; no new runtime-code finding surfaced",
+        "fresh_final_receipt_review": "pending_after_evidence_count_repair",
         "independent_acceptance": false
       },
       "research": [
         {"source":"Microsoft Learn GetThreadContext","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadcontext","accessed":"2026-09-23","applicability":"requires THREAD_GET_CONTEXT and states a valid context cannot be obtained for a running thread; used as explicit post-SuspendThread barrier"},
         {"source":"Microsoft Learn SuspendThread","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-suspendthread","accessed":"2026-09-23","applicability":"increments suspend count and stops user-mode execution; debugger-oriented, so use is restricted to this verification harness"},
         {"source":"Microsoft Learn PROCESS_INFORMATION","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-process_information","accessed":"2026-09-23","applicability":"hThread and dwThreadId identify the newly created process primary thread retained by the smoke"},
-        {"source":"Microsoft Learn ResumeThread","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-resumethread","accessed":"2026-09-23","applicability":"previous suspend count one verifies removal of the harness suspension before waiting"}
+        {"source":"Microsoft Learn ResumeThread","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-resumethread","accessed":"2026-09-23","applicability":"previous suspend count one verifies removal of the harness suspension before waiting"},
+        {"source":"GitHub REST Get a commit","url":"https://docs.github.com/en/rest/commits/commits#get-a-commit","accessed":"2026-09-23","applicability":"commit response stats and per-file additions/deletions/changes are used as the authoritative diff-count evidence for b2c836"}
       ],
-      "licensing_constraints": "Public Win32 API documentation used for behavioral/API semantics only. No proprietary engine source copied and no dependency imported.",
+      "licensing_constraints": "Public Win32 API and GitHub API documentation used for behavioral/API semantics and evidence provenance only. No proprietary engine source copied and no dependency imported.",
       "task": "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
       "evidence": "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
       "native_evidence": [],
