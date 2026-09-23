@@ -8,6 +8,11 @@ from pathlib import Path
 VERSION="astral-color-calibration-2"
 
 
+def canonical_text_bytes(path:Path):
+    """Normalize text newlines for cross-platform hashing/pinning."""
+    return path.read_text(encoding="utf-8").replace("\r\n","\n").replace("\r","\n").encode("utf-8")
+
+
 def png_rgb8(width,height,pixel):
     def chunk(kind,data):
         return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data)&0xffffffff)
@@ -37,7 +42,8 @@ def srgb_gray_from_linear_luminance(y):
 
 
 def build(source_path:Path):
-    source=json.loads(source_path.read_text())
+    source_bytes=canonical_text_bytes(source_path)
+    source=json.loads(source_bytes.decode("utf-8"))
     if source.get("schema_version")!=1: raise ValueError("source schema")
     roles=source.get("roles")
     if not isinstance(roles,list) or len(roles)!=8: raise ValueError("exactly eight roles required")
@@ -79,7 +85,7 @@ def build(source_path:Path):
     manifest={
         "schema_version":1,"generator":VERSION,
         "status":"art_reference_source_validated_not_runtime",
-        "source_sha256":hashlib.sha256(source_path.read_bytes()).hexdigest(),
+        "source_sha256":hashlib.sha256(source_bytes).hexdigest(),
         "files":[{"path":p,"bytes":len(d),"sha256":hashlib.sha256(d).hexdigest()} for p,d in sorted(files.items())],
         "roles":[{"id":r["id"],"hex":r["hex"].upper(),"relative_luminance":round(luminance[r["id"]],6),
                   "preview_gray_srgb8":grays[i][0]} for i,r in enumerate(roles)],
