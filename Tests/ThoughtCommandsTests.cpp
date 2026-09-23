@@ -1,6 +1,7 @@
 #include "Engine/Scene/ThoughtCommands.h"
 #include "Engine/Scene/DefensePracticeSession.h"
 #include "Engine/Scene/ExplorationFieldGuide.h"
+#include "Engine/Scene/LandmarkEncounter.h"
 #include "Engine/Scene/ShadowCryptExpedition.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
 
@@ -72,8 +73,9 @@ void TestSupportedCommandsAndNoOps() {
             && repeatedOn.reason == ThoughtCommandReason::NoOp && actions.IsGuarding(),
         "repeated guard on is a non-mutating no-op");
     const auto guardOff = commands.Submit("guard off", {}, actions, combat);
-    Expect(guardOff.status == ThoughtCommandStatus::Accepted && !actions.IsGuarding(),
-        "guard off releases commanded guard state");
+    Expect(guardOff.status == ThoughtCommandStatus::Accepted && !actions.IsGuarding()
+            && !commands.IsCommandGuardActive(),
+        "guard off commands release held guard state");
     const auto repeatedOff = commands.Submit("guard off", {}, actions, combat);
     Expect(repeatedOff.status == ThoughtCommandStatus::Rejected
             && repeatedOff.reason == ThoughtCommandReason::NoOp,
