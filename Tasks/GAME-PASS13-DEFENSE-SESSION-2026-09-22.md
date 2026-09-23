@@ -45,18 +45,18 @@ Reference: Zenless Zone Zero combat challenge design uses technique-specific exe
 
 Gap: pass 12 counts guards and dodges independently but gives no bounded incentive to alternate defensive techniques.
 
-Original adaptation: successful Guard/Dodge defenses build an alternating chain only when the input differs from the prior successful defense and arrives within 2.5 seconds of combat simulation time. Repeating the same defense, taking a hit, or an authoritative interruption resets the live chain while preserving the best chain.
+Original adaptation: successful Guard/Dodge defenses build an alternating chain only when the authoritative defense result differs from the prior successful defense and arrives within 2.5 seconds of combat simulation time. Repeating the same defense, taking a hit, or an authoritative interruption resets the live chain while preserving the best chain.
 
-Acceptance: Guard->Dodge->Guard reaches chain 3; Guard->Guard resets to 1; hit/interruption resets live chain; pause cannot advance the timing clock.
+Acceptance: Guard->Dodge->Guard reaches chain 3; Guard->Guard resets to 1; hit/interruption resets live chain; malformed raw input cannot fabricate a technique identity; pause cannot advance the timing clock.
 
 ### GAME-065: practice score with time coefficient
 Reference: Zenless Zone Zero timed combat challenges combine execution objectives with time pressure; official current combat-event material was revalidated on 2026-09-22. The local values below are original and intentionally small.
 
 Gap: pass 12 has a coarse grade but no score report that separates execution points from a time coefficient.
 
-Original adaptation: perfect defenses, ordinary defenses, and best alternating chain contribute bounded base points. Average active combat seconds per resolved attempt applies a 125%, 100%, or 75% coefficient. Hits grant no positive base points. Score uses the existing combat clock, which the pass-12 pause already freezes.
+Original adaptation: perfect defenses, ordinary defenses, and best alternating chain contribute bounded base points. Average active session seconds per resolved attempt applies a 125%, 100%, or 75% coefficient. Hits grant no positive base points but still contribute to the timing denominator. The session accumulates only valid, unpaused time passed through its own coordinator, so a direct `CombatSandbox` clock reset cannot rewind an already-earned coefficient.
 
-Acceptance: no resolutions score zero; clean fast practice gets the high coefficient; advancing valid unpaused time can lower only the coefficient; paused time does not change it; integer arithmetic stays bounded.
+Acceptance: no resolutions score zero; hit-only reports still expose the defined timing coefficient while keeping zero points; clean fast practice gets the high coefficient; advancing valid unpaused time can lower only the coefficient; paused time does not change it; a direct combat clock reset cannot improve the coefficient; integer/time accumulation stays bounded.
 
 ### GAME-066: configurable drill target count
 Reference: ZZZ official HoYoLAB `Snap! Hollow Realm Showdown`, published 2026-03-06, https://www.hoyolab.com/article/44074876 , documents main and additional challenge targets plus an objective-free mode after completion. A later official `Snap! Focus Showdown!` event on 2026-08-05 likewise documents six themed stages and objective-free Hyperfocus Shot mode, https://www.hoyolab.com/article/46150564 .
@@ -81,7 +81,7 @@ Acceptance: each queued pattern increments only its own attempts; terminal outco
 Required before merge:
 1. Exact-head hosted Windows Debug and Release build/test workflow must pass with the new tests registered through the existing `ThoughtCommandsTests` target. This target already links `CombatSandbox.cpp`, `ShadowbladeActions.cpp`, and the scene headers needed by the session coordinator; CMake is intentionally untouched because open engine PR #13 owns that shared path.
 2. Release-manifest/integrity workflow must pass on the same final head when triggered by repository policy.
-3. Boundary checks must cover invalid sequence/preset/target values, rejected queues, pause behavior, reset idempotency, per-pattern isolation, and deterministic scoring.
+3. Boundary checks must cover invalid sequence/preset/target values, rejected queues, pause behavior, reset idempotency, per-pattern isolation, deterministic scoring, hit-only coefficient reporting, and combat-clock-reset invariance.
 4. Fresh independent Codex review must inspect the exact final candidate head. Material findings must be repaired and all applicable threads resolved before merge.
 5. Re-read `main`, PR head, changed paths, checks, and review immediately before merge. Use expected-head protection and do not merge if the base moved without reconciliation.
 
