@@ -127,6 +127,27 @@ void TestShadowbladeTrainingHubPass25() {
     Expect(!combat.HasPendingEnemyAttack() && !actions.HasIncomingAttack(),
         "pass25 debrief target stops instead of queueing a fifth threat");
 
+    // Review regression: changing the training contract after a debrief moves
+    // the hub to Ready. Feedback may expose the new timing guide, but must not
+    // mix the previous run's metrics, recommendation, challenges, or damage.
+    Expect(encounter.ConfigureTraining(
+               ShadowbladeTrainingFocus::QuickCut,
+               DefensePracticePace::Learning, 1),
+        "pass25 completed run can be reconfigured for a new bounded drill");
+    const ShadowbladeTrainingHubFeedback readyFeedback =
+        encounter.TrainingFeedback(combat);
+    Expect(readyFeedback.state == ShadowbladeTrainingHubState::Ready
+            && readyFeedback.focus == ShadowbladeTrainingFocus::QuickCut
+            && readyFeedback.pace == DefensePracticePace::Learning
+            && readyFeedback.targetAttempts == 1
+            && readyFeedback.resolvedAttempts == 0
+            && !readyFeedback.debrief.valid
+            && readyFeedback.recommendation
+                == ShadowbladeTrainingRecommendation::NeedMoreData
+            && !readyFeedback.recentDamage.valid
+            && readyFeedback.timingGuideValid,
+        "pass25 ready feedback suppresses stale results after debrief reconfiguration");
+
     const ShadowbladeTrainingHubFeedback wrongOwnerFeedback =
         encounter.TrainingFeedback(unrelatedCombat);
     Expect(wrongOwnerFeedback.resolvedAttempts == 0
@@ -134,8 +155,9 @@ void TestShadowbladeTrainingHubPass25() {
             && !wrongOwnerFeedback.recentDamage.valid,
         "pass25 mismatched combat owner cannot compose mixed-provenance feedback");
 
-    // Review regression: a debrief stays bound to the exact owner pair. Retry
-    // with a different action owner must fail before either owner is reset.
+    // Review regression: a debrief-established binding stays authoritative after
+    // reconfiguration. Retry with a different action owner must fail before
+    // either supplied owner is reset.
     ShadowbladeActions unrelatedRetryActions;
     const TrainingTargetMode retryTargetModeBefore = combat.TargetMode();
     const int unrelatedRetryHealthBefore = unrelatedRetryActions.PlayerHealth();
