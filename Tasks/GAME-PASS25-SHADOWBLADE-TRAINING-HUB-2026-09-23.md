@@ -16,12 +16,16 @@ Allowed paths for this packet:
 - `Engine/Scene/ShadowbladeTrainingHub.h`
 - `Engine/Scene/LandmarkEncounter.h`
 - `Engine/Scene/LandmarkEncounter.cpp`
+- `Engine/Scene/LandmarkInteraction.h` only for the review-required existing `ShadowbladeActions` owner witness in interaction reports
+- `Engine/Scene/LandmarkInteraction.cpp` only for populating that owner witness on the already-existing interaction path
 - `Tests/ShadowbladeTrainingHubPass25Tests.inc`
 - `Tests/ShadowbladeTrainingHubPass25ReviewTests.inc`
 - `Tests/ThoughtCommandsTests.cpp` only for existing registered-test aggregation
 - this task packet
 - `Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS25.md`
 - `Docs/Agents/animerpg-hourly/STATE.json`
+
+The `LandmarkInteraction` paths were admitted only after exact-head independent review found that encounter completion could otherwise be driven by unrelated owners. The repair carries the already-supplied `ShadowbladeActions` object through the existing interaction report so `LandmarkEncounter` can prove the combat/action pair without editing engine-owned Win32 platform code.
 
 ## Research and feature map
 
@@ -133,15 +137,17 @@ Registered regression coverage is added through the existing `ThoughtCommandsTes
 
 Additional boundary checks in the pass-25 test packet cover invalid enum/range inputs, exact owner binding, active-threat retry refusal, exact finite-attempt stop, pause/resume, damage-window expiry, and preserved loadout selection.
 
-The independent review of candidate `e28f415b33461b367da27bec1d410e1ca585a35d` found two additional P2 edge cases. Both are merge-blocking until repaired and exact-head gates rerun:
+Independent review found and repaired multiple real defects during this pass. Earlier repairs include exact production `LandmarkEncounter` linkage into the registered aggregation test, player-defeat termination, live timing-preset guidance, finite-target restoration on encounter retry, mismatched retry-owner rejection, stale Ready-state feedback suppression, live queued-threat guidance, exact linked-generation validation, Active-only telemetry sampling, and exact cutoff handling.
 
-- active timing guidance must validate the practice session's linked combat/action generation before describing a queued pattern, so an externally replaced combat-plan threat cannot be presented as the threat approaching the player;
-- rolling damage telemetry must stop sampling after the run enters Debrief, so later encounter reuse or post-run combat mutations cannot rewrite the completed run's feedback.
+The latest exact-head review of `79f3ed5a23957c3c50e2c0f2783945be439c01d7` found two additional P2 defects and therefore blocked merge despite green hosted CI:
 
-The dedicated review-regression packet covers both cases. Timing feedback now uses `DefensePracticeSession::Cue` as the exact linked-threat witness while Active, and otherwise fails closed. Damage observation is restricted to Active state; the final terminal action is sampled before the transition to Debrief, after which the window remains frozen.
+- an old unflushed telemetry bucket could absorb a fresh damage delta after a gap longer than 20 seconds, causing both old and new damage to be filtered as stale;
+- encounter activation did not retain authoritative owner provenance, so an unrelated defeated combat owner plus unrelated action owner could complete the story gate and unlock training.
+
+The current repair flushes a stale pending damage bucket with its original activity time before accumulating a fresh delta, and adds a no-intermediate-flush regression covering the exact long-gap case. The encounter repair carries the existing live `ShadowbladeActions` owner through `LandmarkInteractionReport`, records the activation combat/action pair, rejects mismatched owners before completion, and only unlocks training when the exact pair is proven. Synthetic legacy encounter tests without an action-owner witness retain base encounter completion behavior but cannot satisfy the new training unlock gate. Dedicated regressions cover unrelated defeated combat, mismatched actions, exact-pair success, and sparse old-plus-fresh telemetry.
 
 Local sandbox compile is not evidence for this pass because the container could not resolve `github.com` while attempting a clean branch clone. No local test success is claimed from that failed fetch.
 
 ## Evidence boundary
 
-This pass creates a real production game-domain call site in `LandmarkEncounter::Update` for training unlock and read-only telemetry, and the existing live `LandmarkEncounter` owns the training APIs. However, current native Win32 input does not yet invoke configure/start/defend/advance/pause. Therefore this packet may count game-domain integration after tests/review, but native-player-playable verification remains zero. There is no rendered training UI, controller/keybinding route, production training scene, art/audio pass, GPU/performance capture, or cross-process training-state persistence in this packet.
+This pass creates a real production game-domain call site in `LandmarkEncounter::Update` for training unlock and read-only telemetry, and the existing live `LandmarkEncounter` owns the training APIs. The existing `LandmarkInteraction::TryInteract` path now supplies an action-owner witness to the encounter without any `Engine/Platform` edit. However, current native Win32 input does not yet invoke configure/start/defend/advance/pause. Therefore this packet may count game-domain integration after tests/review, but native-player-playable verification remains zero. There is no rendered training UI, controller/keybinding route, production training scene, art/audio pass, GPU/performance capture, or cross-process training-state persistence in this packet.
