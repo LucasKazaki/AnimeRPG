@@ -43,7 +43,6 @@ struct ShadowCryptResumePoint {
     bool coolingCacheCleared{};
     int defeats{};
     int damageTaken{};
-    bool firstClearRewardClaimed{};
 };
 
 struct ShadowCryptCompletion {
@@ -169,15 +168,12 @@ public:
 
     ShadowCryptRewardReport ClaimFirstClearReward(CharacterProgression& progression) {
         ShadowCryptRewardReport report{};
-        if (!complete_ || firstClearRewardClaimed_) return report;
-        firstClearRewardClaimed_ = true;
-        report.granted = true;
-        report.progression = progression.GrantRewards(
-            FirstClearExperience, FirstClearMastery, FirstClearEnhancementMaterials);
+        if (!complete_) return report;
+        report.progression = progression.ClaimShadowCryptFirstClearReward(
+            FirstClearExperience, FirstClearMastery, FirstClearEnhancementMaterials,
+            report.granted);
         return report;
     }
-
-    bool FirstClearRewardClaimed() const { return firstClearRewardClaimed_; }
 
     bool SafeToSuspend() const {
         return active_ && !complete_ && objectiveProgress_ == 0;
@@ -194,7 +190,6 @@ public:
         point.coolingCacheCleared = coolingCacheCleared_;
         point.defeats = defeats_;
         point.damageTaken = damageTaken_;
-        point.firstClearRewardClaimed = firstClearRewardClaimed_;
         return point;
     }
 
@@ -209,7 +204,6 @@ public:
         coolingCacheCleared_ = point.coolingCacheCleared;
         defeats_ = point.defeats;
         damageTaken_ = point.damageTaken;
-        firstClearRewardClaimed_ = point.firstClearRewardClaimed;
         return true;
     }
 
@@ -285,7 +279,6 @@ private:
     bool coolingCacheCleared_{};
     int defeats_{};
     int damageTaken_{};
-    bool firstClearRewardClaimed_{};
 };
 
 } // namespace Astral::Scene
