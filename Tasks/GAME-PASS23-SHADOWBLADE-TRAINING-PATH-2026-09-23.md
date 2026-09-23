@@ -12,12 +12,14 @@ Deepen the already-merged Shadowblade defense-practice gameplay instead of creat
 
 No renderer, platform, editor, importer, animation, audio, physics, generic engine tooling, CMake, workflows, dependencies, R0, Company Runtime scheduling, release, deployment, networking, or unrelated repository work is admitted. No local executor job is started by this packet.
 
-Allowed production path:
+Allowed production paths:
 - `Engine/Scene/ShadowbladeTrainingPath.h`
+- `Engine/Scene/DefensePracticeSession.h`, narrowly for the final independent-review repair that exposes a copy-assignment generation witness used by the training path. This game-owned practice-session file was introduced by the game worker in pass 13; no engine/editor/art worker currently owns it. No combat values, renderer/runtime interfaces, build configuration, or unrelated practice behavior may change.
 
 Allowed verification and operating-record paths:
 - `Tests/ShadowbladeTrainingPathPass23Tests.inc`
-- `Tests/ThoughtCommandsTests.cpp`, only pass-23 header/include/call registration
+- `Tests/ShadowbladeTrainingAssignmentPass23Tests.inc`
+- `Tests/ThoughtCommandsTests.cpp`, only pass-23 include/call registration
 - this task packet
 - `Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS23.md`
 - `Docs/Agents/animerpg-hourly/STATE.json`
@@ -45,6 +47,7 @@ Access date for all sources below: 2026-09-23.
 - Completing and committing a lesson advances to exactly the next lesson.
 - Stale metrics cannot double-complete the next lesson.
 - Completion metrics are accepted only after this path instance successfully applies the current lesson to the exact `DefensePracticeSession` later supplied for completion/commit; advancing or restoring curriculum progress invalidates the prior lesson/session binding until `ApplyCurrentLesson` succeeds again.
+- Replacing that applied session by copy assignment from another session invalidates the binding even though the object address is unchanged. Completion/commit requires the same assignment-generation witness captured immediately after lesson application.
 
 ### GAME-113
 - A lesson configures only existing practice sequence/pace/goal/target mechanics.
@@ -91,7 +94,7 @@ Native rendered/player-facing verification is separate. No UI/input-screen/contr
 
 ## Review repairs
 
-The first independent review on commit `67f9039cd295c7d95219e093ca81a73e17e0ba92` raised four P2 findings. The first repaired candidate `66bd5cd33f977f8fbce64d830f9e975e7f476c9f` received two additional findings, one P2 and one P3. The next candidate `8568ed875c793c246a9216b6f6bd82d7cd35406e` received one additional P2. Candidate `9114ec997fb7430fa6d1da5f19b1ceaea68dbca7` passed both hosted workflows but its fresh review found one further P2, cross-session substitution. The bounded repairs keep the same feature scope and add targeted regressions where practical:
+The first independent review on commit `67f9039cd295c7d95219e093ca81a73e17e0ba92` raised four P2 findings. The first repaired candidate `66bd5cd33f977f8fbce64d830f9e975e7f476c9f` received two additional findings, one P2 and one P3. The next candidate `8568ed875c793c246a9216b6f6bd82d7cd35406e` received one additional P2. Candidate `9114ec997fb7430fa6d1da5f19b1ceaea68dbca7` passed both hosted workflows but its fresh review found one further P2, cross-session substitution. Candidate `566282cf7ad7dbb8e2a6bd6ac447dbb5232dcc2d` then passed both hosted workflows, but exact-head review found that copy assignment could replace the contents of the bound session without changing its address. The bounded repairs keep the same feature scope and add targeted regressions where practical:
 
 1. Any hit in Boss Rehearsal caps mastery at Bronze.
 2. Gold on non-boss lessons requires zero ordinary defenses as well as zero hits.
@@ -100,7 +103,8 @@ The first independent review on commit `67f9039cd295c7d95219e093ca81a73e17e0ba92
 5. Boss Gold now requires every authored pattern to have at least one perfect defense and zero ordinary defenses, so later perfect defenses cannot overwrite a mixed run's Silver result.
 6. Boss completion and success checks compare saturating counters individually against zero rather than adding them, eliminating signed-overflow risk when counters approach `INT_MAX`.
 7. Completion is bound to the lesson most recently and successfully applied by this `ShadowbladeTrainingPath`; commit/restore invalidates that lesson binding.
-8. Completion is also bound to the exact `DefensePracticeSession` object passed to the successful `ApplyCurrentLesson`. A second session with matching configuration, provenance, and resolved metrics cannot substitute for the applied session. A registered regression applies Boss Rehearsal to session A, builds matching completed metrics on session B, and verifies session B cannot complete or commit the lesson.
+8. Completion is also bound to the exact `DefensePracticeSession` object passed to the successful `ApplyCurrentLesson`. A second session with matching configuration, provenance, and resolved metrics cannot substitute for the applied session.
+9. Pointer identity is not sufficient because `DefensePracticeSession` is copy-assignable. The practice session now exposes a narrow assignment-generation witness whose destination value changes on whole-session copy assignment and is not copied from the source. `ShadowbladeTrainingPath` captures that witness after successful lesson application and requires it for completion/commit. A registered regression applies Guard Fundamentals to session A, completes matching session B, executes `A = B`, and verifies that the copied metrics cannot complete or commit A's earlier lesson binding.
 
 A fresh exact-head independent review is still required after these fixes and all durable records are frozen.
 
