@@ -57,10 +57,7 @@ public:
     bool Unlock() {
         if (state_ != ShadowbladeTrainingHubState::Locked) return false;
         ShadowbladeTrainingDrillPlan plan{};
-        if (!ShadowbladeTrainingCoach::PlanForFocus(
-                focus_, pace_, plan)) {
-            return false;
-        }
+        if (!ShadowbladeTrainingCoach::PlanForFocus(focus_, pace_, plan)) return false;
         state_ = ShadowbladeTrainingHubState::Ready;
         return true;
     }
@@ -89,6 +86,7 @@ public:
     bool Start(CombatSandbox& combat, ShadowbladeActions& actions) {
         if ((state_ != ShadowbladeTrainingHubState::Ready
                 && state_ != ShadowbladeTrainingHubState::Debrief)
+            || !AcceptsOwners(combat, actions)
             || combat.HasPendingEnemyAttack() || actions.HasIncomingAttack()) {
             return false;
         }
@@ -112,6 +110,8 @@ public:
             return false;
         }
 
+        boundCombat_ = &combat;
+        boundActions_ = &actions;
         state_ = ShadowbladeTrainingHubState::Active;
         ResetDamageWindow(combat);
         return true;
@@ -119,7 +119,8 @@ public:
 
     DefenseReport Defend(CombatSandbox& combat, ShadowbladeActions& actions,
         DefenseInput input) {
-        if (state_ != ShadowbladeTrainingHubState::Active) {
+        if (state_ != ShadowbladeTrainingHubState::Active
+            || !OwnsOwners(combat, actions)) {
             return {DefenseResult::NoThreat, 0, 0, false, 0.0f};
         }
         const DefenseReport report = session_.TryDefend(combat, actions, input);
@@ -133,7 +134,10 @@ public:
     // same owners for the frame. The current Win32 loop does not call this method.
     bool Advance(CombatSandbox& combat, ShadowbladeActions& actions,
         float deltaSeconds) {
-        if (state_ != ShadowbladeTrainingHubState::Active) return false;
+        if (state_ != ShadowbladeTrainingHubState::Active
+            || !OwnsOwners(combat, actions)) {
+            return false;
+        }
         const bool resolved = session_.AdvanceTime(combat, actions, deltaSeconds);
         ObserveCombat(combat);
         if (FinishIfTargetReached()) return true;
@@ -152,20 +156,27 @@ public:
     }
 
     void ObserveCombat(const CombatSandbox& combat) {
-        if (state_ == ShadowbladeTrainingHubState::Locked) return;
+        if (state_ == ShadowbladeTrainingHubState::Locked
+            || (boundCombat_ && boundCombat_ != &combat)) {
+            return;
+        }
         const double now = combat.ElapsedSecondsPrecise();
         if (!std::isfinite(now) || now < 0.0) return;
         const TrainingStats& stats = combat.Stats();
-        if (sampleCount_ == 0 || now < latestSampleSeconds_
-            || stats.totalDamage < latestDamage_ || stats.hitCount < latestHits_) {
+        const std::int64_t safeDamage = std::max<std::int64_t>(0, stats.totalDamage);
+        const int safeHits = std::max(0, stats.hitCount);
+        if (sampleCount_ == 0 || now < latestObservedSeconds_
+            || safeDamage < latestDamage_ || safeHits < latestHits_) {
             ResetDamageWindow(combat);
             return;
         }
 
-        const bool changed = stats.totalDamage != latestDamage_
-            || stats.hitCount != latestHits_;
-        if (!changed && now - latestSampleSeconds_ < DamageSampleIntervalSeconds) return;
-        AddDamageSample(now, stats.totalDamage, stats.hitCount);
+        latestObservedSeconds_ = now;
+        latestDamage_ = safeDamage;
+        latestHits_ = safeHits;
+        if (now - lastStoredSampleSeconds_ >= DamageSampleIntervalSeconds) {
+            AddDamageSample(now, safeDamage, safeHits);
+        }
     }
 
     ShadowbladeTrainingHubFeedback Feedback(const CombatSandbox& combat) const {
@@ -174,6 +185,8 @@ public:
         feedback.focus = focus_;
         feedback.pace = pace_;
         feedback.targetAttempts = targetAttempts_;
+        if (boundCombat_ && boundCombat_ != &combat) return feedback;
+
         feedback.resolvedAttempts = ResolvedAttempts();
         feedback.paused = session_.Paused();
         feedback.debrief = ShadowbladeTrainingCoach::Debrief(session_, combat);
@@ -221,6 +234,17 @@ private:
         int hits{};
     };
 
+    bool AcceptsOwners(const CombatSandbox& combat,
+        const ShadowbladeActions& actions) const {
+        return (!boundCombat_ || boundCombat_ == &combat)
+            && (!boundActions_ || boundActions_ == &actions);
+    }
+
+    bool OwnsOwners(const CombatSandbox& combat,
+        const ShadowbladeActions& actions) const {
+        return boundCombat_ == &combat && boundActions_ == &actions;
+    }
+
     int ResolvedAttempts() const {
         const DefenseTrainingStats& stats = session_.Stats();
         const std::int64_t resolved = static_cast<std::int64_t>(std::max(0, stats.perfectDefenses))
@@ -245,14 +269,19 @@ private:
         damageSamples_ = {};
         sampleCount_ = 0;
         nextSample_ = 0;
-        latestSampleSeconds_ = 0.0;
+        latestObservedSeconds_ = 0.0;
+        lastStoredSampleSeconds_ = 0.0;
         latestDamage_ = 0;
         latestHits_ = 0;
         const double now = combat.ElapsedSecondsPrecise();
         if (!std::isfinite(now) || now < 0.0) return;
         const TrainingStats& stats = combat.Stats();
-        AddDamageSample(now, std::max<std::int64_t>(0, stats.totalDamage),
-            std::max(0, stats.hitCount));
+        const std::int64_t safeDamage = std::max<std::int64_t>(0, stats.totalDamage);
+        const int safeHits = std::max(0, stats.hitCount);
+        latestObservedSeconds_ = now;
+        latestDamage_ = safeDamage;
+        latestHits_ = safeHits;
+        AddDamageSample(now, safeDamage, safeHits);
     }
 
     void AddDamageSample(double seconds, std::int64_t totalDamage, int hits) {
@@ -263,16 +292,14 @@ private:
         };
         nextSample_ = (nextSample_ + 1) % MaximumDamageSamples;
         if (sampleCount_ < MaximumDamageSamples) ++sampleCount_;
-        latestSampleSeconds_ = seconds;
-        latestDamage_ = std::max<std::int64_t>(0, totalDamage);
-        latestHits_ = std::max(0, hits);
+        lastStoredSampleSeconds_ = seconds;
     }
 
     ShadowbladeTrainingDamageWindow RecentDamage() const {
         ShadowbladeTrainingDamageWindow window{};
-        if (sampleCount_ == 0 || !std::isfinite(latestSampleSeconds_)) return window;
+        if (sampleCount_ == 0 || !std::isfinite(latestObservedSeconds_)) return window;
 
-        const double cutoff = std::max(0.0, latestSampleSeconds_ - DamageWindowSeconds);
+        const double cutoff = std::max(0.0, latestObservedSeconds_ - DamageWindowSeconds);
         bool foundAtOrBeforeCutoff = false;
         bool foundEarliest = false;
         DamageSample baseline{};
@@ -296,7 +323,7 @@ private:
         }
 
         window.valid = true;
-        window.windowSeconds = std::max(0.0, latestSampleSeconds_ - baseline.seconds);
+        window.windowSeconds = std::max(0.0, latestObservedSeconds_ - baseline.seconds);
         window.damage = latestDamage_ >= baseline.totalDamage
             ? latestDamage_ - baseline.totalDamage
             : 0;
@@ -310,10 +337,13 @@ private:
     int targetAttempts_{DefaultAttempts};
     DefenseTimingPreset actionsTimingPreset_{DefenseTimingPreset::Standard};
     DefensePracticeSession session_{};
+    const CombatSandbox* boundCombat_{};
+    const ShadowbladeActions* boundActions_{};
     std::array<DamageSample, MaximumDamageSamples> damageSamples_{};
     std::size_t sampleCount_{};
     std::size_t nextSample_{};
-    double latestSampleSeconds_{};
+    double latestObservedSeconds_{};
+    double lastStoredSampleSeconds_{};
     std::int64_t latestDamage_{};
     int latestHits_{};
 };
