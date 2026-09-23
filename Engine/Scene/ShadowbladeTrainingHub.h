@@ -156,7 +156,11 @@ public:
     }
 
     void ObserveCombat(const CombatSandbox& combat) {
-        if (state_ == ShadowbladeTrainingHubState::Locked
+        // Rolling damage telemetry belongs only to the active training run. The
+        // final Defend/Advance call samples before transition to Debrief, after
+        // which later encounter reuse of the same combat owner must not mutate
+        // the completed run's feedback.
+        if (state_ != ShadowbladeTrainingHubState::Active
             || (boundCombat_ && boundCombat_ != &combat)) {
             return;
         }
@@ -212,14 +216,30 @@ public:
                 == ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds) {
             timingPreset = DefenseTimingPreset::Forgiving;
         }
-        ShadowbladeTrainingDrillPlan plan{};
-        if (ShadowbladeTrainingCoach::PlanForFocus(focus_, pace_, plan)
-            && plan.sequence.count > 0) {
-            EnemyAttackPattern guidePattern = plan.sequence.patterns[0];
-            if (state_ == ShadowbladeTrainingHubState::Active
-                && combat.HasPendingEnemyAttack()) {
-                guidePattern = combat.PendingEnemyAttack().pattern;
+
+        EnemyAttackPattern guidePattern{EnemyAttackPattern::QuickCut};
+        bool guidePatternValid = false;
+        if (state_ == ShadowbladeTrainingHubState::Active) {
+            // The practice session's cue validates the exact combat-plan and
+            // Shadowblade incoming-attack generations it owns. Never describe a
+            // replacement planner threat that is not the attack approaching the
+            // bound player action owner.
+            if (boundActions_ && boundCombat_ == &combat) {
+                const DefenseTrainingCue cue = session_.Cue(combat, *boundActions_);
+                if (cue.phase != DefenseTrainingCuePhase::None) {
+                    guidePattern = cue.pattern;
+                    guidePatternValid = true;
+                }
             }
+        } else {
+            ShadowbladeTrainingDrillPlan plan{};
+            if (ShadowbladeTrainingCoach::PlanForFocus(focus_, pace_, plan)
+                && plan.sequence.count > 0) {
+                guidePattern = plan.sequence.patterns[0];
+                guidePatternValid = true;
+            }
+        }
+        if (guidePatternValid) {
             feedback.timingGuideValid = ShadowbladeTrainingCoach::TimingGuide(
                 guidePattern, timingPreset, feedback.timingGuide);
         }
