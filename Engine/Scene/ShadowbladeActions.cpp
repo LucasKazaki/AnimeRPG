@@ -273,9 +273,16 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
     }
 
     const Math::Vec3 target = combatSandbox.Dummy().position;
+    if (!std::isfinite(position.x) || !std::isfinite(position.y)
+        || !std::isfinite(target.x) || !std::isfinite(target.y)) {
+        lastAction_.result = ShadowActionResult::OutOfRange;
+        return lastAction_;
+    }
     const float deltaX = target.x - position.x;
     const float deltaY = target.y - position.y;
-    if (deltaX * deltaX + deltaY * deltaY > FatalStrikeRange * FatalStrikeRange) {
+    const float distanceSquared = deltaX * deltaX + deltaY * deltaY;
+    if (!std::isfinite(distanceSquared)
+        || distanceSquared > FatalStrikeRange * FatalStrikeRange) {
         lastAction_.result = ShadowActionResult::OutOfRange;
         return lastAction_;
     }
