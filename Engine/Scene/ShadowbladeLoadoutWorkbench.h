@@ -2,7 +2,6 @@
 
 #include "Engine/Scene/ShadowbladeLoadout.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -160,42 +159,45 @@ public:
         return best;
     }
 
-    bool HasLastAppliedPreset() const {
-        return lastAppliedPreset_ < ShadowbladeLoadout::PresetSlots;
+    bool HasLastAppliedPreset(const ShadowbladeLoadout& loadout) const {
+        return loadout.lastAppliedPreset_ < ShadowbladeLoadout::PresetSlots;
     }
 
-    std::size_t LastAppliedPreset() const {
-        return HasLastAppliedPreset() ? lastAppliedPreset_ : ShadowbladeLoadout::PresetSlots;
+    std::size_t LastAppliedPreset(const ShadowbladeLoadout& loadout) const {
+        return HasLastAppliedPreset(loadout)
+            ? loadout.lastAppliedPreset_ : ShadowbladeLoadout::PresetSlots;
     }
 
-    bool HasPresetLabel(std::size_t slot) const {
-        return slot < ShadowbladeLoadout::PresetSlots && !presetLabels_[slot].empty();
+    bool HasPresetLabel(const ShadowbladeLoadout& loadout, std::size_t slot) const {
+        return slot < ShadowbladeLoadout::PresetSlots
+            && !loadout.presetLabels_[slot].empty();
     }
 
-    std::string PresetLabel(std::size_t slot) const {
-        return slot < ShadowbladeLoadout::PresetSlots ? presetLabels_[slot] : std::string{};
+    std::string PresetLabel(const ShadowbladeLoadout& loadout, std::size_t slot) const {
+        return slot < ShadowbladeLoadout::PresetSlots
+            ? loadout.presetLabels_[slot] : std::string{};
     }
 
 private:
     friend class ShadowbladeActions;
 
     LoadoutActionResult ApplyPreset(ShadowbladeLoadout& loadout, std::size_t slot,
-        const CharacterProgression& progression) {
+        const CharacterProgression& progression) const {
         const LoadoutActionResult result = loadout.ApplyPreset(slot, progression);
         if (result == LoadoutActionResult::Success) {
-            lastAppliedPreset_ = slot;
+            loadout.lastAppliedPreset_ = slot;
         }
         return result;
     }
 
     LoadoutActionResult ReapplyLastPreset(ShadowbladeLoadout& loadout,
-        const CharacterProgression& progression) {
-        if (!HasLastAppliedPreset()) return LoadoutActionResult::EmptyPreset;
-        return ApplyPreset(loadout, lastAppliedPreset_, progression);
+        const CharacterProgression& progression) const {
+        if (!HasLastAppliedPreset(loadout)) return LoadoutActionResult::EmptyPreset;
+        return ApplyPreset(loadout, loadout.lastAppliedPreset_, progression);
     }
 
-    PresetLabelResult SetPresetLabel(const ShadowbladeLoadout& loadout,
-        std::size_t slot, const std::string& requestedLabel) {
+    PresetLabelResult SetPresetLabel(ShadowbladeLoadout& loadout,
+        std::size_t slot, const std::string& requestedLabel) const {
         if (slot >= ShadowbladeLoadout::PresetSlots) return PresetLabelResult::InvalidSlot;
         if (!loadout.PresetSaved(slot)) return PresetLabelResult::EmptyPreset;
 
@@ -207,16 +209,16 @@ private:
                 return PresetLabelResult::InvalidCharacter;
             }
         }
-        presetLabels_[slot] = label;
+        loadout.presetLabels_[slot] = label;
         return PresetLabelResult::Success;
     }
 
-    PresetLabelResult ClearPresetLabel(const ShadowbladeLoadout& loadout,
-        std::size_t slot) {
+    PresetLabelResult ClearPresetLabel(ShadowbladeLoadout& loadout,
+        std::size_t slot) const {
         if (slot >= ShadowbladeLoadout::PresetSlots) return PresetLabelResult::InvalidSlot;
         if (!loadout.PresetSaved(slot)) return PresetLabelResult::EmptyPreset;
-        if (presetLabels_[slot].empty()) return PresetLabelResult::EmptyLabel;
-        presetLabels_[slot].clear();
+        if (loadout.presetLabels_[slot].empty()) return PresetLabelResult::EmptyLabel;
+        loadout.presetLabels_[slot].clear();
         return PresetLabelResult::Success;
     }
 
@@ -351,9 +353,6 @@ private:
         while (last > first && value[last - 1] == ' ') --last;
         return value.substr(first, last - first);
     }
-
-    std::array<std::string, ShadowbladeLoadout::PresetSlots> presetLabels_{};
-    std::size_t lastAppliedPreset_{ShadowbladeLoadout::PresetSlots};
 };
 
 } // namespace Astral::Scene
