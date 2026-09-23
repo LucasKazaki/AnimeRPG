@@ -738,6 +738,56 @@ bool PostResizeWhileOwnerPinned(HWND window, DWORD processId, DWORD threadId, HA
     return true;
 }
 
+bool PostShowStateWhileOwnerPinned(HWND window, DWORD processId, DWORD threadId, HANDLE thread,
+    HANDLE process, int showCommand, std::wstring& failure) {
+    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
+        || !IsWindowEnabled(window) || WaitForSingleObject(thread, 0) != WAIT_TIMEOUT
+        || WaitForSingleObject(process, 0) != WAIT_TIMEOUT) {
+        failure = L"editor ownership/liveness changed before show-state owner pin";
+        return false;
+    }
+
+    DWORD ownerProcessId = 0;
+    const DWORD ownerThreadId = GetWindowThreadProcessId(window, &ownerProcessId);
+    if (ownerThreadId == 0 || ownerProcessId != processId || ownerThreadId != threadId) {
+        failure = L"editor HWND is not owned by the launched primary thread before show-state request";
+        return false;
+    }
+
+    const DWORD previousSuspendCount = SuspendThread(thread);
+    if (previousSuspendCount == static_cast<DWORD>(-1)) {
+        failure = L"SuspendThread failed before show-state post";
+        return false;
+    }
+
+    bool suspendedContextCaptured = false;
+    bool postedShowState = false;
+    if (previousSuspendCount == 0) {
+        CONTEXT context{};
+        context.ContextFlags = CONTEXT_CONTROL;
+        suspendedContextCaptured = GetThreadContext(thread, &context) != FALSE;
+    }
+    if (previousSuspendCount == 0 && suspendedContextCaptured
+        && WaitForSingleObject(process, 0) == WAIT_TIMEOUT
+        && WaitForSingleObject(thread, 0) == WAIT_TIMEOUT) {
+        DWORD pinnedProcessId = 0;
+        const DWORD pinnedThreadId = GetWindowThreadProcessId(window, &pinnedProcessId);
+        if (pinnedThreadId == threadId && pinnedProcessId == processId
+            && IsWindowVisible(window) && IsWindowEnabled(window)) {
+            postedShowState = ShowWindowAsync(window, showCommand) != FALSE;
+        }
+    }
+
+    const DWORD resumePreviousCount = ResumeThread(thread);
+    if (resumePreviousCount == static_cast<DWORD>(-1)
+        || previousSuspendCount != 0 || !suspendedContextCaptured
+        || resumePreviousCount != 1 || !postedShowState) {
+        failure = L"failed to pin, post, and resume the editor owner thread for show-state request";
+        return false;
+    }
+    return true;
+}
+
 bool ResizeAndCheck(HWND window, DWORD processId, DWORD threadId, HANDLE thread, HANDLE process,
     const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
     const ShellButtonHandles& buttons, int width, int height,
@@ -811,10 +861,10 @@ bool ResizeAndCheck(HWND window, DWORD processId, DWORD threadId, HANDLE thread,
     }
 }
 
-bool MaximizeRestoreAndCheck(HWND window, DWORD processId,
-    const std::vector<ChildControl>& initialControls, const ShellStaticHandles& statics,
-    const ShellButtonHandles& buttons, const wchar_t* expectedInspectorText,
-    int expectedSelection, std::wstring& failure) {
+bool MaximizeRestoreAndCheck(HWND window, DWORD processId, DWORD threadId, HANDLE thread,
+    HANDLE process, const std::vector<ChildControl>& initialControls,
+    const ShellStaticHandles& statics, const ShellButtonHandles& buttons,
+    const wchar_t* expectedInspectorText, int expectedSelection, std::wstring& failure) {
     if (WorkBudgetExpired()) {
         failure = L"internal runtime work budget exhausted before maximize";
         return false;
@@ -841,13 +891,8 @@ bool MaximizeRestoreAndCheck(HWND window, DWORD processId,
     }
 
     const ULONGLONG maximizeDeadline = GetTickCount64() + kShowStateTimeoutMs;
-    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
-        || !IsWindowEnabled(window)) {
-        failure = L"editor HWND ownership, visibility, or enabled state changed immediately before maximize request";
-        return false;
-    }
-    if (!ShowWindowAsync(window, SW_MAXIMIZE)) {
-        failure = L"ShowWindowAsync(SW_MAXIMIZE) did not start successfully";
+    if (!PostShowStateWhileOwnerPinned(
+            window, processId, threadId, thread, process, SW_MAXIMIZE, failure)) {
         return false;
     }
 
@@ -894,13 +939,8 @@ bool MaximizeRestoreAndCheck(HWND window, DWORD processId,
     }
 
     const ULONGLONG restoreDeadline = GetTickCount64() + kShowStateTimeoutMs;
-    if (!WindowOwnedByProcess(window, processId) || !IsWindowVisible(window)
-        || !IsWindowEnabled(window)) {
-        failure = L"editor HWND ownership, visibility, or enabled state changed immediately before restore request";
-        return false;
-    }
-    if (!ShowWindowAsync(window, SW_RESTORE)) {
-        failure = L"ShowWindowAsync(SW_RESTORE) did not start successfully";
+    if (!PostShowStateWhileOwnerPinned(
+            window, processId, threadId, thread, process, SW_RESTORE, failure)) {
         return false;
     }
 
@@ -1179,8 +1219,9 @@ int wmain(int argc, wchar_t** argv) {
                    process.hThread, process.hProcess, initialControls, statics, buttons,
                    1440, 900, kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
-    } else if (!MaximizeRestoreAndCheck(window, process.dwProcessId, initialControls, statics,
-                   buttons, kCubeInspectorText, 3, failure)) {
+    } else if (!MaximizeRestoreAndCheck(window, process.dwProcessId, process.dwThreadId,
+                   process.hThread, process.hProcess, initialControls, statics, buttons,
+                   kCubeInspectorText, 3, failure)) {
         // failure set by maximize/restore validator.
     } else if (!ResizeAndCheck(window, process.dwProcessId, process.dwThreadId,
                    process.hThread, process.hProcess, initialControls, statics, buttons,
@@ -1240,7 +1281,7 @@ int wmain(int argc, wchar_t** argv) {
         << L"every bounded cross-process read and after 800x600, 1280x720, 1440x900, maximized+restored, and 420x260 states; "
         << L"each asynchronous resize post was issued while the exact launched window-owner thread was suspended behind a valid thread-context barrier, then resumed before polling, "
         << L"and resize containment/shell validation stayed inside its 1.5-second phase deadline; "
-        << L"maximize/restore show-state posts were preceded by fresh ownership checks and nested shell-message waits were capped to each show-state deadline; "
+        << L"maximize/restore show-state posts were also issued while that exact owner thread was suspended behind a valid thread-context barrier, then resumed before show-state polling, with nested shell-message waits capped to each show-state deadline; "
         << L"Cube selection stayed synchronized, all direct children remained contained from startup through every size/show-state transition, "
         << L"the retained CreateProcess handle remained nonsignaled around PID-based HWND ownership checks, "
         << L"the original window-owning launch thread was suspended and a valid suspended thread context was captured "
