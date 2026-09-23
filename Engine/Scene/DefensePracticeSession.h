@@ -176,9 +176,15 @@ public:
         DefenseInput input) {
         if (!ObjectsOwned(combat, actions)) return NoSessionThreatReport();
 
+        const DefenseTrainingStats before = drill_.Stats();
         const DefenseReport report = drill_.TryDefend(combat, actions, input);
         if (currentAttackActive_ && IsTerminal(report.result)) {
-            RecordTerminalReport(combat, report, input);
+            RecordTerminalReport(combat, report);
+        } else if (currentAttackActive_
+            && drill_.Stats().interruptions > before.interruptions) {
+            Increment(PatternStatsMutable(currentPattern_).interruptions);
+            ResetAlternatingChain();
+            currentAttackActive_ = false;
         }
         return report;
     }
@@ -253,17 +259,18 @@ public:
         report.bestAlternatingChain = bestAlternatingChain_;
         report.baseScore = perfect * 300 + ordinary * 150
             + static_cast<std::int64_t>(bestAlternatingChain_) * 50;
-        if (report.baseScore <= 0 || successes <= 0) {
+        if (report.baseScore <= 0 || report.resolvedAttempts <= 0) {
             report.baseScore = std::max<std::int64_t>(0, report.baseScore);
             return report;
         }
 
         const double activeSeconds = std::max(
             0.0, combat.ElapsedSecondsPrecise() - sessionStartSeconds_);
-        const double secondsPerSuccess = activeSeconds / static_cast<double>(successes);
-        report.timeCoefficientPercent = secondsPerSuccess <= 1.5
+        const double secondsPerAttempt =
+            activeSeconds / static_cast<double>(report.resolvedAttempts);
+        report.timeCoefficientPercent = secondsPerAttempt <= 1.5
             ? 125
-            : (secondsPerSuccess <= 3.0 ? 100 : 75);
+            : (secondsPerAttempt <= 3.0 ? 100 : 75);
         report.score = report.baseScore * report.timeCoefficientPercent / 100;
         return report;
     }
@@ -364,10 +371,17 @@ private:
             || result == DefenseResult::Hit;
     }
 
-    static SuccessfulDefenseKind KindForInput(DefenseInput input) {
-        return input == DefenseInput::Guard
-            ? SuccessfulDefenseKind::Guard
-            : SuccessfulDefenseKind::Dodge;
+    static SuccessfulDefenseKind KindForResult(DefenseResult result) {
+        switch (result) {
+        case DefenseResult::PerfectGuard:
+        case DefenseResult::Guarded:
+            return SuccessfulDefenseKind::Guard;
+        case DefenseResult::PerfectDodge:
+        case DefenseResult::Evaded:
+            return SuccessfulDefenseKind::Dodge;
+        default:
+            return SuccessfulDefenseKind::None;
+        }
     }
 
     static DefenseReport NoSessionThreatReport() {
@@ -389,15 +403,14 @@ private:
         return patternStats_[PatternIndex(pattern)];
     }
 
-    void RecordTerminalReport(CombatSandbox& combat, const DefenseReport& report,
-        DefenseInput input) {
+    void RecordTerminalReport(CombatSandbox& combat, const DefenseReport& report) {
         DefensePracticePatternStats& pattern = PatternStatsMutable(currentPattern_);
         if (IsPerfect(report.result)) {
             Increment(pattern.perfectDefenses);
-            RecordSuccessfulDefense(combat, input);
+            RecordSuccessfulDefense(combat, KindForResult(report.result));
         } else if (IsOrdinaryDefense(report.result)) {
             Increment(pattern.ordinaryDefenses);
-            RecordSuccessfulDefense(combat, input);
+            RecordSuccessfulDefense(combat, KindForResult(report.result));
         } else if (IsHit(report.result)) {
             Increment(pattern.hitsTaken);
             AddDamage(pattern.damageTaken, report.damageTaken);
@@ -406,8 +419,11 @@ private:
         currentAttackActive_ = false;
     }
 
-    void RecordSuccessfulDefense(const CombatSandbox& combat, DefenseInput input) {
-        const SuccessfulDefenseKind kind = KindForInput(input);
+    void RecordSuccessfulDefense(const CombatSandbox& combat, SuccessfulDefenseKind kind) {
+        if (kind == SuccessfulDefenseKind::None) {
+            ResetAlternatingChain();
+            return;
+        }
         const double now = combat.ElapsedSecondsPrecise();
         const bool alternates = currentAlternatingChain_ > 0
             && kind != lastSuccessfulDefense_
