@@ -30,7 +30,7 @@ Commit `b2c836013c8212e9432e8c2e861551b5c8f3646b` changes only `Tests/EditorRunt
 - immediately resumes the thread and requires `ResumeThread` to report previous suspend count one before waiting on the process;
 - fails closed when the context barrier, liveness, identity, enqueue, or resume verification fails, preserving the existing owned-process/job cleanup path.
 
-GitHub commit metadata shows 7 additions and 0 deletions in the close logic plus the PASS-text adjustment, all in `Tests/EditorRuntimeSmoke.cpp`. Production editor source, CMake registration, workflows, dependencies, graphics API, game content, scheduler configuration, release state, and architecture are unchanged.
+GitHub's `Get a commit` response for `b2c836013c8212e9432e8c2e861551b5c8f3646b` reports 11 additions and 4 deletions, 15 changed lines total, all in `Tests/EditorRuntimeSmoke.cpp`. The close-logic hunks account for 9 additions and 2 deletions; the PASS-text hunk accounts for the remaining 2 additions and 2 deletions. Production editor source, CMake registration, workflows, dependencies, graphics API, game content, scheduler configuration, release state, and architecture are unchanged.
 
 ## Primary research basis, rechecked 2026-09-23 UTC
 
@@ -42,6 +42,8 @@ GitHub commit metadata shows 7 additions and 0 deletions in the close logic plus
   - the returned `hThread` is the primary-thread handle used for thread operations; `dwThreadId` identifies that primary thread.
 - Microsoft Learn `ResumeThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-resumethread
   - decrements the suspend count; previous count one verifies removal of this harness suspension.
+- GitHub REST `Get a commit`: https://docs.github.com/en/rest/commits/commits#get-a-commit
+  - the commit response provides commit-level `stats` and per-file additions/deletions/changes. Those values are the authoritative evidence used to correct the reviewed diff-count mismatch.
 - Existing retained basis: `PostMessageW`, `GetWindowThreadProcessId`, `WaitForSingleObject`, and `DestroyWindow` public Win32 documentation.
 
 No proprietary Unreal Engine or Unity source was copied, and no dependency was added.
@@ -70,6 +72,8 @@ Current source candidate `b2c836013c8212e9432e8c2e861551b5c8f3646b` has complete
 
 Hosted deterministic suites do not execute the interactive GUI `EditorRuntimeSmoke` and do not establish workstation/native acceptance.
 
+Exact prior receipt head `d7ccec1e43500e0409e8ff93811fe3390c4ea266` also completed green hosted workflows: Windows `35867571050` / job `107202971156`, profiling `35867571034`, and release-manifest `35867571047`. Fresh independent review of that exact receipt completed at `2026-09-23T13:38:07Z` and found one evidence-only P2: this task incorrectly recorded the `b2c836...` source diff as 7 additions and 0 deletions. GitHub commit metadata proves the correct total is 11 additions and 4 deletions. No new runtime-code defect was reported by that review. This evidence repair therefore changes the packet records only; fresh review of the repaired receipt head is still required before independent acceptance.
+
 ## Retained E11 hardening and gates
 
 1. `EditorContainmentTests` executes in hosted deterministic suites while interactive `EditorRuntimeSmoke` remains separate.
@@ -78,7 +82,7 @@ Hosted deterministic suites do not execute the interactive GUI `EditorRuntimeSmo
 4. PID-based HWND checks require the retained launched-process handle to remain live.
 5. Final close requires exact original PID/TID ownership plus a successful suspended-thread context barrier before repeated ownership validation and asynchronous `WM_CLOSE`, followed by verified resume before any process wait.
 
-`native_evidence` remains empty. Independent acceptance remains false until the changed source plus evidence receive a fresh independent review and registered native Windows acceptance is retained. Issue #7 remains open, so the historical R0 runner is blocked and must not be invoked.
+`native_evidence` remains empty. Independent acceptance remains false until the repaired exact receipt tree receives a fresh independent review and registered native Windows acceptance is retained. Issue #7 remains open, so the historical R0 runner is blocked and must not be invoked.
 
 ## Registered native handoff
 
@@ -102,4 +106,4 @@ Rollback only this suspension-barrier repair if native evidence shows `GetThread
 
 ## Single next useful action
 
-Obtain fresh independent review of the exact receipt tree containing `b2c836013c8212e9432e8c2e861551b5c8f3646b` and the updated evidence. If that review is clean, hand that exact reviewed tree to the registered Windows executor for Debug/Release `EditorContainmentTests` plus interactive `EditorRuntimeSmoke` acceptance.
+Obtain fresh independent review of the repaired exact receipt tree after this evidence-count correction. If that review is clean, hand that exact reviewed tree to the registered Windows executor for Debug/Release `EditorContainmentTests` plus interactive `EditorRuntimeSmoke` acceptance.
