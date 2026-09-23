@@ -38,25 +38,15 @@ python -m py_compile Scripts/verify_national_mall_reference_ledger.py Scripts/te
 
 Passing these checks means the reference ledger is structurally bounded and internally consistent. It does not prove the linked websites are immutable, establish survey-grade accuracy, grant media redistribution rights, or establish any runtime/art-approval state.
 
-## Author execution receipts
+## Author execution receipt
 
-The unchanged repository ledger previously passed the exact branch author checks before the latest two review repairs:
+The sandbox could not resolve `raw.githubusercontent.com`, so the exact branch files were reconstructed from connector-fetched GitHub contents instead of a network checkout. Before execution, the reconstructed files were pinned back to GitHub evidence:
 
-```text
-python -m json.tool Content/Reference/NationalMall/reference-ledger.json
-# exit 0
+- ledger Git blob SHA: `ba8ec205d2aecfa4b2ace15c13c71fb9932cb7f4`; SHA-256: `3c2664e72d2ce7c8024a020f2179c0c0116f02617cd22f41fd809cf632c40ba8`
+- verifier Git blob SHA: `475dfb80a4f5e25dbb0156271c742d1698b9b2a5`; SHA-256: `0cd179f014bd4006a185cad2268f729bcc1738c16819b2b8aa8cc9834b9207f4`
+- test-script Git blob SHA: `6f710e730b1ed98cf2264bd8ca32eb237ec53b1b`; SHA-256: `ab10e589d67e9e7e08fddc1699dc820791fa1c44093018cd72211ad4fcb1b6c1`
 
-python Scripts/verify_national_mall_reference_ledger.py Content/Reference/NationalMall/reference-ledger.json
-# PASS: 11 authoritative National Mall reference entries; source-only
-
-python Scripts/test_national_mall_reference_ledger.py
-# PASS: 17/17 National Mall reference-ledger tests
-
-python -m py_compile Scripts/verify_national_mall_reference_ledger.py Scripts/test_national_mall_reference_ledger.py
-# exit 0
-```
-
-For the latest review repair, the external sandbox could not resolve `raw.githubusercontent.com`, so it could not obtain a fresh exact-head checkout of the unchanged ledger. The exact verifier and test-script bytes prepared for GitHub were instead exercised against an isolated schema-valid 11-entry fixture that carries the same Lincoln, Washington and WWII measurement contracts. This validates the new control flow and all 20 regression definitions, but it is intentionally **not** recorded as an exact-branch ledger-suite receipt:
+The Git blob SHAs for verifier/test match the content SHAs returned by the GitHub writes, and the reconstructed ledger matches the unchanged repository ledger's published SHA-256 exactly. The focused source checks then passed:
 
 ```text
 python Scripts/verify_national_mall_reference_ledger.py Content/Reference/NationalMall/reference-ledger.json
@@ -69,7 +59,7 @@ python -m py_compile Scripts/verify_national_mall_reference_ledger.py Scripts/te
 # exit 0
 ```
 
-The exact branch suite against the repository ledger remains required before this packet is marked ready for integration review. Source inspection confirms the unchanged ledger's count values are integral and its two encoded derived measurements retain their intended entry ids, labels, `feet` units and source-derived numeric values; that inspection does not replace execution.
+This is exact file-content evidence for the source ledger/verifier/test contract. It is not a native Windows runtime receipt and does not imply Astral import or rendering.
 
 Current prepared-file SHA-256 values:
 
