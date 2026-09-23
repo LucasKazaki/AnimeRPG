@@ -37,6 +37,7 @@ Acceptance:
 - valid outward winding and every indexed vertex normal facing consistently with its geometric triangle face, plus normalized normals/tangents and stable sphere/cube counts;
 - every sphere station shares one canonical sphere geometry accessor binding, every cube station shares one canonical cube binding, and decoded sphere radius / cube half extent / floor extents match the source specification;
 - gallery meshes contain only `name` and `primitives`, and primitives only `attributes`, `indices`, `material`, and `mode`, rejecting morph targets, mesh weights, and other geometry overrides that can change final rendered shape after base-accessor validation;
+- the gallery is a static calibration scene and rejects top-level glTF `animations`, preventing animation channels from changing station, camera, or light transforms after static source checks;
 - floor tangent and bitangent orientation must derive consistently from the actual position/UV derivatives, not only `TANGENT.w`;
 - exact station/material/node ownership and camera/light contract;
 - each neutral-review material permits only the approved `name` plus exact `pbrMetallicRoughness` keys, rejecting emissive, alpha, normal/occlusion, extension, or other uncontracted rendering properties;
@@ -44,7 +45,7 @@ Acceptance:
 - camera and directional-light nodes reject scale, matrix, or other transform overrides that can reverse local -Z while preserving the checked quaternion;
 - no images/textures/samplers, preventing accidental baked-lighting review;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions for light, material binding/rendering properties, camera, source/runtime status, supplemental runtime claims, texture insertion, accessor bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, canonical station geometry/source dimensions, mesh weights/morph targets, floor tangent direction/handedness, and camera/light transform overrides;
+- negative regressions for light, material binding/rendering properties, camera, source/runtime status, supplemental runtime claims, texture insertion, accessor bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, floor tangent direction/handedness, and camera/light transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
 Commands:
