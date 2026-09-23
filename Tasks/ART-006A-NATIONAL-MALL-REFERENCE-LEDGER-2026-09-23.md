@@ -24,7 +24,7 @@ Do not modify `Engine/`, gameplay, renderer/editor/importer code, CMake, workflo
 ## Acceptance
 
 1. Ledger contains at least eight authoritative entries covering axis/scale, materials, landscape, vegetation and context boundaries.
-2. Every entry uses HTTPS and an allowed authoritative host (`nps.gov`, `aoc.gov`, or `si.edu`).
+2. Every entry uses HTTPS and an allowed authoritative host (`nps.gov`, `aoc.gov`, or `si.edu`); authoritative PDF references must actually end in `.pdf`.
 3. No external images, scans, map tiles or downloadable media are embedded.
 4. Numeric facts retain source units and provenance labels; no silent Unreal/Unity coordinate convention is introduced.
 5. Art bible gains a concise source-control/simplification rule pointing to this ledger.

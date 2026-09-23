@@ -17,7 +17,7 @@ Source measurements remain in the units used by the authoritative page. Convert 
 ## Authoritative source set, retrieved 2026-09-23
 
 - National Park Service, The Mall: https://www.nps.gov/places/000/national-mall.htm
-- National Park Service, Lincoln Memorial Other Places / Reflecting Pool: https://www.nps.gov/linc/learn/historyculture/lincoln-memorial-other-places.htm
+- National Park Service, Lincoln Memorial Event Operations Guide, reflecting-pool dimensions and paths: https://www.nps.gov/nama/planyourvisit/upload/20241129_LINC-Event-Operations-Guidelines-FINAL-2.pdf
 - National Park Service, Lincoln Memorial Building Statistics: https://www.nps.gov/linc/learn/historyculture/lincoln-memorial-building-statistics.htm
 - National Park Service, Washington Monument construction reference: https://www.nps.gov/articles/000/build-your-own-washington-monument.htm
 - National Park Service, Constitution Gardens Cultural Landscape: https://www.nps.gov/articles/600012.htm

@@ -62,6 +62,12 @@ def test_unapproved_host_rejected() -> None:
     assert "authoritative https url" in proc.stderr
 
 
+
+def test_pdf_kind_requires_pdf_url() -> None:
+    proc = mutate(lambda d: d["entries"][0].__setitem__("source_kind", "official_pdf"))
+    assert "pdf source url" in proc.stderr
+
+
 def test_embedded_media_rejected() -> None:
     proc = mutate(lambda d: d["entries"][0].__setitem__("embedded_media", True))
     assert "embedded_media" in proc.stderr
@@ -99,6 +105,7 @@ TESTS = [
     test_duplicate_id_rejected,
     test_non_https_rejected,
     test_unapproved_host_rejected,
+    test_pdf_kind_requires_pdf_url,
     test_embedded_media_rejected,
     test_missing_facts_rejected,
     test_measurement_bool_rejected,

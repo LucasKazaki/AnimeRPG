@@ -76,8 +76,8 @@
       "label": "Lincoln Memorial Reflecting Pool and elm walks",
       "zone": "west_axis",
       "authority": "U.S. National Park Service",
-      "url": "https://www.nps.gov/linc/learn/historyculture/lincoln-memorial-other-places.htm",
-      "source_kind": "official_webpage",
+      "url": "https://www.nps.gov/nama/planyourvisit/upload/20241129_LINC-Event-Operations-Guidelines-FINAL-2.pdf",
+      "source_kind": "official_pdf",
       "rights_mode": "reference_only_no_media_redistribution",
       "embedded_media": false,
       "modeling_priority": "A",
@@ -85,37 +85,31 @@
       "art_use": [
         "west-axis scale",
         "water-plane proportions",
-        "Lincoln-to-Washington sightline",
-        "pedestrian elm-walk framing"
+        "Lincoln approach readability",
+        "pedestrian path framing"
       ],
       "facts": [
-        "The Reflecting Pool maintains the physical and visual connection between the Lincoln Memorial and Washington Monument.",
-        "Elm-lined walks run along the north and south sides of the pool."
+        "The rectangular Reflecting Pool east of the Lincoln Memorial was designed to create a dramatic approach to the memorial.",
+        "The 2010-2012 restoration connected the World War II Memorial and Lincoln Memorial with accessible concrete paths directly adjacent to the pool."
       ],
       "measurements": [
         {
           "label": "pool_length",
-          "value": 2028,
+          "value": 2029,
           "unit": "feet",
           "source_relation": "exact_source_value"
         },
         {
-          "label": "pool_west_width",
-          "value": 160,
+          "label": "pool_width",
+          "value": 167,
           "unit": "feet",
           "source_relation": "exact_source_value"
         },
         {
-          "label": "pool_east_width",
-          "value": 175,
+          "label": "pool_perimeter",
+          "value": 4392,
           "unit": "feet",
           "source_relation": "exact_source_value"
-        },
-        {
-          "label": "pool_capacity",
-          "value": 6750000,
-          "unit": "gallons",
-          "source_relation": "approximate"
         }
       ],
       "modeling_constraints": [

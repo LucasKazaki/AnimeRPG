@@ -10,6 +10,7 @@ STATUS = "reference_validated_not_asset"
 RIGHTS_POLICY = "reference_only_no_media_redistribution"
 UNITS_POLICY = "retain_source_units_and_convert_to_metres_only_at_authoring_boundary"
 ALLOWED_HOSTS = {"www.nps.gov", "www.aoc.gov", "www.si.edu"}
+ALLOWED_SOURCE_KINDS = {"official_webpage", "official_pdf"}
 ALLOWED_ZONES = {
     "mall_core",
     "west_axis",
@@ -63,7 +64,8 @@ def load_and_validate(path: Path) -> dict:
         require(isinstance(entry.get("label"), str) and entry["label"].strip(), f"{entry_id}: label")
         require(entry.get("zone") in ALLOWED_ZONES, f"{entry_id}: zone")
         require(isinstance(entry.get("authority"), str) and entry["authority"].strip(), f"{entry_id}: authority")
-        require(entry.get("source_kind") == "official_webpage", f"{entry_id}: source_kind")
+        source_kind = entry.get("source_kind")
+        require(source_kind in ALLOWED_SOURCE_KINDS, f"{entry_id}: source_kind")
         require(entry.get("rights_mode") == RIGHTS_POLICY, f"{entry_id}: rights_mode")
         require(entry.get("embedded_media") is False, f"{entry_id}: embedded_media")
         require(entry.get("modeling_priority") in ALLOWED_PRIORITIES, f"{entry_id}: priority")
@@ -76,6 +78,10 @@ def load_and_validate(path: Path) -> dict:
         parsed = urlparse(url)
         require(parsed.scheme == "https" and parsed.hostname in ALLOWED_HOSTS, f"{entry_id}: authoritative https url")
         require(not parsed.username and not parsed.password and not parsed.fragment, f"{entry_id}: clean url")
+        if source_kind == "official_pdf":
+            require(parsed.path.lower().endswith(".pdf"), f"{entry_id}: pdf source url")
+        else:
+            require(not parsed.path.lower().endswith(".pdf"), f"{entry_id}: webpage source url")
 
         art_use = entry.get("art_use")
         require(isinstance(art_use, list) and len(art_use) >= 2 and all(isinstance(x, str) and x.strip() for x in art_use), f"{entry_id}: art_use")
