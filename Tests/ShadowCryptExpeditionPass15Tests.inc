@@ -97,25 +97,34 @@ void TestShadowCryptExpeditionPass15() {
     CharacterProgression progression;
     const ShadowCryptRewardReport reward = resumed.ClaimFirstClearReward(progression);
     Expect(reward.granted
+            && progression.ShadowCryptFirstClearClaimed()
             && reward.progression.experienceApplied == ShadowCryptExpedition::FirstClearExperience
             && reward.progression.masteryPointsApplied == ShadowCryptExpedition::FirstClearMastery
             && reward.progression.enhancementMaterialsApplied
                 == ShadowCryptExpedition::FirstClearEnhancementMaterials,
-        "first Shadow Crypt completion grants the bounded progression package through CharacterProgression");
+        "first Shadow Crypt completion grants the bounded progression package and persists the claim in protagonist progression");
     Expect(!resumed.ClaimFirstClearReward(progression).granted,
         "repeated claims cannot duplicate the first-clear progression reward");
+
+    ShadowCryptExpedition staleCheckpointReplay;
+    Expect(staleCheckpointReplay.ResumeFrom(checkpoint),
+        "a pre-clear room checkpoint remains structurally resumable after a later first clear");
+    CompleteShadowCryptRun(staleCheckpointReplay);
+    Expect(!staleCheckpointReplay.ClaimFirstClearReward(progression).granted
+            && progression.ShadowCryptFirstClearClaimed(),
+        "resuming a pre-clear checkpoint after reward claim cannot roll back persistent first-clear entitlement");
 
     Expect(resumed.TryBegin(guide),
         "completed Shadow Crypt can be replayed without resetting the persistent first-clear claim");
     const ShadowCryptResumePoint replayPoint = resumed.CreateResumePoint();
-    Expect(replayPoint.valid && replayPoint.firstClearRewardClaimed,
-        "replay checkpoints preserve consumed first-clear reward state");
+    Expect(replayPoint.valid && progression.ShadowCryptFirstClearClaimed(),
+        "replay checkpoint creation leaves consumed first-clear progression state monotonic");
     ShadowCryptExpedition replayed;
     Expect(replayed.ResumeFrom(replayPoint),
         "a valid replay boundary can resume in a fresh expedition object");
     CompleteShadowCryptRun(replayed);
     Expect(!replayed.ClaimFirstClearReward(progression).granted,
-        "resume plus replay cannot regrant a previously consumed first-clear reward");
+        "fresh expedition resume plus replay cannot regrant a previously consumed progression reward");
 
     ShadowCryptExpedition silver;
     Expect(silver.TryBegin(guide) && silver.ReportDefeat()
