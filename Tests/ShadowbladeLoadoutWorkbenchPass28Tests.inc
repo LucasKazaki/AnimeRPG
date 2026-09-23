@@ -127,8 +127,8 @@ void TestShadowbladeLoadoutWorkbenchPass28() {
         "pass28 one-action reapply restores the exact remembered preset");
 
     // QOL-029: saved presets can carry short human-readable labels with spaces.
-    // Stateful edits are owner-bound, persist across transient resets, and clear
-    // without modifying the saved build or live equipment.
+    // Metadata lives with the authoritative loadout, so assignment/replacement cannot
+    // leave labels or last-applied state paired with an unrelated build.
     const ShadowbladeLoadoutProfile beforeLabel = loadout.Profile();
     Expect(actions.SetLoadoutPresetLabel(0, "  Mall Patrol  ")
             == PresetLabelResult::Success
@@ -158,6 +158,24 @@ void TestShadowbladeLoadoutWorkbenchPass28() {
             && !emptyOwner.HasLoadoutPresetLabel(0)
             && foreignOwner.LoadoutPresetLabel(0) == "Foreign Build",
         "pass28 preset metadata cannot cross Shadowblade owner boundaries");
+
+    ShadowbladeActions assignedOwner;
+    Expect(assignedOwner.Loadout().SavePreset(0) == LoadoutActionResult::Success
+            && assignedOwner.SetLoadoutPresetLabel(0, "Stale Build")
+                == PresetLabelResult::Success
+            && assignedOwner.ApplyLoadoutPreset(0, progression)
+                == LoadoutActionResult::Success,
+        "pass28 replacement fixture creates paired metadata");
+    assignedOwner.Loadout() = emptyOwner.Loadout();
+    Expect(!assignedOwner.Loadout().PresetSaved(0)
+            && !assignedOwner.HasLoadoutPresetLabel(0)
+            && !assignedOwner.HasLastAppliedLoadoutPreset(),
+        "pass28 replacing the authoritative loadout cannot leave stale preset metadata");
+    assignedOwner.Loadout() = foreignOwner.Loadout();
+    Expect(assignedOwner.Loadout().PresetSaved(0)
+            && assignedOwner.LoadoutPresetLabel(0) == "Foreign Build"
+            && !assignedOwner.HasLastAppliedLoadoutPreset(),
+        "pass28 loadout assignment transfers only metadata paired with the replacement build");
 
     actions.ResetTransientStatePreservingLoadout();
     Expect(actions.HasLastAppliedLoadoutPreset()
