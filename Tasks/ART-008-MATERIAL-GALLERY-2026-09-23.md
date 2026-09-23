@@ -39,11 +39,12 @@ Acceptance:
 - generated runtime status stays `source_validated_not_imported`;
 - finite triangle geometry with positions, normals, tangents, UVs and bounded indices;
 - valid outward winding, normalized normals/tangents, and stable sphere/cube counts;
+- floor tangent and bitangent orientation must derive consistently from the actual position/UV derivatives, not only `TANGENT.w`;
 - exact station/material/node ownership and camera/light contract;
+- camera and directional-light nodes reject scale, matrix, or other transform overrides that can reverse local -Z while preserving the checked quaternion;
 - no images/textures/samplers, preventing accidental baked-lighting review;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions for light, material, camera, source/runtime status, texture
-  insertion, accessor bounds, expected-manifest pinning and CRLF portability;
+- negative regressions for light, material, camera, source/runtime status, texture insertion, accessor bounds, expected-manifest pinning, CRLF portability, floor tangent direction/handedness, and camera/light transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
 Commands:
