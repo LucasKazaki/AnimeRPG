@@ -257,11 +257,11 @@ public:
 
     bool UseEmergencyVent() {
         if (!active_ || complete_ || failed_ || !emergencyVentAvailable_
-            || heat_ <= 0 || stability_ <= EmergencyVentStabilityCost) {
+            || heat_ < EmergencyVentCooling || stability_ <= EmergencyVentStabilityCost) {
             return false;
         }
 
-        heat_ = std::max(0, heat_ - EmergencyVentCooling);
+        heat_ -= EmergencyVentCooling;
         stability_ = std::max(0, stability_ - EmergencyVentStabilityCost);
         stageMinimumStability_ = std::min(stageMinimumStability_, stability_);
         runMinimumStability_ = std::min(runMinimumStability_, stability_);
