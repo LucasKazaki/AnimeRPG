@@ -2,7 +2,7 @@ from __future__ import annotations
 import argparse, base64, hashlib, json, math, struct
 from pathlib import Path
 
-VERSION = "astral-material-gallery-gltf-2"
+VERSION = "astral-material-gallery-gltf-3"
 SOURCE_STATUS = "proposed_art_reference_not_runtime"
 RUNTIME_STATUS = "source_validated_not_imported"
 
@@ -92,7 +92,7 @@ def plane_geometry(half_x, half_z):
     return (
         [(-half_x,0,-half_z),(half_x,0,-half_z),(half_x,0,half_z),(-half_x,0,half_z)],
         [(0,1,0)]*4,
-        [(1,0,0,1)]*4,
+        [(1,0,0,-1)]*4,
         [(0,0),(1,0),(1,1),(0,1)],
         [0,2,1,0,3,2],
     )
