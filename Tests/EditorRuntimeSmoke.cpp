@@ -704,13 +704,15 @@ bool ResizeAndCheck(HWND window, DWORD processId,
         failure = L"direct child HWND inventory changed before resize";
         return false;
     }
+
+    const ULONGLONG deadline = GetTickCount64() + kResizeTimeoutMs;
     if (!SetWindowPos(window, nullptr, 0, 0, width, height,
             SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS)) {
         failure = L"SetWindowPos failed";
         return false;
     }
 
-    const ULONGLONG deadline = GetTickCount64() + kResizeTimeoutMs;
+    ScopedMessageDeadline phaseDeadline(deadline);
     while (true) {
         if (WorkBudgetExpired()) {
             failure = L"internal runtime work budget exhausted while waiting for asynchronous resize";
@@ -727,17 +729,32 @@ bool ResizeAndCheck(HWND window, DWORD processId,
             return false;
         }
         if (rect.right - rect.left == width && rect.bottom - rect.top == height) {
+            if (GetTickCount64() >= deadline) {
+                failure = L"asynchronous resize reached requested geometry after the resize deadline";
+                return false;
+            }
             if (!DirectChildrenContained(window, processId, initialControls, failure)) return false;
-            return ValidateShellState(window, processId, initialControls, statics, buttons,
-                expectedInspectorText, expectedSelection, failure);
+            if (GetTickCount64() >= deadline) {
+                failure = L"resized editor containment validation finished after the resize deadline";
+                return false;
+            }
+            if (!ValidateShellState(window, processId, initialControls, statics, buttons,
+                    expectedInspectorText, expectedSelection, failure)) {
+                return false;
+            }
+            if (GetTickCount64() >= deadline) {
+                failure = L"resized editor shell validation finished after the resize deadline";
+                return false;
+            }
+            return true;
         }
         if (GetTickCount64() >= deadline) {
             failure = L"asynchronous resize did not complete within deadline";
             return false;
         }
-        const DWORD sleepMs = RemainingWorkBudget(kResizePollIntervalMs);
+        const DWORD sleepMs = RemainingDeadlineBudget(deadline, kResizePollIntervalMs);
         if (sleepMs == 0) {
-            failure = L"internal runtime work budget exhausted while waiting for asynchronous resize";
+            failure = L"resize deadline exhausted while waiting for asynchronous resize";
             return false;
         }
         Sleep(sleepMs);
@@ -1167,6 +1184,7 @@ int wmain(int argc, wchar_t** argv) {
         << L"left-to-right semantic toolbar Button HWNDs, disabled pending tools, enabled Outliner/assets surfaces, "
         << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
         << L"every bounded cross-process read and after 800x600, 1280x720, 1440x900, maximized+restored, and 420x260 states; "
+        << L"each asynchronous resize plus containment/shell validation stayed inside its 1.5-second phase deadline, "
         << L"maximize/restore show-state posts were preceded by fresh ownership checks and nested shell-message waits were capped to each show-state deadline; "
         << L"Cube selection stayed synchronized, all direct children remained contained from startup through every size/show-state transition, "
         << L"the retained CreateProcess handle remained nonsignaled around PID-based HWND ownership checks, "
