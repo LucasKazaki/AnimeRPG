@@ -32,11 +32,11 @@ Access date for all sources below: 2026-09-23.
 
 3. **GAME-114, lesson mastery medals.** ZZZ's March 6, 2026 `Snap! Hollow Realm Showdown` uses main and additional challenge targets, with additional targets strengthening a stage effect. Original adaptation: Bronze/Silver/Gold mastery comes only from authoritative practice results, with no currency or copied reward structure. Source: https://www.hoyolab.com/article/44074876 .
 
-4. **GAME-115, opt-in forgiving defense timing.** PlayStation's Granblue Fantasy: Relink accessibility description lists adjustable difficulty and individually activatable assists. Original adaptation: a training-only option selects the already-existing Forgiving perfect-defense timing preset. It does not inflate player health, lower incoming damage, or alter enemy patterns. Source: https://www.playstation.com/en-my/games/granblue-fantasy-relink/ .
+4. **GAME-115, opt-in forgiving defense timing.** PlayStation's Granblue Fantasy: Relink accessibility description lists adjustable difficulty and individually activatable assists. Original adaptation: a training-only option selects the already-existing Forgiving perfect-defense timing preset. It does not inflate player health, lower incoming damage, or alter enemy patterns. Source: https://www.playstation.com/en-us/games/granblue-fantasy-relink/ .
 
 5. **GAME-116, validated curriculum checkpoint.** The PlayStation Store page for Granblue Fantasy: Relink - Endless Ragnarok Demo, released June 18, 2026, explicitly says demo progress automatically saves. Original adaptation: a versioned in-memory Shadowblade training-progress checkpoint with strict validation and monotonic no-rollback semantics. This does not implement disk/cloud persistence and makes no cross-process save claim. Source: https://store.playstation.com/en-us/product/UP5460-PPSA35115_00-GBRELINKERDEMO01 .
 
-6. **QOL-024, boss-style three-threat rehearsal.** A September 11, 2026 player thread in `r/ZZZ_Official` requests a training environment that can reproduce boss-style three-chain rotations; replies note the ordinary VR room offers elites and suggest alternatives such as Annihilation Simulacrum. A separate January 2, 2025 thread also requests bosses in free training for learning moves. Original adaptation: the final Shadowblade lesson rehearses the game's existing QuickCut -> GuardBreaker -> RiftBurst threat sequence in one bounded loop. This is a player-request-inspired rehearsal, not a copied ZZZ boss, chain-attack system, or claim of community consensus. Sources: https://www.reddit.com/r/ZZZ_Official/comments/1wdtzbh/training_mode/ and https://www.reddit.com/r/ZenlessZoneZero/comments/1hru9ss/ . Current resolution: not established from an authoritative September 2026 source; alternatives exist, so the request is treated as preference evidence rather than proof of a current product defect.
+6. **QOL-024, boss-style three-threat rehearsal.** A February 14, 2026 player thread in `r/ZZZ_Discussion` asks for bosses in training specifically so players can practice manual chains that need a third chain during a stun window; multiple replies independently say boss training has been requested for a long time and point to no-reward boss fights as a workaround. A separate August 27, 2025 `r/ZZZ_Official` thread asks for a larger VR-training enemy roster, and a reply specifically says there is no training boss that allows three chain attacks for practicing those rotations. A January 2, 2025 thread also asks for bosses in free training to study moves. Original adaptation: the final Shadowblade lesson rehearses the game's existing QuickCut -> GuardBreaker -> RiftBurst threat sequence in one bounded loop. This is a player-request-inspired rehearsal, not a copied ZZZ boss, chain-attack system, or claim of community consensus. Sources: https://www.reddit.com/r/ZZZ_Discussion/comments/1r4l7xn/why_cant_we_put_bosses_in_the_training_training/ , https://www.reddit.com/r/ZZZ_Official/comments/1n1lw2x/vr_training_roaster_is_small/ , and https://www.reddit.com/r/ZenlessZoneZero/comments/1hru9ss/ . Current resolution: no authoritative September 2026 source was found establishing that the standard VR room now supports boss enemies; alternative practice routes exist, so the request is treated as preference evidence rather than proof of a current product defect.
 
 ## Acceptance
 
@@ -48,11 +48,11 @@ Access date for all sources below: 2026-09-23.
 ### GAME-113
 - A lesson configures only existing practice sequence/pace/goal/target mechanics.
 - Setup is all-or-nothing through a candidate copy.
-- Reconfiguration during an owned live threat fails without erasing or changing that attempt.
+- Reconfiguration while the supplied `ShadowbladeActions` owns any live incoming threat fails before session or timing-preset mutation, including threats not linked to the supplied practice session.
 
 ### GAME-114
 - An incomplete lesson has no medal.
-- Clean ordinary completion earns Silver; all-perfect eligible completion can earn Gold; completed runs with misses can only earn Bronze.
+- Clean ordinary completion earns Silver; Gold requires an all-perfect eligible completion; any completed run with a hit can only earn Bronze.
 - Stored mastery only moves upward.
 
 ### GAME-115
@@ -70,7 +70,8 @@ Access date for all sources below: 2026-09-23.
 - Boss Rehearsal is locked behind the prior four lessons.
 - It deterministically queues QuickCut, GuardBreaker, and RiftBurst using existing production threat definitions.
 - Completion requires at least one resolved attempt for each threat; interruptions alone cannot complete it.
-- Per-pattern practice telemetry demonstrates all three threats were actually exercised.
+- Non-boss lessons also require per-pattern attempt provenance matching the authored lesson plan, so a same-length replacement sequence cannot omit a required threat and still complete.
+- Per-pattern practice telemetry demonstrates all three boss-rehearsal threats were actually exercised.
 
 ## Verification requirements
 
@@ -83,6 +84,17 @@ Use the existing registered `ThoughtCommandsTests` target rather than a mock-onl
 - fresh independent Codex review of the exact final head with no unresolved material findings.
 
 Native rendered/player-facing verification is separate. No UI/input-screen/controller wiring is changed here, so this slice remains game-domain integrated rather than native-playable evidence. Do not claim GPU, art/audio, performance, cross-process persistence, or Genshin/ZZZ parity.
+
+## Review repairs
+
+The first independent review on commit `67f9039cd295c7d95219e093ca81a73e17e0ba92` raised four P2 findings. The bounded repair keeps the same feature scope and adds regressions for each finding:
+
+1. Any hit in Boss Rehearsal caps mastery at Bronze.
+2. Gold on non-boss lessons requires zero ordinary defenses as well as zero hits.
+3. Completion verifies authored per-pattern provenance, so a same-length duplicate-pattern sequence cannot satisfy a lesson that requires another threat type.
+4. `ApplyCurrentLesson` rejects any live incoming threat on the supplied `ShadowbladeActions` before applying the session candidate or synchronizing the timing preset.
+
+A fresh exact-head independent review is still required after these fixes and all durable records are frozen.
 
 ## Stop condition
 
