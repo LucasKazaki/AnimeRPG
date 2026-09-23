@@ -132,7 +132,7 @@ public:
     }
 
     bool ApplyCurrentLesson(DefensePracticeSession& session,
-        ShadowbladeActions& actions) const {
+        ShadowbladeActions& actions) {
         if (Complete() || !LessonUnlocked(currentLesson_) || actions.HasIncomingAttack()) {
             return false;
         }
@@ -159,6 +159,7 @@ public:
         actions.SetDefenseTimingPreset(forgivingTimingAssist_
             ? DefenseTimingPreset::Forgiving
             : DefenseTimingPreset::Standard);
+        appliedLesson_ = currentLesson_;
         return true;
     }
 
@@ -228,6 +229,7 @@ public:
         if (MedalRank(medal) > MedalRank(medals_[index])) medals_[index] = medal;
         completedMask_ = static_cast<std::uint8_t>(completedMask_ | LessonBit(index));
         currentLesson_ = LessonAtIndex(FirstIncompleteIndex(completedMask_));
+        appliedLesson_ = ShadowbladeTrainingLesson::Complete;
         return true;
     }
 
@@ -254,6 +256,7 @@ public:
         completedMask_ = checkpoint.completedMask;
         medals_ = checkpoint.medals;
         forgivingTimingAssist_ = checkpoint.forgivingTimingAssist;
+        appliedLesson_ = ShadowbladeTrainingLesson::Complete;
         return true;
     }
 
@@ -336,7 +339,8 @@ private:
 
     bool SessionMatchesCurrentLesson(const DefensePracticeSession& session) const {
         const ShadowbladeTrainingLessonPlan plan = PlanForLesson(currentLesson_);
-        return plan.sequence.count > 0
+        return appliedLesson_ == currentLesson_
+            && plan.sequence.count > 0
             && session.PracticeSequenceLength() == plan.sequence.count
             && session.Pace() == plan.pace
             && session.Goal() == plan.goal
@@ -367,6 +371,7 @@ private:
     }
 
     ShadowbladeTrainingLesson currentLesson_{ShadowbladeTrainingLesson::GuardFundamentals};
+    ShadowbladeTrainingLesson appliedLesson_{ShadowbladeTrainingLesson::Complete};
     std::uint8_t completedMask_{};
     std::array<ShadowbladeTrainingMedal, LessonCount> medals_{};
     bool forgivingTimingAssist_{};
