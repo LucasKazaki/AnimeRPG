@@ -83,21 +83,35 @@ def geometry_binding(mesh):
     req(set(prim)=={"attributes","indices","material","mode"},"primitive properties")
     return prim["attributes"],prim["indices"]
 
-def verify_floor_tangent_frame(pos,normal,tangent,uv,indices):
+def sphere_indices(lat_segments,lon_segments):
+    out=[]; row=lon_segments+1
+    for j in range(lat_segments):
+        for i in range(lon_segments):
+            a=j*row+i; b=a+row
+            if j>0: out += [a,a+1,b]
+            if j<lat_segments-1: out += [a+1,b+1,b]
+    return out
+
+def cube_indices():
+    out=[]
+    for base in range(0,24,4): out += [base,base+1,base+2,base,base+2,base+3]
+    return out
+
+def verify_tangent_frame(pos,normal,tangent,uv,indices,msg,strict=False):
+    threshold=0.9999 if strict else 1e-4
     for k in range(0,len(indices),3):
         ia,ib,ic=(indices[k][0],indices[k+1][0],indices[k+2][0])
         e1=sub(pos[ib],pos[ia]); e2=sub(pos[ic],pos[ia])
         du1=uv[ib][0]-uv[ia][0]; dv1=uv[ib][1]-uv[ia][1]
         du2=uv[ic][0]-uv[ia][0]; dv2=uv[ic][1]-uv[ia][1]
-        det=du1*dv2-dv1*du2; req(abs(det)>1e-12,"floor uv derivatives")
-        tref=normalize(tuple((e1[j]*dv2-e2[j]*dv1)/det for j in range(3)),"floor tangent derivative")
-        bref=normalize(tuple((e2[j]*du1-e1[j]*du2)/det for j in range(3)),"floor bitangent derivative")
+        det=du1*dv2-dv1*du2; req(abs(det)>1e-12,msg)
+        tref=normalize(tuple((e1[j]*dv2-e2[j]*dv1)/det for j in range(3)),msg)
+        bref=normalize(tuple((e2[j]*du1-e1[j]*du2)/det for j in range(3)),msg)
         for vi in (ia,ib,ic):
-            t=normalize(tangent[vi][:3],"floor tangent frame")
-            b=scale(cross(normal[vi],t),tangent[vi][3])
-            req(dot(t,tref)>0.9999 and dot(normalize(b,"floor tangent frame"),bref)>0.9999,"floor tangent frame")
+            t=normalize(tangent[vi][:3],msg); b=normalize(scale(cross(normal[vi],t),tangent[vi][3]),msg)
+            req(dot(t,tref)>threshold and dot(b,bref)>threshold,msg)
 
-def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,verify_floor_frame=False):
+def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,expected_indices,frame_msg="mesh tangent frame",strict_frame=False):
     mesh=g["meshes"][mesh_index]; attrs,index_accessor=geometry_binding(mesh)
     prim=mesh["primitives"][0]; req(prim["mode"]==4,"triangle mode"); req(prim["material"]==expected_material,"material binding")
     req(set(attrs)=={"POSITION","NORMAL","TANGENT","TEXCOORD_0"},"attributes")
@@ -109,11 +123,19 @@ def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,verify_floor_
     req(all(abs(sum(c*c for c in t[:3])-1.0)<1e-4 and t[3] in (-1.0,1.0) for t in tangent),"unit tangents")
     req(all(abs(dot(n,t[:3]))<1e-4 for n,t in zip(normal,tangent)),"tangent orthogonality")
     req(all(0.0<=u<=1.0 and 0.0<=v<=1.0 for u,v in uv),"uv range"); req(all(0<=i[0]<len(pos) for i in indices),"index range"); req(len(indices)%3==0,"triangle index count")
+    req([i[0] for i in indices]==expected_indices,"canonical indices")
     for k in range(0,len(indices),3):
         ia,ib,ic=(indices[k][0],indices[k+1][0],indices[k+2][0]); cr=tri_normal(pos[ia],pos[ib],pos[ic]); req(length(cr)>1e-12,"triangle area")
         for vi in (ia,ib,ic): req(dot(cr,normal[vi])>1e-8,"triangle vertex normal")
-    if verify_floor_frame: verify_floor_tangent_frame(pos,normal,tangent,uv,indices)
+    verify_tangent_frame(pos,normal,tangent,uv,indices,frame_msg,strict_frame)
     return pos
+
+def reject_nested_extras(value):
+    if isinstance(value,dict):
+        req("extras" not in value,"nested extras unsupported")
+        for child in value.values(): reject_nested_extras(child)
+    elif isinstance(value,list):
+        for child in value: reject_nested_extras(child)
 
 def quat_x(degrees):
     a=math.radians(degrees)/2.0; return [math.sin(a),0.0,0.0,math.cos(a)]
@@ -132,6 +154,8 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     req(g["asset"]=={"generator":VERSION,"version":"2.0"},"asset header"); req(g["extensionsUsed"]==["KHR_lights_punctual"],"extensions used")
     req(g["scene"]==0 and g["scenes"]==[{"name":"AstralNeutralMaterialGallery","nodes":list(range(12))}],"scene"); req(len(g["nodes"])==12,"node count")
     req("animations" not in g,"gallery animations unsupported")
+    for key,value in g.items():
+        if key!="extras": reject_nested_extras(value)
     req(set(g.get("extras",{}))=={"astral_contract"},"runtime extras")
     contract=g["extras"]["astral_contract"]; req(set(contract)==CONTRACT_KEYS,"runtime contract fields"); req(contract["status"]==RUNTIME_STATUS,"runtime status")
     req(contract["units"]==source["units"] and contract["up"]==source["axes"]["up"] and contract["forward"]==source["axes"]["forward"] and contract["right"]==source["axes"]["right"],"axis contract")
@@ -142,22 +166,23 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     material_specs=source["stations"]+[source["floor_material"]]; req(len(g["materials"])==len(material_specs),"material count")
     for material,s in zip(g["materials"],material_specs):
         req(set(material)=={"name","pbrMetallicRoughness"},"material properties"); req(material["name"]==s["material_name"],"material name"); expected={"baseColorFactor":s["base_color_factor_linear"],"metallicFactor":s["metallic"],"roughnessFactor":s["roughness"]}; req(material["pbrMetallicRoughness"]==expected,"material values")
-    geometry=source["geometry"]; sphere_counts=((geometry["sphere_lat_segments"]+1)*(geometry["sphere_lon_segments"]+1),6*geometry["sphere_lon_segments"]*(geometry["sphere_lat_segments"]-1)); cube_counts=(24,36); floor_counts=(4,6)
+    geometry=source["geometry"]; sphere_expected=sphere_indices(geometry["sphere_lat_segments"],geometry["sphere_lon_segments"]); cube_expected=cube_indices(); floor_expected=[0,2,1,0,3,2]
+    sphere_counts=((geometry["sphere_lat_segments"]+1)*(geometry["sphere_lon_segments"]+1),len(sphere_expected)); cube_counts=(24,len(cube_expected)); floor_counts=(4,len(floor_expected))
     req(len(g["meshes"])==9,"mesh count")
     sphere_binding=geometry_binding(g["meshes"][0]); cube_binding=geometry_binding(g["meshes"][4])
     for i in range(1,4): req(geometry_binding(g["meshes"][i])==sphere_binding,"matched sphere geometry")
     for i in range(5,8): req(geometry_binding(g["meshes"][i])==cube_binding,"matched cube geometry")
     sphere_pos=None
     for i in range(4):
-        pos=verify_mesh(g,buf,i,i,sphere_counts)
+        pos=verify_mesh(g,buf,i,i,sphere_counts,sphere_expected)
         if sphere_pos is None: sphere_pos=pos
     cube_pos=None
     for i in range(4):
-        pos=verify_mesh(g,buf,4+i,i,cube_counts)
+        pos=verify_mesh(g,buf,4+i,i,cube_counts,cube_expected)
         if cube_pos is None: cube_pos=pos
     r=geometry["sphere_radius"]; req(all(abs(length(p)-r)<1e-5 for p in sphere_pos),"sphere radius")
     h=geometry["cube_half_extent"]; req(all(all(abs(abs(c)-h)<1e-6 for c in p) for p in cube_pos),"cube extent")
-    floor_pos=verify_mesh(g,buf,8,4,floor_counts,verify_floor_frame=True); req(all(abs(y)<1e-7 for x,y,z in floor_pos),"floor plane")
+    floor_pos=verify_mesh(g,buf,8,4,floor_counts,floor_expected,"floor tangent frame",True); req(all(abs(y)<1e-7 for x,y,z in floor_pos),"floor plane")
     hx,hz=source["layout"]["floor_half_extents_xz"]; req(all(abs(abs(x)-hx)<1e-6 and abs(abs(z)-hz)<1e-5 for x,y,z in floor_pos),"floor extents")
     xs=source["layout"]["x_positions"]; sy,sz=source["layout"]["sphere_yz"]; cy,cz=source["layout"]["cube_yz"]; req(len(xs)==4,"layout count")
     for i,(label,x) in enumerate(zip(labels,xs)):
