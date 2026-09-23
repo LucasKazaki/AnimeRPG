@@ -3,46 +3,46 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-23",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "ee0c625712e214b2092a9e419b9e244fa84bae34",
+  "last_verified_main_at_pass_start": "a356b4ac9ae30e755962a782d2fc4d74e3b5fc5e",
   "last_merged_pass": {
-    "id": "GAME-PASS18-SHADOWBLADE-TUNING-2026-09-23",
-    "pr": 37,
-    "merge_sha": "ee0c625712e214b2092a9e419b9e244fa84bae34",
-    "head_sha": "b5fa5b3233e777ad12f5709bc6fc14c799013761",
+    "id": "GAME-PASS19-SHADOWBLADE-COMBAT-FLOW-2026-09-23",
+    "pr": 38,
+    "merge_sha": "a356b4ac9ae30e755962a782d2fc4d74e3b5fc5e",
+    "head_sha": "a84a4e64a96a71dfaf1fd2ad8fea8029e16858a0",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-23-shadowblade-combat-flow-pass19",
-  "pass": "GAME-PASS19-SHADOWBLADE-COMBAT-FLOW-2026-09-23",
-  "task_packet": "Tasks/GAME-PASS19-SHADOWBLADE-COMBAT-FLOW-2026-09-23.md",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS19.md",
-  "pr": 38,
-  "final_head": "pending_exact_final_head_after_review_repair_record",
+  "working_branch": "game/2026-09-23-dialogue-flow-pass20",
+  "pass": "GAME-PASS20-DIALOGUE-FLOW-2026-09-23",
+  "task_packet": "Tasks/GAME-PASS20-DIALOGUE-FLOW-2026-09-23.md",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS20.md",
+  "pr": 39,
+  "final_head": "pending_exact_final_head_after_gates",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
     "increments_with_explicit_regression_coverage": 6,
-    "increments_integrated_game_domain": 5,
+    "increments_integrated_game_domain": 6,
     "increments_hosted_verified_on_exact_final_head": 0,
     "increments_native_playable_verified": 0,
     "increments_independently_reviewed_clean_on_final_head": 0,
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-092","title":"Bounded Shadow Momentum from perfect defense","status":"implemented_registered_test_coverage_live_action_owner"},
-    {"id":"GAME-093","title":"Momentum Fatal Strike payoff","status":"implemented_registered_test_coverage_live_action_owner"},
-    {"id":"GAME-094","title":"Riftsteel earned-follow-up efficiency","status":"implemented_registered_test_coverage_live_action_owner"},
-    {"id":"GAME-095","title":"CryoEdge Perfect Guard recovery","status":"implemented_registered_test_coverage_live_action_owner"},
-    {"id":"GAME-096","title":"Training Blade Perfect Dodge mobility recovery","status":"implemented_registered_test_coverage_live_action_owner"},
-    {"id":"QOL-020","title":"Action-readiness telemetry snapshot","status":"implemented_registered_test_coverage_game_domain_api_no_rendered_ui"}
+    {"id":"GAME-097","title":"Story-topic prerequisite gating","status":"implemented_registered_test_coverage_live_landmark_dialogue_owner"},
+    {"id":"GAME-098","title":"Non-mutating advance screening previews","status":"implemented_registered_test_coverage_live_landmark_dialogue_owner"},
+    {"id":"GAME-099","title":"Recommended unresolved dialogue topic","status":"implemented_registered_test_coverage_live_landmark_interaction_api"},
+    {"id":"GAME-100","title":"Bounded authoritative conversation synopsis","status":"implemented_registered_test_coverage_live_landmark_interaction_api"},
+    {"id":"GAME-101","title":"Safe quick-advance metadata","status":"implemented_registered_test_coverage_live_landmark_interaction_api"},
+    {"id":"QOL-021","title":"Suppress redundant fake-choice prompts","status":"implemented_registered_test_coverage_live_landmark_interaction_api"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
-    "hosted_windows_ci": "pending_exact_head_after_review_repair_record",
-    "release_manifest": "pending_exact_head_after_review_repair_record",
+    "hosted_windows_ci": "pending_exact_final_head",
+    "release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "first_exact_head_review_found_nonfinite_Fatal_Strike_position_state_spend; production_and_NaN_infinity_regression_repaired; fresh_exact_head_review_pending",
-    "integration": "GAME-092_through_GAME-096_are_consumed_directly_by_existing_ShadowbladeActions_defense_fatal_dash_flow; QOL-020_is_non_rendered_readiness_API_for_future_owned_UI",
+    "independent_review": "pending_exact_final_head",
+    "integration": "all_six_increments_are_exposed_through_existing_LandmarkDialogue_and_live_LandmarkInteraction_game_domain_owner; no_rendered_dialogue_UI_claimed",
     "persistent_cross_process_save": "not_implemented_not_claimed"
   },
   "coordination": {
@@ -50,5 +50,5 @@
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "Require hosted Windows Debug/Release and release-integrity checks plus a fresh independent Codex review on the exact branch head containing the non-finite-position repair and this durable record; resolve the repaired finding only after verification, re-read live main and PR head, and merge only that exact tested/reviewed head."
+  "next_action": "Require hosted Windows Debug/Release and release-integrity checks plus a fresh independent implementation review on the exact branch head containing this durable record; repair any material finding without weakening tests, then re-read live main, full PR diff, and exact PR head and merge only the exact tested/reviewed head."
 }
