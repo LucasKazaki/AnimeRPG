@@ -9,7 +9,7 @@
   "controls": {
     "production_repository": "LucasKazaki/AnimeRPG",
     "default_branch": "main",
-    "latest_observed_main": "3eaeb72d65c98f887e827999a78eabb636120dfe",
+    "latest_observed_main": "4c3308051c910b66dd0aebcf513956926beab505",
     "engine_branch": "engine/2026-09-22-editor-runtime-smoke",
     "company_runtime_is_sole_local_executor": true,
     "historical_r0_runner_allowed": false,
@@ -28,7 +28,7 @@
     {"id":"E08","title":"Physics and collision","status":"not_found","acceptance":"broad/narrow phase, queries, rigid bodies, collision layers, stable timesteps and 2D/3D stress","native_evidence":[],"independent_acceptance":false},
     {"id":"E09","title":"AI and navigation","status":"partial","acceptance":"behavior/state execution, pathfinding, cancellation/budgets and deterministic agent fixtures","native_evidence":[],"independent_acceptance":false},
     {"id":"E10","title":"Audio engine","status":"not_found","acceptance":"decode/stream/mix, spatialization, latency, underrun/device recovery and procedural-signal budgets","native_evidence":[],"independent_acceptance":false},
-    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_show_state_review_repair_hosted_green_native_and_fresh_review_pending","acceptance":"scene/asset inspectors, selection/gizmos, undo/redo, save/reopen, editor/runtime boundaries, stable usable shell across admitted window states","native_evidence":[],"independent_acceptance":false},
+    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_show_state_repair_hosted_and_independent_review_green_native_pending","acceptance":"scene/asset inspectors, selection/gizmos, undo/redo, save/reopen, editor/runtime boundaries, stable usable shell across admitted window states","native_evidence":[],"independent_acceptance":false},
     {"id":"E12","title":"Genuine 2D support","status":"partial","acceptance":"sprites/batching/layers, tilemaps, 2D cameras/physics, text and image/runtime tests","native_evidence":[],"independent_acceptance":false},
     {"id":"E13","title":"Networking and multiplayer runtime","status":"not_found","acceptance":"offline schema first; later authorized transport, authority/replication, loss/reorder and disconnect recovery","native_evidence":[],"independent_acceptance":false},
     {"id":"E14","title":"Profiling and budgets","status":"partial","acceptance":"CPU/GPU timelines, p50/p95/p99 frame times, RAM/VRAM, allocations/stalls and reproducible manifests","native_evidence":[],"independent_acceptance":false},
@@ -59,11 +59,12 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "show_state_deadline_and_adjacent_ownership_review_findings_repaired_hosted_source_green_final_receipt_review_native_pending",
+      "status": "show_state_review_findings_repaired_hosted_integration_green_clean_independent_review_native_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
-      "latest_observed_main_revision": "3eaeb72d65c98f887e827999a78eabb636120dfe",
+      "latest_observed_main_revision": "4c3308051c910b66dd0aebcf513956926beab505",
       "reviewed_finding_source_head": "d709017977c11a2f0cd9d9498d63a9980cbf5e3c",
       "current_source_candidate": "4582d637a36d8d55981bda0886ef31d8643eef1b",
+      "clean_reviewed_receipt_source_head": "0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d",
       "runtime_smoke_blob": "797eebbc3c4e587efa1c7f14b62230c532a52e15",
       "cmake_blob": "4fd471151acb4b5919ccef4a92f49da12bd8d1f1",
       "review_findings": [
@@ -121,6 +122,26 @@
         "release_manifest_conclusion": "success",
         "interactive_runtime_smoke_executed_by_hosted_suite": false
       },
+      "final_receipt_integration_evidence": {
+        "source_head": "0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d",
+        "tested_synthetic_merge": "5fd749061e2d146a03240232366f17d611327aef",
+        "tested_base": "4c3308051c910b66dd0aebcf513956926beab505",
+        "windows_run": 35902826792,
+        "windows_job": 107323032434,
+        "windows_conclusion": "success",
+        "windows_completed_at": "2026-09-23T18:31:47Z",
+        "profiling_run": 35902826812,
+        "profiling_conclusion": "success",
+        "release_manifest_run": 35902826744,
+        "release_manifest_conclusion": "success",
+        "interactive_runtime_smoke_executed_by_hosted_suite": false
+      },
+      "fresh_independent_review": {
+        "source_head": "0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d",
+        "completed_at": "2026-09-23T18:38:09Z",
+        "result": "no_major_issues",
+        "new_inline_findings_for_exact_head": 0
+      },
       "research": [
         {"source":"Microsoft Learn ShowWindowAsync","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindowasync","accessed":"2026-09-23","applicability":"asynchronous show-state requests require positive bounded completion checks"},
         {"source":"Microsoft Learn SendMessageTimeoutW","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw","accessed":"2026-09-23","applicability":"each nested cross-thread message timeout is capped to the remaining show-state phase budget"},
@@ -129,13 +150,14 @@
         {"source":"Unity 6.0 EditorWindow.maximized","url":"https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html","accessed":"2026-09-23","applicability":"maximized editor-window state is a first-class editor workflow property"}
       ],
       "licensing_constraints": "Public Epic, Unity and Microsoft documentation used for behavioral/API comparison only. No proprietary engine source copied and no dependency imported.",
-      "task_commit": "8a0fefebe71fa262b538e7b96d1617b5f9a5087f",
-      "qa_commit": "39bb15b81b33931341d50bccf16cab6f23979aa6",
+      "task_commit": "d67bbe511c576f6ff80deecaff78afc0e08f574b",
+      "qa_commit": "92d46aae915a19ea3fcbb7b477b552b0c7f3508a",
       "task": "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
       "evidence": "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
       "native_additional_regression": "launch AstralGame separately from the exact source/build and retain no-regression evidence",
       "native_evidence": [],
-      "fresh_final_receipt_review_required": true,
+      "fresh_final_receipt_review_required": false,
+      "fresh_final_receipt_review_clean": true,
       "independent_acceptance": false
     }
   ],
