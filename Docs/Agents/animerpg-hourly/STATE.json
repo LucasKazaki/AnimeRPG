@@ -3,21 +3,21 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "40311ba7dcf1035656b6b2d0dbeb589030071dc7",
+  "last_verified_main_at_pass_start": "6d22da88402db71843ecd5a35766c0c77e62dca6",
   "last_merged_pass": {
-    "id": "GAME-PASS26-MANA-REACTOR-LIVE-2026-09-24",
-    "pr": 46,
-    "merge_sha": "40311ba7dcf1035656b6b2d0dbeb589030071dc7",
-    "head_sha": "6546b7239059238d022d9b3cd102d24b2ae697cd",
+    "id": "GAME-PASS27-SHADOW-CRYPT-LIVE-2026-09-24",
+    "pr": 47,
+    "merge_sha": "6d22da88402db71843ecd5a35766c0c77e62dca6",
+    "head_sha": "2882d496089ffeec3911b182d2c02b249d43984b",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-24-shadow-crypt-live-pass27",
-  "pass": "GAME-PASS27-SHADOW-CRYPT-LIVE-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS27-SHADOW-CRYPT-LIVE-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS27-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS27.md",
-  "pr": "pending",
-  "final_head": "record_in_pr_after_exact_head_gates",
+  "working_branch": "game/2026-09-24-shadowblade-loadout-workbench-pass28",
+  "pass": "GAME-PASS28-SHADOWBLADE-LOADOUT-WORKBENCH-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS28-SHADOWBLADE-LOADOUT-WORKBENCH-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS28-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS28.md",
+  "pr": 48,
+  "final_head": "pending_exact_head_gates",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -30,27 +30,27 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-132","title":"Production-owned Shadow Crypt entry","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-133","title":"Authoritative Shadow Crypt room briefing","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-134","title":"Safe room-boundary suspend and one-shot resume","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-135","title":"Monotonic Shadow Crypt best-clear record","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-136","title":"Live first-clear reward and full expedition replay","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"QOL-028","title":"Authoritative Shadow Crypt next-objective guidance","status":"implemented_registered_regression_pending_exact_head_gates"}
+    {"id":"GAME-137","title":"Non-mutating equipment comparison","status":"implemented_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-138","title":"Focus-aware owned-module recommendation","status":"implemented_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-139","title":"Resonance-family recommendation filter","status":"implemented_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-140","title":"Current-slot versus whole-build recommendation scope","status":"implemented_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-141","title":"Last-successful preset recall and reapply","status":"implemented_registered_regression_pending_exact_head_gates"},
+    {"id":"QOL-029","title":"Human-readable clearable preset labels with spaces","status":"implemented_registered_regression_pending_exact_head_gates"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ShadowCryptMissionPass27Tests",
-    "sandbox_cpp17": "not_run_previous_container_DNS_failure_not_retried_no_product_claim",
+    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ShadowbladeLoadoutWorkbenchPass28Tests",
+    "sandbox_cpp17": "not_run_repo_not_materialized_no_product_claim",
     "hosted_windows_ci": "pending_exact_final_head",
     "release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
     "independent_review": "pending_exact_final_head",
-    "integration": "LandmarkInteraction now owns ShadowCryptMission and routes existing field evidence, room progress, suspend/resume, best record, CharacterProgression reward entitlement, and replay APIs; native input/UI not wired",
-    "persistent_cross_process_save": "not_changed_not_claimed"
+    "integration": "ShadowbladeActions now owns and exposes ShadowbladeLoadoutWorkbench beside its existing authoritative ShadowbladeLoadout; native input/UI not wired",
+    "persistent_cross_process_save": "workbench_session_metadata_not_persisted_not_claimed"
   },
   "coordination": {
     "open_engine_and_art_prs": "left_unchanged",
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "ShadowCryptMission_h_plus_LandmarkInteraction_h_plus_registered_game_tests_only"
+    "gameplay_paths": "ShadowbladeLoadoutWorkbench_h_plus_ShadowbladeActions_h_plus_registered_game_tests_only"
   },
-  "next_action": "Open the bounded PR, run exact-head hosted Windows Debug/Release and Release-manifest gates, obtain fresh independent Codex review on the same head, repair and rerun if needed, then re-read live main/head/full diff and expected-head merge if clean."
+  "next_action": "Run exact-head hosted Windows Debug/Release and Release-manifest gates on PR 48, obtain fresh independent authorized review on the same head, repair and rerun if needed, then re-read live main/head/full diff and expected-head merge if clean."
 }
