@@ -1,5 +1,6 @@
 #include "Engine/Scene/ThoughtCommands.h"
 #include "Engine/Scene/DefensePracticeSession.h"
+#include "Engine/Scene/ExplorationFieldGuide.h"
 
 #include <cmath>
 #include <iostream>
@@ -170,6 +171,7 @@ void TestPhysicalAndCommandGuardComposition() {
 }
 
 #include "DefensePracticePass13Tests.inc"
+#include "ExplorationFieldGuidePass14Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -179,6 +181,7 @@ int main() {
     TestFocusBoundsAndLocalDelta();
     TestPhysicalAndCommandGuardComposition();
     TestDefensePracticePass13();
+    TestExplorationFieldGuidePass14();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;
