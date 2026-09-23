@@ -58,7 +58,7 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "shared_normal_success_descendant_rejection_hosted_passed_native_and_fresh_independent_review_pending",
+      "status": "shared_normal_success_containment_hosted_passed_reviewed_evidence_receipt_repair_pending_rereview_and_native",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_observed_main_revision": "dece8fbb47b6a937b9bafafa3faea837a359fb4d",
       "code_candidate": "1cbef2242fb79edda068751dd71996b5548ec739",
@@ -66,8 +66,6 @@
       "runtime_smoke_blob": "3ca40bccd15950ebd8774ed36902ab15213035bb",
       "editor_source_blob": "5142e632a79c89d0d0ce3efe87e752456f802185",
       "shared_acceptance_fixture_sha256": "378637e40efe2a7ae255a4f232a29278b3ef0acf68b40269bee59e6ec7f35f26",
-      "retained_success_parent_policy_fixture_sha256": "7c049cbfffc481f95b1bfb0bdcee8af6fde6624dd3462a3e23d31acf96f635d8",
-      "retained_job_accounting_fixture_sha256": "6f12e0a2864c80d59b7e55ba979ba7befcfdea505270120f99da0bf8fc44f06e",
       "runtime_budget": {
         "worker_deadline_starts_before_worker_create_process": true,
         "worker_internal_work_budget_ms": 135000,
@@ -88,7 +86,7 @@
         "debug_hosted_result": "pass",
         "release_hosted_result": "pass"
       },
-      "hosted": {
+      "code_candidate_hosted": {
         "windows_run": 35802481221,
         "windows_job": 106995723688,
         "windows_status": "completed_success",
@@ -100,20 +98,34 @@
         "runtime_smoke_executed_by_hosted_ctest": false,
         "containment_self_test_executed_by_hosted_deterministic_ctest": true
       },
+      "evidence_checkpoint": {
+        "sha": "13a6d220125ede24c9eea1662ecb287837740763",
+        "independent_review_completed_at": "2026-09-23T00:41:26Z",
+        "independent_review_result": "one P2 evidence-traceability finding; no new runtime-smoke or containment-code finding",
+        "finding_comment_id": 4077992187,
+        "windows_run": 35802790099,
+        "windows_job": 106996725906,
+        "windows_status": "completed_success",
+        "windows_completed_at": "2026-09-23T00:38:28Z",
+        "profiling_run": 35802790114,
+        "profiling_status": "completed_success",
+        "release_manifest_run": 35802790175,
+        "release_manifest_status": "completed_success",
+        "receipt_repair": "record exact independently reviewed and hosted-verified evidence tree and its results while retaining native gate",
+        "self_reference_policy": "the commit that edits this receipt cannot generally embed its own not-yet-computed SHA; record the exact post-write head and workflow results in PR #13 metadata/commentary rather than creating an infinite receipt-only commit loop"
+      },
       "review_history": {
         "reviewed_candidate_with_shared_path_finding": "7d38e2cd7ffc6b76952711212e7da78d66c7f1af",
-        "review_completed_at": "2026-09-23T00:29:04Z",
-        "finding_comment_id": 4077923601,
-        "finding": "synthetic zero-exit parent test manually invoked primitives and did not exercise the exact production normal-success supervisor branch",
-        "receipt_finding_comment_id": 4077923604,
+        "shared_path_finding_comment_id": 4077923601,
         "repair_candidate": "1cbef2242fb79edda068751dd71996b5548ec739",
         "repair": "factor normal worker acceptance into SupervisorRunNormalWorkerAcceptance and invoke that exact function from both production supervisor and deterministic lingering-descendant self-test",
-        "current_status": "fresh_independent_review_required"
+        "reviewed_evidence_head": "13a6d220125ede24c9eea1662ecb287837740763",
+        "reviewed_evidence_head_finding_comment_id": 4077992187,
+        "current_status": "receipt_traceability_repaired_fresh_independent_rereview_required"
       },
-      "covered_subrequirement": "Native Windows editor smoke contract for stable process-owned shell identity, exact hierarchy/assets/Inspector fixtures, selection synchronization, bounded messages/resizes, clean normal shutdown and worker-local cleanup, plus a CTest-facing Job Object supervisor that contains the worker/editor tree and proves zero active contained processes. Hosted Debug/Release deterministic tests now exercise both live-tree cleanup and the exact shared normal-success rejection path for a zero-exit worker that leaves a descendant. Interactive editor GUI execution remains pending.",
+      "covered_subrequirement": "Native Windows editor smoke contract for stable process-owned shell identity, exact hierarchy/assets/Inspector fixtures, selection synchronization, bounded messages/resizes, clean normal shutdown and worker-local cleanup, plus a CTest-facing Job Object supervisor that contains the worker/editor tree and proves zero active contained processes. Hosted Debug/Release deterministic tests exercise both live-tree cleanup and the exact shared normal-success rejection path for a zero-exit worker that leaves a descendant. Interactive editor GUI execution remains pending.",
       "research": [
         {"source":"Microsoft Learn Job Objects","url":"https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects","accessed":"2026-09-23","applicability":"child processes remain associated with the job by default unless breakaway is enabled; E11 enables neither breakaway flag"},
-        {"source":"Microsoft Learn AssignProcessToJobObject","url":"https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject","accessed":"2026-09-23","applicability":"job membership and child-process inheritance behavior"},
         {"source":"Microsoft Learn TerminateJobObject","url":"https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-terminatejobobject","accessed":"2026-09-23","applicability":"controlled termination of every process associated with the job"},
         {"source":"Microsoft Learn QueryInformationJobObject","url":"https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-queryinformationjobobject","accessed":"2026-09-23","applicability":"query current JobObjectBasicAccountingInformation"},
         {"source":"Microsoft Learn JOBOBJECT_BASIC_ACCOUNTING_INFORMATION","url":"https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information","accessed":"2026-09-23","applicability":"ActiveProcesses supplies the empty-job acceptance count"},
