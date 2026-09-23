@@ -7,9 +7,13 @@ MAX_FILE=2*1024*1024
 MAX_WIDTH=4096
 MAX_HEIGHT=4096
 MAX_INFLATED=2*1024*1024
+EXPECTED_STATUS="art_reference_source_validated_not_runtime"
 
 def req(x,msg):
     if not x: raise ValueError(msg)
+
+def canonical_text_bytes(path:Path):
+    return path.read_text(encoding="utf-8").replace("\r\n","\n").replace("\r","\n").encode("utf-8")
 
 def read_png(path:Path, expected_dims:tuple[int,int]|None=None):
     data=path.read_bytes(); req(len(data)<=MAX_FILE,"oversized png"); req(data[:8]==b"\x89PNG\r\n\x1a\n","png signature")
@@ -54,10 +58,11 @@ def gray_from_lum(y):
     v=max(0,min(255,round(encoded*255))); return (v,v,v)
 
 def verify(root:Path,source:Path,expected_manifest:Path|None=None):
-    root=root.resolve(); source_data=source.read_bytes(); src=json.loads(source_data); roles=src["roles"]; req(len(roles)==8,"roles")
+    root=root.resolve(); source_data=canonical_text_bytes(source); src=json.loads(source_data); roles=src["roles"]; req(len(roles)==8,"roles")
     manifest_bytes=(root/"manifest.json").read_bytes(); manifest=json.loads(manifest_bytes); req(manifest["generator"]=="astral-color-calibration-2","generator")
+    req(manifest.get("status")==EXPECTED_STATUS,"manifest status")
     req(manifest["source_sha256"]==hashlib.sha256(source_data).hexdigest(),"source hash")
-    if expected_manifest is not None: req(manifest_bytes==expected_manifest.read_bytes(),"expected manifest pin")
+    if expected_manifest is not None: req(manifest_bytes==canonical_text_bytes(expected_manifest),"expected manifest pin")
     listed={r["path"] for r in manifest["files"]}; req(listed=={"palette_card.png","neutral_lut_16.png","value_ramp_16.png"},"file list")
     for r in manifest["files"]:
         p=root/r["path"]; req(p.is_file() and not p.is_symlink(),"file missing/link"); d=p.read_bytes(); req(len(d)==r["bytes"] and hashlib.sha256(d).hexdigest()==r["sha256"],"file hash")
