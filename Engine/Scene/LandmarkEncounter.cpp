@@ -126,7 +126,18 @@ LandmarkEncounterReport LandmarkEncounter::Retry(CombatSandbox& combatSandbox,
         return lastReport_;
     }
 
-    combatSandbox.ResetTrainingSession();
+    // Training practice deliberately uses an Endless target. Returning the same
+    // combat owner to the landmark encounter must restore the standard finite
+    // target before resetting the encounter, otherwise a retried encounter can
+    // no longer defeat its target or complete.
+    if (combatSandbox.TargetMode() != TrainingTargetMode::Standard) {
+        if (!combatSandbox.SetTrainingTargetMode(TrainingTargetMode::Standard)) {
+            lastReport_ = {LandmarkEncounterResult::RetryUnavailable, 0.0f};
+            return lastReport_;
+        }
+    } else {
+        combatSandbox.ResetTrainingSession();
+    }
     shadowbladeActions.ResetTransientStatePreservingLoadout();
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
