@@ -15,7 +15,7 @@
   "pass": "GAME-PASS25-SHADOWBLADE-TRAINING-HUB-2026-09-23",
   "task_packet": "Tasks/GAME-PASS25-SHADOWBLADE-TRAINING-HUB-2026-09-23.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS25.md",
-  "pr": null,
+  "pr": 44,
   "final_head": "pending_exact_head_after_this_state_record",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -32,17 +32,17 @@
     {"id":"GAME-122","title":"Story-gated live training unlock","status":"implemented_registered_test_coverage_live_LandmarkEncounter_unlock_callsite_native_input_not_wired"},
     {"id":"GAME-123","title":"Selectable focus pace and bounded attempt target","status":"implemented_registered_test_coverage_owned_by_live_LandmarkEncounter_API_native_input_not_wired"},
     {"id":"GAME-124","title":"Consequence-free endless target practice on authoritative owners","status":"implemented_registered_test_coverage_exact_owner_pair_binding_native_input_not_wired"},
-    {"id":"GAME-125","title":"Finite multi-attempt run and authoritative coach debrief","status":"implemented_registered_test_coverage_exact_stop_and_feedback_native_input_not_wired"},
+    {"id":"GAME-125","title":"Finite multi-attempt run and authoritative coach debrief","status":"implemented_registered_test_coverage_exact_attempt_or_player_defeat_stop_timing_guide_bound_to_action_owner_native_input_not_wired"},
     {"id":"GAME-126","title":"Training pause and resume","status":"implemented_registered_test_coverage_explicit_training_clock_owner_native_input_not_wired"},
     {"id":"QOL-026","title":"Bounded twenty-second recent damage and hit feedback","status":"implemented_registered_test_coverage_live_read_only_sampling_fixed_capacity_native_UI_not_wired"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim_plus_ShadowbladeTrainingHubPass25Tests",
-    "sandbox_cpp17": "not_run_clean_clone_failed_due_container_DNS_resolution_for_github.com_no_product_claim",
-    "hosted_windows_ci": "pending_exact_final_PR_head",
-    "release_manifest": "pending_exact_final_PR_head",
+    "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim_plus_exact_production_LandmarkEncounter_cpp_include_plus_ShadowbladeTrainingHubPass25Tests",
+    "sandbox_cpp17": "not_run_clean_clone_failed_twice_due_container_DNS_resolution_for_github.com_no_product_claim",
+    "hosted_windows_ci": "initial_bdb519591c_run_35898246354_number_765_failed_Debug_link_due_missing_LandmarkEncounter_implementation_in_registered_test_target; repaired_without_shared_CMake_edit; pending_exact_final_PR_head",
+    "release_manifest": "initial_bdb519591c_run_35898246615_number_544_success_but_invalidated_by_review_repairs; pending_exact_final_PR_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "pending_fresh_Codex_review_on_exact_final_PR_head",
+    "independent_review": "initial_bdb519591c_Codex_review_found_P1_registered_test_link_failure_plus_P2_player_defeat_active_run_trap_plus_P2_timing_guide_preset_mismatch; all_three_repaired_with_regressions_where_behavioral; fresh_exact_final_head_review_required",
     "research": "ZZZ_2026-08-31_official_Combat_Simulation_story_unlock_and_selectable_enemy_card; Granblue_official_Adjustable_Difficulty_Practice_Mode_Game_Pausing; Genshin_2026-01-19_official_selectable_difficulty_three_phase_challenge_corroboration; WutheringWaves_2026-03-14_original_player_training_dummy_thread_with_2026-03-18_recent_10_to_20_second_damage_feedback_request_and_counterexamples",
     "integration": "real_production_game_domain_owner_now_calls_training_hub_unlock_and_read_only_observation_from_LandmarkEncounter_Update; configure_start_defend_advance_pause_are_owned_by_live_LandmarkEncounter_but_current_Win32_input_has_no_calls_so_native_playable_count_remains_zero",
     "persistent_cross_process_save": "not_changed_not_claimed"
@@ -51,6 +51,7 @@
     "engine_pr_13": "separate_editor_runtime_smoke_ownership_no_overlap",
     "art_prs_23_26_28_33": "separate_art_ownership_no_overlap",
     "shared_engine_paths": "platform_renderer_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
+    "registered_test_link_repair": "shared_CMake_not_modified; exact_production_LandmarkEncounter_cpp_compiled_only_into_existing_game_aggregation_test_translation_unit",
     "live_game_owner": "LandmarkEncounter_only_plus_new_game_owned_ShadowbladeTrainingHub"
   },
   "safety_properties": [
@@ -60,9 +61,11 @@
     "training_run_binds_exact_CombatSandbox_and_ShadowbladeActions_objects",
     "unrelated_owner_pairs_cannot_defend_advance_or_read_mixed_provenance_feedback",
     "active_training_blocks_LandmarkEncounter_Retry",
+    "finite_run_ends_on_configured_attempt_target_or_player_defeat_so_no_dead_owner_can_strand_Active_state",
+    "timing_guide_uses_the_bound_action_owner_current_standard_or_forgiving_perfect_defense_window",
     "pause_freezes_practice_owned_clocks_and_state",
     "recent_damage_storage_fixed_at_128_samples_and_report_window_capped_at_20_seconds",
     "LandmarkEncounter_Update_sampling_is_read_only_and_does_not_double_advance_platform_owned_clocks"
   ],
-  "next_action": "Open one scoped PR targeting main, run the required exact-head hosted Windows Debug/Release registered tests and Release-manifest integrity, obtain fresh independent Codex review on that exact head, repair and rerun any invalidated gate, re-read live main/head plus full diff immediately before merge, then merge only the exact tested/reviewed head. Native input/UI remains a coordinated engine dependency and must not be claimed by this pass."
+  "next_action": "Require exact-head hosted Windows Debug/Release registered tests and Release-manifest integrity for the commit containing this state record, then request fresh independent Codex review on that same exact head. Repair any material finding and rerun invalidated gates. Re-read live main/head and full diff immediately before merge, and merge only the exact tested/reviewed candidate with expected-head checking. Native input/UI remains a coordinated engine dependency and must not be claimed by this pass."
 }
