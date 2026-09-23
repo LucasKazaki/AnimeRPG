@@ -119,7 +119,7 @@ public:
     bool AcquireModule(ResonanceModule module) {
         if (!IsValidModule(module)) return false;
         const std::size_t index = ModuleIndex(module);
-        if (ownedModules_[index]) return false;
+        if (ownedModules_[index] || salvagedModules_[index]) return false;
         ownedModules_[index] = true;
         return true;
     }
@@ -238,6 +238,7 @@ public:
         if (IsEquipped(module)) return LoadoutActionResult::Equipped;
         const std::size_t index = ModuleIndex(module);
         ownedModules_[index] = false;
+        salvagedModules_[index] = true;
         const int room = MaximumTuningParts - tuningParts_;
         tuningParts_ += std::min(SalvageValue(module), std::max(0, room));
         return LoadoutActionResult::Success;
@@ -408,6 +409,7 @@ private:
 
     std::array<bool, WeaponCount> ownedWeapons_{};
     std::array<bool, ModuleCount> ownedModules_{};
+    std::array<bool, ModuleCount> salvagedModules_{};
     ShadowbladeWeapon equippedWeapon_{ShadowbladeWeapon::TrainingBlade};
     std::array<ResonanceModule, ModuleSlotCount> equippedModules_{
         ResonanceModule::CoolingEdge,
