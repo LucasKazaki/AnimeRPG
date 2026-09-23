@@ -15,8 +15,8 @@
   "pass": "GAME-PASS17-LOADOUT-LIVE-EFFECTS-2026-09-23",
   "task_packet": "Tasks/GAME-PASS17-LOADOUT-LIVE-EFFECTS-2026-09-23.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS17.md",
-  "pr": null,
-  "final_head": "pending_exact_head_gates",
+  "pr": 36,
+  "final_head": "pending_exact_head_gates_see_pr_36",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -51,5 +51,5 @@
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "Open the scoped pass-17 PR, run exact-head hosted Windows Debug/Release and release-integrity gates, obtain fresh independent Codex review against the pass-17 task packet, repair any material findings within allowed paths, re-read live main and exact PR head, and merge only the exact tested/reviewed head."
+  "next_action": "On PR #36, require exact-head hosted Windows Debug/Release and release-integrity gates plus fresh independent Codex review against the pass-17 task packet, repair any material findings within allowed paths, re-read live main and exact PR head, and merge only the exact tested/reviewed head."
 }
