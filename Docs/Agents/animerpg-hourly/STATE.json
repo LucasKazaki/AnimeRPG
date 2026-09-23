@@ -20,7 +20,7 @@
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS13.md",
   "pr": 30,
   "reviewed_initial_head": "ca187fb9c03d6e2ffe873599bf28da6f75b43880",
-  "latest_review_repair_checkpoint": "3ab2530c0896689263765739292465e57e7e0285",
+  "latest_review_repair_checkpoint": "1ae99759c55b5ec11c700e5b6ee93252f67bcdee",
   "final_head": "pending_self_reference_see_pr_30_final_receipt",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -35,7 +35,7 @@
   "increments": [
     {"id":"GAME-062","title":"Bounded configurable practice pattern sequence","status":"implemented_registered_test_coverage"},
     {"id":"GAME-063","title":"Learning Standard Expert practice pace","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-064","title":"Alternating Guard Dodge defense chain","status":"implemented_review_repaired_registered_test_coverage"},
+    {"id":"GAME-064","title":"Alternating Guard Dodge defense chain with monotonic timing and reconciliation","status":"implemented_review_repaired_registered_test_coverage"},
     {"id":"GAME-065","title":"Bounded execution score with session-owned active-time coefficient","status":"implemented_review_repaired_registered_test_coverage"},
     {"id":"GAME-066","title":"Configurable drill target count 1 through 10","status":"implemented_registered_test_coverage"},
     {"id":"QOL-014","title":"Per-pattern practice analytics","status":"implemented_review_repaired_registered_test_coverage"}
@@ -49,7 +49,10 @@
     "second_review_head": "126b6eee606a27605b9812fb79e554f32bfd34e6",
     "hit_only_coefficient": "compute_defined_time_coefficient_for_resolved_hit_only_reports_while_score_remains_zero",
     "clock_reset_invariance": "accumulate_valid_unpaused_session_time_independently_of_mutable_CombatSandbox_elapsed_clock",
-    "focused_regressions": "added_for_all_material_review_findings_including_hit_only_and_clock_reset_cases",
+    "third_review_head": "6755593d22d888a15e5712c8a8e6a45c16c93e69",
+    "chain_monotonic_clock": "use_session_owned_active_time_for_chain_window_so_CombatSandbox_reset_cannot_revive_expired_chain",
+    "external_success_reconciliation": "AdvanceTime_reconciliation_uses_actions_LastDefense_authoritative_result_and_normal_chain_path_for_perfect_or_ordinary_success",
+    "focused_regressions": "added_for_all_material_review_findings_including_hit_only_clock_reset_chain_reset_and_external_success_reconciliation",
     "fresh_final_head_review": "pending"
   },
   "verification": {
@@ -60,10 +63,12 @@
     "records_head_24bbb_hosted_windows_ci": "failed_run_428_test_assumption_only_ThoughtCommandsTests",
     "pre_second_review_head_windows_ci": "passed_run_435_on_126b6eee_but_not_final_after_second_review_repairs",
     "pre_second_review_head_release_manifest": "passed_run_348_on_126b6eee_but_not_final_after_second_review_repairs",
+    "third_review_head_windows_ci": "passed_run_445_on_6755593_but_not_final_after_third_review_repairs",
+    "third_review_head_release_manifest": "passed_run_356_on_6755593_but_not_final_after_third_review_repairs",
     "latest_review_repair_commits": [
-      "a7bc215889175eae5c2527965e4d884013e79992",
-      "3ab2530c0896689263765739292465e57e7e0285",
-      "01924a309cfe23e414dc01926f4400703f114012"
+      "a9bf867bc4e9107b566b9556bd8139ce142db76c",
+      "1ae99759c55b5ec11c700e5b6ee93252f67bcdee",
+      "27096257d572874f553b821336419befba752bd5"
     ],
     "final_records_head_hosted_windows_ci": "pending_exact_final_head",
     "final_records_head_release_manifest": "pending_exact_final_head",
@@ -78,5 +83,5 @@
     "art_pr_28": "separate color/exposure calibration ownership; no overlap",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release and deployment unchanged"
   },
-  "next_action": "Freeze the final records head, require exact-head Windows/release gates and a fresh independent Codex review with all material threads resolved, re-read main and PR head immediately before merge, merge PR 30 with expected-head protection, then record self-referential final head/workflow/review/merge receipts in PR discussion and task result."
+  "next_action": "Freeze the final receipt/state head, require exact-head Windows/release gates and a fresh independent Codex review with all material threads resolved, re-read main and PR head immediately before merge, merge PR 30 with expected-head protection, then record self-referential final head/workflow/review/merge receipts in PR discussion and task result."
 }
