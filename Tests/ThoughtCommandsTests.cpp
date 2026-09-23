@@ -1,6 +1,7 @@
 #include "Engine/Scene/ThoughtCommands.h"
 #include "Engine/Scene/DefensePracticeSession.h"
 #include "Engine/Scene/ExplorationFieldGuide.h"
+#include "Engine/Scene/LandmarkInteraction.h"
 #include "Engine/Scene/ShadowCryptExpedition.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
 
