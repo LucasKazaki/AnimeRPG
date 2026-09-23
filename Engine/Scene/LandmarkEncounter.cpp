@@ -121,15 +121,16 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
 
 LandmarkEncounterReport LandmarkEncounter::Retry(CombatSandbox& combatSandbox,
     ShadowbladeActions& shadowbladeActions) {
-    if (state_ != LandmarkEncounterState::Completed || trainingHub_.Active()) {
+    if (state_ != LandmarkEncounterState::Completed || trainingHub_.Active()
+        || !trainingHub_.AcceptsOwnerPair(combatSandbox, shadowbladeActions)) {
         lastReport_ = {LandmarkEncounterResult::RetryUnavailable, 0.0f};
         return lastReport_;
     }
 
     // Training practice deliberately uses an Endless target. Returning the same
-    // combat owner to the landmark encounter must restore the standard finite
-    // target before resetting the encounter, otherwise a retried encounter can
-    // no longer defeat its target or complete.
+    // authoritative owner pair to the landmark encounter must restore the standard
+    // finite target before resetting the encounter. A mismatched pair is rejected
+    // above before either owner can be mutated.
     if (combatSandbox.TargetMode() != TrainingTargetMode::Standard) {
         if (!combatSandbox.SetTrainingTargetMode(TrainingTargetMode::Standard)) {
             lastReport_ = {LandmarkEncounterResult::RetryUnavailable, 0.0f};
