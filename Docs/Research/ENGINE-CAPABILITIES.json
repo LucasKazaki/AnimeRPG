@@ -59,11 +59,12 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "positive_area_hardening_hosted_and_review_pending_native_pending",
+      "status": "positive_area_hardened_hosted_integration_green_review_finding_repaired_native_pending",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_observed_main_revision": "a356b4ac9ae30e755962a782d2fc4d74e3b5fc5e",
       "previous_clean_reviewed_source_head": "a8d1bad1135eca3ee74f689e02ee6df1672514b3",
       "positive_area_candidate": "2c1d2315c0e0f4bf915a3b11d27d8088f4af6429",
+      "reviewed_source_evidence_head": "1381f720f093b9704f2d30197e92469eee2c1b66",
       "runtime_smoke_blob": "1458a74e15f2dcf46730c6f07a4ea7bb7343c389",
       "cmake_blob": "4fd471151acb4b5919ccef4a92f49da12bd8d1f1",
       "verification_gap": "DirectChildrenContained previously accepted zero-width or zero-height required child controls because equality was not rejected; WS_VISIBLE does not prove positive drawable extent",
@@ -75,13 +76,18 @@
         "scope": "geometry predicate only, not Win32 runtime evidence"
       },
       "hosted_workflows": {
-        "source_head": "2c1d2315c0e0f4bf915a3b11d27d8088f4af6429",
-        "windows_run": 35842586238,
-        "profiling_run": 35842586031,
-        "release_manifest_run": 35842586139,
-        "status_at_first_observation": "in_progress",
-        "tested_merge_sha": null,
-        "tested_base_sha": null,
+        "evidence_model": "pull_request runs using default actions/checkout validate the synthetic merge; source association, tested merge and tested base are distinct identities",
+        "source_evidence_head": "1381f720f093b9704f2d30197e92469eee2c1b66",
+        "tested_merge_sha": "5d06dc61efe398add72f484efa1f1f8402042c9b",
+        "tested_base_sha": "a356b4ac9ae30e755962a782d2fc4d74e3b5fc5e",
+        "windows_run": 35842853870,
+        "windows_job": 107121837092,
+        "windows_status": "completed_success",
+        "windows_completed_at": "2026-09-23T09:27:43Z",
+        "profiling_run": 35842853835,
+        "profiling_status": "completed_success",
+        "release_manifest_run": 35842853825,
+        "release_manifest_status": "completed_success",
         "raw_source_head_execution_claim": false
       },
       "retained_hardening": {
@@ -97,9 +103,13 @@
         "positive_area_required_after_resize": true
       },
       "independent_review": {
-        "previous_clean_review_source_sha": "a8d1bad1135eca3ee74f689e02ee6df1672514b3",
-        "previous_clean_review_completed_at": "2026-09-23T08:34:01Z",
-        "current_changed_source_review_result": "pending",
+        "reviewed_source_evidence_head": "1381f720f093b9704f2d30197e92469eee2c1b66",
+        "completed_at": "2026-09-23T09:31:04Z",
+        "result": "one_p2_evidence_traceability_finding",
+        "finding_comment_id": 4080955609,
+        "finding": "durable task/QA/capability records did not record final head 1381f720, its final workflow set, or synthetic merge/base identity",
+        "repair": "this evidence-only task/QA/capability update records the final source head, hosted run results, tested merge/base and review outcome; post-write exact receipt head must be pinned in PR metadata because a Git commit cannot self-embed its own content-addressed SHA",
+        "fresh_receipt_recheck": "pending",
         "independent_acceptance": false
       },
       "research": [
@@ -132,6 +142,7 @@
     "Keep native and independent acceptance gates; staged repairs are not auto-merged.",
     "Record source SHA, commands, exits, versions, files, hashes, and deferred local checks.",
     "For pull_request CI, record the PR source head separately from the synthetic merge commit and its tested base; do not call source association raw-head execution evidence.",
+    "A post-write receipt head is pinned in PR metadata rather than creating an infinite evidence-only commit chain solely to self-embed its own SHA.",
     "No second local scheduler, local process control, R0 execution, publication, release, or merge from this engine packet.",
     "Do not remove unresolved capability rows or catalogue gaps to make parity easier."
   ]
