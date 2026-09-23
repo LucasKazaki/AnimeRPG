@@ -33,6 +33,37 @@ ALLOWED_SOURCE_RELATIONS = {
     "minimum",
 }
 REQUIRED_COVERAGE = {"axis_scale", "materials", "landscape", "vegetation", "context_boundary"}
+ROOT_KEYS = {
+    "schema_version",
+    "loop_id",
+    "status",
+    "retrieved_date",
+    "rights_policy",
+    "units_policy",
+    "entries",
+    "required_coverage",
+    "review_note",
+}
+ENTRY_KEYS = {
+    "id",
+    "label",
+    "zone",
+    "authority",
+    "url",
+    "source_kind",
+    "rights_mode",
+    "embedded_media",
+    "modeling_priority",
+    "accuracy_class",
+    "art_use",
+    "facts",
+    "measurements",
+    "modeling_constraints",
+}
+DERIVED_RELATION_VALUES = {
+    "derived_from_79_ft_10_in": 79 + 10 / 12,
+    "derived_from_555_ft_5_1_8_in": 555 + (5 + 1 / 8) / 12,
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -42,6 +73,7 @@ def require(condition: bool, message: str) -> None:
 
 def load_and_validate(path: Path) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
+    require(set(data) == ROOT_KEYS, "root keys")
     require(type(data.get("schema_version")) is int and data["schema_version"] == 1, "schema_version")
     require(data.get("loop_id") == "astral-art-hourly-20260922", "loop_id")
     require(data.get("status") == STATUS, "status")
@@ -58,6 +90,7 @@ def load_and_validate(path: Path) -> dict:
 
     for entry in entries:
         require(isinstance(entry, dict), "entry type")
+        require(set(entry) == ENTRY_KEYS, "entry keys")
         entry_id = entry.get("id")
         require(isinstance(entry_id, str) and entry_id and entry_id not in seen_ids, "entry id")
         seen_ids.add(entry_id)
@@ -99,7 +132,13 @@ def load_and_validate(path: Path) -> dict:
             value = measurement["value"]
             require(type(value) in {int, float} and math.isfinite(value) and value > 0, f"{entry_id}: measurement value")
             require(measurement["unit"] in ALLOWED_UNITS, f"{entry_id}: measurement unit")
-            require(measurement["source_relation"] in ALLOWED_SOURCE_RELATIONS, f"{entry_id}: measurement provenance")
+            relation = measurement["source_relation"]
+            require(relation in ALLOWED_SOURCE_RELATIONS, f"{entry_id}: measurement provenance")
+            if relation in DERIVED_RELATION_VALUES:
+                require(
+                    math.isclose(value, DERIVED_RELATION_VALUES[relation], rel_tol=0.0, abs_tol=1e-9),
+                    f"{entry_id}: derived measurement value",
+                )
 
     require(REQUIRED_COVERAGE.issubset(coverage), "coverage classes")
     return data

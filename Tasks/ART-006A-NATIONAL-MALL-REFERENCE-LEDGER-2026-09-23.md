@@ -28,7 +28,7 @@ Do not modify `Engine/`, gameplay, renderer/editor/importer code, CMake, workflo
 3. No external images, scans, map tiles or downloadable media are embedded.
 4. Numeric facts retain source units and provenance labels; no silent Unreal/Unity coordinate convention is introduced.
 5. Art bible gains a concise source-control/simplification rule pointing to this ledger.
-6. Independent standard-library verifier rejects false runtime status, boolean schema confusion, unapproved hosts, embedded media, missing facts, invalid measurement values/units/provenance and incomplete coverage.
+6. Independent standard-library verifier rejects unknown root/entry fields, false runtime status, boolean schema confusion, unapproved hosts, embedded media, missing facts, invalid measurement values/units/provenance, derived-value/provenance mismatches and incomplete coverage.
 7. Focused test suite and `py_compile` pass in the sandbox.
 
 ## Evidence boundary

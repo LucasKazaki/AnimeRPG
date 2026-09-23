@@ -35,6 +35,32 @@ def test_valid() -> None:
     assert "11 authoritative" in proc.stdout
 
 
+def test_unknown_root_field_rejected() -> None:
+    proc = mutate(lambda d: d.__setitem__("runtime_verified", True))
+    assert "root keys" in proc.stderr
+
+
+def test_unknown_entry_field_rejected() -> None:
+    proc = mutate(lambda d: d["entries"][0].__setitem__("image_url", "data:image/png;base64,AAAA"))
+    assert "entry keys" in proc.stderr
+
+
+def test_lincoln_derived_measurement_mismatch_rejected() -> None:
+    def change(d):
+        entry = next(e for e in d["entries"] if e["id"] == "lincoln-memorial-materials")
+        entry["measurements"][0]["value"] = 1
+    proc = mutate(change)
+    assert "derived measurement value" in proc.stderr
+
+
+def test_washington_derived_measurement_mismatch_rejected() -> None:
+    def change(d):
+        entry = next(e for e in d["entries"] if e["id"] == "washington-monument-massing")
+        entry["measurements"][0]["value"] = 1
+    proc = mutate(change)
+    assert "derived measurement value" in proc.stderr
+
+
 def test_schema_bool_rejected() -> None:
     proc = mutate(lambda d: d.__setitem__("schema_version", True))
     assert "schema_version" in proc.stderr
@@ -100,6 +126,10 @@ def test_missing_required_coverage_rejected() -> None:
 
 TESTS = [
     test_valid,
+    test_unknown_root_field_rejected,
+    test_unknown_entry_field_rejected,
+    test_lincoln_derived_measurement_mismatch_rejected,
+    test_washington_derived_measurement_mismatch_rejected,
     test_schema_bool_rejected,
     test_false_runtime_status_rejected,
     test_duplicate_id_rejected,
