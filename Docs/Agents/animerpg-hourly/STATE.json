@@ -15,8 +15,8 @@
   "pass": "GAME-PASS16-SHADOWBLADE-LOADOUT-2026-09-23",
   "task_packet": "Tasks/GAME-PASS16-SHADOWBLADE-LOADOUT-2026-09-23.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS16.md",
-  "pr": null,
-  "final_head": "pending_pr_and_exact_head_gates",
+  "pr": 35,
+  "final_head": "pending_exact_head_gates_see_pr_35",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -52,5 +52,5 @@
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "Open one scoped PR to main, run exact-head hosted Windows Debug/Release and release-integrity checks, obtain fresh independent Codex review, repair material findings without weakening acceptance, re-read live main/head, then merge only the exact tested and reviewed head."
+  "next_action": "On PR #35, require exact-head hosted Windows Debug/Release and release-integrity checks plus fresh independent Codex review, repair material findings without weakening acceptance, re-read live main/head, then merge only the exact tested and reviewed head."
 }
