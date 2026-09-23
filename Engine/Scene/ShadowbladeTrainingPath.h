@@ -189,19 +189,22 @@ public:
         if (currentLesson_ == ShadowbladeTrainingLesson::BossRehearsal) {
             bool everySuccess = true;
             bool everyPerfect = true;
+            bool anyHit = false;
             for (EnemyAttackPattern pattern : BossPatterns()) {
                 const DefensePracticePatternStats stats = session.PatternStats(pattern);
                 everySuccess = everySuccess
                     && stats.perfectDefenses + stats.ordinaryDefenses >= 1;
                 everyPerfect = everyPerfect && stats.perfectDefenses >= 1;
+                anyHit = anyHit || stats.hitsTaken > 0;
             }
+            if (anyHit) return ShadowbladeTrainingMedal::Bronze;
             if (everyPerfect) return ShadowbladeTrainingMedal::Gold;
             if (everySuccess) return ShadowbladeTrainingMedal::Silver;
             return ShadowbladeTrainingMedal::Bronze;
         }
 
         const DefenseTrainingStats& stats = session.Stats();
-        if (stats.hitsTaken == 0
+        if (stats.hitsTaken == 0 && stats.ordinaryDefenses == 0
             && stats.perfectDefenses >= session.GoalTarget()) {
             return ShadowbladeTrainingMedal::Gold;
         }
