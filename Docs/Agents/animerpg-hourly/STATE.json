@@ -22,19 +22,19 @@
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
     "increments_with_explicit_regression_coverage": 6,
-    "increments_integrated_game_domain": 6,
+    "increments_integrated_game_domain": 0,
     "increments_hosted_verified_on_exact_final_head": 0,
     "increments_native_playable_verified": 0,
     "increments_independently_reviewed_clean_on_final_head": 0,
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-077","title":"Level-gated Shadowblade weapon frames","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-078","title":"Four typed resonance-module slots","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-079","title":"Bounded equipment-family resonance profile","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-080","title":"Three exact saved loadout slots with atomic switching","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-081","title":"One-time unequipped-module salvage into bounded tuning parts","status":"implemented_registered_test_coverage"},
-    {"id":"QOL-017","title":"Exact-item preset fidelity with atomic stale-item failure","status":"implemented_registered_test_coverage"}
+    {"id":"GAME-077","title":"Level-gated Shadowblade weapon frames","status":"implemented_registered_test_coverage_backend_only"},
+    {"id":"GAME-078","title":"Four typed resonance-module slots","status":"implemented_registered_test_coverage_backend_only"},
+    {"id":"GAME-079","title":"Bounded equipment-family resonance profile","status":"implemented_registered_test_coverage_backend_only"},
+    {"id":"GAME-080","title":"Three exact saved loadout slots with atomic switching","status":"implemented_registered_test_coverage_backend_only"},
+    {"id":"GAME-081","title":"One-time unequipped-module salvage into bounded tuning parts","status":"implemented_registered_test_coverage_backend_only"},
+    {"id":"QOL-017","title":"Exact-item preset fidelity with atomic stale-item failure","status":"implemented_registered_test_coverage_backend_only"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
@@ -44,6 +44,7 @@
     "release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
     "independent_review": "pending_fresh_exact_final_head",
+    "integration": "backend_only_not_constructed_or_called_by_live_game_flow",
     "persistent_save": "not_implemented_not_claimed",
     "combat_stat_application": "not_implemented_not_claimed"
   },
@@ -52,5 +53,5 @@
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "On PR #35, require exact-head hosted Windows Debug/Release and release-integrity checks plus fresh independent Codex review, repair material findings without weakening acceptance, re-read live main/head, then merge only the exact tested and reviewed head."
+  "next_action": "On PR #35, require exact-head hosted Windows Debug/Release and release-integrity checks plus fresh independent Codex review after the backend-only accounting correction, repair material findings without weakening acceptance, re-read live main/head, then merge only the exact tested and reviewed head. A later bounded packet must wire ShadowbladeLoadout into a live game flow before any integrated/playable count is claimed."
 }
