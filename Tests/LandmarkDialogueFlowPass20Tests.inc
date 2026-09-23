@@ -132,12 +132,17 @@ void TestLandmarkDialogueFlowPass20() {
         LandmarkDialogue dialogue;
         const DialogueTopic invalidTopic = static_cast<DialogueTopic>(255);
         const DialogueChoice invalidChoice = static_cast<DialogueChoice>(255);
-        Expect(dialogue.TopicAvailability(invalidTopic) == DialogueAvailability::Locked
-                && !dialogue.RecommendedTopic({0, false, false}).available == false,
-            "pass20 invalid topic availability fails closed while normal recommendation remains valid");
-        const DialogueBeat invalid = dialogue.Choose(
+        const DialogueRecommendation normalRecommendation =
+            dialogue.RecommendedTopic({0, false, false});
+        const DialogueBeat invalidTopicBeat = dialogue.Choose(
+            invalidTopic, DialogueChoice::AskDirectly, {0, false, false});
+        const DialogueBeat invalidChoiceBeat = dialogue.Choose(
             DialogueTopic::RiftTheory, invalidChoice, {0, false, false});
-        Expect(invalid.response == DialogueResponse::Invalid && dialogue.HistoryCount() == 0,
-            "pass20 invalid choice fails closed without history mutation");
+        Expect(dialogue.TopicAvailability(invalidTopic) == DialogueAvailability::Locked
+                && normalRecommendation.available
+                && invalidTopicBeat.response == DialogueResponse::Invalid
+                && invalidChoiceBeat.response == DialogueResponse::Invalid
+                && dialogue.HistoryCount() == 0,
+            "pass20 invalid topic and choice values fail closed without history mutation");
     }
 }
