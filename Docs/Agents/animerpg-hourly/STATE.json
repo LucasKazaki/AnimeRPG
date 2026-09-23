@@ -16,7 +16,7 @@
   "task_packet": "Tasks/GAME-PASS23-SHADOWBLADE-TRAINING-PATH-2026-09-23.md",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS23.md",
   "pr": 42,
-  "final_head": "pending_exact_final_head_after_state_record",
+  "final_head": "pending_exact_repaired_final_head_after_state_record",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -30,20 +30,20 @@
   },
   "increments": [
     {"id":"GAME-112","title":"Sequential Shadowblade lesson curriculum","status":"implemented_registered_test_coverage_game_domain"},
-    {"id":"GAME-113","title":"Atomic authored lesson setup","status":"implemented_registered_test_coverage_game_domain"},
-    {"id":"GAME-114","title":"Deterministic lesson mastery medals","status":"implemented_registered_test_coverage_game_domain"},
+    {"id":"GAME-113","title":"Atomic authored lesson setup","status":"implemented_registered_test_coverage_game_domain_review_repair_live_threat_lock"},
+    {"id":"GAME-114","title":"Deterministic lesson mastery medals","status":"implemented_registered_test_coverage_game_domain_review_repair_medal_caps"},
     {"id":"GAME-115","title":"Opt-in forgiving defense timing assist","status":"implemented_registered_test_coverage_game_domain"},
     {"id":"GAME-116","title":"Versioned monotonic training checkpoint","status":"implemented_registered_test_coverage_game_domain_in_memory_only"},
-    {"id":"QOL-024","title":"Boss-style three-threat rehearsal","status":"implemented_registered_test_coverage_game_domain"}
+    {"id":"QOL-024","title":"Boss-style three-threat rehearsal","status":"implemented_registered_test_coverage_game_domain_review_repair_pattern_provenance"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
     "sandbox_cpp17": "not_run_clone_failed_before_source_access_due_container_DNS_no_product_claim",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
+    "hosted_windows_ci": "pending_exact_repaired_final_head",
+    "release_manifest": "pending_exact_repaired_final_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "pending_exact_final_head",
-    "research": "five_official_reference_mechanics_plus_new_ZZZ_training_boss_rehearsal_player_request_with_corroboration_and_counterexample_alternatives",
+    "independent_review": "first_review_on_67f9039_found_four_P2s_all_repaired; fresh_exact_final_head_review_required",
+    "research": "five_official_reference_mechanics_plus_boss_training_rotation_request_verified_from_2026-02-14_and_2025-08-27_player_threads_with_workaround_counterexamples",
     "integration": "all_six_increments_layer_on_existing_DefensePracticeSession_and_ShadowbladeActions_authority; no_parallel_combat_framework",
     "persistent_cross_process_save": "not_implemented_not_claimed"
   },
@@ -52,5 +52,11 @@
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged"
   },
-  "next_action": "PR 42 is open. Freeze the branch, inspect the full diff, require hosted Windows Debug/Release deterministic tests and release-manifest integrity on the exact final head, request fresh independent Codex review on that exact head, repair any material finding and rerun affected gates, then merge only that exact tested/reviewed head after re-reading live main."
+  "review_repairs": [
+    "boss_hit_caps_medal_at_bronze",
+    "gold_requires_zero_ordinary_defenses",
+    "lesson_completion_requires_authored_pattern_provenance",
+    "lesson_application_rejects_any_live_action_threat_before_mutation"
+  ],
+  "next_action": "Freeze the repaired PR 42 branch, inspect the full six-path diff, require exact-head Windows Debug/Release deterministic tests plus release-manifest integrity, request fresh independent Codex review on that exact head, resolve all material threads, then re-read live main and merge only the exact tested/reviewed head using expected-head checking."
 }
