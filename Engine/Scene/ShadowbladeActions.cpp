@@ -52,6 +52,30 @@ ShadowbladeActionTuning ShadowbladeActions::CurrentLoadoutTuning() const {
     return BuildLoadoutTuning(loadout_);
 }
 
+ShadowActionReadiness ShadowbladeActions::CurrentActionReadiness() const {
+    ShadowActionReadiness readiness{};
+    readiness.resource = std::isfinite(resource_)
+        ? std::clamp(resource_, 0.0f, MaximumResource)
+        : 0.0f;
+    readiness.dashCooldownRemaining = std::isfinite(dashCooldownRemaining_)
+        ? std::clamp(dashCooldownRemaining_, 0.0f, DashCooldownSeconds)
+        : 0.0f;
+    readiness.fatalStrikeCooldownRemaining = std::isfinite(fatalStrikeCooldownRemaining_)
+        ? std::clamp(fatalStrikeCooldownRemaining_, 0.0f, FatalStrikeCooldownSeconds)
+        : 0.0f;
+    readiness.dashCooldownNormalized = DashCooldownSeconds > 0.0f
+        ? readiness.dashCooldownRemaining / DashCooldownSeconds
+        : 0.0f;
+    readiness.fatalStrikeCooldownNormalized = FatalStrikeCooldownSeconds > 0.0f
+        ? readiness.fatalStrikeCooldownRemaining / FatalStrikeCooldownSeconds
+        : 0.0f;
+    readiness.dashResourceAffordable = readiness.resource >= DashCost;
+    readiness.fatalStrikeBaseResourceAffordable = readiness.resource >= FatalStrikeCost;
+    readiness.guarding = guarding_;
+    readiness.shadowMomentum = std::clamp(shadowMomentum_, 0, MaximumShadowMomentum);
+    return readiness;
+}
+
 LoadoutActionResult ShadowbladeActions::PreviewPresetTuning(std::size_t slot,
     const CharacterProgression& progression, ShadowbladeActionTuning& tuning) const {
     ShadowbladeLoadout preview = loadout_;
@@ -239,6 +263,10 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
     } else if (defenseCounter) {
         resourceCost = DefenseCounterFatalStrikeCost;
     }
+    if ((staggerFollowUp || defenseCounter)
+        && loadout_.EquippedWeapon() == ShadowbladeWeapon::RiftsteelSabre) {
+        resourceCost = std::max(0.0f, resourceCost - RiftsteelFollowUpCostReduction);
+    }
     if (resource_ < resourceCost) {
         lastAction_.result = ShadowActionResult::InsufficientResource;
         return lastAction_;
@@ -253,6 +281,9 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
     }
 
     const ShadowbladeActionTuning tuning = CurrentLoadoutTuning();
+    const bool consumeMomentum = shadowMomentum_ > 0;
+    const int fatalStrikeDamage = tuning.fatalStrikeDamage
+        + (consumeMomentum ? MomentumFatalStrikeDamageBonus : 0);
     resource_ -= resourceCost;
     fatalStrikeCooldownRemaining_ = FatalStrikeCooldownSeconds;
     lastAction_.result = ShadowActionResult::Activated;
@@ -265,7 +296,10 @@ ShadowActionReport ShadowbladeActions::TryFatalStrike(const Math::Vec3& position
         defenseCounterEndSeconds_ = 0.0;
         defenseCounterDeadlineUncertaintySeconds_ = 0.0;
     }
-    lastAction_.damageApplied = combatSandbox.ApplyDamage(tuning.fatalStrikeDamage);
+    if (consumeMomentum) {
+        --shadowMomentum_;
+    }
+    lastAction_.damageApplied = combatSandbox.ApplyDamage(fatalStrikeDamage);
     if (lastAction_.damageApplied > 0) {
         combatSandbox.RegisterSuccessfulAttackHit();
     }
@@ -321,6 +355,12 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
         incomingAttackDeadlineUncertaintySeconds_ = 0.0;
         if (DefenseWindowContains(remainingSeconds, perfectWindow, perfectTolerance)) {
             defenseCounterEndSeconds_ = StartDefenseCounterDeadline();
+            shadowMomentum_ = std::min(MaximumShadowMomentum, shadowMomentum_ + 1);
+            if (loadout_.EquippedWeapon() == ShadowbladeWeapon::TrainingBlade) {
+                dashCooldownRemaining_ = std::max(0.0f,
+                    dashCooldownRemaining_
+                        - TrainingBladePerfectDodgeDashCooldownReductionSeconds);
+            }
             lastDefense_ = {DefenseResult::PerfectDodge, 0, 0, true, remaining};
         } else {
             RebaseDefenseClock();
@@ -338,6 +378,11 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
     incomingAttackDeadlineUncertaintySeconds_ = 0.0;
     if (DefenseWindowContains(remainingSeconds, perfectWindow, perfectTolerance)) {
         defenseCounterEndSeconds_ = StartDefenseCounterDeadline();
+        shadowMomentum_ = std::min(MaximumShadowMomentum, shadowMomentum_ + 1);
+        if (loadout_.EquippedWeapon() == ShadowbladeWeapon::CryoEdge) {
+            guardIntegrity_ = std::min(MaximumGuardIntegrity,
+                guardIntegrity_ + CryoEdgePerfectGuardRestore);
+        }
         lastDefense_ = {DefenseResult::PerfectGuard, 0, 0, true, remaining};
         return lastDefense_;
     }
@@ -364,6 +409,7 @@ DefenseReport ShadowbladeActions::TryDefend(DefenseInput input) {
 void ShadowbladeActions::ResetDefenseState() {
     playerHealth_ = MaximumPlayerHealth;
     guardIntegrity_ = MaximumGuardIntegrity;
+    shadowMomentum_ = 0;
     incomingAttackActive_ = false;
     defenseElapsedSecondsPrecise_ = 0.0;
     defenseElapsedUncertaintySeconds_ = 0.0;
