@@ -197,27 +197,35 @@ public:
             && deltaSeconds <= std::numeric_limits<float>::max();
         const DefenseTrainingStats before = drill_.Stats();
         const bool resolved = drill_.AdvanceTime(combat, actions, deltaSeconds);
-        if (countActiveTime) AddActiveSeconds(deltaSeconds);
-        if (!resolved || !currentAttackActive_) return resolved;
 
-        const DefenseTrainingStats after = drill_.Stats();
-        DefensePracticePatternStats& pattern = PatternStatsMutable(currentPattern_);
-        if (after.hitsTaken > before.hitsTaken) {
-            Increment(pattern.hitsTaken);
-            AddDamage(pattern.damageTaken, after.damageTaken - before.damageTaken);
-            ResetAlternatingChain();
-        } else if (after.interruptions > before.interruptions) {
-            Increment(pattern.interruptions);
-            ResetAlternatingChain();
-        } else if (after.perfectDefenses > before.perfectDefenses) {
-            Increment(pattern.perfectDefenses);
-            RecordSuccessfulDefense(KindForResult(actions.LastDefense().result));
-        } else if (after.ordinaryDefenses > before.ordinaryDefenses) {
-            Increment(pattern.ordinaryDefenses);
-            RecordSuccessfulDefense(KindForResult(actions.LastDefense().result));
+        // Reconcile terminal state before adding this coordinator frame to the
+        // session clock. A defense may already have resolved directly through
+        // ShadowbladeActions before this call; in that case its chain timestamp
+        // is the pre-frame session time, not the end of an arbitrarily large
+        // reconciliation tick. Automatic impacts do not create successful
+        // defenses, so hit/interruption handling remains frame-invariant.
+        if (resolved && currentAttackActive_) {
+            const DefenseTrainingStats after = drill_.Stats();
+            DefensePracticePatternStats& pattern = PatternStatsMutable(currentPattern_);
+            if (after.hitsTaken > before.hitsTaken) {
+                Increment(pattern.hitsTaken);
+                AddDamage(pattern.damageTaken, after.damageTaken - before.damageTaken);
+                ResetAlternatingChain();
+            } else if (after.interruptions > before.interruptions) {
+                Increment(pattern.interruptions);
+                ResetAlternatingChain();
+            } else if (after.perfectDefenses > before.perfectDefenses) {
+                Increment(pattern.perfectDefenses);
+                RecordSuccessfulDefense(KindForResult(actions.LastDefense().result));
+            } else if (after.ordinaryDefenses > before.ordinaryDefenses) {
+                Increment(pattern.ordinaryDefenses);
+                RecordSuccessfulDefense(KindForResult(actions.LastDefense().result));
+            }
+            currentAttackActive_ = false;
         }
-        currentAttackActive_ = false;
-        return true;
+
+        if (countActiveTime) AddActiveSeconds(deltaSeconds);
+        return resolved;
     }
 
     bool SetPaused(bool paused) { return drill_.SetPaused(paused); }
