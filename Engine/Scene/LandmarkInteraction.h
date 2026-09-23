@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Engine/Scene/CharacterProgression.h"
+#include "Engine/Scene/ExplorationFieldGuide.h"
 #include "Engine/Scene/LandmarkDialogue.h"
 #include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/WorldBlockout.h"
@@ -55,10 +56,24 @@ public:
     void SetCharacterProgression(CharacterProgression* progression) { progression_ = progression; }
 
     DialogueBeat TryDialogueChoice(DialogueTopic topic, DialogueChoice choice) {
-        return dialogue_.Choose(topic, choice, {VisitedCount(), ObjectiveComplete()});
+        const DialogueBeat beat = dialogue_.Choose(topic, choice,
+            {VisitedCount(), ObjectiveComplete()});
+        SyncFieldGuideNarrative();
+        return beat;
     }
-    DialogueOutcome CommitDialogueOutcome() { return dialogue_.CommitOutcome(); }
+    DialogueOutcome CommitDialogueOutcome() {
+        const DialogueOutcome outcome = dialogue_.CommitOutcome();
+        SyncFieldGuideNarrative();
+        return outcome;
+    }
     const LandmarkDialogue& Dialogue() const { return dialogue_; }
+
+    bool TrackFieldOperation(FieldOperation operation) {
+        return fieldGuide_.TrackOperation(operation);
+    }
+    bool PinFieldTarget(LandmarkKind landmark) { return fieldGuide_.PinTarget(landmark); }
+    void ClearPinnedFieldTarget() { fieldGuide_.ClearPinnedTarget(); }
+    const ExplorationFieldGuide& FieldGuide() const { return fieldGuide_; }
 
     bool SetObjectiveActivationMode(LandmarkObjectiveActivationMode mode);
     bool StartObjective();
@@ -90,6 +105,14 @@ private:
     void RecordObjectiveVisit(std::size_t index);
     void ApplyObjectiveRewards(ShadowbladeActions& shadowbladeActions,
         float& reward, ProgressionRewardReport& progressionReward);
+    void SyncFieldGuideNarrative() {
+        fieldGuide_.SyncNarrativeEvidence({
+            dialogue_.HasClue(DialogueClue::RiftResidue),
+            dialogue_.HasClue(DialogueClue::CoolingAnomaly),
+            dialogue_.HasClue(DialogueClue::CryptSigil),
+            dialogue_.HasLoreEntry(LoreEntry::ShadowCryptRumor),
+        });
+    }
 
     std::array<bool, LedgerCapacity> visited_{};
     std::array<bool, LedgerCapacity> objectiveVisited_{};
@@ -103,6 +126,7 @@ private:
     bool objectiveStarted_{true};
     CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
     LandmarkDialogue dialogue_{};
+    ExplorationFieldGuide fieldGuide_{};
     LandmarkInteractionReport lastReport_{};
 };
 

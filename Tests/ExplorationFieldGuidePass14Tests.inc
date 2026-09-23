@@ -1,0 +1,92 @@
+void TestExplorationFieldGuidePass14() {
+    using namespace Astral::Scene;
+
+    ExplorationFieldGuide guide;
+    const FieldOperationProgress initialSurvey = guide.OperationProgress(FieldOperation::MallSurvey);
+    Expect(initialSurvey.current == 0 && initialSurvey.required == 3 && !initialSurvey.Complete(),
+        "field-operation board begins with a bounded three-site Mall survey");
+    Expect(guide.TrackOperation(FieldOperation::RiftInvestigation)
+            && guide.TrackedOperation() == FieldOperation::RiftInvestigation,
+        "tracked operations can change explicitly to a valid field operation");
+    Expect(!guide.TrackOperation(static_cast<FieldOperation>(999))
+            && guide.TrackedOperation() == FieldOperation::RiftInvestigation,
+        "invalid operation ids fail closed without changing the tracked operation");
+
+    Expect(guide.RecordLandmark(LandmarkKind::WashingtonMonument)
+            && !guide.RecordLandmark(LandmarkKind::WashingtonMonument)
+            && guide.DiscoveryCount() == 1
+            && guide.DiscoveryFromOldest(0) == LandmarkKind::WashingtonMonument,
+        "landmark survey chronology records each site once even when exploration is out of order");
+    Expect(guide.HasJournalEntry(FieldJournalEntry::MonumentFieldNote)
+            && guide.JournalEntryUnlockedCount() == 1,
+        "first-time site surveys unlock their bounded field-journal entry");
+
+    FieldNarrativeSnapshot evidence{};
+    evidence.hasRiftResidue = true;
+    evidence.hasCryptSigil = true;
+    guide.SyncNarrativeEvidence(evidence);
+    const FieldOperationProgress oneRiftClue =
+        guide.OperationProgress(FieldOperation::RiftInvestigation);
+    Expect(oneRiftClue.current == 1 && oneRiftClue.required == 2 && !oneRiftClue.Complete(),
+        "Shadow Crypt evidence cannot substitute for the second Rift investigation clue");
+    Expect(guide.OperationProgress(FieldOperation::ShadowCryptLead).current == 1
+            && !guide.OperationProgress(FieldOperation::ShadowCryptLead).Complete(),
+        "Crypt Sigil advances only its separate Shadow Crypt evidence gate without lore");
+
+    evidence.hasCoolingAnomaly = true;
+    guide.SyncNarrativeEvidence(evidence);
+    const FieldOperationProgress rift = guide.OperationProgress(FieldOperation::RiftInvestigation);
+    Expect(rift.current == 2 && rift.required == 2 && rift.Complete()
+            && guide.HasJournalEntry(FieldJournalEntry::RiftEvidence),
+        "Rift Residue plus Cooling Anomaly complete the Rift investigation and unlock its evidence note");
+
+    FieldNarrativeSnapshot staleEvidence{};
+    staleEvidence.hasRiftResidue = true;
+    guide.SyncNarrativeEvidence(staleEvidence);
+    Expect(guide.OperationProgress(FieldOperation::RiftInvestigation).current == 2,
+        "a stale lower evidence snapshot cannot erase already observed Rift clue progress");
+
+    FieldNarrativeSnapshot cryptEvidence{};
+    cryptEvidence.hasShadowCryptLore = true;
+    guide.SyncNarrativeEvidence(cryptEvidence);
+    Expect(guide.OperationProgress(FieldOperation::ShadowCryptLead).Complete()
+            && guide.HasJournalEntry(FieldJournalEntry::ShadowCryptLead),
+        "the crypt clue plus matching lore complete the Shadow Crypt lead without a duplicate reward path");
+
+    ExplorationFieldGuide route;
+    Expect(route.TrackOperation(FieldOperation::MallSurvey),
+        "survey route can be selected as the tracked field operation");
+    const FieldTarget recommended = route.CurrentTarget();
+    Expect(recommended.available && recommended.source == FieldTargetSource::Recommended
+            && recommended.landmark == LandmarkKind::LincolnMemorial,
+        "survey guidance recommends the first unvisited National Mall site");
+    Expect(route.RecordLandmark(LandmarkKind::LincolnMemorial)
+            && route.CurrentTarget().landmark == LandmarkKind::ReflectingPool,
+        "survey guidance advances past already observed landmarks");
+
+    Expect(route.PinTarget(LandmarkKind::WashingtonMonument),
+        "player can temporarily override route guidance with a custom unvisited field target");
+    const FieldTarget pinned = route.CurrentTarget();
+    Expect(pinned.available && pinned.source == FieldTargetSource::PlayerPin
+            && pinned.landmark == LandmarkKind::WashingtonMonument,
+        "manual field pin takes precedence over the automatic survey recommendation");
+    Expect(route.RecordLandmark(LandmarkKind::WashingtonMonument)
+            && !route.HasPinnedTarget()
+            && route.CurrentTarget().source == FieldTargetSource::Recommended
+            && route.CurrentTarget().landmark == LandmarkKind::ReflectingPool,
+        "discovering the pinned site automatically reconciles the pin instead of leaving stale cleanup work");
+    Expect(!route.PinTarget(LandmarkKind::LincolnMemorial),
+        "already completed landmarks cannot be repinned as unfinished targets");
+    Expect(!route.PinTarget(static_cast<LandmarkKind>(999))
+            && !route.HasPinnedTarget()
+            && route.CurrentTarget().source == FieldTargetSource::Recommended
+            && route.CurrentTarget().landmark == LandmarkKind::ReflectingPool,
+        "invalid landmark ids fail closed without fabricating or replacing an unfinished pin");
+
+    Expect(route.RecordLandmark(LandmarkKind::ReflectingPool)
+            && route.OperationProgress(FieldOperation::MallSurvey).Complete()
+            && !route.CurrentTarget().available,
+        "completing all three unique site surveys closes the bounded route with no phantom target");
+    Expect(route.CompletedOperationCount() == 1,
+        "completed operation count reflects only operations actually satisfied in this guide state");
+}

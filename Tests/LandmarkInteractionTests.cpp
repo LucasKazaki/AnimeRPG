@@ -406,6 +406,62 @@ void TestManualObjectiveActivationPreservesFreeExploration() {
         "completed manual objectives cannot be restarted, mode-reset, or reward-farmed");
 }
 
+void TestFieldGuideProductionIntegration() {
+    using namespace Astral::Scene;
+    WorldBlockout world;
+    LandmarkInteraction interaction;
+    ShadowbladeActions actions;
+
+    const Astral::Math::Vec3 lincoln{-8.0f, 18.0f, 0.0f};
+    const Astral::Math::Vec3 pool{4.0f, 39.0f, 0.0f};
+    const Astral::Math::Vec3 monument{5.0f, 68.0f, 0.0f};
+
+    const auto first = interaction.TryInteract(lincoln, world, actions);
+    Expect(first.result == LandmarkInteractionResult::Discovered
+            && interaction.FieldGuide().IsVisited(LandmarkKind::LincolnMemorial)
+            && interaction.FieldGuide().DiscoveryCount() == 1
+            && interaction.FieldGuide().HasJournalEntry(FieldJournalEntry::LincolnFieldNote),
+        "real landmark discovery feeds the field guide and unlocks its site note");
+    const auto repeat = interaction.TryInteract(lincoln, world, actions);
+    Expect(repeat.result == LandmarkInteractionResult::AlreadyVisited
+            && interaction.FieldGuide().DiscoveryCount() == 1,
+        "repeat landmark interaction cannot duplicate field-guide discovery state");
+
+    Expect(interaction.TryInteract(pool, world, actions).result
+            == LandmarkInteractionResult::Discovered,
+        "field-guide dialogue integration setup reaches two visited landmarks");
+    const DialogueBeat rift = interaction.TryDialogueChoice(
+        DialogueTopic::RiftTheory, DialogueChoice::ShareEvidence);
+    Expect(rift.clueUnlocked
+            && interaction.Dialogue().HasClue(DialogueClue::RiftResidue)
+            && interaction.FieldGuide().OperationProgress(FieldOperation::RiftInvestigation).current == 1
+            && interaction.FieldGuide().HasJournalEntry(FieldJournalEntry::RiftEvidence),
+        "LandmarkInteraction dialogue wrapper synchronizes the first authoritative Rift clue");
+
+    Expect(interaction.TryInteract(monument, world, actions).result
+            == LandmarkInteractionResult::Discovered
+            && interaction.ObjectiveComplete(),
+        "field-guide dialogue integration setup completes the National Mall objective");
+    const DialogueBeat cooling = interaction.TryDialogueChoice(
+        DialogueTopic::LandmarkHistory, DialogueChoice::ShareEvidence);
+    Expect(cooling.clueUnlocked
+            && interaction.Dialogue().HasClue(DialogueClue::CoolingAnomaly)
+            && interaction.FieldGuide().OperationProgress(FieldOperation::RiftInvestigation).Complete(),
+        "second authoritative Rift clue completes the field-guide investigation through production integration");
+
+    const DialogueBeat crypt = interaction.TryDialogueChoice(
+        DialogueTopic::ShadowCrypt, DialogueChoice::ShareEvidence);
+    Expect(crypt.clueUnlocked && crypt.loreUnlocked
+            && interaction.Dialogue().HasClue(DialogueClue::CryptSigil)
+            && interaction.Dialogue().HasLoreEntry(LoreEntry::ShadowCryptRumor)
+            && interaction.FieldGuide().OperationProgress(FieldOperation::ShadowCryptLead).Complete()
+            && interaction.FieldGuide().HasJournalEntry(FieldJournalEntry::ShadowCryptLead),
+        "production dialogue synchronization keeps Shadow Crypt clue and lore on their own operation");
+    const DialogueOutcome outcome = interaction.CommitDialogueOutcome();
+    Expect(outcome != DialogueOutcome::None,
+        "dialogue outcome wrapper remains callable after field-guide evidence synchronization");
+}
+
 void TestEncounterChallengeScoringRanksAndFirstClears() {
     using namespace Astral::Scene;
 
@@ -528,6 +584,7 @@ int main() {
     TestProgressionTrainingReadinessJourneyAndAwakening();
     TestLandmarkObjectiveGrantsProgressionOnce();
     TestManualObjectiveActivationPreservesFreeExploration();
+    TestFieldGuideProductionIntegration();
     TestEncounterChallengeScoringRanksAndFirstClears();
     if (failures != 0) return 1;
     std::cout << "Landmark interaction tests passed\n";

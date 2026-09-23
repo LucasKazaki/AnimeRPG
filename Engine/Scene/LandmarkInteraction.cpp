@@ -55,6 +55,7 @@ LandmarkInteractionReport LandmarkInteraction::TryInteract(const Math::Vec3& pla
 
     if (!alreadyVisited) {
         visited_[selectedIndex_] = true;
+        fieldGuide_.RecordLandmark(kind);
         if (kind == LandmarkKind::LincolnMemorial) {
             reward += shadowbladeActions.RestoreResource(LincolnReward);
         }
