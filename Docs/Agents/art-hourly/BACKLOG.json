@@ -48,9 +48,16 @@
     {
       "id": "ART-007",
       "title": "Color/value/exposure calibration references",
+      "status": "source_validated_ready_for_review",
+      "dependency": "runtime color/exposure path later; PR #28 remains unmerged",
+      "next_acceptance": "fixed neutral daylight and overcast Astral captures once renderer controls exist"
+    },
+    {
+      "id": "ART-008",
+      "title": "Neutral material-response gallery source fixture",
       "status": "source_validated_pending_review",
-      "dependency": "independent review now; runtime color/exposure path later",
-      "next_acceptance": "exact-head CI/review then fixed neutral daylight and overcast Astral captures once renderer controls exist"
+      "dependency": "exact-head hosted CI and independent review now; Astral glTF/material/light import later",
+      "next_acceptance": "generated gallery imports and renders in Astral with correct camera, geometry, material response and neutral light contract"
     }
   ]
 }
