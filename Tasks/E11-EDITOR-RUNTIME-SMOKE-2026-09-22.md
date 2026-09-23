@@ -57,25 +57,36 @@ ASAN_OPTIONS=detect_leaks=1 ./e11_show_state_deadline_fixture_clang
 
 Both executions printed `e11 show-state deadline fixture: PASS`. The fixture proves only source-logic properties, not Win32 GUI behavior.
 
-## Hosted evidence for implementation commit
+## Hosted evidence and exact reviewed receipt
 
-For source commit `4582d637a36d8d55981bda0886ef31d8643eef1b`:
+For implementation source commit `4582d637a36d8d55981bda0886ef31d8643eef1b`:
 
-- Windows build and deterministic tests: run `35902292907`, job `107321254906`, completed success at `2026-09-23T18:27:06Z`. Repository/R0 safety checks, VS2022 x64 configure, Debug build/tests, Release build/tests, runtime/prerequisite checks, static verifiers, and clean tracked-tree verification all passed.
+- Windows build and deterministic tests: run `35902292907`, job `107321254906`, completed success at `2026-09-23T18:27:06Z`.
 - Profiling capture portability: run `35902292991`, success.
 - Release manifest integrity: run `35902292936`, success.
 
-Hosted deterministic CTest intentionally excludes the interactive GUI `EditorRuntimeSmoke`. These results are compilation/deterministic evidence only and do not establish native maximize/restore, GPU/desktop behavior, screenshots, package launch, performance, stress, or soak acceptance.
+For exact final receipt/source head `0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d`:
+
+- current observed `main` at the tested integration point: `4c3308051c910b66dd0aebcf513956926beab505`;
+- GitHub synthetic PR merge actually tested: `5fd749061e2d146a03240232366f17d611327aef`, whose parents are base `4c3308051c910b66dd0aebcf513956926beab505` and source `0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d`;
+- Windows build and deterministic tests: run `35902826792`, job `107323032434`, completed `success` at `2026-09-23T18:31:47Z`;
+- profiling capture portability: run `35902826812`, `success`;
+- release manifest integrity: run `35902826744`, `success`;
+- fresh independent Codex review completed `2026-09-23T18:38:09Z` on exact commit `0e756498...` and reported no major issues. No new inline finding was produced for that exact head.
+
+The Windows job passed repository/R0 safety contracts, VS2022 x64 configure, Debug build/tests, Release build/tests, runtime/prerequisite checks, static milestone verifiers, and clean tracked-tree verification.
+
+Hosted deterministic CTest intentionally excludes the interactive GUI `EditorRuntimeSmoke`. These results are compilation/deterministic/integration evidence only and do not establish native maximize/restore, GPU/desktop behavior, screenshots, package launch, performance, stress, or soak acceptance.
 
 ## Retained gates
 
-`native_evidence` remains empty. Independent final acceptance remains false until the exact post-evidence receipt tree receives fresh independent review and the registered Windows executor retains native evidence. Issue #7 is still open, so the historical R0 runner remains blocked.
+`native_evidence` remains empty. The exact receipt tree has now satisfied the fresh independent implementation-review gate, but E11 final acceptance remains false until the registered Windows executor produces the required native interactive evidence on that exact reviewed tree. Issue #7 is still open, so the historical R0 runner remains blocked.
 
 The wider engine capability catalogue remains unresolved, including runtime/jobs/memory, scene ownership/serialization, full asset pipeline, GPU rendering/materials, lighting/shadows/reflections, large-world streaming/detail, animation, physics/collision, AI/navigation, audio, genuine 2D, networking, profiling/budgets, packaging/platforms, terrain/foliage, VFX/particles, cinematics, scripting/reflection, input/replay, accessibility/localization, additional platforms, comparative performance/reliability, clean-machine packaging, stress/recovery, and the required 24-hour soak. No UE5/Unity parity claim follows from this packet.
 
-## Registered native handoff
+## Registered native handoff, now unblocked by hosted/review gates
 
-Only after green hosted checks and a fresh clean review of the exact post-evidence receipt tree, the registered Windows executor should use one owned interactive desktop:
+The registered Windows executor should use one owned interactive desktop on exact reviewed source SHA `0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d`:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -95,4 +106,4 @@ Rollback only this verification repair if native evidence proves the phase-budge
 
 ## Single next useful action
 
-Refresh the QA/capability receipts and PR checkpoint around `4582d637...`, obtain fresh independent review of the exact final receipt head, then, if clean, hand that exact reviewed tree to the registered Windows executor. Do not start another dependent editor feature while the native QA gate is unresolved.
+Run the registered native Debug/Release `EditorContainmentTests` and interactive `EditorRuntimeSmoke` handoff on exact reviewed SHA `0e7564982ca4a61f84840c1b9e6da6d9a3d7ef9d`, retain the required machine/toolchain/GPU/desktop/process evidence and screenshots, then launch `AstralGame` separately as the same-build no-regression check. Do not start another dependent editor feature while this native QA gate is unresolved.
