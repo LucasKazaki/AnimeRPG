@@ -106,13 +106,16 @@ void TestManaReactorMissionPass26() {
         "recovery fixture reaches an authoritative Core failure");
     const ManaReactorMissionBriefing failedBriefing = recovery.Briefing();
     Expect(failedBriefing.recovery == ManaReactorMissionRecoveryAction::RetryStage
-            && recovery.RetryCurrentStage()
+            && !failedBriefing.emergencyVentSuggested,
+        "failed reactor guidance offers only an actually usable recovery action");
+    Expect(recovery.RetryCurrentStage()
             && recovery.Expedition().CurrentStage() == ManaReactorStage::CoreChamber
             && recovery.Expedition().StagesCleared() == 2
             && !recovery.Expedition().Failed(),
         "failure guidance retries only the failed stage and retains cleared work");
 
-    // GAME-130: best score/grade is retained per difficulty+protocol bucket.
+    // GAME-130: best score/grade is retained per difficulty+protocol bucket and
+    // consequence-free Calibration cannot overwrite Expedition records.
     ManaReactorMission records;
     Expect(records.Begin(readyGuide, ManaReactorMode::Expedition,
                ManaReactorDifficulty::Standard, ManaReactorProtocol::Baseline)
@@ -126,6 +129,13 @@ void TestManaReactorMissionPass26() {
         "clean reactor clear records the authoritative score and grade");
     Expect(!separateBucket.valid,
         "personal-best records stay isolated across difficulty/protocol configurations");
+    ManaReactorMission calibrationRecords;
+    Expect(calibrationRecords.Begin(readyGuide, ManaReactorMode::Calibration,
+               ManaReactorDifficulty::Standard, ManaReactorProtocol::Baseline)
+            && ClearManaReactorMissionSafely(calibrationRecords)
+            && !calibrationRecords.BestRecord(ManaReactorDifficulty::Standard,
+                ManaReactorProtocol::Baseline).valid,
+        "Calibration completion cannot replace or fabricate an Expedition personal best");
 
     // GAME-131: the live mission claims the existing one-time protagonist reward
     // without adding a second economy path.
