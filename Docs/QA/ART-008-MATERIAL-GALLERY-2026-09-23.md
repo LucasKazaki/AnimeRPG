@@ -8,20 +8,15 @@ Status: source-validated candidate, not imported or runtime-approved.
 
 ART-008 adds a machine-readable neutral gallery spec plus deterministic glTF generation and an independent verifier. The derived scene contains four matched sphere/cube stations, five PBR materials including the floor, one fixed camera, two white directional lights, and no image textures. This is an art-side source fixture, not a renderer feature or an Astral screenshot.
 
-Earlier exact-head reviews repaired floor tangent handedness, source-derived camera/light rotations, full floor tangent-frame validation, transform overrides that could reverse camera/light local -Z, uncontracted material rendering properties, and incomplete per-triangle normal validation.
+Earlier exact-head reviews repaired floor tangent handedness, source-derived camera/light rotations, full floor tangent-frame validation, transform overrides that could reverse camera/light local -Z, uncontracted material rendering properties, incomplete per-triangle normal validation, divergent per-station geometry, source-dimension drift, and unsupported evidence claims.
 
-The latest exact-head review at `aad40d621c35ca20049d06260e78702fb2717603` found two additional P2 acceptance gaps:
+The fifth exact-head review at `b14511647d72b789a9523fa3cd49667ecf8d0215` found one further P2 acceptance gap: valid glTF morph targets plus non-zero mesh weights could alter one station after the verifier checked only the base accessors, breaking the matched-geometry review while still passing after manifest repinning.
 
-1. a material station could be redirected to a separate same-count geometry accessor and repinned, so the four stations no longer had to use one canonical sphere/cube geometry source and source dimensions such as `sphere_radius` were not enforced;
-2. `extras.astral_contract` could gain unsupported evidence claims such as `runtime_verified` or `art_approved` while retaining the approved status and still pass after repinning.
-
-This pass closes both gaps. Sphere stations must share one canonical geometry accessor binding, cube stations must share one canonical binding, and the decoded sphere radius, cube half extent, and floor half extents are checked against the source specification. The glTF `extras` object is also closed to exactly `astral_contract`, and that contract must contain exactly the approved source-only fields. Supplemental runtime/art/parity claims are rejected independently of the manifest hash.
-
-Four new negative regressions cover split station geometry binding, source sphere radius drift, source cube extent drift, and a repinned `art_approved` evidence claim. The focused suite is now 23 tests.
+This pass closes that path by making each gallery mesh and primitive a closed contract. Meshes may contain only `name` and `primitives`; primitives may contain only `attributes`, `indices`, `material`, and `mode`. That rejects `weights`, morph `targets`, and other unapproved mesh/primitive features before geometry comparison. Two new negative regressions cover the exact weighted-morph bypass and an unweighted primitive morph target. The focused suite is now 25 tests.
 
 ## Source research
 
-The contract remains based on the Khronos glTF 2.0.1 rules already recorded for this task. Mesh/accessor indirection is valid glTF, so matched-review geometry must be an Astral fixture rule rather than assumed from the format. Likewise, glTF `extras` is extensible by design, so unsupported runtime or approval claims must be blocked by this fixture's evidence contract rather than inferred from generic glTF validity.
+The contract remains based on Khronos glTF 2.0.1. Morph targets and mesh weights are valid core glTF features, but they are outside this calibration fixture because the review requires every station to render the same immutable source geometry. Closing those optional fields is therefore an Astral fixture rule, not a claim that glTF itself forbids morphing.
 
 Primary references retained for this task:
 - https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
@@ -30,7 +25,7 @@ Primary references retained for this task:
 
 ## Verification state
 
-Exact-head hosted verification is required after the verifier/test and evidence commits. The generator, canonical source, and pinned generated artifact are unchanged by this repair:
+Fresh exact-head hosted CI and exact-head independent review are required after this repair. The generator, canonical source, and pinned generated artifact are unchanged:
 
 - canonical `gallery-spec.json`: `517833a990db74f97d8046aa7fafa2d2d73859538d59c3c41ff4a8a7fb63f530`
 - generated `material_gallery.gltf`: `d0bca093cfc52b59816a14ff98cc90b8684e7e7f664d0b687b394be5aa166af1`
@@ -41,7 +36,7 @@ The generated glTF remains intentionally untracked; `expected-manifest.json` pin
 
 ## Publication verification
 
-This repair remains within ART-008 ownership. The implementation changes are limited to the verifier and regression suite; source spec, generator, and expected manifest are unchanged. Draft PR #33 remains the integration surface. Exact-head hosted CI and a new exact-head independent source review are separate gates before marking the PR ready for review.
+This repair remains within ART-008 ownership. Implementation changes are limited to the verifier and regression suite; source spec, generator, and expected manifest are unchanged. Draft PR #33 remains the integration surface. Exact-head hosted CI and a new exact-head independent source review are separate gates before marking the PR ready for review.
 
 ## Evidence boundaries
 
