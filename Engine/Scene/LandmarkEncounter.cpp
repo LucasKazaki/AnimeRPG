@@ -64,6 +64,8 @@ LandmarkEncounterReport LandmarkEncounter::TryActivate(
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
     activationTrainingStats_ = combatSandbox.Stats();
+    activationCombatOwner_ = &combatSandbox;
+    activationActionsOwner_ = interaction.actionOwner;
     lastReport_ = {LandmarkEncounterResult::Activated, 0.0f};
     return lastReport_;
 }
@@ -75,10 +77,23 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
     // AdvanceTraining path remains the sole owner of practice-session clock steps.
     trainingHub_.ObserveCombat(combatSandbox);
 
-    if (state_ != LandmarkEncounterState::Active || !combatSandbox.Dummy().IsDefeated()) {
+    if (state_ != LandmarkEncounterState::Active
+        || activationCombatOwner_ != &combatSandbox) {
+        return false;
+    }
+    if (activationActionsOwner_ && activationActionsOwner_ != &shadowbladeActions) {
+        return false;
+    }
+    if (!combatSandbox.Dummy().IsDefeated()) {
+        // Legacy/synthetic callers may not carry the action-owner witness that the
+        // real LandmarkInteraction path supplies. A live nonterminal update can
+        // establish that owner before completion, but an instant terminal update
+        // cannot establish the provenance required for the training unlock.
+        if (!activationActionsOwner_) activationActionsOwner_ = &shadowbladeActions;
         return false;
     }
 
+    const bool trainingUnlockAuthorized = activationActionsOwner_ == &shadowbladeActions;
     state_ = LandmarkEncounterState::Completed;
     const double completionSecondsPrecise = std::max(
         0.0, combatSandbox.ElapsedSecondsPrecise() - activationElapsedSeconds_);
@@ -108,11 +123,14 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
         }
     }
 
-    // GAME pass 25: the completed live landmark encounter is the production
-    // unlock point for the Shadowblade practice hub. Repeated completions are
-    // idempotent and never reset an existing training configuration or debrief.
-    trainingHub_.Unlock();
-    trainingHub_.ObserveCombat(combatSandbox);
+    // GAME pass 25: only an encounter completed by the combat/action pair that
+    // established the live interaction may unlock training. Synthetic legacy
+    // completion without an action witness retains the encounter reward contract
+    // but cannot satisfy the training story gate.
+    if (trainingUnlockAuthorized) {
+        trainingHub_.Unlock();
+        trainingHub_.ObserveCombat(combatSandbox);
+    }
 
     lastReport_ = {LandmarkEncounterResult::Completed, rewardApplied,
         grade, completionSeconds, challenge};
@@ -143,6 +161,8 @@ LandmarkEncounterReport LandmarkEncounter::Retry(CombatSandbox& combatSandbox,
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
     activationTrainingStats_ = combatSandbox.Stats();
+    activationCombatOwner_ = &combatSandbox;
+    activationActionsOwner_ = &shadowbladeActions;
     lastReport_ = {LandmarkEncounterResult::Retried, 0.0f};
     return lastReport_;
 }
