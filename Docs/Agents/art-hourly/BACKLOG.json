@@ -56,8 +56,8 @@
       "id": "ART-008",
       "title": "Neutral material-response gallery source fixture",
       "status": "source_validated_pending_review",
-      "dependency": "fresh exact-head hosted CI and independent review after eleventh-review canonical-topology, all-mesh tangent-frame and nested-extras repairs; Astral glTF/material/light import later",
-      "next_acceptance": "generated static gallery imports and renders in Astral with canonical full topology, immutable matched station geometry, correct UV-derived tangent frames, FLOAT VEC3 POSITION semantics, truthful POSITION min/max metadata, exact source-only capture/manifest intent, correct camera/material/light contracts, and no unsupported root or nested runtime/art evidence claims"
+      "dependency": "fresh exact-head focused source execution, hosted CI and independent review after twelfth-review tangent-alignment/accessor-format repairs; Astral glTF/material/light import later",
+      "next_acceptance": "generated static gallery imports and renders in Astral with canonical full topology, immutable matched station geometry, UV-derived tangent frames aligned above the qualified source threshold, exact POSITION/NORMAL/TANGENT/TEXCOORD_0/index accessor formats, truthful POSITION bounds, source-only capture/manifest intent, correct camera/material/light contracts, and no unsupported root or nested runtime/art evidence claims"
     }
   ]
 }
