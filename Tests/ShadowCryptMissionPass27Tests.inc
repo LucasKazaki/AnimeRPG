@@ -131,8 +131,9 @@ void TestShadowCryptMissionPass27() {
     owner.SetCharacterProgression(&unrelatedProgression);
     Expect(!owner.ClaimShadowCryptFirstClearReward().granted
             && !unrelatedProgression.ShadowCryptFirstClearClaimed()
+            && !owner.BeginShadowCrypt()
             && !owner.ReplayCompletedShadowCrypt(),
-        "pass27 swapping the live progression pointer cannot redirect reward or replay authority to another protagonist");
+        "pass27 swapping the live progression pointer cannot redirect reward or restart authority to another protagonist");
     owner.SetCharacterProgression(&progression);
 
     const ShadowCryptRewardReport reward = owner.ClaimShadowCryptFirstClearReward();
