@@ -31,20 +31,20 @@
   "increments": [
     {"id":"GAME-122","title":"Story-gated live training unlock","status":"implemented_registered_test_coverage_live_LandmarkEncounter_unlock_callsite_native_input_not_wired"},
     {"id":"GAME-123","title":"Selectable focus pace and bounded attempt target","status":"implemented_registered_test_coverage_owned_by_live_LandmarkEncounter_API_native_input_not_wired"},
-    {"id":"GAME-124","title":"Consequence-free endless target practice on authoritative owners","status":"implemented_registered_test_coverage_exact_owner_pair_binding_native_input_not_wired"},
-    {"id":"GAME-125","title":"Finite multi-attempt run and authoritative coach debrief","status":"implemented_registered_test_coverage_exact_attempt_or_player_defeat_stop_timing_guide_bound_to_action_owner_native_input_not_wired"},
+    {"id":"GAME-124","title":"Consequence-free endless target practice on authoritative owners","status":"implemented_registered_test_coverage_exact_owner_pair_binding_and_standard_target_restoration_on_encounter_retry_native_input_not_wired"},
+    {"id":"GAME-125","title":"Finite multi-attempt run and authoritative coach debrief","status":"implemented_registered_test_coverage_exact_attempt_or_player_defeat_stop_timing_guide_reads_current_bound_action_owner_native_input_not_wired"},
     {"id":"GAME-126","title":"Training pause and resume","status":"implemented_registered_test_coverage_explicit_training_clock_owner_native_input_not_wired"},
     {"id":"QOL-026","title":"Bounded twenty-second recent damage and hit feedback","status":"implemented_registered_test_coverage_live_read_only_sampling_fixed_capacity_native_UI_not_wired"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim_plus_exact_production_LandmarkEncounter_cpp_include_plus_ShadowbladeTrainingHubPass25Tests",
     "sandbox_cpp17": "not_run_clean_clone_failed_twice_due_container_DNS_resolution_for_github.com_no_product_claim",
-    "hosted_windows_ci": "initial_bdb519591c_run_35898246354_number_765_failed_Debug_link_due_missing_LandmarkEncounter_implementation_in_registered_test_target; repaired_without_shared_CMake_edit; pending_exact_final_PR_head",
-    "release_manifest": "initial_bdb519591c_run_35898246615_number_544_success_but_invalidated_by_review_repairs; pending_exact_final_PR_head",
+    "hosted_windows_ci": "bdb519591c_run_35898246354_number_765_failed_Debug_link; repaired. 2e78d2f8_run_35900026231_number_770_success but invalidated by second review repairs. pending_exact_final_PR_head",
+    "release_manifest": "bdb519591c_run_35898246615_number_544_success_then invalidated; 2e78d2f8_run_35900026715_number_549_success_then invalidated_by_second_review_repairs; pending_exact_final_PR_head",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "initial_bdb519591c_Codex_review_found_P1_registered_test_link_failure_plus_P2_player_defeat_active_run_trap_plus_P2_timing_guide_preset_mismatch; all_three_repaired_with_regressions_where_behavioral; fresh_exact_final_head_review_required",
+    "independent_review": "bdb519591c_review_found_link_failure_player_defeat_trap_initial_timing_mismatch; repaired. 2e78d2f8_fresh_review_found_Endless_target_preserved_on_encounter_retry_and_post_start_timing_preset_staleness; both repaired_with_registered_regressions; fresh_exact_final_head_review_required",
     "research": "ZZZ_2026-08-31_official_Combat_Simulation_story_unlock_and_selectable_enemy_card; Granblue_official_Adjustable_Difficulty_Practice_Mode_Game_Pausing; Genshin_2026-01-19_official_selectable_difficulty_three_phase_challenge_corroboration; WutheringWaves_2026-03-14_original_player_training_dummy_thread_with_2026-03-18_recent_10_to_20_second_damage_feedback_request_and_counterexamples",
-    "integration": "real_production_game_domain_owner_now_calls_training_hub_unlock_and_read_only_observation_from_LandmarkEncounter_Update; configure_start_defend_advance_pause_are_owned_by_live_LandmarkEncounter_but_current_Win32_input_has_no_calls_so_native_playable_count_remains_zero",
+    "integration": "real_production game-domain owner calls training hub unlock/read-only observation from LandmarkEncounter_Update; configure_start_defend_advance_pause owned by live LandmarkEncounter; current Win32 input has no calls so native playable count remains zero",
     "persistent_cross_process_save": "not_changed_not_claimed"
   },
   "coordination": {
@@ -56,13 +56,14 @@
   },
   "safety_properties": [
     "training_locked_until_existing_Lincoln_encounter_completes",
-    "configuration_validates_focus_pace_attempt_bounds_before_mutation",
+    "configuration_validates_focus_pace_attempt_bounds_before mutation",
     "training_start_reuses_TrainingTargetMode_Endless_and_ResetTransientStatePreservingLoadout",
     "training_run_binds_exact_CombatSandbox_and_ShadowbladeActions_objects",
     "unrelated_owner_pairs_cannot_defend_advance_or_read_mixed_provenance_feedback",
     "active_training_blocks_LandmarkEncounter_Retry",
     "finite_run_ends_on_configured_attempt_target_or_player_defeat_so_no_dead_owner_can_strand_Active_state",
-    "timing_guide_uses_the_bound_action_owner_current_standard_or_forgiving_perfect_defense_window",
+    "leaving_training_for_encounter_retry_restores_TrainingTargetMode_Standard_and_a_defeatable_target",
+    "timing_guide_reads_the_current_bound_action_owner_standard_or_forgiving_perfect_defense_window_at_feedback_time",
     "pause_freezes_practice_owned_clocks_and_state",
     "recent_damage_storage_fixed_at_128_samples_and_report_window_capped_at_20_seconds",
     "LandmarkEncounter_Update_sampling_is_read_only_and_does_not_double_advance_platform_owned_clocks"
