@@ -104,6 +104,7 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     source,source_raw=load_source(source_path); path=Path(path); raw=path.read_bytes(); g=json.loads(raw)
     req(g["asset"]=={"generator":VERSION,"version":"2.0"},"asset header"); req(g["extensionsUsed"]==["KHR_lights_punctual"],"extensions used")
     req(g["scene"]==0 and g["scenes"]==[{"name":"AstralNeutralMaterialGallery","nodes":list(range(12))}],"scene"); req(len(g["nodes"])==12,"node count")
+    req("animations" not in g,"gallery animations unsupported")
     req(set(g.get("extras",{}))=={"astral_contract"},"runtime extras")
     contract=g["extras"]["astral_contract"]; req(set(contract)==CONTRACT_KEYS,"runtime contract fields"); req(contract["status"]==RUNTIME_STATUS,"runtime status")
     req(contract["units"]==source["units"] and contract["up"]==source["axes"]["up"] and contract["forward"]==source["axes"]["forward"] and contract["right"]==source["axes"]["right"],"axis contract")
