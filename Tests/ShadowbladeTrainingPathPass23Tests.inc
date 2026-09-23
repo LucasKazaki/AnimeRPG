@@ -354,6 +354,49 @@ void TestShadowbladeTrainingPathPass23() {
                 == ShadowbladeTrainingMedal::Silver,
         "pass23 boss rehearsal with ordinary defenses cannot later upgrade itself to Gold");
 
+    // Review regression: matching config and resolved metrics are not enough to
+    // complete a lesson unless this path instance successfully applied that lesson.
+    ShadowbladeTrainingPath unboundBossPath;
+    DefensePracticeSession unboundBossSession;
+    ShadowbladeActions unboundBossActions;
+    CombatSandbox unboundBossCombat;
+    const ShadowbladeTrainingLessonPlan unboundBossPlan =
+        ShadowbladeTrainingPath::PlanForLesson(ShadowbladeTrainingLesson::BossRehearsal);
+    Expect(unboundBossPath.RestoreCheckpoint(bossCheckpoint)
+            && unboundBossSession.SetPracticeSequence(unboundBossPlan.sequence)
+            && (unboundBossSession.Pace() == unboundBossPlan.pace
+                || unboundBossSession.SetPace(unboundBossPlan.pace))
+            && (unboundBossSession.Goal() == unboundBossPlan.goal
+                || unboundBossSession.SetGoal(unboundBossPlan.goal))
+            && (unboundBossSession.GoalTarget() == unboundBossPlan.goalTarget
+                || unboundBossSession.SetGoalTarget(unboundBossPlan.goalTarget)),
+        "pass23 stale-metric binding regression builds matching boss config without applying it");
+    for (int patternIndex = 0; patternIndex < 3; ++patternIndex) {
+        Expect(unboundBossSession.QueueNextAttack(unboundBossCombat, unboundBossActions),
+            "pass23 stale-metric binding regression queues a matching boss threat");
+        const EnemyAttackPlan plan = unboundBossCombat.PendingEnemyAttack();
+        if (plan.pattern == EnemyAttackPattern::RiftBurst) {
+            unboundBossSession.AdvanceTime(unboundBossCombat, unboundBossActions, 0.40f);
+            const DefenseResult dodge = unboundBossSession.TryDefend(
+                unboundBossCombat, unboundBossActions, DefenseInput::Dodge).result;
+            Expect(dodge == DefenseResult::Evaded || dodge == DefenseResult::PerfectDodge,
+                "pass23 stale-metric binding regression resolves RiftBurst");
+        } else {
+            Expect(unboundBossSession.TryDefend(unboundBossCombat, unboundBossActions,
+                    DefenseInput::Guard).result == DefenseResult::Guarded,
+                "pass23 stale-metric binding regression resolves a blockable threat");
+        }
+        unboundBossSession.AdvanceTime(
+            unboundBossCombat, unboundBossActions, plan.recoverySeconds);
+    }
+    Expect(unboundBossSession.PatternStats(EnemyAttackPattern::QuickCut).attempts == 1
+            && unboundBossSession.PatternStats(EnemyAttackPattern::GuardBreaker).attempts == 1
+            && unboundBossSession.PatternStats(EnemyAttackPattern::RiftBurst).attempts == 1
+            && !unboundBossPath.CurrentLessonComplete(unboundBossSession)
+            && !unboundBossPath.CommitCurrentLesson(unboundBossSession)
+            && unboundBossPath.CurrentLesson() == ShadowbladeTrainingLesson::BossRehearsal,
+        "pass23 matching stale metrics cannot complete a lesson that was never applied");
+
     ShadowbladeTrainingCheckpoint malformedBoss = bossPath.Checkpoint();
     malformedBoss.medals[2] = static_cast<ShadowbladeTrainingMedal>(99);
     Expect(!bossPath.RestoreCheckpoint(malformedBoss)
