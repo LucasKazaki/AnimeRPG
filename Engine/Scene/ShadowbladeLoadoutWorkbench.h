@@ -160,6 +160,25 @@ public:
         return best;
     }
 
+    bool HasLastAppliedPreset() const {
+        return lastAppliedPreset_ < ShadowbladeLoadout::PresetSlots;
+    }
+
+    std::size_t LastAppliedPreset() const {
+        return HasLastAppliedPreset() ? lastAppliedPreset_ : ShadowbladeLoadout::PresetSlots;
+    }
+
+    bool HasPresetLabel(std::size_t slot) const {
+        return slot < ShadowbladeLoadout::PresetSlots && !presetLabels_[slot].empty();
+    }
+
+    std::string PresetLabel(std::size_t slot) const {
+        return slot < ShadowbladeLoadout::PresetSlots ? presetLabels_[slot] : std::string{};
+    }
+
+private:
+    friend class ShadowbladeActions;
+
     LoadoutActionResult ApplyPreset(ShadowbladeLoadout& loadout, std::size_t slot,
         const CharacterProgression& progression) {
         const LoadoutActionResult result = loadout.ApplyPreset(slot, progression);
@@ -167,14 +186,6 @@ public:
             lastAppliedPreset_ = slot;
         }
         return result;
-    }
-
-    bool HasLastAppliedPreset() const {
-        return lastAppliedPreset_ < ShadowbladeLoadout::PresetSlots;
-    }
-
-    std::size_t LastAppliedPreset() const {
-        return HasLastAppliedPreset() ? lastAppliedPreset_ : ShadowbladeLoadout::PresetSlots;
     }
 
     LoadoutActionResult ReapplyLastPreset(ShadowbladeLoadout& loadout,
@@ -209,15 +220,6 @@ public:
         return PresetLabelResult::Success;
     }
 
-    bool HasPresetLabel(std::size_t slot) const {
-        return slot < ShadowbladeLoadout::PresetSlots && !presetLabels_[slot].empty();
-    }
-
-    std::string PresetLabel(std::size_t slot) const {
-        return slot < ShadowbladeLoadout::PresetSlots ? presetLabels_[slot] : std::string{};
-    }
-
-private:
     static bool IsValidSlot(ResonanceSlot slot) {
         return static_cast<std::uint8_t>(slot)
             < static_cast<std::uint8_t>(ResonanceSlot::Count);
