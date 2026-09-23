@@ -208,4 +208,99 @@ void TestShadowbladeLoadoutEffectsPass17() {
                 <= ShadowbladeActions::MaximumLoadoutGuardDamageMitigation
             && boundedTuning.readinessScore >= 0 && boundedTuning.readinessScore <= 100,
         "pass17 full catalogue build remains inside every explicit live tuning bound");
+
+    ShadowbladeLoadoutProfile extremeProfile{};
+    extremeProfile.attackBonus = std::numeric_limits<int>::max();
+    extremeProfile.guardBonus = std::numeric_limits<int>::max();
+    extremeProfile.resourceRecoveryBonus = std::numeric_limits<int>::max();
+    extremeProfile.mobilityBonus = std::numeric_limits<int>::max();
+    extremeProfile.readinessScore = std::numeric_limits<int>::max();
+    extremeProfile.activeResonanceFamilies = std::numeric_limits<int>::max();
+    const ShadowbladeActionTuning clampedExtreme =
+        ShadowbladeActions::ActionTuningForProfile(extremeProfile);
+    Expect(clampedExtreme.fatalStrikeDamage
+                == ShadowbladeActions::FatalStrikeDamage
+                    + ShadowbladeActions::MaximumLoadoutAttackDamageBonus
+            && Near(clampedExtreme.dashDistance,
+                ShadowbladeActions::DashDistance
+                    + ShadowbladeActions::MaximumLoadoutDashDistanceBonus)
+            && Near(clampedExtreme.resourceRegenerationPerSecond,
+                ShadowbladeActions::ResourceRegenerationPerSecond
+                    + ShadowbladeActions::MaximumLoadoutResourceRegenerationBonus)
+            && clampedExtreme.guardDamageMitigation
+                == ShadowbladeActions::MaximumLoadoutGuardDamageMitigation
+            && clampedExtreme.readinessScore == 100
+            && clampedExtreme.activeResonanceFamilies == 3,
+        "pass17 extreme hypothetical profile exercises every hard tuning clamp exactly");
+
+    ShadowbladeLoadoutProfile negativeProfile{};
+    negativeProfile.attackBonus = std::numeric_limits<int>::min();
+    negativeProfile.guardBonus = std::numeric_limits<int>::min();
+    negativeProfile.resourceRecoveryBonus = std::numeric_limits<int>::min();
+    negativeProfile.mobilityBonus = std::numeric_limits<int>::min();
+    negativeProfile.readinessScore = std::numeric_limits<int>::min();
+    negativeProfile.activeResonanceFamilies = std::numeric_limits<int>::min();
+    const ShadowbladeActionTuning clampedNegative =
+        ShadowbladeActions::ActionTuningForProfile(negativeProfile);
+    Expect(clampedNegative.fatalStrikeDamage == ShadowbladeActions::FatalStrikeDamage
+            && Near(clampedNegative.dashDistance, ShadowbladeActions::DashDistance)
+            && Near(clampedNegative.resourceRegenerationPerSecond,
+                ShadowbladeActions::ResourceRegenerationPerSecond)
+            && clampedNegative.guardDamageMitigation == 0
+            && clampedNegative.readinessScore == 0
+            && clampedNegative.activeResonanceFamilies == 0,
+        "pass17 negative hypothetical profile clamps safely to the baseline without overflow");
+
+    ShadowbladeActions retryActions;
+    ShadowbladeLoadout& retryLoadout = retryActions.Loadout();
+    Expect(retryLoadout.AcquireWeapon(ShadowbladeWeapon::RiftsteelSabre)
+            && retryLoadout.TryEquipWeapon(ShadowbladeWeapon::RiftsteelSabre, progression)
+                == LoadoutActionResult::Success
+            && retryLoadout.AcquireModule(ResonanceModule::RiftEdge)
+            && retryLoadout.TryEquipModule(ResonanceSlot::Edge, ResonanceModule::RiftEdge)
+                == LoadoutActionResult::Success
+            && retryLoadout.SavePreset(0) == LoadoutActionResult::Success,
+        "pass17 retry fixture owns, equips, and saves a non-default persistent loadout");
+    const ShadowbladeActionTuning tuningBeforeRetry = retryActions.CurrentLoadoutTuning();
+    retryActions.SetDefenseTimingPreset(DefenseTimingPreset::Forgiving);
+
+    CombatSandbox retryCombat;
+    LandmarkEncounter retryEncounter;
+    const LandmarkInteractionReport retryDiscovery{
+        LandmarkInteractionResult::Discovered, LandmarkEncounter::EncounterLandmark, 0.0f};
+    Expect(retryEncounter.TryActivate(retryDiscovery, retryCombat).result
+                == LandmarkEncounterResult::Activated,
+        "pass17 retry fixture activates the production landmark encounter");
+    retryCombat.ApplyDamage(retryCombat.Dummy().maximumHealth);
+    Expect(retryEncounter.Update(retryCombat, retryActions),
+        "pass17 retry fixture completes the production landmark encounter");
+    Expect(retryActions.TryDash({}).result == ShadowActionResult::Activated
+            && retryActions.BeginIncomingAttack({1.0f, 20, 10, true}),
+        "pass17 retry fixture creates transient action state before retry reset");
+    retryActions.SetGuarding(true);
+
+    const LandmarkEncounterReport retryReport = retryEncounter.Retry(retryCombat, retryActions);
+    const ShadowbladeActionTuning tuningAfterRetry = retryActions.CurrentLoadoutTuning();
+    Expect(retryReport.result == LandmarkEncounterResult::Retried
+            && retryActions.Loadout().OwnsWeapon(ShadowbladeWeapon::RiftsteelSabre)
+            && retryActions.Loadout().EquippedWeapon() == ShadowbladeWeapon::RiftsteelSabre
+            && retryActions.Loadout().OwnsModule(ResonanceModule::RiftEdge)
+            && retryActions.Loadout().ModuleSlotOccupied(ResonanceSlot::Edge)
+            && retryActions.Loadout().EquippedModule(ResonanceSlot::Edge)
+                == ResonanceModule::RiftEdge
+            && retryActions.Loadout().PresetSaved(0)
+            && tuningAfterRetry.fatalStrikeDamage == tuningBeforeRetry.fatalStrikeDamage
+            && Near(tuningAfterRetry.dashDistance, tuningBeforeRetry.dashDistance)
+            && Near(tuningAfterRetry.resourceRegenerationPerSecond,
+                tuningBeforeRetry.resourceRegenerationPerSecond)
+            && tuningAfterRetry.guardDamageMitigation == tuningBeforeRetry.guardDamageMitigation,
+        "pass17 production encounter retry preserves owned, equipped, preset, and tuned loadout state");
+    Expect(Near(retryActions.Resource(), ShadowbladeActions::MaximumResource)
+            && Near(retryActions.DashCooldownRemaining(), 0.0f)
+            && !retryActions.IsGuarding() && !retryActions.HasIncomingAttack()
+            && retryActions.PlayerHealth() == ShadowbladeActions::MaximumPlayerHealth
+            && retryActions.GuardIntegrity() == ShadowbladeActions::MaximumGuardIntegrity
+            && Near(retryActions.PerfectDefenseWindowSeconds(),
+                ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds),
+        "pass17 encounter retry still resets transient action/defense state while retaining timing preset");
 }
