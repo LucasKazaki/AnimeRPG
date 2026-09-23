@@ -17,6 +17,7 @@ Allowed paths for this packet:
 - `Engine/Scene/LandmarkEncounter.h`
 - `Engine/Scene/LandmarkEncounter.cpp`
 - `Tests/ShadowbladeTrainingHubPass25Tests.inc`
+- `Tests/ShadowbladeTrainingHubPass25ReviewTests.inc`
 - `Tests/ThoughtCommandsTests.cpp` only for existing registered-test aggregation
 - this task packet
 - `Docs/Agents/animerpg-hourly/RUN-2026-09-23-PASS25.md`
@@ -131,6 +132,13 @@ Registered regression coverage is added through the existing `ThoughtCommandsTes
 5. expected-head merge only if `main` has not moved incompatibly.
 
 Additional boundary checks in the pass-25 test packet cover invalid enum/range inputs, exact owner binding, active-threat retry refusal, exact finite-attempt stop, pause/resume, damage-window expiry, and preserved loadout selection.
+
+The independent review of candidate `e28f415b33461b367da27bec1d410e1ca585a35d` found two additional P2 edge cases. Both are merge-blocking until repaired and exact-head gates rerun:
+
+- active timing guidance must validate the practice session's linked combat/action generation before describing a queued pattern, so an externally replaced combat-plan threat cannot be presented as the threat approaching the player;
+- rolling damage telemetry must stop sampling after the run enters Debrief, so later encounter reuse or post-run combat mutations cannot rewrite the completed run's feedback.
+
+The dedicated review-regression packet covers both cases. Timing feedback now uses `DefensePracticeSession::Cue` as the exact linked-threat witness while Active, and otherwise fails closed. Damage observation is restricted to Active state; the final terminal action is sampled before the transition to Debrief, after which the window remains frozen.
 
 Local sandbox compile is not evidence for this pass because the container could not resolve `github.com` while attempting a clean branch clone. No local test success is claimed from that failed fetch.
 
