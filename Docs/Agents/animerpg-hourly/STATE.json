@@ -29,47 +29,51 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-122","title":"Story-gated live training unlock","status":"implemented_registered_test_coverage_live_LandmarkEncounter_unlock_callsite_native_input_not_wired"},
+    {"id":"GAME-122","title":"Story-gated live training unlock","status":"implemented_registered_test_coverage_activation_combat_and_action_provenance_bound_live_LandmarkEncounter_unlock_callsite_native_input_not_wired"},
     {"id":"GAME-123","title":"Selectable focus pace and bounded attempt target","status":"implemented_registered_test_coverage_owned_by_live_LandmarkEncounter_API_native_input_not_wired"},
     {"id":"GAME-124","title":"Consequence-free endless target practice on authoritative owners","status":"implemented_registered_test_coverage_exact_owner_pair_binding_and_standard_target_restoration_on_encounter_retry_native_input_not_wired"},
     {"id":"GAME-125","title":"Finite multi-attempt run and authoritative coach debrief","status":"implemented_registered_test_coverage_exact_attempt_or_player_defeat_stop_timing_guide_requires_linked_generation_witness_native_input_not_wired"},
     {"id":"GAME-126","title":"Training pause and resume","status":"implemented_registered_test_coverage_explicit_training_clock_owner_native_input_not_wired"},
-    {"id":"QOL-026","title":"Bounded twenty-second recent damage and hit feedback","status":"implemented_registered_test_coverage_live_read_only_sampling_fixed_capacity_active_only_frozen_in_debrief_timed_delta_activity_buckets_exact_cutoff_pending_deltas_visible_native_UI_not_wired"}
+    {"id":"QOL-026","title":"Bounded twenty-second recent damage and hit feedback","status":"implemented_registered_test_coverage_active_only_frozen_debrief_timed_delta_buckets_exact_cutoff_stale_pending_split_from_fresh_delta_native_UI_not_wired"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim_plus_exact_production_LandmarkEncounter_cpp_include_plus_ShadowbladeTrainingHubPass25Tests_plus_ShadowbladeTrainingHubPass25ReviewTests",
-    "sandbox_cpp17": "not_run_clean_clone_failed_twice_due_container_DNS_resolution_for_github.com_no_product_claim",
-    "hosted_windows_ci": "bdb519591c_run_35898246354_number_765_failed_Debug_link; repaired. 2e78d2f8_run_35900026231_number_770_success but invalidated by later review repairs. f15c4a51ab_run_35907004607_number_792_success but invalidated by cutoff review. 222c544f08_run_35908042666_number_796_failed_deterministic_Debug_ThoughtCommands_recent_damage_regression_after_first_cutoff_fix; repaired_with_timed_delta_activity_buckets. pending_exact_final_PR_head",
-    "release_manifest": "bdb519591c_run_35898246615_number_544_success_then_invalidated; 2e78d2f8_run_35900026715_number_549_success_then_invalidated_by_later_review_repairs; f15c4a51ab_run_35907004596_number_571_success_then_invalidated_by_cutoff_review; 222c544f08_run_35908042555_number_575_success_but_invalidated_by_subsequent_timed_delta_repair; pending_exact_final_PR_head",
+    "sandbox_cpp17": "not_run_clean_clone_failed_due_container_DNS_resolution_for_github.com_no_product_claim",
+    "hosted_windows_ci": "prior exact heads include bdb519591c_run_35898246354_number_765_failed_Debug_link; 2e78d2f8ab_run_35900026231_number_770_success_then_invalidated; f15c4a51ab_run_35907004607_number_792_success_then_invalidated; 222c544f08_run_35908042666_number_796_failed_recent_damage_regression; 79f3ed5a23_run_35908865255_number_801_success_but_invalidated_by_fresh_review_findings; pending_exact_final_PR_head_after_current_repairs",
+    "release_manifest": "prior exact heads include bdb519591c_number_544_success_then_invalidated; 2e78d2f8ab_number_549_success_then_invalidated; f15c4a51ab_number_571_success_then_invalidated; 222c544f08_number_575_success_then_invalidated; 79f3ed5a23_run_35908865248_number_580_success_but_invalidated_by_fresh_review_findings; pending_exact_final_PR_head_after_current_repairs",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "bdb519591c_review_found_link_failure_player_defeat_trap_initial_timing_mismatch; repaired. 2e78d2f8_fresh_review_found_Endless_target_preserved_on_encounter_retry_and_post_start_timing_preset_staleness; repaired. Later reviews found void_setter_compile_error, retry_mismatched_action_owner, stale_ready_feedback, and first-pattern_live_timing_guide; repaired. e28f415_fresh_review_found queued_threat_generation_ownership and debrief_telemetry_mutation; repaired. f15c4a51ab_fresh_review_found cumulative_baseline_could_retain_prewindow_damage; first_at_or_after_cutoff_fix_on_222c544f08_failed_existing_recent_damage_regression; replaced_with_timed_delta_activity_buckets_and_registered_exact_cutoff_plus_new_damage_retention_coverage; fresh_exact_final_head_review_required",
+    "independent_review": "all earlier material findings repaired. Exact-head review of 79f3ed5a23 completed and found two new P2 defects: stale pending telemetry could absorb a fresh post-cutoff delta; activation completion lacked authoritative owner provenance. Current candidate flushes stale pending buckets before fresh accumulation, carries the live ShadowbladeActions witness through LandmarkInteractionReport, records activation combat/action owners, rejects mismatches, gates training unlock on the proven exact pair, and adds dedicated regressions. Fresh exact-final-head review required.",
     "research": "ZZZ_2026-08-31_official_Combat_Simulation_story_unlock_and_selectable_enemy_card; Granblue_official_Adjustable_Difficulty_Practice_Mode_Game_Pausing; Genshin_2026-01-19_official_selectable_difficulty_three_phase_challenge_corroboration; WutheringWaves_2026-03-14_original_player_training_dummy_thread_with_2026-03-18_recent_10_to_20_second_damage_feedback_request_and_counterexamples",
-    "integration": "real_production game-domain owner calls training hub unlock/read-only observation from LandmarkEncounter_Update; configure_start_defend_advance_pause owned by live LandmarkEncounter; current Win32 input has no calls so native playable count remains zero",
+    "integration": "production LandmarkInteraction supplies existing ShadowbladeActions owner witness to LandmarkEncounter without Engine_Platform edit; LandmarkEncounter owns training unlock/read-only observation and configure_start_defend_advance_pause APIs; current Win32 input has no training calls so native playable count remains zero",
     "persistent_cross_process_save": "not_changed_not_claimed"
   },
   "coordination": {
-    "engine_pr_13": "separate_editor_runtime_smoke_ownership_no_overlap",
-    "art_prs_23_26_28_33": "separate_art_ownership_no_overlap",
+    "engine_pr_13": "separate_editor_runtime_smoke_paths_CMake_Tests_EditorRuntimeSmoke_docs_only_no_overlap_with_pass25_gameplay_paths",
+    "art_prs_23_26_28_33": "separate_art_ownership_no_Engine_gameplay_overlap",
     "shared_engine_paths": "platform_renderer_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
+    "review_admitted_gameplay_paths": "LandmarkInteraction_h_cpp_only_for_existing_action_owner_witness_no_platform_or_engine_takeover",
     "registered_test_link_repair": "shared_CMake_not_modified; exact_production_LandmarkEncounter_cpp_compiled_only_into_existing_game_aggregation_test_translation_unit",
-    "live_game_owner": "LandmarkEncounter_only_plus_new_game_owned_ShadowbladeTrainingHub"
+    "live_game_owner": "LandmarkEncounter_plus_game_owned_ShadowbladeTrainingHub_with_LandmarkInteraction_owner_witness"
   },
   "safety_properties": [
-    "training_locked_until_existing_Lincoln_encounter_completes",
+    "training_locked_until_authoritative_Lincoln_encounter_completes",
+    "real_landmark_interaction_carries_nonowning_ShadowbladeActions_witness_into_activation",
+    "encounter_completion_rejects_mismatched_activation_combat_or_action_owner_before_training_unlock",
+    "legacy_synthetic_terminal_completion_without_action_witness_cannot_satisfy_training_unlock_gate",
     "configuration_validates_focus_pace_attempt_bounds_before_mutation",
     "training_start_reuses_TrainingTargetMode_Endless_and_ResetTransientStatePreservingLoadout",
     "training_run_binds_exact_CombatSandbox_and_ShadowbladeActions_objects",
     "unrelated_owner_pairs_cannot_defend_advance_or_read_mixed_provenance_feedback",
     "active_training_blocks_LandmarkEncounter_Retry",
-    "finite_run_ends_on_configured_attempt_target_or_player_defeat_so_no_dead_owner_can_strand_Active_state",
-    "leaving_training_for_encounter_retry_restores_TrainingTargetMode_Standard_and_a_defeatable_target",
-    "timing_guide_reads_the_current_bound_action_owner_standard_or_forgiving_perfect_defense_window_at_feedback_time",
-    "active_timing_guide_requires_DefensePracticeSession_Cue_exact_linked_combat_and_action_generation_witness_and_fails_closed_for_replacement_planner_events",
+    "finite_run_ends_on_configured_attempt_target_or_player_defeat",
+    "leaving_training_for_encounter_retry_restores_TrainingTargetMode_Standard",
+    "timing_guide_reads_current_bound_action_timing_and_requires_exact_linked_threat_generation_witness",
     "pause_freezes_practice_owned_clocks_and_state",
     "recent_damage_storage_fixed_at_128_samples_and_flush_rate_capped_at_5Hz_while_pending_current_deltas_remain_visible",
-    "recent_damage_sampling_mutates_only_while_training_is_Active_and_completed_Debrief_telemetry_is_frozen",
-    "recent_damage_uses_timed_delta_activity_buckets_and_never_sums_activity_older_than_the_exact_twenty_second_cutoff",
+    "recent_damage_sampling_mutates_only_while_training_is_Active_and_Debrief_telemetry_is_frozen",
+    "stale_pending_damage_bucket_is_flushed_with_original_activity_time_before_any_fresh_post_cutoff_delta_is_accumulated",
+    "recent_damage_never_sums_activity_older_than_exact_twenty_second_cutoff",
     "LandmarkEncounter_Update_sampling_is_read_only_and_does_not_double_advance_platform_owned_clocks"
   ],
-  "next_action": "Require exact-head hosted Windows Debug/Release registered tests and Release-manifest integrity for the commit containing this state record, then request fresh independent Codex review on that same exact head. Repair any material finding and rerun invalidated gates. Re-read live main/head and full diff immediately before merge, and merge only the exact tested/reviewed candidate with expected-head checking. Native input/UI remains a coordinated engine dependency and must not be claimed by this pass."
+  "next_action": "Run exact-head hosted Windows Debug/Release registered tests and Release-manifest integrity for the commit containing this state record, then request fresh independent Codex review on that same exact head. Repair any material finding and rerun invalidated gates. Re-read live main/head and full diff immediately before expected-head merge. Native input/UI remains a coordinated engine dependency and must not be claimed by this pass."
 }
