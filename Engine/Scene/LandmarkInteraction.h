@@ -55,9 +55,10 @@ public:
         const WorldBlockout& world, ShadowbladeActions& shadowbladeActions);
     void SetCharacterProgression(CharacterProgression* progression) { progression_ = progression; }
 
-    DialogueBeat TryDialogueChoice(DialogueTopic topic, DialogueChoice choice) {
+    DialogueBeat TryDialogueChoice(DialogueTopic topic, DialogueChoice choice,
+        bool allowAdvanceScreening = false) {
         const DialogueBeat beat = dialogue_.Choose(topic, choice,
-            {VisitedCount(), ObjectiveComplete()});
+            {VisitedCount(), ObjectiveComplete(), allowAdvanceScreening});
         SyncFieldGuideNarrative();
         return beat;
     }
@@ -65,6 +66,20 @@ public:
         const DialogueOutcome outcome = dialogue_.CommitOutcome();
         SyncFieldGuideNarrative();
         return outcome;
+    }
+    DialogueRecommendation RecommendedDialogueTopic(
+        bool allowAdvanceScreening = false) const {
+        return dialogue_.RecommendedTopic(
+            {VisitedCount(), ObjectiveComplete(), allowAdvanceScreening});
+    }
+    DialogueSynopsis DialogueSummary() const { return dialogue_.Synopsis(); }
+    bool ShouldPromptForDialogueChoice(DialogueTopic topic,
+        bool allowAdvanceScreening = false) const {
+        return dialogue_.ShouldPromptForChoice(
+            topic, {VisitedCount(), ObjectiveComplete(), allowAdvanceScreening});
+    }
+    static constexpr bool DialogueQuickAdvanceSafe(const DialogueBeat& beat) {
+        return LandmarkDialogue::QuickAdvanceSafe(beat);
     }
     const LandmarkDialogue& Dialogue() const { return dialogue_; }
 
