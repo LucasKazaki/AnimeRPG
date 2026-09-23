@@ -868,6 +868,9 @@ int wmain(int argc, wchar_t** argv) {
     } else if (!ValidateShellState(window, process.dwProcessId, initialControls, statics,
                    buttons, kSceneRootInspectorText, 0, failure)) {
         // failure set by validator.
+    } else if (!DirectChildrenContained(
+                   window, process.dwProcessId, initialControls, failure)) {
+        // failure set by startup containment validator before any resize can normalize layout.
     } else if (!SelectCubeAndNotify(
                    window, process.dwProcessId, initialControls, statics, buttons, failure)) {
         // failure set by selector/validator.
@@ -927,6 +930,6 @@ int wmain(int argc, wchar_t** argv) {
         << L"left-to-right semantic toolbar Button HWNDs, disabled pending tools, enabled Outliner/assets surfaces, "
         << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
         << L"every bounded cross-process read and after both normal+narrow resizes; Cube selection stayed synchronized, "
-        << L"all direct children remained contained, and shutdown exited cleanly.\n";
+        << L"all direct children remained contained from startup through both resizes, and shutdown exited cleanly.\n";
     return 0;
 }
