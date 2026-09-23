@@ -178,7 +178,7 @@ def test_accessor_bounds(tmp):
     out=generate(tmp); mutate_gltf(out,lambda g:g["bufferViews"][0].__setitem__("byteLength",4)); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "accessor within bufferView" in p.stderr
 
 def test_expected_pin_negative(tmp):
-    out=generate(tmp); m=json.loads((out/"manifest.json").read_text()); m["intent"]+=" changed"; (out/"manifest.json").write_text(json.dumps(m,indent=2,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json","--expected-manifest",PIN],ok=False); assert "manifest intent" in p.stderr
+    out=generate(tmp); m=json.loads((out/"manifest.json").read_text()); (out/"manifest.json").write_text(json.dumps(m,indent=4,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json","--expected-manifest",PIN],ok=False); assert "expected manifest pin" in p.stderr
 
 def test_crlf_source_and_pin_portability(tmp):
     source=tmp/"source-crlf.json"; source.write_bytes(SOURCE.read_bytes().replace(b"\n",b"\r\n")); pin=tmp/"pin-crlf.json"; pin.write_bytes(PIN.read_bytes().replace(b"\n",b"\r\n")); out=generate(tmp,source); assert (out/"manifest.json").read_bytes()==PIN.read_bytes(); run([VER,out/"material_gallery.gltf","--source",source,"--manifest",out/"manifest.json","--expected-manifest",pin])
