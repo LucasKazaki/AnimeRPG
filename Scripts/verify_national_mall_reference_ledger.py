@@ -60,9 +60,19 @@ ENTRY_KEYS = {
     "measurements",
     "modeling_constraints",
 }
-DERIVED_RELATION_VALUES = {
-    "derived_from_79_ft_10_in": 79 + 10 / 12,
-    "derived_from_555_ft_5_1_8_in": 555 + (5 + 1 / 8) / 12,
+DERIVED_MEASUREMENT_CONTRACTS = {
+    "derived_from_79_ft_10_in": {
+        "entry_id": "lincoln-memorial-materials",
+        "label": "building_height_from_foundation_top",
+        "unit": "feet",
+        "value": 79 + 10 / 12,
+    },
+    "derived_from_555_ft_5_1_8_in": {
+        "entry_id": "washington-monument-massing",
+        "label": "obelisk_height",
+        "unit": "feet",
+        "value": 555 + (5 + 1 / 8) / 12,
+    },
 }
 
 
@@ -131,12 +141,21 @@ def load_and_validate(path: Path) -> dict:
             require(isinstance(measurement["label"], str) and measurement["label"], f"{entry_id}: measurement label")
             value = measurement["value"]
             require(type(value) in {int, float} and math.isfinite(value) and value > 0, f"{entry_id}: measurement value")
-            require(measurement["unit"] in ALLOWED_UNITS, f"{entry_id}: measurement unit")
+            unit = measurement["unit"]
+            require(unit in ALLOWED_UNITS, f"{entry_id}: measurement unit")
+            if unit == "count":
+                require(type(value) is int or value.is_integer(), f"{entry_id}: count measurement integral")
             relation = measurement["source_relation"]
             require(relation in ALLOWED_SOURCE_RELATIONS, f"{entry_id}: measurement provenance")
-            if relation in DERIVED_RELATION_VALUES:
+            if relation in DERIVED_MEASUREMENT_CONTRACTS:
+                contract = DERIVED_MEASUREMENT_CONTRACTS[relation]
                 require(
-                    math.isclose(value, DERIVED_RELATION_VALUES[relation], rel_tol=0.0, abs_tol=1e-9),
+                    entry_id == contract["entry_id"] and measurement["label"] == contract["label"],
+                    f"{entry_id}: derived measurement identity",
+                )
+                require(unit == contract["unit"], f"{entry_id}: derived measurement unit")
+                require(
+                    math.isclose(value, contract["value"], rel_tol=0.0, abs_tol=1e-9),
                     f"{entry_id}: derived measurement value",
                 )
 
