@@ -519,9 +519,49 @@ int SupervisorRunContainmentSelfTest(const std::wstring& selfPath) {
         return 1;
     }
 
-    DWORD exitCode = STILL_ACTIVE;
+    DWORD directCleanupExit = STILL_ACTIVE;
+    std::wstring directCleanupFailure;
+    if (!CleanupProcess(child.process, directCleanupExit, directCleanupFailure)
+        || directCleanupExit != 2) {
+        failure = L"worker-local CleanupProcess failed to terminate its direct owned process";
+        if (!directCleanupFailure.empty()) {
+            failure += L": " + directCleanupFailure;
+        }
+        DWORD ignoredExit = STILL_ACTIVE;
+        std::wstring cleanupFailure;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                child, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
+            && !cleanupFailure.empty()) {
+            failure += L"; supervisor cleanup also failed: " + cleanupFailure;
+        }
+        SupervisorCloseProcessHandles(child);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    DWORD activeAfterDirectCleanup = 0;
+    if (!SupervisorQueryActiveProcesses(child.job, activeAfterDirectCleanup, failure)
+        || activeAfterDirectCleanup == 0) {
+        if (failure.empty()) {
+            failure = L"worker-local CleanupProcess unexpectedly emptied the whole job; descendant backstop was not exercised";
+        }
+        DWORD ignoredExit = directCleanupExit;
+        std::wstring cleanupFailure;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                child, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
+            && !cleanupFailure.empty()) {
+            failure += L"; supervisor cleanup also failed: " + cleanupFailure;
+        }
+        SupervisorCloseProcessHandles(child);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    DWORD jobCleanupExit = directCleanupExit;
     const bool terminated = SupervisorTerminateJobAndVerifyEmpty(
-        child, kSupervisorCleanupTimeoutMs, exitCode, failure);
+        child, kSupervisorCleanupTimeoutMs, jobCleanupExit, failure);
     SupervisorCloseProcessHandles(child);
     if (!terminated) {
         std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
@@ -559,7 +599,7 @@ int SupervisorRunContainmentSelfTest(const std::wstring& selfPath) {
     }
 
     std::wcout << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: PASS "
-               << L"(live tree cleanup and shared normal-success rejection verified)\n";
+               << L"(worker-local direct cleanup, live tree cleanup and shared normal-success rejection verified)\n";
     return 0;
 }
 } // namespace
