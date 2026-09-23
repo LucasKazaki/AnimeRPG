@@ -6,6 +6,7 @@ VERSION="astral-material-gallery-gltf-3"
 SOURCE_STATUS="proposed_art_reference_not_runtime"
 RUNTIME_STATUS="source_validated_not_imported"
 CONTRACT_KEYS={"units","up","forward","right","status","capture_intent","station_order","forbid_baked_lighting","source_sha256"}
+MANIFEST_KEYS={"schema_version","generator","runtime_status","source_sha256","intent","counts","files"}
 
 def req(cond,msg):
     if not cond: raise ValueError(msg)
@@ -144,7 +145,7 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
         node=g["nodes"][10+j]; req(set(node)=={"name","rotation","extensions"},"light transform"); req(node["name"]==s["name"] and node["extensions"]=={"KHR_lights_punctual":{"light":j}},"light node")
         rot=s["rotation_degrees"]; req(quat_close(node["rotation"],quat_xy(rot["x"],rot["y"])),"light rotation")
     if manifest_path:
-        manifest_raw=Path(manifest_path).read_bytes(); m=json.loads(manifest_raw); req(m["generator"]==VERSION and m["runtime_status"]==RUNTIME_STATUS,"manifest status"); req(m["source_sha256"]==hashlib.sha256(source_raw).hexdigest(),"manifest source hash")
+        manifest_raw=Path(manifest_path).read_bytes(); m=json.loads(manifest_raw); req(set(m)==MANIFEST_KEYS,"manifest fields"); req(m["schema_version"]==1,"manifest schema"); req(m["generator"]==VERSION and m["runtime_status"]==RUNTIME_STATUS,"manifest status"); req(m["source_sha256"]==hashlib.sha256(source_raw).hexdigest(),"manifest source hash")
         req(m["counts"]=={"cameras":1,"cube_nodes":4,"directional_lights":2,"materials":5,"sphere_nodes":4,"stations":4},"manifest counts"); req(len(m["files"])==1,"manifest files")
         rec=m["files"][0]; req(rec=={"path":path.name,"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()},"manifest file record")
         if expected_manifest_path: req(manifest_raw.replace(b"\r\n",b"\n").replace(b"\r",b"\n")==canonical_text_bytes(expected_manifest_path),"expected manifest pin")
