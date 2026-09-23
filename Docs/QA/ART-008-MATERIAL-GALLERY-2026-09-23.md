@@ -8,15 +8,15 @@ Status: source-validated candidate, not imported or runtime-approved.
 
 ART-008 adds a machine-readable neutral gallery spec plus deterministic glTF generation and an independent verifier. The derived scene contains four matched sphere/cube stations, five PBR materials including the floor, one fixed camera, two white directional lights, and no image textures. This is an art-side source fixture, not a renderer feature or an Astral screenshot.
 
-Earlier exact-head reviews repaired floor tangent handedness, source-derived camera/light rotations, full floor tangent-frame validation, transform overrides that could reverse camera/light local -Z, uncontracted material rendering properties, incomplete per-triangle normal validation, divergent per-station geometry, source-dimension drift, unsupported glTF evidence claims, mesh/primitive morph overrides, animation transform overrides, supplemental manifest evidence fields, false manifest intent, boolean schema-version acceptance, non-orthogonal tangent frames, and false POSITION accessor bounds.
+Ten earlier exact-head review rounds repaired tangent handedness, camera/light rotation and transform validation, closed materials and evidence fields, per-triangle normals, matched geometry and source dimensions, morph/animation overrides, manifest evidence boundaries, POSITION format/bounds, and canonical source-only intent.
 
-The tenth exact-head review at `604470e9d971f64b131610dfad75e0735efc3a43` found two additional P2 contract gaps. First, POSITION semantics were not explicitly constrained to the glTF-required FLOAT `VEC3` accessor format before decoding, so a repinned non-VEC3 accessor could be interpreted through the generic accessor reader. Second, the source `capture_intent` could be rewritten to carry unsupported import/runtime/art/parity claims while still matching the generated `extras.astral_contract` field.
+The eleventh independent review at `3b7d1600ed1f053465f0dfccd85414d48ced859c` found three additional P2 gaps. First, a repinned cube could replace its canonical faces with one triangle repeated twelve times while preserving counts and decoded extents. Second, sphere/cube tangent handedness could be flipped even though tangent length and normal orthogonality remained valid. Third, valid glTF `extras` on nested objects could carry unsupported runtime/art evidence claims outside the already-closed root contract.
 
-This pass closes both paths. Every POSITION semantic is now checked for `componentType == 5126` and `type == VEC3` before payload decoding. The verifier also requires the canonical source `capture_intent` sentence exactly, and the generated contract must carry that same canonical sentence. Two focused regressions cover a sphere POSITION accessor changed to `VEC4` and a source capture intent rewritten to claim Astral import, runtime verification, art approval and parity. The focused suite definition is now 33 tests.
+This pass closes all three paths. The verifier derives the exact generator-owned sphere/cube/floor index payloads and requires the decoded indices to match them. It derives tangent and bitangent orientation from each triangle's positions and UVs for every mesh, with a stricter orientation threshold retained for the floor. It also recursively rejects nested glTF `extras` everywhere outside the approved root `extras.astral_contract`. Dedicated repinned negatives cover repeated cube triangles, non-floor `TANGENT.w=-1`, and camera `extras` carrying `runtime_verified` / `art_approved`. The focused suite now contains 36 tests.
 
 ## Source research
 
-The contract remains based on Khronos glTF 2.0.1. Vertex POSITION attributes use FLOAT `VEC3` accessors, and POSITION accessor `min` / `max` metadata must describe the decoded vertex extents. Tangent `xyz` is a normalized tangent direction and `w` carries handedness for reconstructing the bitangent. Animations, morph targets, and mesh weights are valid core glTF features but remain outside this immutable calibration fixture.
+The contract remains based on Khronos glTF 2.0.1. POSITION uses FLOAT `VEC3`; POSITION accessor bounds describe decoded geometry; tangent `xyz` plus `w` reconstruct a tangent-space bitangent; and application-specific `extras` may appear on glTF objects, which is why this intentionally closed calibration fixture now rejects nested extras rather than treating them as evidence-neutral.
 
 Primary references retained for this task:
 - https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
@@ -25,14 +25,16 @@ Primary references retained for this task:
 
 ## Verification state
 
-Previous ninth-repair sandbox evidence remains historical only:
-- fresh generation: PASS;
-- exact generator `--check`: PASS;
-- independent verifier with generated manifest plus expected-manifest pin: PASS;
+Fresh sandbox evidence for this eleventh-review repair:
 - Python compilation of generator, verifier and regression suite: PASS;
-- all 31 then-defined regressions: PASS across bounded isolated batches.
+- canonical generation / expected-manifest pin checks are included in the focused suite and passed;
+- tests 1-18 of the 36-test focused suite: PASS in one bounded isolated batch;
+- tests 19-36 of the focused suite: PASS in a second bounded isolated batch;
+- repeated-triangle cube mutation: rejected with `canonical indices`;
+- non-floor handedness mutation: rejected with `mesh tangent frame`;
+- nested camera evidence extras: rejected with `nested extras unsupported`.
 
-For the current tenth-review repair, remote source inspection confirms the verifier checks the new POSITION format and canonical capture-intent gates before the affected downstream checks, and the regression list contains both new negative cases. A fresh exact-head hosted Windows CI run and a fresh independent Codex review are required after the final branch head is established. The repository workflow does not by itself establish Astral runtime or visual-art acceptance, and this record does not claim a fresh 33/33 local execution receipt.
+The 36 tests were executed in two bounded batches because one uninterrupted invocation exceeded the available sandbox command window. This is source-validation evidence only, not native/Astral evidence.
 
 The generator, canonical source, expected manifest and generated artifact bytes are unchanged:
 - canonical `gallery-spec.json`: `517833a990db74f97d8046aa7fafa2d2d73859538d59c3c41ff4a8a7fb63f530`;
@@ -44,7 +46,9 @@ The generated glTF remains intentionally untracked; `expected-manifest.json` pin
 
 ## Publication verification
 
-This repair remains within ART-008 ownership. Implementation changes are limited to the verifier, regression suite, and art-owned records. Source spec, generator and expected manifest are unchanged. Draft PR #33 remains the integration surface. No engine, renderer, gameplay, CMake, workflow or dependency path is changed.
+This repair remains within ART-008 ownership. Implementation changes are limited to the verifier, regression suite, task/QA and art-hourly continuation records. Source spec, generator and expected manifest are unchanged. Draft PR #33 remains the integration surface. No engine, renderer, gameplay, CMake, workflow or dependency path is changed.
+
+Fresh exact-head hosted Windows CI and an independent exact-head review are still required after the final documentation head is established. Passing source tests does not clear those separate gates.
 
 ## Evidence boundaries
 
