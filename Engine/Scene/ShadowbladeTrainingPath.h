@@ -161,6 +161,7 @@ public:
             : DefenseTimingPreset::Standard);
         appliedLesson_ = currentLesson_;
         appliedSession_ = &session;
+        appliedAssignmentGeneration_ = session.AssignmentGeneration();
         return true;
     }
 
@@ -342,6 +343,7 @@ private:
         const ShadowbladeTrainingLessonPlan plan = PlanForLesson(currentLesson_);
         return appliedLesson_ == currentLesson_
             && appliedSession_ == &session
+            && appliedAssignmentGeneration_ == session.AssignmentGeneration()
             && plan.sequence.count > 0
             && session.PracticeSequenceLength() == plan.sequence.count
             && session.Pace() == plan.pace
@@ -353,6 +355,7 @@ private:
     void ClearAppliedSession() {
         appliedLesson_ = ShadowbladeTrainingLesson::Complete;
         appliedSession_ = nullptr;
+        appliedAssignmentGeneration_ = 0;
     }
 
     static bool CheckpointValid(const ShadowbladeTrainingCheckpoint& checkpoint) {
@@ -380,6 +383,7 @@ private:
     ShadowbladeTrainingLesson currentLesson_{ShadowbladeTrainingLesson::GuardFundamentals};
     ShadowbladeTrainingLesson appliedLesson_{ShadowbladeTrainingLesson::Complete};
     const DefensePracticeSession* appliedSession_{};
+    std::uint64_t appliedAssignmentGeneration_{};
     std::uint8_t completedMask_{};
     std::array<ShadowbladeTrainingMedal, LessonCount> medals_{};
     bool forgivingTimingAssist_{};
