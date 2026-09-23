@@ -2,6 +2,7 @@
 #include "Engine/Scene/DefensePracticeSession.h"
 #include "Engine/Scene/ExplorationFieldGuide.h"
 #include "Engine/Scene/LandmarkInteraction.h"
+#include "Engine/Scene/ManaReactorExpedition.h"
 #include "Engine/Scene/ShadowCryptExpedition.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
 
@@ -181,6 +182,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "ShadowbladeTuningPass18Tests.inc"
 #include "ShadowbladeCombatFlowPass19Tests.inc"
 #include "LandmarkDialogueFlowPass20Tests.inc"
+#include "ManaReactorExpeditionPass21Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -197,6 +199,7 @@ int main() {
     TestShadowbladeTuningPass18();
     TestShadowbladeCombatFlowPass19();
     TestLandmarkDialogueFlowPass20();
+    TestManaReactorExpeditionPass21();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;
