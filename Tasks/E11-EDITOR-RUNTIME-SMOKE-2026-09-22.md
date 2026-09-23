@@ -8,6 +8,7 @@ Owned branch: `engine/2026-09-22-editor-runtime-smoke`.
 Admitted baseline from `main`: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`.
 Latest observed `main`: `7dfaeeb340e57d1024a8bc818c65c82cd391d4ae`. Separate game-worker work was not absorbed or rebased into this engine branch.
 Current multi-size verification candidate: `d71f5446bfbc7360778101f376a5d6deeaec17a8`.
+Last fully hosted integration receipt before this evidence repair: source/receipt head `0d2bc2f89171282cdaa14f8291e2d37e63a301ad`, synthetic PR merge `3d260d2e1baa726d36993deaf85d6b47f5919f00`, tested base `7dfaeeb340e57d1024a8bc818c65c82cd391d4ae`.
 `Tests/EditorRuntimeSmoke.cpp` blob: `dff48af572093bc99b45ef11a0f1d60390f3d425`.
 `CMakeLists.txt` remains blob `4fd471151acb4b5919ccef4a92f49da12bd8d1f1`.
 
@@ -57,37 +58,40 @@ Public documentation is used for behavioral/API comparison only. No proprietary 
 
 ## Verification state
 
-Previous exact receipt `6c0bd849c2a5feeb1400d7fc263e155f48ea17b7` completed all three hosted workflows successfully:
+Previous clean receipt `6c0bd849c2a5feeb1400d7fc263e155f48ea17b7` completed all three hosted workflows successfully and received a clean fresh Codex review at `2026-09-23T14:29:04.697315Z`. That predates the multi-size source change.
 
-- Windows build and deterministic tests `35873639886`: PASS;
-- profiling capture portability `35873639870`: PASS;
-- release manifest integrity `35873639882`: PASS.
-
-Fresh Codex review of exact `6c0bd849...` completed at `2026-09-23T14:29:04.697315Z` with no new inline finding surfaced. That clean review predates the multi-size source change and therefore is not acceptance of `d71f5446...`.
-
-For source candidate `d71f5446...`:
+The first workflow set triggered directly by source candidate `d71f5446...` was superseded by the required evidence commits:
 
 - profiling capture portability `35881476543`: PASS;
-- Windows build and deterministic tests `35881476517`: running at this checkpoint;
-- release manifest integrity `35881476562`: running at this checkpoint;
-- fresh independent review: required after the exact post-evidence receipt head is pinned.
+- Windows build and deterministic tests `35881476517`: CANCELLED after a newer branch head was pushed;
+- release manifest integrity `35881476562`: CANCELLED after a newer branch head was pushed.
 
-Hosted deterministic suites do not execute interactive `EditorRuntimeSmoke`; a hosted compile/test pass is not native GUI acceptance.
+Those canceled runs are not treated as a pass or failure of the final receipt.
+
+Exact integration receipt `0d2bc2f89171282cdaa14f8291e2d37e63a301ad` completed all replacement hosted workflows successfully against synthetic PR merge `3d260d2e1baa726d36993deaf85d6b47f5919f00`, whose merge message records source `0d2bc2f8...` into tested base `7dfaeeb340e57d1024a8bc818c65c82cd391d4ae`:
+
+- Windows build and deterministic tests `35881865946`, job `107252459186`: PASS, completed `2026-09-23T15:32:02Z`; every reported safety, VS2022 x64 configure, Debug build/test, Release build/test, runtime/prerequisite, static-verifier, and clean-tree stage passed;
+- profiling capture portability `35881866081`: PASS;
+- release manifest integrity `35881866038`: PASS.
+
+Fresh Codex review of exact `0d2bc2f8...` completed at `2026-09-23T15:33:36.727690Z`. It reported one evidence-only P2: this task, QA receipt, and capability record still described the superseded source-candidate workflow runs as running and did not preserve the exact `0d2bc2f8...` replacement workflow set. No new runtime-code finding was reported by that review. This evidence repair corrects those records. Because the repair itself creates a later content-addressed commit, the post-write receipt head and its own workflow/review state are pinned in PR metadata/checkpoint rather than requiring a document to contain its own not-yet-computed SHA.
+
+Hosted deterministic suites do not execute interactive `EditorRuntimeSmoke`; hosted green checks are not native GUI acceptance.
 
 ## Retained E11 hardening and gates
 
 1. `EditorContainmentTests` executes in hosted deterministic suites while interactive `EditorRuntimeSmoke` remains separate.
 2. Containment coverage exercises worker-local `CleanupProcess`, supervisor whole-job cleanup to zero active processes, and rejection of a zero-exit worker that leaves a descendant.
 3. Shell verification retains stable single top-level identity, the original 12 child HWND/class inventory, semantic Static/Button binding, exact Outliner/assets rows, selection/Inspector synchronization, `LBS_NOTIFY`, bounded cross-process messages, positive-area startup containment, and final stable-window revalidation.
-4. Automated fixed-size runtime checks now cover 800x600, 1280x720, 1440x900 and 420x260.
+4. Automated fixed-size runtime checks cover 800x600, 1280x720, 1440x900 and 420x260.
 5. Maximized-desktop layout, screenshots and human-visible usability remain native interactive acceptance requirements.
 6. PID-based HWND checks require retained launched-process-handle liveness. Final close requires exact original PID/TID ownership plus a successful suspended-thread context barrier, followed by verified resume before any process wait.
-7. `native_evidence` remains empty. Independent final acceptance remains false until the exact current source/receipt receives fresh independent review and registered native Windows acceptance is retained.
+7. `native_evidence` remains empty. Independent final acceptance remains false until the exact post-repair receipt receives fresh independent review and registered native Windows acceptance is retained.
 8. Issue #7 remains open, so the historical R0 runner is blocked and must not be invoked.
 
 ## Registered native handoff
 
-Only after green hosted checks and a fresh clean independent review of the exact receipt tree, the registered Windows executor should use one owned interactive desktop:
+Only after green hosted checks and a fresh clean independent review of the exact post-repair receipt tree, the registered Windows executor should use one owned interactive desktop:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -120,4 +124,4 @@ Stop before production-runtime change, workflow edit outside packet authority, r
 
 ## Single next useful action
 
-Finish hosted verification for `d71f5446...`, reconcile the exact source/merge/base and workflow results into the receipt/capability records, obtain fresh independent review of that exact receipt tree, then hand only that reviewed tree to the registered Windows executor for Debug/Release containment plus the full interactive size matrix.
+Pin this evidence-repair commit as the post-write receipt in PR metadata, allow its replacement hosted workflows to complete, obtain fresh independent review of that exact post-repair tree, then hand only that reviewed tree to the registered Windows executor for Debug/Release containment plus the full interactive size matrix.
