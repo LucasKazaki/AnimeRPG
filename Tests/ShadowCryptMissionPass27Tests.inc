@@ -33,7 +33,6 @@ void TestShadowCryptMissionPass27() {
     ShadowbladeActions actions;
     CharacterProgression progression;
     LandmarkInteraction owner;
-    owner.SetCharacterProgression(&progression);
 
     const Astral::Math::Vec3 positions[3]{
         {-8.0f, 18.0f, 0.0f},
@@ -55,6 +54,9 @@ void TestShadowCryptMissionPass27() {
     Expect(cryptLore.loreUnlocked && cryptSigil.clueUnlocked
             && owner.FieldGuide().OperationProgress(FieldOperation::ShadowCryptLead).Complete(),
         "pass27 production dialogue produces both Shadow Crypt lead witnesses before entry");
+    Expect(!owner.BeginShadowCrypt(),
+        "pass27 an otherwise-unlocked Shadow Crypt still rejects entry without a persistent progression owner");
+    owner.SetCharacterProgression(&progression);
     Expect(owner.BeginShadowCrypt() && !owner.BeginShadowCrypt(),
         "pass27 production owner starts exactly one active Shadow Crypt expedition");
 
