@@ -53,9 +53,10 @@ struct ShadowCryptMissionBriefing {
 class ShadowCryptMission {
 public:
     bool Begin(const ExplorationFieldGuide& guide) {
-        // A suspended room-boundary checkpoint is authoritative until explicitly
-        // resumed; beginning a fresh run must not silently discard it.
-        if (checkpointAvailable_ || !expedition_.TryBegin(guide)) return false;
+        // Begin is the one-time initial-entry gate. Once a run exists, completed
+        // state must go through ReplayCompletedRun and suspended state through
+        // ResumeSuspendedRun so callers cannot bypass those authority checks.
+        if (hasRunHistory_ || checkpointAvailable_ || !expedition_.TryBegin(guide)) return false;
         hasRunHistory_ = true;
         return true;
     }
@@ -96,8 +97,8 @@ public:
     // GAME-136: completed expeditions can restart through the same authoritative
     // lead gate while persistent progression keeps the one-time reward monotonic.
     bool ReplayCompletedRun(const ExplorationFieldGuide& guide) {
-        if (checkpointAvailable_ || !expedition_.Complete()) return false;
-        return Begin(guide);
+        if (!hasRunHistory_ || checkpointAvailable_ || !expedition_.Complete()) return false;
+        return expedition_.TryBegin(guide);
     }
 
     ShadowCryptRewardReport ClaimFirstClearReward(CharacterProgression& progression) {
