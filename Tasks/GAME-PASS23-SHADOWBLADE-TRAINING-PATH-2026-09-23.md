@@ -44,7 +44,7 @@ Access date for all sources below: 2026-09-23.
 - Only Guard Fundamentals is initially unlocked.
 - Completing and committing a lesson advances to exactly the next lesson.
 - Stale metrics cannot double-complete the next lesson.
-- Completion metrics are accepted only after this path instance successfully applies the current lesson; advancing or restoring curriculum progress invalidates the prior lesson-session binding until `ApplyCurrentLesson` succeeds again.
+- Completion metrics are accepted only after this path instance successfully applies the current lesson to the exact `DefensePracticeSession` later supplied for completion/commit; advancing or restoring curriculum progress invalidates the prior lesson/session binding until `ApplyCurrentLesson` succeeds again.
 
 ### GAME-113
 - A lesson configures only existing practice sequence/pace/goal/target mechanics.
@@ -66,7 +66,7 @@ Access date for all sources below: 2026-09-23.
 - Checkpoint schema, lesson enum, prefix completion mask, medal values, and current-lesson consistency are validated before mutation.
 - Older progress or lower medals cannot roll local progress backward.
 - Malformed checkpoints fail closed.
-- Restoring a checkpoint does not restore a live practice-session binding. The resumed lesson must be applied before metrics can complete it.
+- Restoring a checkpoint does not restore a live practice-session binding. The resumed lesson must be applied to a session before metrics from that exact session can complete it.
 - This pass claims only an in-memory contract, not durable save integration.
 
 ### QOL-024
@@ -91,7 +91,7 @@ Native rendered/player-facing verification is separate. No UI/input-screen/contr
 
 ## Review repairs
 
-The first independent review on commit `67f9039cd295c7d95219e093ca81a73e17e0ba92` raised four P2 findings. The first repaired candidate `66bd5cd33f977f8fbce64d830f9e975e7f476c9f` received two additional findings, one P2 and one P3. The next candidate `8568ed875c793c246a9216b6f6bd82d7cd35406e` received one additional P2. The bounded repairs keep the same feature scope and add targeted regressions where practical:
+The first independent review on commit `67f9039cd295c7d95219e093ca81a73e17e0ba92` raised four P2 findings. The first repaired candidate `66bd5cd33f977f8fbce64d830f9e975e7f476c9f` received two additional findings, one P2 and one P3. The next candidate `8568ed875c793c246a9216b6f6bd82d7cd35406e` received one additional P2. Candidate `9114ec997fb7430fa6d1da5f19b1ceaea68dbca7` passed both hosted workflows but its fresh review found one further P2, cross-session substitution. The bounded repairs keep the same feature scope and add targeted regressions where practical:
 
 1. Any hit in Boss Rehearsal caps mastery at Bronze.
 2. Gold on non-boss lessons requires zero ordinary defenses as well as zero hits.
@@ -99,7 +99,8 @@ The first independent review on commit `67f9039cd295c7d95219e093ca81a73e17e0ba92
 4. `ApplyCurrentLesson` rejects any live incoming threat on the supplied `ShadowbladeActions` before applying the session candidate or synchronizing the timing preset.
 5. Boss Gold now requires every authored pattern to have at least one perfect defense and zero ordinary defenses, so later perfect defenses cannot overwrite a mixed run's Silver result.
 6. Boss completion and success checks compare saturating counters individually against zero rather than adding them, eliminating signed-overflow risk when counters approach `INT_MAX`.
-7. Completion is now bound to the lesson most recently and successfully applied by this `ShadowbladeTrainingPath`. Commit/restore invalidates that binding, so matching stale metrics from a prior lesson or manually reconfigured session cannot complete the next lesson without a new atomic `ApplyCurrentLesson`. A regression builds matching Boss Rehearsal configuration and resolved metrics without applying the lesson and verifies completion/commit remain rejected.
+7. Completion is bound to the lesson most recently and successfully applied by this `ShadowbladeTrainingPath`; commit/restore invalidates that lesson binding.
+8. Completion is also bound to the exact `DefensePracticeSession` object passed to the successful `ApplyCurrentLesson`. A second session with matching configuration, provenance, and resolved metrics cannot substitute for the applied session. A registered regression applies Boss Rehearsal to session A, builds matching completed metrics on session B, and verifies session B cannot complete or commit the lesson.
 
 A fresh exact-head independent review is still required after these fixes and all durable records are frozen.
 
