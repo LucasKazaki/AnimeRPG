@@ -307,6 +307,30 @@ void TestShadowbladeTrainingCoachPass24() {
             && retrySession.Stats().ordinaryDefenses == replacementBefore.ordinaryDefenses,
         "pass24 direct replacement threat prevents result reset");
 
+    // Review regression: the owner checks themselves must be bound to the
+    // session's recorded pair. An unrelated idle pair cannot hide a live
+    // replacement on the real pair from either reconfiguration or retry.
+    CombatSandbox unrelatedIdleCombat;
+    ShadowbladeActions unrelatedIdleActions;
+    Expect(!retrySession.AcceptsPracticeObjects(
+               unrelatedIdleCombat, unrelatedIdleActions),
+        "pass24 bound practice session rejects an unrelated idle owner pair");
+    Expect(!ShadowbladeTrainingCoach::ApplyDrill(
+               retrySession, unrelatedIdleCombat, unrelatedIdleActions,
+               ShadowbladeTrainingFocus::QuickCut, DefensePracticePace::Standard)
+            && retryActions.HasIncomingAttack()
+            && retrySession.Stats().attacksQueued == replacementBefore.attacksQueued
+            && retrySession.PracticeSequenceLength() == 2
+            && retrySession.Pace() == DefensePracticePace::Expert,
+        "pass24 unrelated idle owners cannot bypass live replacement protection during reconfiguration");
+    Expect(!ShadowbladeTrainingCoach::RetryDrill(
+               retrySession, unrelatedIdleCombat, unrelatedIdleActions)
+            && retryActions.HasIncomingAttack()
+            && retrySession.Stats().attacksQueued == replacementBefore.attacksQueued
+            && retrySession.Stats().perfectDefenses == replacementBefore.perfectDefenses
+            && retrySession.Stats().ordinaryDefenses == replacementBefore.ordinaryDefenses,
+        "pass24 unrelated idle owners cannot bypass live replacement protection during retry");
+
     // QOL-025: the requested timing guide is a read-only view over the same
     // production threat definitions and existing defense-window constants.
     ShadowbladeTrainingTimingGuide quickGuide{};
