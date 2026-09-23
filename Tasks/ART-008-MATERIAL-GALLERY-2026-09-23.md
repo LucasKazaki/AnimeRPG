@@ -20,7 +20,8 @@ Allowed paths:
 
 Forbidden: `Engine/`, renderer, editor, gameplay, CMake, workflow, dependencies, software installs, local Company Runtime execution, R0, releases, deployment, paid services, force-pushes, or merging another worker's changes.
 
-Source decisions:
+## Source decisions
+
 - glTF 2.0.1 source scene, metres, +Y up / +Z forward / -X right;
 - four matched material stations, each shown on the same immutable sphere and cube geometry;
 - one neutral floor, fixed 16:9 perspective camera at 50 degrees vertical FOV;
@@ -29,35 +30,35 @@ Source decisions:
 - no image textures and no baked lighting in the gallery fixture;
 - source values remain reference-only, with exposure/tonemapping runtime-owned.
 
-Acceptance:
+## Acceptance
+
 - deterministic generation plus exact `--check`;
 - independent standard-library verifier;
 - canonical source status is `proposed_art_reference_not_runtime`;
-- canonical source `capture_intent` must equal the exact source-only sentence above, preventing source/contract agreement from legitimizing runtime/import/art/parity claims;
 - generated runtime status stays `source_validated_not_imported`;
-- generated manifest is a closed schema-version-1 contract containing only `schema_version`, `generator`, `runtime_status`, `source_sha256`, `intent`, `counts`, and `files`, so supplemental runtime/art/parity claims are rejected even without `--expected-manifest`;
-- manifest schema version must be a JSON integer exactly equal to 1, not a boolean accepted through Python integer equality;
-- manifest `intent` must exactly equal the generator's source-only intent, preventing runtime/import/art/parity claims from being hidden inside an otherwise approved field;
-- finite triangle geometry with positions, normals, tangents, UVs and bounded indices;
-- every required vertex/index semantic must use the exact generator-owned glTF accessor format before payload decoding: POSITION FLOAT VEC3, NORMAL FLOAT VEC3, TANGENT FLOAT VEC4, TEXCOORD_0 FLOAT VEC2, and indices UNSIGNED_SHORT SCALAR; FLOAT vertex attributes must not set `normalized=true`;
-- each POSITION accessor declares finite three-component `min` and `max` values matching the decoded payload within the fixture tolerance, so repinned but false culling bounds are rejected;
-- valid outward winding and every indexed vertex normal facing consistently with its geometric triangle face, plus normalized normals/tangents and stable sphere/cube counts;
-- every sphere, cube and floor index payload must exactly match the generator-owned canonical topology, preventing repeated/partial triangles from satisfying only count and extent checks;
-- every vertex tangent must be orthogonal to its paired normal, and every sphere/cube/floor tangent plus reconstructed bitangent must agree with the position/UV derivative orientation, preventing mirrored or materially rotated tangent-space data after repinning;
-- non-floor tangent and bitangent alignment against the UV-derived frame must each exceed 0.95; the canonical 12x24 sphere's measured worst-case source alignments are approximately 0.9914 and 0.9588, while the floor keeps the stricter 0.9999 threshold;
-- every sphere station shares one canonical sphere geometry accessor binding, every cube station shares one canonical cube binding, and decoded sphere radius / cube half extent / floor extents match the source specification;
-- gallery meshes contain only `name` and `primitives`, and primitives only `attributes`, `indices`, `material`, and `mode`, rejecting morph targets, mesh weights, and other geometry overrides that can change final rendered shape after base-accessor validation;
-- the gallery is a static calibration scene and rejects top-level glTF `animations`, preventing animation channels from changing station, camera, or light transforms after static source checks;
-- exact station/material/node ownership and camera/light contract;
-- each neutral-review material permits only the approved `name` plus exact `pbrMetallicRoughness` keys, rejecting emissive, alpha, normal/occlusion, extension, or other uncontracted rendering properties;
-- root `extras` contains only `astral_contract`, that contract contains only the approved source-only evidence fields, and nested glTF `extras` are rejected throughout the fixture so unsupported runtime/art/parity claims cannot be hidden on cameras, nodes, materials, accessors or other objects;
-- camera and directional-light nodes reject scale, matrix, or other transform overrides that can reverse local -Z while preserving the checked quaternion;
-- no images/textures/samplers, preventing accidental baked-lighting review;
+- canonical source `capture_intent` and generated manifest `intent` must equal their exact source-only sentences;
+- generated manifest is a closed schema-version-1 contract, and schema version must be a JSON integer exactly equal to 1;
+- exact generator-owned glTF profile for required semantics: POSITION FLOAT VEC3, NORMAL FLOAT VEC3, TANGENT FLOAT VEC4, TEXCOORD_0 FLOAT VEC2, and indices UNSIGNED_SHORT SCALAR;
+- deterministic accessor, bufferView, buffer, camera, perspective, extension, mesh, primitive, material and scene object key sets are closed to the generator-owned profile, so optional text or metadata fields cannot carry unsupported runtime/import/art/parity claims;
+- all required accessors and bufferViews are referenced by the calibration geometry, with no unused metadata containers admitted;
+- each POSITION accessor declares finite three-component `min` and `max` values matching decoded payload;
+- finite triangle geometry, bounded indices, exact generator-owned index topology, outward winding and consistent indexed vertex normals;
+- every vertex tangent is normalized, normal-orthogonal, and its tangent plus reconstructed bitangent agrees with position/UV derivatives; non-floor alignment must exceed 0.95 and floor alignment 0.9999;
+- all sphere stations share one canonical sphere binding and all cube stations share one canonical cube binding;
+- decoded POSITION/NORMAL/TANGENT/TEXCOORD_0/index payloads for sphere, cube and floor must match the generator-owned procedural geometry within `1e-6` for floating payloads, preventing repeated/relocated faces that preserve counts, extents and topology;
+- decoded sphere radius, cube half extent and floor extents match the source specification;
+- exact generator-owned mesh names and station/material/node ownership;
+- gallery meshes contain only `name` and `primitives`, and primitives only `attributes`, `indices`, `material`, and `mode`;
+- top-level glTF animations are rejected;
+- neutral-review materials permit only approved `name` and exact `pbrMetallicRoughness` fields;
+- root `extras` contains only `astral_contract`, that contract contains only approved source-only evidence fields, and nested glTF `extras` are rejected;
+- camera and directional-light nodes reject scale, matrix or other transform overrides and use source-derived rotations;
+- no images/textures/samplers;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions for light, material binding/rendering properties, camera, source/runtime status, source capture intent, supplemental root/nested glTF and manifest runtime claims, exact manifest intent, boolean schema-version rejection, texture insertion, buffer/accessor bounds, required semantic accessor type/component/normalized format, declared POSITION metadata bounds, expected-manifest pinning, CRLF portability, all-triangle-vertex normals, tangent/normal orthogonality, sphere/cube/floor tangent-frame orientation including an 80-degree non-floor tangent rotation, canonical index coverage, canonical station geometry/source dimensions, mesh weights/morph targets, animation transform overrides, and camera/light transform overrides;
+- negative regressions cover material/light/camera contracts, statuses and evidence claims, nested `extras`, nested accessor `name` evidence claims, manifest schema/intent, texture insertion, bounds and semantic formats, topology, full canonical cube payload, geometry dimensions/sharing, normals/tangent frames, morphs/animation and transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
-Commands:
+## Verification commands
 
 ```text
 python Scripts/generate_material_gallery_gltf.py --source Content/Calibration/MaterialGallery/gallery-spec.json --output <new-dir>
@@ -66,3 +67,7 @@ python Scripts/verify_material_gallery_gltf.py <same-dir>/material_gallery.gltf 
 python Scripts/test_material_gallery_gltf.py
 python -m py_compile Scripts/generate_material_gallery_gltf.py Scripts/verify_material_gallery_gltf.py Scripts/test_material_gallery_gltf.py
 ```
+
+## Current bounded repair
+
+The thirteenth independent review of PR #33 found two P2 gaps at head `49ef9d92057a577f55095f31d7d0f201c70bcb0d`: a cube could collapse to six copies of one face while preserving counts/extents/topology, and optional nested `name` metadata could carry unsupported evidence claims. The repair compares complete decoded sphere/cube/floor payloads with generator-owned geometry and closes deterministic object key sets plus referenced accessor/bufferView coverage. Two focused negatives raise the suite definition from 42 to 44 tests.
