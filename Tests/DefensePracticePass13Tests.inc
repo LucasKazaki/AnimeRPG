@@ -348,7 +348,6 @@ void TestDefensePracticePass13() {
             && inputInterruptedQuick.interruptions == 1,
         "pass13 TryDefend reconciles authoritative interruption exactly once");
     Expect(inputInterruptSession.ResetMetrics()
-            && inputInterruptSession.QueueNextAttack(
-                inputInterruptCombat, inputInterruptActions),
-        "pass13 TryDefend interruption clears active session ownership for reuse");
+            && inputInterruptSession.SetPace(DefensePracticePace::Learning),
+        "pass13 TryDefend interruption clears session ownership for reset and reconfiguration");
 }
