@@ -206,7 +206,7 @@ void TestDefensePracticePass13() {
         "pass13 malformed defense input cannot fabricate a Dodge-to-Guard chain");
 
     // GAME-065: score separates original execution points from a bounded time
-    // coefficient and relies on the pause-aware combat clock.
+    // coefficient and accumulates only valid, unpaused session time.
     CombatSandbox scoreCombat;
     ShadowbladeActions scoreActions;
     DefensePracticeSession scoreSession;
@@ -272,6 +272,53 @@ void TestDefensePracticePass13() {
             && mixedScore.timeCoefficientPercent == 125
             && mixedScore.score == 250,
         "pass13 time coefficient averages over successes and hits without rewarding hits");
+
+    // Hit-only sessions still expose the timing coefficient even though their
+    // execution score stays at zero.
+    CombatSandbox hitOnlyScoreCombat;
+    ShadowbladeActions hitOnlyScoreActions;
+    DefensePracticeSession hitOnlyScoreSession;
+    Expect(hitOnlyScoreSession.SetPracticeSequence(quickOnly)
+            && hitOnlyScoreSession.QueueNextAttack(
+                hitOnlyScoreCombat, hitOnlyScoreActions),
+        "pass13 hit-only score regression queues one QuickCut");
+    const EnemyAttackPlan hitOnlyPlan = hitOnlyScoreCombat.PendingEnemyAttack();
+    Expect(hitOnlyScoreSession.AdvanceTime(
+            hitOnlyScoreCombat, hitOnlyScoreActions, hitOnlyPlan.windupSeconds),
+        "pass13 hit-only score regression resolves the missed QuickCut");
+    const DefensePracticeScoreReport hitOnlyScore =
+        hitOnlyScoreSession.Score(hitOnlyScoreCombat);
+    Expect(hitOnlyScore.resolvedAttempts == 1
+            && hitOnlyScore.baseScore == 0
+            && hitOnlyScore.timeCoefficientPercent == 125
+            && hitOnlyScore.score == 0,
+        "pass13 hit-only report keeps zero points while exposing its timing coefficient");
+
+    // External CombatSandbox resets must not rewind already accumulated session
+    // time or improve an earned coefficient.
+    CombatSandbox resetClockCombat;
+    ShadowbladeActions resetClockActions;
+    DefensePracticeSession resetClockSession;
+    Expect(resetClockSession.SetPracticeSequence(quickOnly)
+            && resetClockSession.QueueNextAttack(resetClockCombat, resetClockActions)
+            && resetClockSession.TryDefend(resetClockCombat, resetClockActions,
+                DefenseInput::Guard).result == DefenseResult::Guarded,
+        "pass13 reset-clock regression records one successful guard");
+    resetClockSession.AdvanceTime(resetClockCombat, resetClockActions, 4.0f);
+    const DefensePracticeScoreReport beforeCombatReset =
+        resetClockSession.Score(resetClockCombat);
+    Expect(beforeCombatReset.timeCoefficientPercent == 75
+            && beforeCombatReset.score == 150,
+        "pass13 reset-clock regression first earns the slow timing coefficient");
+    resetClockCombat.ResetTrainingSession();
+    const DefensePracticeScoreReport afterCombatReset =
+        resetClockSession.Score(resetClockCombat);
+    Expect(afterCombatReset.resolvedAttempts == beforeCombatReset.resolvedAttempts
+            && afterCombatReset.baseScore == beforeCombatReset.baseScore
+            && afterCombatReset.timeCoefficientPercent
+                == beforeCombatReset.timeCoefficientPercent
+            && afterCombatReset.score == beforeCombatReset.score,
+        "pass13 combat clock reset cannot improve or erase accumulated session score timing");
 
     // GAME-066: goal categories keep pass-12 semantics while the session can
     // choose a bounded target count from one through ten.
