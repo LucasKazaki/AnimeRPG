@@ -38,6 +38,7 @@ constexpr std::array<const wchar_t*, 5> kPendingButtons{{
     L"Play (pending)"}};
 
 ULONGLONG gWorkDeadlineTick = 0;
+HANDLE gOwnedProcessHandle = nullptr;
 
 DWORD RemainingWorkBudget(DWORD requestedMs) {
     if (gWorkDeadlineTick == 0) return requestedMs;
@@ -49,6 +50,11 @@ DWORD RemainingWorkBudget(DWORD requestedMs) {
 
 bool WorkBudgetExpired() {
     return gWorkDeadlineTick != 0 && GetTickCount64() >= gWorkDeadlineTick;
+}
+
+bool OwnedProcessStillRunning() {
+    if (!gOwnedProcessHandle) return false;
+    return WaitForSingleObject(gOwnedProcessHandle, 0) == WAIT_TIMEOUT;
 }
 
 struct ProcessWindowCollection {
@@ -86,10 +92,10 @@ struct ButtonGeometry {
 };
 
 bool WindowOwnedByProcess(HWND window, DWORD processId) {
-    if (!window) return false;
+    if (!window || !OwnedProcessStillRunning()) return false;
     DWORD ownerProcessId = 0;
     if (GetWindowThreadProcessId(window, &ownerProcessId) == 0) return false;
-    return ownerProcessId == processId;
+    return ownerProcessId == processId && OwnedProcessStillRunning();
 }
 
 std::wstring ClassName(HWND window) {
@@ -233,9 +239,7 @@ bool ReadValidatedListboxText(HWND listbox, HWND parent, DWORD processId, int co
 
 BOOL CALLBACK CollectVisibleProcessWindow(HWND window, LPARAM parameter) {
     auto& collection = *reinterpret_cast<ProcessWindowCollection*>(parameter);
-    DWORD processId = 0;
-    GetWindowThreadProcessId(window, &processId);
-    if (processId == collection.processId && IsWindowVisible(window)) {
+    if (WindowOwnedByProcess(window, collection.processId) && IsWindowVisible(window)) {
         collection.windows.push_back(window);
     }
     return TRUE;
@@ -820,6 +824,7 @@ int wmain(int argc, wchar_t** argv) {
         std::cerr << "EDITOR AUTOMATED NATIVE RUNTIME SMOKE: FAIL (launch)\n";
         return 1;
     }
+    gOwnedProcessHandle = process.hProcess;
 
     HWND window = nullptr;
     bool passed = false;
@@ -916,6 +921,7 @@ int wmain(int argc, wchar_t** argv) {
     if (!passed && GetExitCodeProcess(process.hProcess, &exitCode) == FALSE) exitCode = 1;
 
     CloseHandle(process.hThread);
+    gOwnedProcessHandle = nullptr;
     CloseHandle(process.hProcess);
 
     if (!passed) {
@@ -930,6 +936,7 @@ int wmain(int argc, wchar_t** argv) {
         << L"left-to-right semantic toolbar Button HWNDs, disabled pending tools, enabled Outliner/assets surfaces, "
         << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
         << L"every bounded cross-process read and after both normal+narrow resizes; Cube selection stayed synchronized, "
-        << L"all direct children remained contained from startup through both resizes, and shutdown exited cleanly.\n";
+        << L"all direct children remained contained from startup through both resizes, the retained CreateProcess handle "
+        << L"remained nonsignaled around PID-based HWND ownership checks, and shutdown exited cleanly.\n";
     return 0;
 }
