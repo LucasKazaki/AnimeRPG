@@ -6,25 +6,30 @@
 
 namespace Astral::Scene {
 
-ShadowbladeActionTuning ShadowbladeActions::BuildLoadoutTuning(
-    const ShadowbladeLoadout& loadout) {
-    const ShadowbladeLoadoutProfile profile = loadout.Profile();
-    const int attackPoints = std::max(0, profile.attackBonus - BaselineLoadoutAttackBonus);
-    const int guardPoints = std::max(0, profile.guardBonus - BaselineLoadoutGuardBonus);
-    const int resourcePoints = std::max(
-        0, profile.resourceRecoveryBonus - BaselineLoadoutResourceRecoveryBonus);
-    const int mobilityPoints = std::max(0, profile.mobilityBonus - BaselineLoadoutMobilityBonus);
-
-    const int cappedAttackPoints = std::min(
-        attackPoints, MaximumLoadoutAttackDamageBonus / LoadoutAttackDamagePerPoint);
-    const int cappedGuardPoints = std::min(
-        guardPoints, MaximumLoadoutGuardDamageMitigation / LoadoutGuardMitigationPerPoint);
+ShadowbladeActionTuning ShadowbladeActions::ActionTuningForProfile(
+    const ShadowbladeLoadoutProfile& profile) {
+    const int maximumAttackPoints =
+        MaximumLoadoutAttackDamageBonus / LoadoutAttackDamagePerPoint;
+    const int maximumGuardPoints =
+        MaximumLoadoutGuardDamageMitigation / LoadoutGuardMitigationPerPoint;
     const int maximumResourcePoints = static_cast<int>(
         MaximumLoadoutResourceRegenerationBonus / LoadoutResourceRegenerationPerPoint);
     const int maximumMobilityPoints = static_cast<int>(
         MaximumLoadoutDashDistanceBonus / LoadoutMobilityDistancePerPoint);
-    const int cappedResourcePoints = std::min(resourcePoints, maximumResourcePoints);
-    const int cappedMobilityPoints = std::min(mobilityPoints, maximumMobilityPoints);
+
+    const int cappedAttackPoints = std::clamp(profile.attackBonus,
+        BaselineLoadoutAttackBonus, BaselineLoadoutAttackBonus + maximumAttackPoints)
+        - BaselineLoadoutAttackBonus;
+    const int cappedGuardPoints = std::clamp(profile.guardBonus,
+        BaselineLoadoutGuardBonus, BaselineLoadoutGuardBonus + maximumGuardPoints)
+        - BaselineLoadoutGuardBonus;
+    const int cappedResourcePoints = std::clamp(profile.resourceRecoveryBonus,
+        BaselineLoadoutResourceRecoveryBonus,
+        BaselineLoadoutResourceRecoveryBonus + maximumResourcePoints)
+        - BaselineLoadoutResourceRecoveryBonus;
+    const int cappedMobilityPoints = std::clamp(profile.mobilityBonus,
+        BaselineLoadoutMobilityBonus, BaselineLoadoutMobilityBonus + maximumMobilityPoints)
+        - BaselineLoadoutMobilityBonus;
 
     return {
         FatalStrikeDamage + cappedAttackPoints * LoadoutAttackDamagePerPoint,
@@ -33,9 +38,14 @@ ShadowbladeActionTuning ShadowbladeActions::BuildLoadoutTuning(
         ResourceRegenerationPerSecond + static_cast<float>(cappedResourcePoints)
             * LoadoutResourceRegenerationPerPoint,
         cappedGuardPoints * LoadoutGuardMitigationPerPoint,
-        profile.readinessScore,
-        profile.activeResonanceFamilies,
+        std::clamp(profile.readinessScore, 0, 100),
+        std::clamp(profile.activeResonanceFamilies, 0, 3),
     };
+}
+
+ShadowbladeActionTuning ShadowbladeActions::BuildLoadoutTuning(
+    const ShadowbladeLoadout& loadout) {
+    return ActionTuningForProfile(loadout.Profile());
 }
 
 ShadowbladeActionTuning ShadowbladeActions::CurrentLoadoutTuning() const {
