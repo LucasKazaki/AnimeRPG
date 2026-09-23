@@ -1,8 +1,8 @@
 void TestShadowbladeTrainingCoachPass24() {
     using namespace Astral::Scene;
 
-    // GAME-117: focused drills select bounded canonical threat sequences while
-    // continuing to use the authoritative DefensePracticeSession combat path.
+    // GAME-117: every advertised focus has an exact bounded mapping to the
+    // existing canonical threat definitions, goals, and selected pace.
     ShadowbladeTrainingDrillPlan quickPlan{};
     Expect(ShadowbladeTrainingCoach::PlanForFocus(
                ShadowbladeTrainingFocus::QuickCut,
@@ -12,7 +12,41 @@ void TestShadowbladeTrainingCoachPass24() {
             && quickPlan.pace == DefensePracticePace::Learning
             && quickPlan.goal == DefenseTrainingGoal::GuardDiscipline
             && quickPlan.goalTarget == DefensePracticeSession::DefaultGoalTarget,
-        "pass24 QuickCut focus maps to the canonical guard drill");
+        "pass24 QuickCut focus maps exactly to the canonical guard drill");
+
+    ShadowbladeTrainingDrillPlan breakerPlan{};
+    Expect(ShadowbladeTrainingCoach::PlanForFocus(
+               ShadowbladeTrainingFocus::GuardBreaker,
+               DefensePracticePace::Standard, breakerPlan)
+            && breakerPlan.sequence.count == 1
+            && breakerPlan.sequence.patterns[0] == EnemyAttackPattern::GuardBreaker
+            && breakerPlan.pace == DefensePracticePace::Standard
+            && breakerPlan.goal == DefenseTrainingGoal::GuardDiscipline
+            && breakerPlan.goalTarget == DefensePracticeSession::DefaultGoalTarget,
+        "pass24 GuardBreaker focus maps exactly to the canonical guard drill");
+
+    ShadowbladeTrainingDrillPlan riftPlan{};
+    Expect(ShadowbladeTrainingCoach::PlanForFocus(
+               ShadowbladeTrainingFocus::RiftBurst,
+               DefensePracticePace::Expert, riftPlan)
+            && riftPlan.sequence.count == 1
+            && riftPlan.sequence.patterns[0] == EnemyAttackPattern::RiftBurst
+            && riftPlan.pace == DefensePracticePace::Expert
+            && riftPlan.goal == DefenseTrainingGoal::DodgeDiscipline
+            && riftPlan.goalTarget == DefensePracticeSession::DefaultGoalTarget,
+        "pass24 RiftBurst focus maps exactly to the canonical dodge drill");
+
+    ShadowbladeTrainingDrillPlan mixedPlan{};
+    Expect(ShadowbladeTrainingCoach::PlanForFocus(
+               ShadowbladeTrainingFocus::MixedDefense,
+               DefensePracticePace::Standard, mixedPlan)
+            && mixedPlan.sequence.count == 2
+            && mixedPlan.sequence.patterns[0] == EnemyAttackPattern::QuickCut
+            && mixedPlan.sequence.patterns[1] == EnemyAttackPattern::RiftBurst
+            && mixedPlan.pace == DefensePracticePace::Standard
+            && mixedPlan.goal == DefenseTrainingGoal::PerfectDefense
+            && mixedPlan.goalTarget == DefensePracticeSession::DefaultGoalTarget,
+        "pass24 MixedDefense focus maps exactly to QuickCut then RiftBurst");
 
     ShadowbladeTrainingDrillPlan bossPlan{};
     Expect(ShadowbladeTrainingCoach::PlanForFocus(
@@ -23,8 +57,9 @@ void TestShadowbladeTrainingCoachPass24() {
             && bossPlan.sequence.patterns[1] == EnemyAttackPattern::GuardBreaker
             && bossPlan.sequence.patterns[2] == EnemyAttackPattern::RiftBurst
             && bossPlan.pace == DefensePracticePace::Expert
-            && bossPlan.goal == DefenseTrainingGoal::FreePractice,
-        "pass24 boss focus maps to all three authoritative threat types");
+            && bossPlan.goal == DefenseTrainingGoal::FreePractice
+            && bossPlan.goalTarget == DefensePracticeSession::DefaultGoalTarget,
+        "pass24 BossCycle focus maps exactly to all three canonical threat types");
 
     const ShadowbladeTrainingDrillPlan unchangedPlan = bossPlan;
     Expect(!ShadowbladeTrainingCoach::PlanForFocus(
@@ -43,7 +78,8 @@ void TestShadowbladeTrainingCoachPass24() {
     ShadowbladeActions focusedActions;
     CombatSandbox focusedCombat;
     Expect(ShadowbladeTrainingCoach::ApplyDrill(
-               focusedSession, ShadowbladeTrainingFocus::RiftBurst,
+               focusedSession, focusedCombat, focusedActions,
+               ShadowbladeTrainingFocus::RiftBurst,
                DefensePracticePace::Learning)
             && focusedSession.PracticeSequenceLength() == 1
             && focusedSession.Pace() == DefensePracticePace::Learning
@@ -53,13 +89,14 @@ void TestShadowbladeTrainingCoachPass24() {
         "pass24 focused drill config reaches the existing live threat path");
     const DefenseTrainingStats focusedBefore = focusedSession.Stats();
     Expect(!ShadowbladeTrainingCoach::ApplyDrill(
-               focusedSession, ShadowbladeTrainingFocus::QuickCut,
+               focusedSession, focusedCombat, focusedActions,
+               ShadowbladeTrainingFocus::QuickCut,
                DefensePracticePace::Standard)
             && focusedActions.HasIncomingAttack()
             && focusedSession.Stats().attacksQueued == focusedBefore.attacksQueued
             && focusedSession.PracticeSequenceLength() == 1
             && focusedSession.Goal() == DefenseTrainingGoal::DodgeDiscipline,
-        "pass24 drill reconfiguration is atomic while a threat is active");
+        "pass24 drill reconfiguration is atomic while a session threat is active");
     const EnemyAttackPlan focusedThreat = focusedCombat.PendingEnemyAttack();
     focusedSession.AdvanceTime(focusedCombat, focusedActions,
         focusedThreat.windupSeconds - 0.10f);
@@ -69,13 +106,41 @@ void TestShadowbladeTrainingCoachPass24() {
     focusedSession.AdvanceTime(
         focusedCombat, focusedActions, focusedThreat.recoverySeconds);
 
+    // Review regression: threats queued directly on either authoritative owner
+    // must block reconfiguration even though the session itself has no link.
+    DefensePracticeSession detachedActionSession;
+    ShadowbladeActions detachedActions;
+    CombatSandbox detachedActionCombat;
+    Expect(detachedActions.BeginIncomingAttack({0.8f, 20, 10, true}),
+        "pass24 detached-action regression creates a live authoritative threat");
+    Expect(!ShadowbladeTrainingCoach::ApplyDrill(
+               detachedActionSession, detachedActionCombat, detachedActions,
+               ShadowbladeTrainingFocus::QuickCut, DefensePracticePace::Standard)
+            && detachedActions.HasIncomingAttack()
+            && detachedActionSession.PracticeSequenceLength() == 0
+            && detachedActionSession.Stats().attacksQueued == 0,
+        "pass24 detached action threat blocks drill mutation");
+
+    DefensePracticeSession detachedCombatSession;
+    ShadowbladeActions detachedCombatActions;
+    CombatSandbox detachedCombat;
+    Expect(detachedCombat.QueueEnemyAttackPattern(EnemyAttackPattern::GuardBreaker),
+        "pass24 detached-combat regression creates a live planner threat");
+    Expect(!ShadowbladeTrainingCoach::ApplyDrill(
+               detachedCombatSession, detachedCombat, detachedCombatActions,
+               ShadowbladeTrainingFocus::RiftBurst, DefensePracticePace::Learning)
+            && detachedCombat.HasPendingEnemyAttack()
+            && detachedCombatSession.PracticeSequenceLength() == 0,
+        "pass24 detached combat threat blocks drill mutation");
+
     // GAME-118 and GAME-119: run a bounded five-attempt practice sample so the
     // debrief and optional challenges are derived from real session metrics.
     DefensePracticeSession masterySession;
     ShadowbladeActions masteryActions;
     CombatSandbox masteryCombat;
     Expect(ShadowbladeTrainingCoach::ApplyDrill(
-               masterySession, ShadowbladeTrainingFocus::BossCycle,
+               masterySession, masteryCombat, masteryActions,
+               ShadowbladeTrainingFocus::BossCycle,
                DefensePracticePace::Standard),
         "pass24 mastery sample configures the three-pattern boss cycle");
     for (int attempt = 0; attempt < 5; ++attempt) {
@@ -96,7 +161,8 @@ void TestShadowbladeTrainingCoachPass24() {
 
     const ShadowbladeTrainingDebrief masteryDebrief =
         ShadowbladeTrainingCoach::Debrief(masterySession, masteryCombat);
-    Expect(masteryDebrief.resolvedAttempts == 5
+    Expect(masteryDebrief.valid
+            && masteryDebrief.resolvedAttempts == 5
             && masteryDebrief.successfulDefenses == 5
             && masteryDebrief.perfectDefenses == 5
             && masteryDebrief.ordinaryDefenses == 0
@@ -110,6 +176,19 @@ void TestShadowbladeTrainingCoachPass24() {
             && masteryDebrief.timeCoefficientPercent > 0
             && masteryDebrief.grade == DefenseTrainingGrade::Gold,
         "pass24 scored debrief exposes bounded authoritative session results");
+
+    // Review regression: score ownership is the combat/session provenance
+    // witness. A mismatched combat object fails the complete debrief closed.
+    CombatSandbox unrelatedCombat;
+    const ShadowbladeTrainingDebrief mismatchedDebrief =
+        ShadowbladeTrainingCoach::Debrief(masterySession, unrelatedCombat);
+    Expect(!mismatchedDebrief.valid
+            && mismatchedDebrief.resolvedAttempts == 0
+            && mismatchedDebrief.successfulDefenses == 0
+            && mismatchedDebrief.baseScore == 0
+            && mismatchedDebrief.finalScore == 0
+            && mismatchedDebrief.grade == DefenseTrainingGrade::None,
+        "pass24 mismatched combat owner cannot produce a mixed-provenance debrief");
 
     const ShadowbladeTrainingChallengeStatus streak =
         ShadowbladeTrainingCoach::ChallengeStatus(
@@ -137,7 +216,8 @@ void TestShadowbladeTrainingCoachPass24() {
     ShadowbladeActions missActions;
     CombatSandbox missCombat;
     Expect(ShadowbladeTrainingCoach::ApplyDrill(
-               missSession, ShadowbladeTrainingFocus::BossCycle,
+               missSession, missCombat, missActions,
+               ShadowbladeTrainingFocus::BossCycle,
                DefensePracticePace::Standard)
             && missSession.QueueNextAttack(missCombat, missActions),
         "pass24 recommendation sample starts with canonical QuickCut");
@@ -154,7 +234,8 @@ void TestShadowbladeTrainingCoachPass24() {
     ShadowbladeActions ordinaryActions;
     CombatSandbox ordinaryCombat;
     Expect(ShadowbladeTrainingCoach::ApplyDrill(
-               ordinarySession, ShadowbladeTrainingFocus::QuickCut,
+               ordinarySession, ordinaryCombat, ordinaryActions,
+               ShadowbladeTrainingFocus::QuickCut,
                DefensePracticePace::Standard)
             && ordinarySession.QueueNextAttack(ordinaryCombat, ordinaryActions)
             && ordinarySession.TryDefend(ordinaryCombat, ordinaryActions,
@@ -171,12 +252,13 @@ void TestShadowbladeTrainingCoachPass24() {
         "pass24 all-perfect measured practice recommends maintaining form");
 
     // GAME-121: retry clears results/cursor while preserving the selected drill
-    // contract, and it refuses to erase an active threat.
+    // contract, and refuses threats visible on either authoritative live owner.
     DefensePracticeSession retrySession;
     ShadowbladeActions retryActions;
     CombatSandbox retryCombat;
     Expect(ShadowbladeTrainingCoach::ApplyDrill(
-               retrySession, ShadowbladeTrainingFocus::MixedDefense,
+               retrySession, retryCombat, retryActions,
+               ShadowbladeTrainingFocus::MixedDefense,
                DefensePracticePace::Expert)
             && retrySession.QueueNextAttack(retryCombat, retryActions)
             && retrySession.TryDefend(retryCombat, retryActions,
@@ -184,7 +266,8 @@ void TestShadowbladeTrainingCoachPass24() {
         "pass24 retry sample records an ordinary result before reset");
     EnemyAttackPlan retryPlan = retryCombat.PendingEnemyAttack();
     retrySession.AdvanceTime(retryCombat, retryActions, retryPlan.recoverySeconds);
-    Expect(ShadowbladeTrainingCoach::RetryDrill(retrySession)
+    Expect(ShadowbladeTrainingCoach::RetryDrill(
+               retrySession, retryCombat, retryActions)
             && retrySession.Stats().attacksQueued == 0
             && retrySession.Stats().ordinaryDefenses == 0
             && retrySession.PracticeSequenceLength() == 2
@@ -196,11 +279,33 @@ void TestShadowbladeTrainingCoachPass24() {
     Expect(retrySession.QueueNextAttack(retryCombat, retryActions),
         "pass24 retried drill restarts its canonical sequence");
     const DefenseTrainingStats activeRetryBefore = retrySession.Stats();
-    Expect(!ShadowbladeTrainingCoach::RetryDrill(retrySession)
+    Expect(!ShadowbladeTrainingCoach::RetryDrill(
+               retrySession, retryCombat, retryActions)
             && retryActions.HasIncomingAttack()
             && retrySession.Stats().attacksQueued == activeRetryBefore.attacksQueued
             && retrySession.PracticeSequenceLength() == 2,
         "pass24 quick retry fails closed while an owned threat is active");
+
+    // Review regression: after the session-owned threat is fully resolved, a
+    // replacement queued directly on the actions owner still blocks reset.
+    retryPlan = retryCombat.PendingEnemyAttack();
+    retrySession.AdvanceTime(retryCombat, retryActions,
+        retryPlan.windupSeconds - 0.10f);
+    const DefenseInput retryInput = retryPlan.blockable
+        ? DefenseInput::Guard
+        : DefenseInput::Dodge;
+    retrySession.TryDefend(retryCombat, retryActions, retryInput);
+    retrySession.AdvanceTime(retryCombat, retryActions, retryPlan.recoverySeconds);
+    const DefenseTrainingStats replacementBefore = retrySession.Stats();
+    Expect(retryActions.BeginIncomingAttack({0.6f, 19, 12, true}),
+        "pass24 replacement regression creates a direct action threat after session resolution");
+    Expect(!ShadowbladeTrainingCoach::RetryDrill(
+               retrySession, retryCombat, retryActions)
+            && retryActions.HasIncomingAttack()
+            && retrySession.Stats().attacksQueued == replacementBefore.attacksQueued
+            && retrySession.Stats().perfectDefenses == replacementBefore.perfectDefenses
+            && retrySession.Stats().ordinaryDefenses == replacementBefore.ordinaryDefenses,
+        "pass24 direct replacement threat prevents result reset");
 
     // QOL-025: the requested timing guide is a read-only view over the same
     // production threat definitions and existing defense-window constants.
