@@ -312,6 +312,48 @@ void TestShadowbladeTrainingPathPass23() {
                 == ShadowbladeTrainingMedal::Bronze,
         "pass23 any boss-rehearsal hit prevents Silver or Gold mastery");
 
+    // Review regression: later perfect defenses cannot erase earlier ordinary
+    // defenses from boss Gold eligibility. This remains a Silver clean run.
+    ShadowbladeTrainingPath bossMixedPath;
+    DefensePracticeSession bossMixedSession;
+    ShadowbladeActions bossMixedActions;
+    CombatSandbox bossMixedCombat;
+    Expect(bossMixedPath.RestoreCheckpoint(bossCheckpoint)
+            && bossMixedPath.ApplyCurrentLesson(bossMixedSession, bossMixedActions),
+        "pass23 boss mixed-mastery regression starts the authored rehearsal");
+    for (int pass = 0; pass < 2; ++pass) {
+        for (int patternIndex = 0; patternIndex < 3; ++patternIndex) {
+            Expect(bossMixedSession.QueueNextAttack(bossMixedCombat, bossMixedActions),
+                "pass23 boss mixed-mastery regression queues the authored threat");
+            const EnemyAttackPlan plan = bossMixedCombat.PendingEnemyAttack();
+            if (pass == 0) {
+                if (plan.pattern == EnemyAttackPattern::RiftBurst) {
+                    bossMixedSession.AdvanceTime(bossMixedCombat, bossMixedActions, 0.40f);
+                    Expect(bossMixedSession.TryDefend(bossMixedCombat, bossMixedActions,
+                            DefenseInput::Dodge).result == DefenseResult::Evaded,
+                        "pass23 boss mixed-mastery first RiftBurst is an ordinary evade");
+                } else {
+                    Expect(bossMixedSession.TryDefend(bossMixedCombat, bossMixedActions,
+                            DefenseInput::Guard).result == DefenseResult::Guarded,
+                        "pass23 boss mixed-mastery first blockable threat is an ordinary guard");
+                }
+            } else {
+                bossMixedSession.AdvanceTime(
+                    bossMixedCombat, bossMixedActions, plan.windupSeconds - 0.10f);
+                const DefenseResult perfect = bossMixedSession.TryDefend(
+                    bossMixedCombat, bossMixedActions, DefenseInput::Dodge).result;
+                Expect(perfect == DefenseResult::PerfectDodge,
+                    "pass23 boss mixed-mastery second-cycle threat is perfectly dodged");
+            }
+            bossMixedSession.AdvanceTime(
+                bossMixedCombat, bossMixedActions, plan.recoverySeconds);
+        }
+    }
+    Expect(bossMixedPath.CurrentLessonComplete(bossMixedSession)
+            && bossMixedPath.CurrentMedal(bossMixedSession)
+                == ShadowbladeTrainingMedal::Silver,
+        "pass23 boss rehearsal with ordinary defenses cannot later upgrade itself to Gold");
+
     ShadowbladeTrainingCheckpoint malformedBoss = bossPath.Checkpoint();
     malformedBoss.medals[2] = static_cast<ShadowbladeTrainingMedal>(99);
     Expect(!bossPath.RestoreCheckpoint(malformedBoss)
