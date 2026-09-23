@@ -4,7 +4,7 @@ void TestShadowbladeLoadoutWorkbenchPass28() {
     CharacterProgression progression;
     ShadowbladeActions actions;
     ShadowbladeLoadout& loadout = actions.Loadout();
-    ShadowbladeLoadoutWorkbench& workbench = actions.LoadoutWorkbench();
+    const ShadowbladeLoadoutWorkbench& workbench = actions.LoadoutWorkbench();
 
     Expect(loadout.AcquireModule(ResonanceModule::CoolingEdge),
         "pass28 setup acquires Cooling Edge");
@@ -101,8 +101,8 @@ void TestShadowbladeLoadoutWorkbenchPass28() {
     Expect(loadout.EquippedModule(ResonanceSlot::Edge) == ResonanceModule::CoolingEdge,
         "pass28 scope comparison remains preview-only");
 
-    // GAME-141: the live Shadowblade owner remembers only a successful preset
-    // application and can reapply it after later manual equipment changes.
+    // GAME-141: stateful preset operations route through the live Shadowblade owner,
+    // remember only a successful application, and survive transient encounter resets.
     Expect(loadout.SavePreset(0) == LoadoutActionResult::Success,
         "pass28 saves baseline preset zero");
     Expect(loadout.TryEquipModule(ResonanceSlot::Edge, ResonanceModule::RiftEdge)
@@ -110,44 +110,68 @@ void TestShadowbladeLoadoutWorkbenchPass28() {
         "pass28 changes live equipment before second preset");
     Expect(loadout.SavePreset(1) == LoadoutActionResult::Success,
         "pass28 saves alternate preset one");
-    Expect(!workbench.HasLastAppliedPreset(),
+    Expect(!actions.HasLastAppliedLoadoutPreset(),
         "pass28 saving alone does not fabricate a last-applied preset");
-    Expect(workbench.ApplyPreset(loadout, 0, progression) == LoadoutActionResult::Success
-            && workbench.HasLastAppliedPreset() && workbench.LastAppliedPreset() == 0,
+    Expect(actions.ApplyLoadoutPreset(0, progression) == LoadoutActionResult::Success
+            && actions.HasLastAppliedLoadoutPreset()
+            && actions.LastAppliedLoadoutPreset() == 0,
         "pass28 successful preset application becomes the remembered selection");
-    Expect(workbench.ApplyPreset(loadout, 2, progression) == LoadoutActionResult::EmptyPreset
-            && workbench.LastAppliedPreset() == 0,
+    Expect(actions.ApplyLoadoutPreset(2, progression) == LoadoutActionResult::EmptyPreset
+            && actions.LastAppliedLoadoutPreset() == 0,
         "pass28 failed preset application cannot replace remembered selection");
     Expect(loadout.TryEquipModule(ResonanceSlot::Edge, ResonanceModule::RiftEdge)
             == LoadoutActionResult::Success,
         "pass28 changes equipment before one-action reapply");
-    Expect(workbench.ReapplyLastPreset(loadout, progression) == LoadoutActionResult::Success
+    Expect(actions.ReapplyLastLoadoutPreset(progression) == LoadoutActionResult::Success
             && loadout.EquippedModule(ResonanceSlot::Edge) == ResonanceModule::CoolingEdge,
         "pass28 one-action reapply restores the exact remembered preset");
 
-    // QOL-029: saved presets can carry short human-readable labels with spaces,
-    // and labels can be cleared without modifying the saved build or live gear.
+    // QOL-029: saved presets can carry short human-readable labels with spaces.
+    // Stateful edits are owner-bound, persist across transient resets, and clear
+    // without modifying the saved build or live equipment.
     const ShadowbladeLoadoutProfile beforeLabel = loadout.Profile();
-    Expect(workbench.SetPresetLabel(loadout, 0, "  Mall Patrol  ")
+    Expect(actions.SetLoadoutPresetLabel(0, "  Mall Patrol  ")
             == PresetLabelResult::Success
-            && workbench.PresetLabel(0) == "Mall Patrol",
+            && actions.LoadoutPresetLabel(0) == "Mall Patrol",
         "pass28 preset labels trim outer spaces while preserving internal spaces");
-    Expect(workbench.SetPresetLabel(loadout, 0, std::string(25, 'x'))
+    Expect(actions.SetLoadoutPresetLabel(0, std::string(25, 'x'))
             == PresetLabelResult::TooLong
-            && workbench.PresetLabel(0) == "Mall Patrol",
+            && actions.LoadoutPresetLabel(0) == "Mall Patrol",
         "pass28 overlong label rejection preserves the previous label");
-    Expect(workbench.SetPresetLabel(loadout, 0, "bad\tlabel")
+    Expect(actions.SetLoadoutPresetLabel(0, "bad\tlabel")
             == PresetLabelResult::InvalidCharacter
-            && workbench.PresetLabel(0) == "Mall Patrol",
+            && actions.LoadoutPresetLabel(0) == "Mall Patrol",
         "pass28 control-character label rejection is non-mutating");
-    Expect(workbench.SetPresetLabel(loadout, 2, "Unused")
+    Expect(actions.SetLoadoutPresetLabel(2, "Unused")
             == PresetLabelResult::EmptyPreset,
         "pass28 cannot label an unsaved preset slot");
-    Expect(workbench.ClearPresetLabel(loadout, 0) == PresetLabelResult::Success
-            && !workbench.HasPresetLabel(0)
-            && loadout.PresetSaved(0)
-            && loadout.Profile().readinessScore == beforeLabel.readinessScore,
+
+    ShadowbladeActions foreignOwner;
+    Expect(foreignOwner.Loadout().SavePreset(0) == LoadoutActionResult::Success,
+        "pass28 cross-owner fixture saves a preset only on the foreign owner");
+    Expect(foreignOwner.SetLoadoutPresetLabel(0, "Foreign Build")
+            == PresetLabelResult::Success,
+        "pass28 foreign owner can label its own saved preset");
+    ShadowbladeActions emptyOwner;
+    Expect(emptyOwner.SetLoadoutPresetLabel(0, "Foreign Build")
+            == PresetLabelResult::EmptyPreset
+            && !emptyOwner.HasLoadoutPresetLabel(0)
+            && foreignOwner.LoadoutPresetLabel(0) == "Foreign Build",
+        "pass28 preset metadata cannot cross Shadowblade owner boundaries");
+
+    actions.ResetTransientStatePreservingLoadout();
+    Expect(actions.HasLastAppliedLoadoutPreset()
+            && actions.LastAppliedLoadoutPreset() == 0
+            && actions.HasLoadoutPresetLabel(0)
+            && actions.LoadoutPresetLabel(0) == "Mall Patrol"
+            && actions.Loadout().PresetSaved(0),
+        "pass28 transient reset preserves remembered preset and label metadata");
+
+    Expect(actions.ClearLoadoutPresetLabel(0) == PresetLabelResult::Success
+            && !actions.HasLoadoutPresetLabel(0)
+            && actions.Loadout().PresetSaved(0)
+            && actions.Loadout().Profile().readinessScore == beforeLabel.readinessScore,
         "pass28 clearing a label preserves saved and equipped gameplay state");
-    Expect(workbench.ClearPresetLabel(loadout, 0) == PresetLabelResult::EmptyLabel,
+    Expect(actions.ClearLoadoutPresetLabel(0) == PresetLabelResult::EmptyLabel,
         "pass28 repeated label clear is deterministic");
 }
