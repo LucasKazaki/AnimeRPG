@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "repository": "LucasKazaki/AnimeRPG",
+  "target_branch": "main",
+  "pass": "GAME-PASS28-SHADOWBLADE-LOADOUT-WORKBENCH-2026-09-24",
+  "baseline": "6d22da88402db71843ecd5a35766c0c77e62dca6",
+  "branch": "game/2026-09-24-shadowblade-loadout-workbench-pass28",
+  "pr": 48,
+  "sources": [
+    {
+      "id": "GENSHIN-5.7-UPDATE",
+      "kind": "developer_release_notes",
+      "url": "https://www.hoyolab.com/article/39384127",
+      "published": "2025-06-17",
+      "accessed": "2026-09-23",
+      "context": "Official Genshin Impact Version 5.7 equipment/configuration UX details; design reference only."
+    },
+    {
+      "id": "ZZZ-PLAYER-PRESET-NAMES-20260711",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZenlessZoneZero/comments/1utacze/agent_presets_delete_how/",
+      "published": "2026-07-11",
+      "accessed": "2026-09-23",
+      "context": "Small anecdotal thread; replies specifically complain about preset naming/default-name friction and spaces. Current official resolution not established.",
+      "consensus": false
+    }
+  ],
+  "increments": [
+    {
+      "id": "GAME-137",
+      "kind": "reference_feature",
+      "title": "Non-mutating equipment comparison",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Owned compatible module/weapon previews expose exact authoritative profile deltas without mutating the live loadout; rejected previews fail atomically."
+    },
+    {
+      "id": "GAME-138",
+      "kind": "reference_feature",
+      "title": "Focus-aware owned-module recommendation",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Balanced/Assault/Guard/Recovery/Mobility focuses deterministically rank only owned slot-compatible modules and never auto-equip."
+    },
+    {
+      "id": "GAME-139",
+      "kind": "reference_feature",
+      "title": "Resonance-family recommendation filter",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Any/Cooling/Rift/Civic filters restrict suggestions; missing or malformed families return unavailable without mutation."
+    },
+    {
+      "id": "GAME-140",
+      "kind": "reference_feature",
+      "title": "Current-slot versus whole-build recommendation scope",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "CurrentSlot scores direct module contribution without newly activated family synergy; WholeBuild scores the full resulting profile and can legitimately choose a different candidate."
+    },
+    {
+      "id": "GAME-141",
+      "kind": "reference_feature",
+      "title": "Last-successful preset recall and reapply",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Only successful preset application becomes remembered; failed applies do not replace it; reapply routes through existing preset validation."
+    },
+    {
+      "id": "QOL-029",
+      "kind": "community_improvement",
+      "title": "Human-readable clearable preset labels with spaces",
+      "source_ids": ["ZZZ-PLAYER-PRESET-NAMES-20260711"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Saved slots accept bounded labels with internal spaces; invalid edits are atomic; label clearing does not alter the saved build or current equipment."
+    }
+  ],
+  "counts": {
+    "reference_researched": 5,
+    "community_researched": 1,
+    "implemented": 6,
+    "registered_regression_covered": 6,
+    "game_domain_integrated": 6,
+    "hosted_exact_head_verified": 0,
+    "native_playable_verified": 0,
+    "independently_reviewed_clean": 0,
+    "merged": 0
+  },
+  "next_action": "Run exact-head hosted Windows Debug/Release and release-manifest gates on PR 48, obtain fresh independent review on the same final head, repair/rerun if needed, then expected-head merge if all gates are clean."
+}
