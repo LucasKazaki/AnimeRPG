@@ -159,8 +159,8 @@ void TestShadowbladeTrainingHubPass25ReviewRepairs() {
         "pass25 rolling telemetry expires damage before the exact twenty-second cutoff");
 
     // Independent-review regression: a stale unflushed burst cannot absorb a
-    // fresh delta after a long observation gap. The old pending bucket must age
-    // out while the new damage remains visible in the current 20-second window.
+    // fresh delta after a long observation gap. The old activity must age out
+    // while the new damage remains visible in the current 20-second window.
     LandmarkEncounter sparseEncounter;
     CombatSandbox sparseCombat;
     ShadowbladeActions sparseActions;
@@ -188,4 +188,93 @@ void TestShadowbladeTrainingHubPass25ReviewRepairs() {
     Expect(sparseWindow.valid && sparseWindow.damage == 15 && sparseWindow.hits == 1
             && sparseWindow.windowSeconds <= ShadowbladeTrainingHub::DamageWindowSeconds,
         "pass25 sparse telemetry excludes stale pending damage but preserves the fresh delta");
+
+    // Independent-review regression: once the story gate has completed with an
+    // explicit owner pair, neither training start nor encounter retry may rebind
+    // that unlock to unrelated owners before the hub has established its own pair.
+    LandmarkEncounter startOwnerEncounter;
+    CombatSandbox startOwnerCombat;
+    ShadowbladeActions startOwnerActions;
+    CombatSandbox foreignStartCombat;
+    ShadowbladeActions foreignStartActions;
+    Expect(startOwnerEncounter.TryActivate(
+               TrainingDiscovery(startOwnerActions), startOwnerCombat).result
+            == LandmarkEncounterResult::Activated,
+        "pass25 review start-owner fixture activates with explicit owners");
+    startOwnerCombat.ApplyDamage(1000);
+    Expect(startOwnerEncounter.Update(startOwnerCombat, startOwnerActions)
+            && startOwnerEncounter.ConfigureTraining(
+                ShadowbladeTrainingFocus::QuickCut,
+                DefensePracticePace::Learning, 2),
+        "pass25 review start-owner fixture completes and configures training");
+    const int foreignHealthBeforeRetry = foreignStartCombat.Dummy().health;
+    const float foreignResourceBeforeRetry = foreignStartActions.Resource();
+    Expect(startOwnerEncounter.Retry(foreignStartCombat, foreignStartActions).result
+            == LandmarkEncounterResult::RetryUnavailable
+            && startOwnerEncounter.State() == LandmarkEncounterState::Completed
+            && foreignStartCombat.Dummy().health == foreignHealthBeforeRetry
+            && foreignStartActions.Resource() == foreignResourceBeforeRetry,
+        "pass25 review completed story gate cannot retry through unrelated owners");
+    Expect(!startOwnerEncounter.StartTraining(foreignStartCombat, foreignStartActions)
+            && startOwnerEncounter.TrainingHub().State() == ShadowbladeTrainingHubState::Ready
+            && foreignStartCombat.TargetMode() == TrainingTargetMode::Standard
+            && !foreignStartCombat.HasPendingEnemyAttack()
+            && !foreignStartActions.HasIncomingAttack(),
+        "pass25 review training start rejects owners unrelated to encounter completion");
+    Expect(startOwnerEncounter.StartTraining(startOwnerCombat, startOwnerActions)
+            && startOwnerEncounter.TrainingHub().State() == ShadowbladeTrainingHubState::Active,
+        "pass25 review exact completed encounter owners can start training");
+
+    // Independent-review regression: an out-of-range DefenseInput value must fail
+    // closed before the practice session can treat it as Guard or consume a threat.
+    const ShadowbladeTrainingHubFeedback beforeInvalidDefense =
+        startOwnerEncounter.TrainingFeedback(startOwnerCombat);
+    const std::uint64_t pendingGenerationBeforeInvalid =
+        startOwnerCombat.EnemyAttackGeneration();
+    const int playerHealthBeforeInvalid = startOwnerActions.PlayerHealth();
+    const DefenseReport invalidDefense = startOwnerEncounter.TryTrainingDefense(
+        startOwnerCombat, startOwnerActions, static_cast<DefenseInput>(255));
+    const ShadowbladeTrainingHubFeedback afterInvalidDefense =
+        startOwnerEncounter.TrainingFeedback(startOwnerCombat);
+    Expect(invalidDefense.result == DefenseResult::NoThreat
+            && startOwnerCombat.HasPendingEnemyAttack()
+            && startOwnerActions.HasIncomingAttack()
+            && startOwnerCombat.EnemyAttackGeneration() == pendingGenerationBeforeInvalid
+            && startOwnerActions.PlayerHealth() == playerHealthBeforeInvalid
+            && afterInvalidDefense.resolvedAttempts == beforeInvalidDefense.resolvedAttempts,
+        "pass25 review invalid defense input cannot consume or resolve a training threat");
+
+    // Independent-review regression: distinct damage observations inside one
+    // 200 ms storage bucket retain their own activity timestamps. At a later
+    // cutoff that falls between those observations, only the still-fresh delta
+    // remains even though both activities were persisted in the same 5 Hz sample.
+    LandmarkEncounter bucketEncounter;
+    CombatSandbox bucketCombat;
+    ShadowbladeActions bucketActions;
+    Expect(bucketEncounter.TryActivate(
+               TrainingDiscovery(bucketActions), bucketCombat).result
+            == LandmarkEncounterResult::Activated,
+        "pass25 review bucket telemetry fixture activates encounter");
+    bucketCombat.ApplyDamage(1000);
+    Expect(bucketEncounter.Update(bucketCombat, bucketActions)
+            && bucketEncounter.ConfigureTraining(
+                ShadowbladeTrainingFocus::QuickCut,
+                DefensePracticePace::Learning, 2)
+            && bucketEncounter.StartTraining(bucketCombat, bucketActions),
+        "pass25 review bucket telemetry fixture starts active practice");
+    bucketCombat.AdvanceTime(0.10f);
+    Expect(bucketCombat.ApplyDamage(10) == 10,
+        "pass25 review bucket fixture records the first in-bucket delta");
+    bucketEncounter.Update(bucketCombat, bucketActions);
+    bucketCombat.AdvanceTime(0.11f);
+    Expect(bucketCombat.ApplyDamage(15) == 15,
+        "pass25 review bucket fixture records the second in-bucket delta");
+    bucketEncounter.Update(bucketCombat, bucketActions);
+    bucketCombat.AdvanceTime(19.94f);
+    bucketEncounter.Update(bucketCombat, bucketActions);
+    const ShadowbladeTrainingDamageWindow bucketWindow =
+        bucketEncounter.TrainingFeedback(bucketCombat).recentDamage;
+    Expect(bucketWindow.valid && bucketWindow.damage == 15 && bucketWindow.hits == 1
+            && bucketWindow.windowSeconds <= ShadowbladeTrainingHub::DamageWindowSeconds,
+        "pass25 review exact cutoff separates old and fresh deltas within one stored sample");
 }
