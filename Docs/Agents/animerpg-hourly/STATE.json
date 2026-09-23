@@ -34,16 +34,23 @@
   "increments": [
     {"id":"GAME-067","title":"Bounded field-operation tracking","status":"implemented_registered_test_coverage"},
     {"id":"GAME-068","title":"Free-order landmark survey chronology","status":"implemented_registered_test_coverage"},
-    {"id":"GAME-069","title":"Authoritative clue-driven investigation progress","status":"implemented_registered_test_coverage"},
+    {"id":"GAME-069","title":"Authoritative clue-driven investigation progress with Rift and Crypt evidence separation","status":"implemented_review_repaired_registered_test_coverage"},
     {"id":"GAME-070","title":"Bounded exploration field journal","status":"implemented_registered_test_coverage"},
     {"id":"GAME-071","title":"Next-unvisited National Mall survey recommendation","status":"implemented_registered_test_coverage"},
     {"id":"QOL-015","title":"Player-pinned field target with automatic discovery reconciliation","status":"implemented_registered_test_coverage"}
   ],
+  "review_repairs": {
+    "invalid_operation_state_preservation": "covered_after_rejected_enum",
+    "invalid_landmark_pin_rejection": "covered_without_replacing_automatic_target",
+    "rift_crypt_evidence_separation": "production_logic_and_regression_repaired",
+    "landmark_interaction_integration": "already_registered_LandmarkInteractionTests_now_cover_real_discovery_and_dialogue_sync",
+    "material_threads": "answered_and_resolved_before_fresh_final_head_review"
+  },
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
+    "registered_state_object_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
+    "registered_integration_test_target": "LandmarkInteractionTests_existing_CTest_target",
     "production_compile_coverage": "LandmarkInteraction_and_AstralGame_build_targets",
-    "local_disposable_gcc_fixture": "passed_not_hosted_not_native",
-    "local_disposable_clang_asan_ubsan_fixture": "passed_not_hosted_not_native",
+    "local_disposable_fixture_evidence": "historical_pre_repair_not_used_as_final_gate",
     "hosted_windows_ci": "pending_exact_final_head",
     "release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
@@ -57,5 +64,5 @@
     "art_pr_28": "separate color/exposure calibration ownership; no overlap",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release and deployment unchanged"
   },
-  "next_action": "Require exact-head hosted Windows and release-integrity checks plus a fresh independent Codex review on PR #32, repair any material findings, re-read live main and PR head, then merge with expected-head protection only if every applicable gate is green."
+  "next_action": "Freeze this state head, require exact-head hosted Windows and release-integrity checks plus a fresh independent Codex review on PR #32, repair any material finding, re-read live main and PR head, then merge with expected-head protection only if every applicable gate is green. Final receipts are recorded in PR discussion/task output without mutating the verified head."
 }
