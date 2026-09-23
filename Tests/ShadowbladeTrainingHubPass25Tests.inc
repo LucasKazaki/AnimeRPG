@@ -134,6 +134,19 @@ void TestShadowbladeTrainingHubPass25() {
             && !wrongOwnerFeedback.recentDamage.valid,
         "pass25 mismatched combat owner cannot compose mixed-provenance feedback");
 
+    // Review regression: leaving a completed training run for encounter retry
+    // must restore the finite target. Endless practice mode otherwise makes the
+    // retried landmark target impossible to defeat and strands the encounter.
+    Expect(encounter.Retry(combat, actions).result == LandmarkEncounterResult::Retried
+            && combat.TargetMode() == TrainingTargetMode::Standard
+            && !combat.Dummy().IsDefeated(),
+        "pass25 encounter retry restores the standard finite training target");
+    Expect(combat.ApplyDamage(1000) > 0 && combat.Dummy().IsDefeated(),
+        "pass25 retried landmark target remains defeatable after leaving training");
+    Expect(encounter.Update(combat, actions)
+            && encounter.State() == LandmarkEncounterState::Completed,
+        "pass25 retried landmark encounter can complete after training debrief");
+
     // Review regression: a run that defeats the player before the requested
     // attempt cap must end in Debrief rather than becoming permanently Active
     // with no queueable threat. The same owner pair can then be configured and
@@ -181,8 +194,9 @@ void TestShadowbladeTrainingHubPass25() {
             && defeatActions.PlayerHealth() == ShadowbladeActions::MaximumPlayerHealth,
         "pass25 a defeated run can be reconfigured and restarted on the same owners");
 
-    // Review regression: timing guidance must mirror the timing preset already
-    // active on the exact bound ShadowbladeActions owner.
+    // Review regression: timing guidance must mirror the timing preset on the
+    // exact bound ShadowbladeActions owner, including supported post-start assist
+    // changes rather than a preset snapshot captured when the run began.
     LandmarkEncounter timingEncounter;
     CombatSandbox timingCombat;
     ShadowbladeActions timingActions;
@@ -205,6 +219,16 @@ void TestShadowbladeTrainingHubPass25() {
             && Near(timingActions.PerfectDefenseWindowSeconds(),
                 ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds),
         "pass25 timing guide matches the exact bound action owner's forgiving window");
+    Expect(timingActions.SetDefenseTimingPreset(DefenseTimingPreset::Standard),
+        "pass25 timing fixture supports a post-start timing assist change");
+    const ShadowbladeTrainingHubFeedback changedTimingFeedback =
+        timingEncounter.TrainingFeedback(timingCombat);
+    Expect(changedTimingFeedback.timingGuideValid
+            && Near(changedTimingFeedback.timingGuide.selectedPerfectWindowSeconds,
+                ShadowbladeActions::StandardPerfectDefenseWindowSeconds)
+            && Near(timingActions.PerfectDefenseWindowSeconds(),
+                ShadowbladeActions::StandardPerfectDefenseWindowSeconds),
+        "pass25 timing guide reads the current bound action owner after start");
 
     // GAME-126: pause/resume freezes the practice-owned combat and Shadowblade
     // clocks. It does not consume a threat, take damage, or fabricate progress.
