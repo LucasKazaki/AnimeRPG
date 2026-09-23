@@ -184,6 +184,27 @@ void TestDefensePracticePass13() {
             && chainSession.BestAlternatingChain() == 3,
         "pass13 taking a hit resets live alternating chain while preserving best");
 
+    // Invalid DefenseInput values must not fabricate an alternating technique.
+    CombatSandbox invalidInputCombat;
+    ShadowbladeActions invalidInputActions;
+    DefensePracticeSession invalidInputSession;
+    Expect(invalidInputSession.SetPracticeSequence(quickOnly)
+            && invalidInputSession.QueueNextAttack(invalidInputCombat, invalidInputActions),
+        "pass13 invalid-input chain regression queues first QuickCut");
+    const DefenseReport invalidInputReport = invalidInputSession.TryDefend(
+        invalidInputCombat, invalidInputActions, static_cast<DefenseInput>(99));
+    Expect(invalidInputReport.result == DefenseResult::Guarded
+            && invalidInputSession.CurrentAlternatingChain() == 1
+            && invalidInputSession.BestAlternatingChain() == 1,
+        "pass13 chain derives technique from authoritative guard result");
+    invalidInputSession.AdvanceTime(invalidInputCombat, invalidInputActions, 0.85f);
+    Expect(invalidInputSession.QueueNextAttack(invalidInputCombat, invalidInputActions)
+            && invalidInputSession.TryDefend(invalidInputCombat, invalidInputActions,
+                DefenseInput::Guard).result == DefenseResult::Guarded
+            && invalidInputSession.CurrentAlternatingChain() == 1
+            && invalidInputSession.BestAlternatingChain() == 1,
+        "pass13 malformed defense input cannot fabricate a Dodge-to-Guard chain");
+
     // GAME-065: score separates original execution points from a bounded time
     // coefficient and relies on the pause-aware combat clock.
     CombatSandbox scoreCombat;
@@ -219,6 +240,38 @@ void TestDefensePracticePass13() {
             && slowScore.timeCoefficientPercent == 75
             && slowScore.score == 150,
         "pass13 valid unpaused idle time lowers only the time coefficient");
+
+    // Hits contribute no base points, but they still count as resolved attempts
+    // for the time coefficient denominator.
+    CombatSandbox mixedScoreCombat;
+    ShadowbladeActions mixedScoreActions;
+    DefensePracticeSession mixedScoreSession;
+    Expect(mixedScoreSession.SetPracticeSequence(quickOnly)
+            && mixedScoreSession.QueueNextAttack(mixedScoreCombat, mixedScoreActions)
+            && mixedScoreSession.TryDefend(mixedScoreCombat, mixedScoreActions,
+                DefenseInput::Guard).result == DefenseResult::Guarded,
+        "pass13 mixed-score regression records its initial successful guard");
+    mixedScoreSession.AdvanceTime(mixedScoreCombat, mixedScoreActions, 0.85f);
+    Expect(mixedScoreSession.QueueNextAttack(mixedScoreCombat, mixedScoreActions),
+        "pass13 mixed-score regression queues first miss");
+    EnemyAttackPlan mixedMiss = mixedScoreCombat.PendingEnemyAttack();
+    Expect(mixedScoreSession.AdvanceTime(
+            mixedScoreCombat, mixedScoreActions, mixedMiss.windupSeconds),
+        "pass13 mixed-score regression resolves first miss");
+    mixedScoreSession.AdvanceTime(
+        mixedScoreCombat, mixedScoreActions, mixedMiss.recoverySeconds);
+    Expect(mixedScoreSession.QueueNextAttack(mixedScoreCombat, mixedScoreActions),
+        "pass13 mixed-score regression queues second miss");
+    mixedMiss = mixedScoreCombat.PendingEnemyAttack();
+    Expect(mixedScoreSession.AdvanceTime(
+            mixedScoreCombat, mixedScoreActions, mixedMiss.windupSeconds),
+        "pass13 mixed-score regression resolves second miss");
+    const DefensePracticeScoreReport mixedScore = mixedScoreSession.Score(mixedScoreCombat);
+    Expect(mixedScore.resolvedAttempts == 3
+            && mixedScore.baseScore == 200
+            && mixedScore.timeCoefficientPercent == 125
+            && mixedScore.score == 250,
+        "pass13 time coefficient averages over successes and hits without rewarding hits");
 
     // GAME-066: goal categories keep pass-12 semantics while the session can
     // choose a bounded target count from one through ten.
@@ -271,4 +324,31 @@ void TestDefensePracticePass13() {
     Expect(interruptedQuick.attempts == 1 && interruptedQuick.interruptions == 1
             && interruptedQuick.hitsTaken == 0 && interruptedQuick.damageTaken == 0,
         "pass13 analytics records interruption exactly once without fabricating damage");
+
+    // An input arriving after authoritative interruption must reconcile the same
+    // stale link immediately rather than wedging the session until another tick.
+    CombatSandbox inputInterruptCombat;
+    ShadowbladeActions inputInterruptActions;
+    DefensePracticeSession inputInterruptSession;
+    Expect(inputInterruptSession.SetPracticeSequence(quickOnly)
+            && inputInterruptSession.QueueNextAttack(
+                inputInterruptCombat, inputInterruptActions),
+        "pass13 TryDefend interruption regression queues an owned QuickCut");
+    inputInterruptCombat.TryAttack(AttackType::Light, {});
+    inputInterruptSession.AdvanceTime(inputInterruptCombat, inputInterruptActions, 0.4f);
+    const AttackReport inputInterruptHeavy =
+        inputInterruptCombat.TryAttack(AttackType::Heavy, {});
+    const DefenseReport staleDefense = inputInterruptSession.TryDefend(
+        inputInterruptCombat, inputInterruptActions, DefenseInput::Guard);
+    const DefensePracticePatternStats inputInterruptedQuick =
+        inputInterruptSession.PatternStats(EnemyAttackPattern::QuickCut);
+    Expect(inputInterruptHeavy.staggerTriggered
+            && staleDefense.result == DefenseResult::NoThreat
+            && inputInterruptSession.Stats().interruptions == 1
+            && inputInterruptedQuick.interruptions == 1,
+        "pass13 TryDefend reconciles authoritative interruption exactly once");
+    Expect(inputInterruptSession.ResetMetrics()
+            && inputInterruptSession.QueueNextAttack(
+                inputInterruptCombat, inputInterruptActions),
+        "pass13 TryDefend interruption clears active session ownership for reuse");
 }
