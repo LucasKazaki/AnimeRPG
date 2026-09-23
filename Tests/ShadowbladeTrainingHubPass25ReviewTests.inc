@@ -1,9 +1,41 @@
 void TestShadowbladeTrainingHubPass25ReviewRepairs() {
     using namespace Astral::Scene;
 
-    LandmarkInteractionReport discovery{};
-    discovery.result = LandmarkInteractionResult::Discovered;
-    discovery.landmark = LandmarkEncounter::EncounterLandmark;
+    const auto TrainingDiscovery = [](ShadowbladeActions& owner) {
+        LandmarkInteractionReport report{};
+        report.result = LandmarkInteractionResult::Discovered;
+        report.landmark = LandmarkEncounter::EncounterLandmark;
+        report.actionOwner = &owner;
+        return report;
+    };
+
+    // Independent-review regression: encounter completion and the training unlock
+    // must stay bound to the same combat/action pair that established activation.
+    // An already-defeated unrelated combat owner or a mismatched action owner
+    // cannot complete the story gate, receive its completion transition, or unlock
+    // the practice hub.
+    LandmarkEncounter ownerEncounter;
+    CombatSandbox ownerCombat;
+    ShadowbladeActions ownerActions;
+    CombatSandbox unrelatedOwnerCombat;
+    ShadowbladeActions unrelatedOwnerActions;
+    Expect(ownerEncounter.TryActivate(TrainingDiscovery(ownerActions), ownerCombat).result
+            == LandmarkEncounterResult::Activated,
+        "pass25 review owner fixture activates with an explicit combat/action pair");
+    unrelatedOwnerCombat.ApplyDamage(1000);
+    Expect(!ownerEncounter.Update(unrelatedOwnerCombat, unrelatedOwnerActions)
+            && ownerEncounter.State() == LandmarkEncounterState::Active
+            && ownerEncounter.TrainingHub().State() == ShadowbladeTrainingHubState::Locked,
+        "pass25 review unrelated defeated combat owner cannot satisfy the story gate");
+    ownerCombat.ApplyDamage(1000);
+    Expect(!ownerEncounter.Update(ownerCombat, unrelatedOwnerActions)
+            && ownerEncounter.State() == LandmarkEncounterState::Active
+            && ownerEncounter.TrainingHub().State() == ShadowbladeTrainingHubState::Locked,
+        "pass25 review mismatched action owner cannot complete or unlock the encounter");
+    Expect(ownerEncounter.Update(ownerCombat, ownerActions)
+            && ownerEncounter.State() == LandmarkEncounterState::Completed
+            && ownerEncounter.TrainingHub().State() == ShadowbladeTrainingHubState::Ready,
+        "pass25 review exact activation owners complete and unlock training");
 
     // Independent-review regression: active timing guidance may only describe the
     // threat owned by the current DefensePracticeSession. If the combat planner is
@@ -12,7 +44,7 @@ void TestShadowbladeTrainingHubPass25ReviewRepairs() {
     LandmarkEncounter guideEncounter;
     CombatSandbox guideCombat;
     ShadowbladeActions guideActions;
-    Expect(guideEncounter.TryActivate(discovery, guideCombat).result
+    Expect(guideEncounter.TryActivate(TrainingDiscovery(guideActions), guideCombat).result
             == LandmarkEncounterResult::Activated,
         "pass25 review timing fixture activates encounter");
     guideCombat.ApplyDamage(1000);
@@ -45,7 +77,8 @@ void TestShadowbladeTrainingHubPass25ReviewRepairs() {
     LandmarkEncounter telemetryEncounter;
     CombatSandbox telemetryCombat;
     ShadowbladeActions telemetryActions;
-    Expect(telemetryEncounter.TryActivate(discovery, telemetryCombat).result
+    Expect(telemetryEncounter.TryActivate(
+               TrainingDiscovery(telemetryActions), telemetryCombat).result
             == LandmarkEncounterResult::Activated,
         "pass25 review telemetry fixture activates encounter");
     telemetryCombat.ApplyDamage(1000);
@@ -90,13 +123,12 @@ void TestShadowbladeTrainingHubPass25ReviewRepairs() {
 
     // Independent-review regression: a damage event that occurred before the
     // exact 20-second cutoff must not remain in the reported rolling window just
-    // because the nearest stored sample before the cutoff is older. The hub may
-    // conservatively omit up to one sample interval, but it cannot report stale
-    // out-of-window damage while claiming a 20-second maximum window.
+    // because the nearest stored sample before the cutoff is older.
     LandmarkEncounter cutoffEncounter;
     CombatSandbox cutoffCombat;
     ShadowbladeActions cutoffActions;
-    Expect(cutoffEncounter.TryActivate(discovery, cutoffCombat).result
+    Expect(cutoffEncounter.TryActivate(
+               TrainingDiscovery(cutoffActions), cutoffCombat).result
             == LandmarkEncounterResult::Activated,
         "pass25 review cutoff fixture activates encounter");
     cutoffCombat.ApplyDamage(1000);
@@ -125,4 +157,35 @@ void TestShadowbladeTrainingHubPass25ReviewRepairs() {
     Expect(afterExpiry.valid && afterExpiry.damage == 0 && afterExpiry.hits == 0
             && afterExpiry.windowSeconds <= ShadowbladeTrainingHub::DamageWindowSeconds,
         "pass25 rolling telemetry expires damage before the exact twenty-second cutoff");
+
+    // Independent-review regression: a stale unflushed burst cannot absorb a
+    // fresh delta after a long observation gap. The old pending bucket must age
+    // out while the new damage remains visible in the current 20-second window.
+    LandmarkEncounter sparseEncounter;
+    CombatSandbox sparseCombat;
+    ShadowbladeActions sparseActions;
+    Expect(sparseEncounter.TryActivate(
+               TrainingDiscovery(sparseActions), sparseCombat).result
+            == LandmarkEncounterResult::Activated,
+        "pass25 review sparse telemetry fixture activates encounter");
+    sparseCombat.ApplyDamage(1000);
+    Expect(sparseEncounter.Update(sparseCombat, sparseActions)
+            && sparseEncounter.ConfigureTraining(
+                ShadowbladeTrainingFocus::QuickCut,
+                DefensePracticePace::Learning, 2)
+            && sparseEncounter.StartTraining(sparseCombat, sparseActions),
+        "pass25 review sparse telemetry fixture starts active practice");
+    sparseCombat.AdvanceTime(0.05f);
+    Expect(sparseCombat.ApplyDamage(10) == 10,
+        "pass25 review sparse fixture creates an unflushed early damage bucket");
+    sparseEncounter.Update(sparseCombat, sparseActions);
+    sparseCombat.AdvanceTime(21.0f);
+    Expect(sparseCombat.ApplyDamage(15) == 15,
+        "pass25 review sparse fixture records fresh damage after the old bucket expires");
+    sparseEncounter.Update(sparseCombat, sparseActions);
+    const ShadowbladeTrainingDamageWindow sparseWindow =
+        sparseEncounter.TrainingFeedback(sparseCombat).recentDamage;
+    Expect(sparseWindow.valid && sparseWindow.damage == 15 && sparseWindow.hits == 1
+            && sparseWindow.windowSeconds <= ShadowbladeTrainingHub::DamageWindowSeconds,
+        "pass25 sparse telemetry excludes stale pending damage but preserves the fresh delta");
 }
