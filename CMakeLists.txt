@@ -368,6 +368,23 @@ int SupervisorRunContainedSelfTestChild(const std::wstring& selfPath) {
     return 99;
 }
 
+int SupervisorRunContainedSelfTestSuccessParent(const std::wstring& selfPath) {
+    std::wstring descendantCommand = SupervisorQuoteArgument(selfPath.c_str())
+        + L" --contained-self-test-grandchild";
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    PROCESS_INFORMATION descendant{};
+    if (!CreateProcessW(selfPath.c_str(), descendantCommand.data(), nullptr, nullptr,
+            FALSE, 0, nullptr, nullptr, &startup, &descendant)) {
+        std::wcerr << L"contained success-parent could not launch descendant: "
+                   << GetLastError() << L"\n";
+        return 96;
+    }
+    CloseHandle(descendant.hThread);
+    CloseHandle(descendant.hProcess);
+    return 0;
+}
+
 int SupervisorRunContainmentSelfTest(const std::wstring& selfPath) {
     std::wstring failure;
     SupervisorContainedProcess child{};
@@ -422,7 +439,106 @@ int SupervisorRunContainmentSelfTest(const std::wstring& selfPath) {
         return 1;
     }
 
-    std::wcout << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: PASS (process tree empty)\n";
+    SupervisorContainedProcess successParent{};
+    std::wstring successCommand = SupervisorQuoteArgument(selfPath.c_str())
+        + L" --contained-self-test-success-parent";
+    if (!SupervisorLaunchContained(selfPath, successCommand, nullptr, successParent, failure)) {
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    const DWORD completedWait = WaitForSingleObject(
+        successParent.process, kSupervisorSelfTestTreeReadyMs);
+    if (completedWait != WAIT_OBJECT_0) {
+        failure = completedWait == WAIT_TIMEOUT
+            ? L"contained success-parent did not exit within self-test deadline"
+            : SupervisorWin32Failure(L"WaitForSingleObject(success-parent)", GetLastError());
+        DWORD ignoredExit = STILL_ACTIVE;
+        std::wstring cleanupFailure;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                successParent, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
+            && !cleanupFailure.empty()) {
+            failure += L"; " + cleanupFailure;
+        }
+        SupervisorCloseProcessHandles(successParent);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    DWORD successExit = STILL_ACTIVE;
+    if (!GetExitCodeProcess(successParent.process, &successExit)
+        || successExit != 0) {
+        failure = !GetExitCodeProcess(successParent.process, &successExit)
+            ? SupervisorWin32Failure(L"GetExitCodeProcess(success-parent)", GetLastError())
+            : L"contained success-parent returned nonzero exit " + std::to_wstring(successExit);
+        DWORD ignoredExit = successExit;
+        std::wstring cleanupFailure;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                successParent, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
+            && !cleanupFailure.empty()) {
+            failure += L"; " + cleanupFailure;
+        }
+        SupervisorCloseProcessHandles(successParent);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    if (!CloseHandle(successParent.process)) {
+        failure = SupervisorWin32Failure(L"CloseHandle(success-parent)", GetLastError());
+        successParent.process = nullptr;
+        SupervisorCloseProcessHandles(successParent);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+    successParent.process = nullptr;
+
+    DWORD activeAfterParentExit = 0;
+    if (!SupervisorQueryActiveProcesses(
+            successParent.job, activeAfterParentExit, failure)
+        || activeAfterParentExit == 0) {
+        if (failure.empty()) {
+            failure = L"success-parent did not leave a contained descendant for leak detection";
+        }
+        DWORD ignoredExit = STILL_ACTIVE;
+        std::wstring cleanupFailure;
+        if (!SupervisorTerminateJobAndVerifyEmpty(
+                successParent, kSupervisorCleanupTimeoutMs, ignoredExit, cleanupFailure)
+            && !cleanupFailure.empty()) {
+            failure += L"; " + cleanupFailure;
+        }
+        SupervisorCloseProcessHandles(successParent);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    std::wstring expectedNonEmptyFailure;
+    const ULONGLONG nonEmptyDeadline = GetTickCount64() + kSupervisorSelfTestAliveMs;
+    if (SupervisorWaitForJobEmpty(
+            successParent.job, nonEmptyDeadline, expectedNonEmptyFailure)) {
+        failure = L"success-parent descendant unexpectedly disappeared before leak detection";
+        SupervisorCloseProcessHandles(successParent);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+
+    DWORD cleanupExit = STILL_ACTIVE;
+    if (!SupervisorTerminateJobAndVerifyEmpty(
+            successParent, kSupervisorCleanupTimeoutMs, cleanupExit, failure)) {
+        SupervisorCloseProcessHandles(successParent);
+        std::wcerr << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: FAIL\nReason: "
+                   << failure << L"\n";
+        return 1;
+    }
+    SupervisorCloseProcessHandles(successParent);
+
+    std::wcout << L"EDITOR RUNTIME SUPERVISOR CONTAINMENT TEST: PASS "
+               << L"(live tree and successful-parent descendant leak both cleaned)\n";
     return 0;
 }
 } // namespace
@@ -441,6 +557,9 @@ int wmain(int argc, wchar_t** argv) {
 
     if (argc == 2 && std::wcscmp(argv[1], L"--contained-self-test-child") == 0) {
         return SupervisorRunContainedSelfTestChild(selfPath);
+    }
+    if (argc == 2 && std::wcscmp(argv[1], L"--contained-self-test-success-parent") == 0) {
+        return SupervisorRunContainedSelfTestSuccessParent(selfPath);
     }
     if (argc == 2 && std::wcscmp(argv[1], L"--self-test") == 0) {
         return SupervisorRunContainmentSelfTest(selfPath);
