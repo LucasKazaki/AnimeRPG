@@ -2,7 +2,7 @@ from __future__ import annotations
 import argparse, base64, hashlib, json, math, struct
 from pathlib import Path
 
-VERSION="astral-material-gallery-gltf-2"
+VERSION="astral-material-gallery-gltf-3"
 SOURCE_STATUS="proposed_art_reference_not_runtime"
 RUNTIME_STATUS="source_validated_not_imported"
 
@@ -51,7 +51,7 @@ def tri_normal(a,b,c):
     ab=tuple(b[i]-a[i] for i in range(3)); ac=tuple(c[i]-a[i] for i in range(3))
     return (ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0])
 
-def verify_mesh(g,buf,mesh_index,expected_material,expected_counts):
+def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,expected_tangent_w=None):
     mesh=g["meshes"][mesh_index]
     req(len(mesh["primitives"])==1,"primitive count")
     prim=mesh["primitives"][0]
@@ -69,6 +69,8 @@ def verify_mesh(g,buf,mesh_index,expected_material,expected_counts):
     req(all(math.isfinite(c) for seq in (pos,normal,tangent,uv) for v in seq for c in v),"finite geometry")
     req(all(abs(sum(c*c for c in n)-1.0)<1e-4 for n in normal),"unit normals")
     req(all(abs(sum(c*c for c in t[:3])-1.0)<1e-4 and t[3] in (-1.0,1.0) for t in tangent),"unit tangents")
+    if expected_tangent_w is not None:
+        req(all(t[3]==expected_tangent_w for t in tangent),"tangent handedness")
     req(all(0.0<=u<=1.0 and 0.0<=v<=1.0 for u,v in uv),"uv range")
     req(all(0<=i[0]<len(pos) for i in indices),"index range")
     req(len(indices)%3==0,"triangle index count")
@@ -78,8 +80,29 @@ def verify_mesh(g,buf,mesh_index,expected_material,expected_counts):
         req(sum(cr[j]*normal[ia][j] for j in range(3))>1e-8,"triangle winding")
     return pos
 
-def quat_norm(v):
-    return abs(sum(x*x for x in v)-1.0)<1e-6
+def quat_x(degrees):
+    a=math.radians(degrees)/2.0
+    return [math.sin(a),0.0,0.0,math.cos(a)]
+
+def quat_xy(x_deg,y_deg):
+    x=math.radians(x_deg)/2.0
+    y=math.radians(y_deg)/2.0
+    qx=(math.sin(x),0.0,0.0,math.cos(x))
+    qy=(0.0,math.sin(y),0.0,math.cos(y))
+    ax,ay,az,aw=qy; bx,by,bz,bw=qx
+    return [
+        aw*bx + ax*bw + ay*bz - az*by,
+        aw*by - ax*bz + ay*bw + az*bx,
+        aw*bz + ax*by - ay*bx + az*bw,
+        aw*bw - ax*bx - ay*by - az*bz,
+    ]
+
+def quat_close(actual, expected, tol=1e-12):
+    if not isinstance(actual,list) or len(actual)!=4 or not all(isinstance(v,(int,float)) and math.isfinite(v) for v in actual):
+        return False
+    direct=max(abs(a-b) for a,b in zip(actual,expected))
+    negated=max(abs(a+b) for a,b in zip(actual,expected))
+    return min(direct,negated)<=tol
 
 def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     source,source_raw=load_source(source_path)
@@ -115,7 +138,7 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     req(len(g["meshes"])==9,"mesh count")
     for i in range(4): verify_mesh(g,buf,i,i,sphere_counts)
     for i in range(4): verify_mesh(g,buf,4+i,i,cube_counts)
-    floor_pos=verify_mesh(g,buf,8,4,floor_counts)
+    floor_pos=verify_mesh(g,buf,8,4,floor_counts,expected_tangent_w=-1.0)
     req(all(abs(y)<1e-7 for x,y,z in floor_pos),"floor plane")
 
     xs=source["layout"]["x_positions"]; sy,sz=source["layout"]["sphere_yz"]; cy,cz=source["layout"]["cube_yz"]
@@ -133,7 +156,7 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     req(abs(p["aspectRatio"]-aspect)<1e-12 and abs(p["yfov"]-math.radians(camera["vertical_fov_degrees"]))<1e-12,"camera framing")
     req(p["znear"]==camera["znear"] and p["zfar"]==camera["zfar"],"camera clip")
     req(g["nodes"][9]["name"]=="ReviewCamera" and g["nodes"][9]["camera"]==0 and g["nodes"][9]["translation"]==camera["translation"],"camera node")
-    req(quat_norm(g["nodes"][9]["rotation"]),"camera rotation")
+    req(quat_close(g["nodes"][9].get("rotation"),quat_x(camera["pitch_degrees"])),"camera rotation")
 
     lights=g["extensions"]["KHR_lights_punctual"]["lights"]
     expected_lights=[{"color":s["color_linear"],"intensity":s["intensity_lux"],"name":s["name"],"type":s["type"]} for s in source["lights"]]
@@ -141,7 +164,8 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     for j,s in enumerate(source["lights"]):
         node=g["nodes"][10+j]
         req(node["name"]==s["name"] and node["extensions"]=={"KHR_lights_punctual":{"light":j}},"light node")
-        req(quat_norm(node["rotation"]),"light rotation")
+        rot=s["rotation_degrees"]
+        req(quat_close(node.get("rotation"),quat_xy(rot["x"],rot["y"])),"light rotation")
 
     if manifest_path:
         manifest_raw=Path(manifest_path).read_bytes(); m=json.loads(manifest_raw)
