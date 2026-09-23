@@ -2,7 +2,9 @@
 
 #include "Engine/Math/Math.h"
 #include "Engine/Scene/CombatSandbox.h"
+#include "Engine/Scene/ShadowbladeLoadout.h"
 
+#include <cstddef>
 #include <cstdint>
 
 namespace Astral::Scene {
@@ -75,6 +77,15 @@ struct DefenseReport {
     float timeToImpact{};
 };
 
+struct ShadowbladeActionTuning {
+    int fatalStrikeDamage{};
+    float dashDistance{};
+    float resourceRegenerationPerSecond{};
+    int guardDamageMitigation{};
+    int readinessScore{};
+    int activeResonanceFamilies{};
+};
+
 class ShadowbladeActions {
 public:
     static constexpr float MaximumResource = 100.0f;
@@ -94,6 +105,19 @@ public:
     static constexpr float ForgivingPerfectDefenseWindowSeconds = 0.20f;
     static constexpr float DodgeWindowSeconds = 0.35f;
     static constexpr float DefenseCounterWindowSeconds = 0.8f;
+
+    static constexpr int BaselineLoadoutAttackBonus = 4;
+    static constexpr int BaselineLoadoutGuardBonus = 1;
+    static constexpr int BaselineLoadoutResourceRecoveryBonus = 0;
+    static constexpr int BaselineLoadoutMobilityBonus = 0;
+    static constexpr int LoadoutAttackDamagePerPoint = 2;
+    static constexpr int MaximumLoadoutAttackDamageBonus = 40;
+    static constexpr float LoadoutMobilityDistancePerPoint = 0.25f;
+    static constexpr float MaximumLoadoutDashDistanceBonus = 2.0f;
+    static constexpr float LoadoutResourceRegenerationPerPoint = 1.0f;
+    static constexpr float MaximumLoadoutResourceRegenerationBonus = 10.0f;
+    static constexpr int LoadoutGuardMitigationPerPoint = 2;
+    static constexpr int MaximumLoadoutGuardDamageMitigation = 30;
 
     void AdvanceTime(float deltaSeconds);
     float RestoreResource(float amount);
@@ -152,16 +176,24 @@ public:
     }
     const DefenseReport& LastDefense() const { return lastDefense_; }
 
+    ShadowbladeLoadout& Loadout() { return loadout_; }
+    const ShadowbladeLoadout& Loadout() const { return loadout_; }
+    ShadowbladeActionTuning CurrentLoadoutTuning() const;
+    LoadoutActionResult PreviewPresetTuning(std::size_t slot,
+        const CharacterProgression& progression, ShadowbladeActionTuning& tuning) const;
+
 private:
     static double FloatHalfUlpSeconds(float seconds);
     double DefenseTimingToleranceSeconds(double deadlineUncertaintySeconds) const;
     static bool DefenseDeadlineReached(double now, double deadline, double toleranceSeconds);
     static bool DefenseWindowContains(double remaining, double window, double toleranceSeconds);
+    static ShadowbladeActionTuning BuildLoadoutTuning(const ShadowbladeLoadout& loadout);
     double CurrentDefenseSeconds() const { return defenseElapsedSecondsPrecise_; }
     void RebaseDefenseClock();
     double StartDefenseCounterDeadline();
     DefenseReport ResolveIncomingHit(DefenseResult result);
 
+    ShadowbladeLoadout loadout_{};
     float resource_{MaximumResource};
     float dashCooldownRemaining_{};
     float fatalStrikeCooldownRemaining_{};
