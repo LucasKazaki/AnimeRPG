@@ -20,7 +20,7 @@
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-22-PASS13.md",
   "pr": 30,
   "reviewed_initial_head": "ca187fb9c03d6e2ffe873599bf28da6f75b43880",
-  "latest_review_repair_checkpoint": "64d400229a2629bc5f3120f0e1d56d743d804b2f",
+  "latest_review_repair_checkpoint": "3ab2530c0896689263765739292465e57e7e0285",
   "final_head": "pending_self_reference_see_pr_30_final_receipt",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -36,7 +36,7 @@
     {"id":"GAME-062","title":"Bounded configurable practice pattern sequence","status":"implemented_registered_test_coverage"},
     {"id":"GAME-063","title":"Learning Standard Expert practice pace","status":"implemented_registered_test_coverage"},
     {"id":"GAME-064","title":"Alternating Guard Dodge defense chain","status":"implemented_review_repaired_registered_test_coverage"},
-    {"id":"GAME-065","title":"Bounded execution score with active-time coefficient","status":"implemented_review_repaired_registered_test_coverage"},
+    {"id":"GAME-065","title":"Bounded execution score with session-owned active-time coefficient","status":"implemented_review_repaired_registered_test_coverage"},
     {"id":"GAME-066","title":"Configurable drill target count 1 through 10","status":"implemented_registered_test_coverage"},
     {"id":"QOL-014","title":"Per-pattern practice analytics","status":"implemented_review_repaired_registered_test_coverage"}
   ],
@@ -45,8 +45,11 @@
     "try_defend_interruption": "reconcile_interrupt_stat_delta_and_release_session_immediately",
     "score_denominator": "active_time_divides_by_all_resolved_attempts_including_hits",
     "chain_identity": "derive_guard_or_dodge_from_authoritative_DefenseResult_not_raw_input",
-    "focused_regressions": "added_for_each_material_review_finding",
     "hosted_test_assumption": "run_428_proved_immediate_requeue_is_invalid_while_combat_remains_staggered; regression_now_checks_session_reset_and_reconfiguration_without_weakening_combat_stagger_rule",
+    "second_review_head": "126b6eee606a27605b9812fb79e554f32bfd34e6",
+    "hit_only_coefficient": "compute_defined_time_coefficient_for_resolved_hit_only_reports_while_score_remains_zero",
+    "clock_reset_invariance": "accumulate_valid_unpaused_session_time_independently_of_mutable_CombatSandbox_elapsed_clock",
+    "focused_regressions": "added_for_all_material_review_findings_including_hit_only_and_clock_reset_cases",
     "fresh_final_head_review": "pending"
   },
   "verification": {
@@ -55,7 +58,13 @@
     "initial_head_release_manifest": "passed_run_334_not_final_after_review_repair",
     "records_head_24bbb_release_manifest": "passed_run_345_not_final_after_test_repair",
     "records_head_24bbb_hosted_windows_ci": "failed_run_428_test_assumption_only_ThoughtCommandsTests",
-    "hosted_failure_repair_commit": "64d400229a2629bc5f3120f0e1d56d743d804b2f",
+    "pre_second_review_head_windows_ci": "passed_run_435_on_126b6eee_but_not_final_after_second_review_repairs",
+    "pre_second_review_head_release_manifest": "passed_run_348_on_126b6eee_but_not_final_after_second_review_repairs",
+    "latest_review_repair_commits": [
+      "a7bc215889175eae5c2527965e4d884013e79992",
+      "3ab2530c0896689263765739292465e57e7e0285",
+      "01924a309cfe23e414dc01926f4400703f114012"
+    ],
     "final_records_head_hosted_windows_ci": "pending_exact_final_head",
     "final_records_head_release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed",
@@ -69,5 +78,5 @@
     "art_pr_28": "separate color/exposure calibration ownership; no overlap",
     "shared_engine_paths": "renderer platform editor import animation audio physics CMake workflows dependencies R0 release and deployment unchanged"
   },
-  "next_action": "Freeze this records head, require exact-head Windows/release gates and a fresh independent Codex review with all material threads resolved, re-read main and PR head immediately before merge, merge PR 30 with expected-head protection, then record self-referential final head/workflow/review/merge receipts in PR discussion and task result."
+  "next_action": "Freeze the final records head, require exact-head Windows/release gates and a fresh independent Codex review with all material threads resolved, re-read main and PR head immediately before merge, merge PR 30 with expected-head protection, then record self-referential final head/workflow/review/merge receipts in PR discussion and task result."
 }
