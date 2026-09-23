@@ -6,6 +6,7 @@ VERSION="astral-material-gallery-gltf-3"
 SOURCE_STATUS="proposed_art_reference_not_runtime"
 RUNTIME_STATUS="source_validated_not_imported"
 MANIFEST_INTENT="Source-only neutral material-response gallery for future Astral import/render and art review."
+CAPTURE_INTENT="Neutral material-response comparison. Absolute exposure and tonemapping are runtime-owned and are not encoded by glTF."
 CONTRACT_KEYS={"units","up","forward","right","status","capture_intent","station_order","forbid_baked_lighting","source_sha256"}
 MANIFEST_KEYS={"schema_version","generator","runtime_status","source_sha256","intent","counts","files"}
 
@@ -22,6 +23,7 @@ def load_source(path):
     req(source.get("units")=="metres","source units")
     req(source.get("axes")=={"forward":"+Z","right":"-X per glTF convention","up":"+Y"},"source axes")
     req(source.get("forbid_baked_lighting") is True,"baked-lighting rule")
+    req(source.get("capture_intent")==CAPTURE_INTENT,"source capture intent")
     req(len(source.get("stations",[]))==4 and len(source.get("lights",[]))==2,"source counts")
     return source,raw
 
@@ -52,6 +54,10 @@ def normalize(v,msg):
     n=length(v); req(n>1e-12,msg); return tuple(c/n for c in v)
 
 def tri_normal(a,b,c): return cross(sub(b,a),sub(c,a))
+
+def verify_position_accessor_contract(g, accessor_index):
+    accessor=g["accessors"][accessor_index]
+    req(accessor.get("componentType")==5126 and accessor.get("type")=="VEC3","position accessor format")
 
 def verify_position_accessor_bounds(g, accessor_index, positions):
     accessor=g["accessors"][accessor_index]
@@ -95,7 +101,7 @@ def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,verify_floor_
     mesh=g["meshes"][mesh_index]; attrs,index_accessor=geometry_binding(mesh)
     prim=mesh["primitives"][0]; req(prim["mode"]==4,"triangle mode"); req(prim["material"]==expected_material,"material binding")
     req(set(attrs)=={"POSITION","NORMAL","TANGENT","TEXCOORD_0"},"attributes")
-    pos=read_accessor(g,buf,attrs["POSITION"]); verify_position_accessor_bounds(g,attrs["POSITION"],pos)
+    verify_position_accessor_contract(g,attrs["POSITION"]); pos=read_accessor(g,buf,attrs["POSITION"]); verify_position_accessor_bounds(g,attrs["POSITION"],pos)
     normal=read_accessor(g,buf,attrs["NORMAL"]); tangent=read_accessor(g,buf,attrs["TANGENT"]); uv=read_accessor(g,buf,attrs["TEXCOORD_0"]); indices=read_accessor(g,buf,index_accessor)
     req((len(pos),len(indices))==expected_counts,"geometry counts"); req(len(normal)==len(pos) and len(tangent)==len(pos) and len(uv)==len(pos),"attribute counts")
     req(all(math.isfinite(c) for seq in (pos,normal,tangent,uv) for v in seq for c in v),"finite geometry")
@@ -130,7 +136,7 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
     contract=g["extras"]["astral_contract"]; req(set(contract)==CONTRACT_KEYS,"runtime contract fields"); req(contract["status"]==RUNTIME_STATUS,"runtime status")
     req(contract["units"]==source["units"] and contract["up"]==source["axes"]["up"] and contract["forward"]==source["axes"]["forward"] and contract["right"]==source["axes"]["right"],"axis contract")
     req(contract["forbid_baked_lighting"] is True,"baked-lighting rule")
-    labels=tuple(s["label"] for s in source["stations"]); req(tuple(contract["station_order"])==labels,"station order"); req(contract["capture_intent"]==source["capture_intent"],"capture intent"); req(contract["source_sha256"]==hashlib.sha256(source_raw).hexdigest(),"source hash")
+    labels=tuple(s["label"] for s in source["stations"]); req(tuple(contract["station_order"])==labels,"station order"); req(contract["capture_intent"]==CAPTURE_INTENT,"capture intent"); req(contract["source_sha256"]==hashlib.sha256(source_raw).hexdigest(),"source hash")
     req("images" not in g and "textures" not in g and "samplers" not in g,"gallery must not embed texture lighting")
     req(len(g["buffers"])==1,"buffer count"); buf=data_uri(g["buffers"][0]["uri"],"data:application/octet-stream;base64,"); req(len(buf)==g["buffers"][0]["byteLength"],"buffer length")
     material_specs=source["stations"]+[source["floor_material"]]; req(len(g["materials"])==len(material_specs),"material count")
