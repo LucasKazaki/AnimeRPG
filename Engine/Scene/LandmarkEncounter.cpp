@@ -120,8 +120,10 @@ LandmarkEncounterReport LandmarkEncounter::Retry(CombatSandbox& combatSandbox,
             == ShadowbladeActions::ForgivingPerfectDefenseWindowSeconds
         ? DefenseTimingPreset::Forgiving
         : DefenseTimingPreset::Standard;
+    const ShadowbladeLoadout persistentLoadout = shadowbladeActions.Loadout();
     combatSandbox.ResetTrainingSession();
     shadowbladeActions = ShadowbladeActions{};
+    shadowbladeActions.Loadout() = persistentLoadout;
     shadowbladeActions.SetDefenseTimingPreset(timingPreset);
     state_ = LandmarkEncounterState::Active;
     activationElapsedSeconds_ = combatSandbox.ElapsedSecondsPrecise();
