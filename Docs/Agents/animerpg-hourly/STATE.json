@@ -38,17 +38,20 @@
   ],
   "review_repairs": {
     "initial_review_head": "f8c5daf26504930b890279a83867fc79a7ab02aa",
-    "persistent_loadout_retry_loss": "repaired_in_LandmarkEncounter_retry_with_registered_production_path_regression",
+    "persistent_loadout_retry_loss": "repaired_with_ShadowbladeActions_ResetTransientStatePreservingLoadout_used_by_LandmarkEncounter_retry",
     "unexercised_tuning_caps": "repaired_with_overflow_safe_profile_transform_and_INT_MIN_INT_MAX_exact_cap_regressions",
+    "repaired_candidate_ci_head": "2c0c1aa35ec957058760817cf23a3976756858bc",
+    "repaired_candidate_ci_result": "windows_debug_link_failure_ThoughtCommandsTests_did_not_link_LandmarkEncounter_cpp; not bypassed; no_CMake_change; regression_moved_to_linked_Shadowblade_reset_helper",
     "final_review": "pending_fresh_exact_final_head"
   },
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_registration_shim",
-    "hosted_windows_ci": "pending_exact_final_head_after_review_repairs",
-    "release_manifest": "pending_exact_final_head_after_review_repairs",
+    "existing_encounter_retry_test_target": "LandmarkEncounterTests_unchanged",
+    "hosted_windows_ci": "pending_exact_final_head_after_linker_safe_repair",
+    "release_manifest": "pending_exact_final_head_after_linker_safe_repair",
     "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "pending_fresh_exact_final_head_after_review_repairs",
-    "integration": "five_gameplay_increments_consumed_by_live_ShadowbladeActions_owner; LandmarkEncounter_retry_preserves_persistent_loadout; QOL_preview_has_no_rendered_native_caller",
+    "independent_review": "pending_fresh_exact_final_head_after_all_repairs",
+    "integration": "five_gameplay_increments_consumed_by_live_ShadowbladeActions_owner; LandmarkEncounter_retry_calls_tested_persistent_loadout_reset_helper; QOL_preview_has_no_rendered_native_caller",
     "player_equipment_selection": "not_implemented_not_claimed",
     "persistent_cross_process_save": "not_implemented_not_claimed"
   },
@@ -56,7 +59,7 @@
     "engine_pr_13": "separate editor/runtime-smoke ownership; no overlap",
     "art_prs_23_26_28_33": "separate art ownership; no overlap",
     "shared_engine_paths": "platform renderer editor import animation audio physics CMake workflows dependencies R0 release deployment networking unchanged",
-    "narrow_game_domain_repair": "Engine/Scene/LandmarkEncounter.cpp retry preservation only, admitted because pass17 loadout persistence exposed a regression"
+    "narrow_game_domain_repair": "Engine/Scene/LandmarkEncounter.cpp retry now delegates to persistent-loadout transient reset helper"
   },
-  "next_action": "On PR #36, require exact-head hosted Windows Debug/Release and release-integrity gates plus fresh independent Codex review after the two P2 repairs, resolve repaired review threads only after evidence is current, re-read live main and exact PR head, and merge only the exact tested/reviewed head."
+  "next_action": "On PR #36, require exact-head hosted Windows Debug/Release and release-integrity gates plus fresh independent Codex review after the linker-safe repair, resolve repaired review threads only after evidence is current, re-read live main and exact PR head, and merge only the exact tested/reviewed head."
 }
