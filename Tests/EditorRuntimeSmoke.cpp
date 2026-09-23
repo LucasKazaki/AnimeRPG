@@ -758,10 +758,40 @@ bool SelectCubeAndNotify(HWND window, DWORD processId,
         window, processId, initialControls, statics, buttons, kCubeInspectorText, 3, failure);
 }
 
-bool CloseEditor(HWND window, DWORD processId, HANDLE process, DWORD& exitCode) {
+bool CloseEditor(HWND window, DWORD processId, DWORD threadId, HANDLE thread,
+    HANDLE process, DWORD& exitCode) {
     if (WorkBudgetExpired()) return false;
-    if (!WindowOwnedByProcess(window, processId)) return false;
-    if (!PostMessageW(window, WM_CLOSE, 0, 0)) return false;
+    if (!WindowOwnedByProcess(window, processId)
+        || WaitForSingleObject(thread, 0) != WAIT_TIMEOUT) {
+        return false;
+    }
+
+    DWORD ownerProcessId = 0;
+    const DWORD ownerThreadId = GetWindowThreadProcessId(window, &ownerProcessId);
+    if (ownerThreadId == 0 || ownerProcessId != processId || ownerThreadId != threadId) {
+        return false;
+    }
+
+    const DWORD previousSuspendCount = SuspendThread(thread);
+    if (previousSuspendCount == static_cast<DWORD>(-1)) return false;
+
+    bool postedClose = false;
+    if (previousSuspendCount == 0
+        && WaitForSingleObject(process, 0) == WAIT_TIMEOUT
+        && WaitForSingleObject(thread, 0) == WAIT_TIMEOUT) {
+        DWORD pinnedProcessId = 0;
+        const DWORD pinnedThreadId = GetWindowThreadProcessId(window, &pinnedProcessId);
+        if (pinnedThreadId == threadId && pinnedProcessId == processId) {
+            postedClose = PostMessageW(window, WM_CLOSE, 0, 0) != FALSE;
+        }
+    }
+
+    const DWORD resumePreviousCount = ResumeThread(thread);
+    if (resumePreviousCount == static_cast<DWORD>(-1)
+        || previousSuspendCount != 0 || resumePreviousCount != 1 || !postedClose) {
+        return false;
+    }
+
     if (WaitForSingleObject(process, kProcessExitTimeoutMs) != WAIT_OBJECT_0) return false;
     return GetExitCodeProcess(process, &exitCode) != FALSE;
 }
@@ -901,7 +931,8 @@ int wmain(int argc, wchar_t** argv) {
         } else if (!ValidateShellState(window, process.dwProcessId, initialControls, statics,
                        buttons, kCubeInspectorText, 3, failure)) {
             // failure set by validator.
-        } else if (CloseEditor(window, process.dwProcessId, process.hProcess, exitCode)
+        } else if (CloseEditor(window, process.dwProcessId, process.dwThreadId,
+                       process.hThread, process.hProcess, exitCode)
             && exitCode == 0) {
             passed = true;
         } else {
@@ -937,6 +968,8 @@ int wmain(int argc, wchar_t** argv) {
         << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
         << L"every bounded cross-process read and after both normal+narrow resizes; Cube selection stayed synchronized, "
         << L"all direct children remained contained from startup through both resizes, the retained CreateProcess handle "
-        << L"remained nonsignaled around PID-based HWND ownership checks, and shutdown exited cleanly.\n";
+        << L"remained nonsignaled around PID-based HWND ownership checks, the original window-owning launch thread was "
+        << L"suspended only across the final asynchronous WM_CLOSE enqueue and resumed before any wait, and shutdown "
+        << L"exited cleanly.\n";
     return 0;
 }
