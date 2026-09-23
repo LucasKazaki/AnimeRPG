@@ -170,7 +170,7 @@ public:
     }
 
     bool CurrentLessonComplete(const DefensePracticeSession& session) const {
-        if (Complete()) return false;
+        if (Complete() || !SessionMatchesCurrentLesson(session)) return false;
         if (currentLesson_ != ShadowbladeTrainingLesson::BossRehearsal) {
             return session.GoalStatus().complete;
         }
@@ -302,6 +302,15 @@ private:
         return {EnemyAttackPattern::QuickCut,
             EnemyAttackPattern::GuardBreaker,
             EnemyAttackPattern::RiftBurst};
+    }
+
+    bool SessionMatchesCurrentLesson(const DefensePracticeSession& session) const {
+        const ShadowbladeTrainingLessonPlan plan = PlanForLesson(currentLesson_);
+        return plan.sequence.count > 0
+            && session.PracticeSequenceLength() == plan.sequence.count
+            && session.Pace() == plan.pace
+            && session.Goal() == plan.goal
+            && session.GoalTarget() == plan.goalTarget;
     }
 
     static bool CheckpointValid(const ShadowbladeTrainingCheckpoint& checkpoint) {
