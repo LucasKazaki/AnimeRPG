@@ -176,7 +176,7 @@ public:
         const DefenseTrainingStats before = drill_.Stats();
         const DefenseReport report = drill_.TryDefend(combat, actions, input);
         if (currentAttackActive_ && IsTerminal(report.result)) {
-            RecordTerminalReport(combat, report);
+            RecordTerminalReport(report);
         } else if (currentAttackActive_
             && drill_.Stats().interruptions > before.interruptions) {
             Increment(PatternStatsMutable(currentPattern_).interruptions);
@@ -211,10 +211,10 @@ public:
             ResetAlternatingChain();
         } else if (after.perfectDefenses > before.perfectDefenses) {
             Increment(pattern.perfectDefenses);
-            ResetAlternatingChain();
+            RecordSuccessfulDefense(KindForResult(actions.LastDefense().result));
         } else if (after.ordinaryDefenses > before.ordinaryDefenses) {
             Increment(pattern.ordinaryDefenses);
-            ResetAlternatingChain();
+            RecordSuccessfulDefense(KindForResult(actions.LastDefense().result));
         }
         currentAttackActive_ = false;
         return true;
@@ -402,14 +402,14 @@ private:
         return patternStats_[PatternIndex(pattern)];
     }
 
-    void RecordTerminalReport(CombatSandbox& combat, const DefenseReport& report) {
+    void RecordTerminalReport(const DefenseReport& report) {
         DefensePracticePatternStats& pattern = PatternStatsMutable(currentPattern_);
         if (IsPerfect(report.result)) {
             Increment(pattern.perfectDefenses);
-            RecordSuccessfulDefense(combat, KindForResult(report.result));
+            RecordSuccessfulDefense(KindForResult(report.result));
         } else if (IsOrdinaryDefense(report.result)) {
             Increment(pattern.ordinaryDefenses);
-            RecordSuccessfulDefense(combat, KindForResult(report.result));
+            RecordSuccessfulDefense(KindForResult(report.result));
         } else if (IsHit(report.result)) {
             Increment(pattern.hitsTaken);
             AddDamage(pattern.damageTaken, report.damageTaken);
@@ -418,12 +418,12 @@ private:
         currentAttackActive_ = false;
     }
 
-    void RecordSuccessfulDefense(const CombatSandbox& combat, SuccessfulDefenseKind kind) {
+    void RecordSuccessfulDefense(SuccessfulDefenseKind kind) {
         if (kind == SuccessfulDefenseKind::None) {
             ResetAlternatingChain();
             return;
         }
-        const double now = combat.ElapsedSecondsPrecise();
+        const double now = sessionActiveSeconds_;
         const bool alternates = currentAlternatingChain_ > 0
             && kind != lastSuccessfulDefense_
             && now >= lastSuccessfulDefenseSeconds_
