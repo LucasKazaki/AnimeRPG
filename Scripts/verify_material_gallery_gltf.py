@@ -9,6 +9,8 @@ MANIFEST_INTENT="Source-only neutral material-response gallery for future Astral
 CAPTURE_INTENT="Neutral material-response comparison. Absolute exposure and tonemapping are runtime-owned and are not encoded by glTF."
 CONTRACT_KEYS={"units","up","forward","right","status","capture_intent","station_order","forbid_baked_lighting","source_sha256"}
 MANIFEST_KEYS={"schema_version","generator","runtime_status","source_sha256","intent","counts","files"}
+NONFLOOR_TANGENT_ALIGNMENT_MIN=0.95
+FLOOR_TANGENT_ALIGNMENT_MIN=0.9999
 
 def req(cond,msg):
     if not cond: raise ValueError(msg)
@@ -55,9 +57,18 @@ def normalize(v,msg):
 
 def tri_normal(a,b,c): return cross(sub(b,a),sub(c,a))
 
-def verify_position_accessor_contract(g, accessor_index):
+def verify_accessor_contract(g, accessor_index, component_type, accessor_type, msg):
+    req(isinstance(accessor_index,int) and 0<=accessor_index<len(g["accessors"]),"accessor index")
     accessor=g["accessors"][accessor_index]
-    req(accessor.get("componentType")==5126 and accessor.get("type")=="VEC3","position accessor format")
+    req(
+        accessor.get("componentType")==component_type
+        and accessor.get("type")==accessor_type
+        and accessor.get("normalized",False) is False,
+        msg,
+    )
+
+def verify_position_accessor_contract(g, accessor_index):
+    verify_accessor_contract(g,accessor_index,5126,"VEC3","position accessor format")
 
 def verify_position_accessor_bounds(g, accessor_index, positions):
     accessor=g["accessors"][accessor_index]
@@ -98,7 +109,7 @@ def cube_indices():
     return out
 
 def verify_tangent_frame(pos,normal,tangent,uv,indices,msg,strict=False):
-    threshold=0.9999 if strict else 1e-4
+    threshold=FLOOR_TANGENT_ALIGNMENT_MIN if strict else NONFLOOR_TANGENT_ALIGNMENT_MIN
     for k in range(0,len(indices),3):
         ia,ib,ic=(indices[k][0],indices[k+1][0],indices[k+2][0])
         e1=sub(pos[ib],pos[ia]); e2=sub(pos[ic],pos[ia])
@@ -115,7 +126,12 @@ def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,expected_indi
     mesh=g["meshes"][mesh_index]; attrs,index_accessor=geometry_binding(mesh)
     prim=mesh["primitives"][0]; req(prim["mode"]==4,"triangle mode"); req(prim["material"]==expected_material,"material binding")
     req(set(attrs)=={"POSITION","NORMAL","TANGENT","TEXCOORD_0"},"attributes")
-    verify_position_accessor_contract(g,attrs["POSITION"]); pos=read_accessor(g,buf,attrs["POSITION"]); verify_position_accessor_bounds(g,attrs["POSITION"],pos)
+    verify_position_accessor_contract(g,attrs["POSITION"])
+    verify_accessor_contract(g,attrs["NORMAL"],5126,"VEC3","normal accessor format")
+    verify_accessor_contract(g,attrs["TANGENT"],5126,"VEC4","tangent accessor format")
+    verify_accessor_contract(g,attrs["TEXCOORD_0"],5126,"VEC2","texcoord accessor format")
+    verify_accessor_contract(g,index_accessor,5123,"SCALAR","index accessor format")
+    pos=read_accessor(g,buf,attrs["POSITION"]); verify_position_accessor_bounds(g,attrs["POSITION"],pos)
     normal=read_accessor(g,buf,attrs["NORMAL"]); tangent=read_accessor(g,buf,attrs["TANGENT"]); uv=read_accessor(g,buf,attrs["TEXCOORD_0"]); indices=read_accessor(g,buf,index_accessor)
     req((len(pos),len(indices))==expected_counts,"geometry counts"); req(len(normal)==len(pos) and len(tangent)==len(pos) and len(uv)==len(pos),"attribute counts")
     req(all(math.isfinite(c) for seq in (pos,normal,tangent,uv) for v in seq for c in v),"finite geometry")
