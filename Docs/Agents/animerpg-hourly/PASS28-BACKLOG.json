@@ -69,8 +69,8 @@
       "title": "Last-successful preset recall and reapply",
       "source_ids": ["GENSHIN-5.7-UPDATE"],
       "status": "implemented_registered_regression_pending_exact_head_gates",
-      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
-      "acceptance": "Only successful preset application becomes remembered; failed applies do not replace it; reapply routes through existing preset validation."
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h", "Engine/Scene/ShadowbladeActions.cpp"],
+      "acceptance": "Only successful owner-bound preset application becomes remembered; failed applies do not replace it; transient encounter/training resets preserve the remembered selection; reapply routes through existing preset validation."
     },
     {
       "id": "QOL-029",
@@ -78,8 +78,8 @@
       "title": "Human-readable clearable preset labels with spaces",
       "source_ids": ["ZZZ-PLAYER-PRESET-NAMES-20260711"],
       "status": "implemented_registered_regression_pending_exact_head_gates",
-      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
-      "acceptance": "Saved slots accept bounded labels with internal spaces; invalid edits are atomic; label clearing does not alter the saved build or current equipment."
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h", "Engine/Scene/ShadowbladeActions.cpp"],
+      "acceptance": "Saved slots accept bounded labels with internal spaces through their paired Shadowblade owner; invalid/cross-owner edits fail atomically; transient resets preserve labels; label clearing does not alter the saved build or current equipment."
     }
   ],
   "counts": {
@@ -93,5 +93,20 @@
     "independently_reviewed_clean": 0,
     "merged": 0
   },
-  "next_action": "Run exact-head hosted Windows Debug/Release and release-manifest gates on PR 48, obtain fresh independent review on the same final head, repair/rerun if needed, then expected-head merge if all gates are clean."
+  "review_repairs": [
+    "CurrentSlot scoring removes newly activated family synergy before focus scoring.",
+    "Bounded task/backlog/receipt records were added before acceptance.",
+    "Stateful preset metadata is accessible only through its paired ShadowbladeActions owner.",
+    "ResetTransientStatePreservingLoadout preserves workbench metadata as persistent loadout session state.",
+    "Registered tests use the owner API and cover cross-owner rejection plus transient-reset persistence."
+  ],
+  "known_failed_gate": {
+    "head": "6957ff8d913e0a70c18df7deb0bc13b572bc304c",
+    "windows_run": 35930449020,
+    "result": "failed_debug_build_before_tests",
+    "cause": "registered tests still called stateful workbench methods after those methods became private owner-only APIs; repaired on a later head",
+    "release_manifest_run": 35930449015,
+    "release_manifest_result": "success"
+  },
+  "next_action": "Run exact-head hosted Windows Debug/Release and release-manifest gates on the final PR 48 record head, obtain fresh independent review on that same head, repair/rerun if needed, then expected-head merge if all gates are clean."
 }
