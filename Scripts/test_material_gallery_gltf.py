@@ -163,6 +163,9 @@ def test_light_transform_override_semantics(tmp):
 def test_source_status_rejected_by_generator(tmp):
     source=json.loads(SOURCE.read_text()); source["status"]="runtime_verified"; bad=tmp/"bad-source.json"; bad.write_text(json.dumps(source,indent=2,sort_keys=True)+"\n"); p=run([GEN,"--source",bad,"--output",tmp/"bad-out"],ok=False); assert "source status" in p.stderr
 
+def test_source_capture_intent_semantics(tmp):
+    out=generate(tmp); source=json.loads(SOURCE.read_text()); source["capture_intent"]="Astral imported; runtime_verified; art_approved; parity achieved"; bad=tmp/"bad-source.json"; bad.write_text(json.dumps(source,indent=2,sort_keys=True)+"\n"); p=run([VER,out/"material_gallery.gltf","--source",bad],ok=False); assert "source capture intent" in p.stderr
+
 def test_runtime_status_semantics(tmp):
     out=generate(tmp); mutate_gltf(out,lambda g:g["extras"]["astral_contract"].__setitem__("status","runtime_verified")); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "runtime status" in p.stderr
 
@@ -189,6 +192,13 @@ def test_position_accessor_declared_bounds_semantics(tmp):
         g["accessors"][pos_accessor]["max"]=[101.0,101.0,101.0]
     mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "position bounds" in p.stderr
 
+def test_position_accessor_format_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        pos_accessor=g["meshes"][0]["primitives"][0]["attributes"]["POSITION"]
+        g["accessors"][pos_accessor]["type"]="VEC4"
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "position accessor format" in p.stderr
+
 def test_accessor_bounds(tmp):
     out=generate(tmp); mutate_gltf(out,lambda g:g["bufferViews"][0].__setitem__("byteLength",4)); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "accessor within bufferView" in p.stderr
 
@@ -198,7 +208,7 @@ def test_expected_pin_negative(tmp):
 def test_crlf_source_and_pin_portability(tmp):
     source=tmp/"source-crlf.json"; source.write_bytes(SOURCE.read_bytes().replace(b"\n",b"\r\n")); pin=tmp/"pin-crlf.json"; pin.write_bytes(PIN.read_bytes().replace(b"\n",b"\r\n")); out=generate(tmp,source); assert (out/"manifest.json").read_bytes()==PIN.read_bytes(); run([VER,out/"material_gallery.gltf","--source",source,"--manifest",out/"manifest.json","--expected-manifest",pin])
 
-TESTS=[test_expected_pin_matches_generator,test_exact_check,test_light_intensity_semantics,test_material_binding_semantics,test_uncontracted_material_property_semantics,test_camera_fov_semantics,test_camera_rotation_semantics,test_light_rotation_semantics,test_all_triangle_vertex_normals_semantics,test_tangent_normal_orthogonality_semantics,test_station_geometry_sharing_semantics,test_sphere_radius_semantics,test_cube_extent_semantics,test_mesh_morph_weights_semantics,test_primitive_morph_target_semantics,test_animation_transform_override_semantics,test_floor_tangent_handedness,test_floor_tangent_direction_semantics,test_camera_transform_override_semantics,test_light_transform_override_semantics,test_source_status_rejected_by_generator,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,test_uncontracted_manifest_claim_semantics,test_manifest_intent_semantics,test_manifest_schema_bool_semantics,test_reject_embedded_texture_or_baked_lighting_path,test_position_accessor_declared_bounds_semantics,test_accessor_bounds,test_expected_pin_negative,test_crlf_source_and_pin_portability]
+TESTS=[test_expected_pin_matches_generator,test_exact_check,test_light_intensity_semantics,test_material_binding_semantics,test_uncontracted_material_property_semantics,test_camera_fov_semantics,test_camera_rotation_semantics,test_light_rotation_semantics,test_all_triangle_vertex_normals_semantics,test_tangent_normal_orthogonality_semantics,test_station_geometry_sharing_semantics,test_sphere_radius_semantics,test_cube_extent_semantics,test_mesh_morph_weights_semantics,test_primitive_morph_target_semantics,test_animation_transform_override_semantics,test_floor_tangent_handedness,test_floor_tangent_direction_semantics,test_camera_transform_override_semantics,test_light_transform_override_semantics,test_source_status_rejected_by_generator,test_source_capture_intent_semantics,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,test_uncontracted_manifest_claim_semantics,test_manifest_intent_semantics,test_manifest_schema_bool_semantics,test_reject_embedded_texture_or_baked_lighting_path,test_position_accessor_declared_bounds_semantics,test_position_accessor_format_semantics,test_accessor_bounds,test_expected_pin_negative,test_crlf_source_and_pin_portability]
 
 def main():
     passed=0
