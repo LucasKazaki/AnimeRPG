@@ -5,6 +5,7 @@ from pathlib import Path
 VERSION="astral-material-gallery-gltf-3"
 SOURCE_STATUS="proposed_art_reference_not_runtime"
 RUNTIME_STATUS="source_validated_not_imported"
+MANIFEST_INTENT="Source-only neutral material-response gallery for future Astral import/render and art review."
 CONTRACT_KEYS={"units","up","forward","right","status","capture_intent","station_order","forbid_baked_lighting","source_sha256"}
 MANIFEST_KEYS={"schema_version","generator","runtime_status","source_sha256","intent","counts","files"}
 
@@ -82,6 +83,7 @@ def verify_mesh(g,buf,mesh_index,expected_material,expected_counts,verify_floor_
     req(all(math.isfinite(c) for seq in (pos,normal,tangent,uv) for v in seq for c in v),"finite geometry")
     req(all(abs(sum(c*c for c in n)-1.0)<1e-4 for n in normal),"unit normals")
     req(all(abs(sum(c*c for c in t[:3])-1.0)<1e-4 and t[3] in (-1.0,1.0) for t in tangent),"unit tangents")
+    req(all(abs(dot(n,t[:3]))<1e-4 for n,t in zip(normal,tangent)),"tangent orthogonality")
     req(all(0.0<=u<=1.0 and 0.0<=v<=1.0 for u,v in uv),"uv range"); req(all(0<=i[0]<len(pos) for i in indices),"index range"); req(len(indices)%3==0,"triangle index count")
     for k in range(0,len(indices),3):
         ia,ib,ic=(indices[k][0],indices[k+1][0],indices[k+2][0]); cr=tri_normal(pos[ia],pos[ib],pos[ic]); req(length(cr)>1e-12,"triangle area")
@@ -145,7 +147,7 @@ def verify(path,source_path,manifest_path=None,expected_manifest_path=None):
         node=g["nodes"][10+j]; req(set(node)=={"name","rotation","extensions"},"light transform"); req(node["name"]==s["name"] and node["extensions"]=={"KHR_lights_punctual":{"light":j}},"light node")
         rot=s["rotation_degrees"]; req(quat_close(node["rotation"],quat_xy(rot["x"],rot["y"])),"light rotation")
     if manifest_path:
-        manifest_raw=Path(manifest_path).read_bytes(); m=json.loads(manifest_raw); req(set(m)==MANIFEST_KEYS,"manifest fields"); req(m["schema_version"]==1,"manifest schema"); req(m["generator"]==VERSION and m["runtime_status"]==RUNTIME_STATUS,"manifest status"); req(m["source_sha256"]==hashlib.sha256(source_raw).hexdigest(),"manifest source hash")
+        manifest_raw=Path(manifest_path).read_bytes(); m=json.loads(manifest_raw); req(set(m)==MANIFEST_KEYS,"manifest fields"); req(type(m["schema_version"]) is int and m["schema_version"]==1,"manifest schema"); req(m["generator"]==VERSION and m["runtime_status"]==RUNTIME_STATUS,"manifest status"); req(m["intent"]==MANIFEST_INTENT,"manifest intent"); req(m["source_sha256"]==hashlib.sha256(source_raw).hexdigest(),"manifest source hash")
         req(m["counts"]=={"cameras":1,"cube_nodes":4,"directional_lights":2,"materials":5,"sphere_nodes":4,"stations":4},"manifest counts"); req(len(m["files"])==1,"manifest files")
         rec=m["files"][0]; req(rec=={"path":path.name,"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()},"manifest file record")
         if expected_manifest_path: req(manifest_raw.replace(b"\r\n",b"\n").replace(b"\r",b"\n")==canonical_text_bytes(expected_manifest_path),"expected manifest pin")
