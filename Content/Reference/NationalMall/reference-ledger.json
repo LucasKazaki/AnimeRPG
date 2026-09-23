@@ -1,0 +1,460 @@
+{
+  "schema_version": 1,
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "reference_validated_not_asset",
+  "retrieved_date": "2026-09-23",
+  "rights_policy": "reference_only_no_media_redistribution",
+  "units_policy": "retain_source_units_and_convert_to_metres_only_at_authoring_boundary",
+  "entries": [
+    {
+      "id": "mall-core-axis",
+      "label": "The Mall core lawns and Capitol-Washington Monument vista",
+      "zone": "mall_core",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/places/000/national-mall.htm",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "A",
+      "accuracy_class": "axis_scale",
+      "art_use": [
+        "primary east-west blockout proportions",
+        "lawn-panel rhythm",
+        "tree-grove framing",
+        "long-distance landmark readability"
+      ],
+      "facts": [
+        "The Mall extends about one mile west from the U.S. Capitol to the Washington Monument.",
+        "The core is bounded by Constitution Avenue to the north and Independence Avenue to the south.",
+        "Eight long lawn panels are separated by cross streets and framed by broad tree groves."
+      ],
+      "measurements": [
+        {
+          "label": "core_length",
+          "value": 1,
+          "unit": "mile",
+          "source_relation": "approximate"
+        },
+        {
+          "label": "lawn_panel_count",
+          "value": 8,
+          "unit": "count",
+          "source_relation": "exact_count"
+        },
+        {
+          "label": "typical_lawn_panel_length",
+          "value": 450,
+          "unit": "feet",
+          "source_relation": "approximate"
+        },
+        {
+          "label": "typical_lawn_panel_width",
+          "value": 170,
+          "unit": "feet",
+          "source_relation": "approximate"
+        },
+        {
+          "label": "perimeter_gravel_path_width",
+          "value": 35,
+          "unit": "feet",
+          "source_relation": "approximate"
+        },
+        {
+          "label": "tree_grove_width",
+          "value": 130,
+          "unit": "feet",
+          "source_relation": "approximate"
+        }
+      ],
+      "modeling_constraints": [
+        "Preserve the uninterrupted Capitol-Washington Monument vista in baseline blockouts.",
+        "Do not compress cross-street rhythm until a gameplay traversal review documents the simplification."
+      ]
+    },
+    {
+      "id": "reflecting-pool-axis",
+      "label": "Lincoln Memorial Reflecting Pool and elm walks",
+      "zone": "west_axis",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/nama/planyourvisit/upload/20241129_LINC-Event-Operations-Guidelines-FINAL-2.pdf",
+      "source_kind": "official_pdf",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "A",
+      "accuracy_class": "axis_scale",
+      "art_use": [
+        "west-axis scale",
+        "water-plane proportions",
+        "Lincoln approach readability",
+        "pedestrian path framing"
+      ],
+      "facts": [
+        "The rectangular Reflecting Pool east of the Lincoln Memorial was designed to create a dramatic approach to the memorial.",
+        "The 2010-2012 restoration connected the World War II Memorial and Lincoln Memorial with accessible concrete paths directly adjacent to the pool."
+      ],
+      "measurements": [
+        {
+          "label": "pool_length",
+          "value": 2029,
+          "unit": "feet",
+          "source_relation": "exact_source_value"
+        },
+        {
+          "label": "pool_width",
+          "value": 167,
+          "unit": "feet",
+          "source_relation": "exact_source_value"
+        },
+        {
+          "label": "pool_perimeter",
+          "value": 4392,
+          "unit": "feet",
+          "source_relation": "exact_source_value"
+        }
+      ],
+      "modeling_constraints": [
+        "Treat the pool as an orientation landmark, not decorative water disconnected from the main axis.",
+        "Keep the north and south walks visually legible from gameplay camera height."
+      ]
+    },
+    {
+      "id": "lincoln-memorial-materials",
+      "label": "Lincoln Memorial material and massing reference",
+      "zone": "west_anchor",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/linc/learn/historyculture/lincoln-memorial-building-statistics.htm",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "A",
+      "accuracy_class": "materials",
+      "art_use": [
+        "civic-stone family separation",
+        "major massing",
+        "step and terrace material differentiation"
+      ],
+      "facts": [
+        "Upper exterior steps, Doric columns, facade and major exterior elements use Colorado Yule marble.",
+        "Lower steps and terrace walls use pink Milford, Massachusetts granite.",
+        "Interior walls and Ionic columns use Indiana limestone; other interior elements use distinct marble families."
+      ],
+      "measurements": [
+        {
+          "label": "building_height_from_foundation_top",
+          "value": 79.8333333333,
+          "unit": "feet",
+          "source_relation": "derived_from_79_ft_10_in"
+        },
+        {
+          "label": "height_above_grade_at_terrace",
+          "value": 99,
+          "unit": "feet",
+          "source_relation": "exact_source_value"
+        }
+      ],
+      "modeling_constraints": [
+        "Do not collapse all Lincoln Memorial stone into one generic white material.",
+        "Material variation must remain restrained enough to preserve the monument's large-value readability."
+      ]
+    },
+    {
+      "id": "washington-monument-massing",
+      "label": "Washington Monument material and silhouette reference",
+      "zone": "central_anchor",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/articles/000/build-your-own-washington-monument.htm",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "A",
+      "accuracy_class": "materials",
+      "art_use": [
+        "skyline silhouette",
+        "marble-versus-gneiss material separation",
+        "long-distance scale anchor"
+      ],
+      "facts": [
+        "The monument is constructed of white marble ashlar blocks backed by blue gneiss.",
+        "The obelisk stands 555 feet 5 1/8 inches high and terminates in an aluminum cap."
+      ],
+      "measurements": [
+        {
+          "label": "obelisk_height",
+          "value": 555.4270833333,
+          "unit": "feet",
+          "source_relation": "derived_from_555_ft_5_1_8_in"
+        },
+        {
+          "label": "aluminum_cap_height",
+          "value": 8.9,
+          "unit": "inches",
+          "source_relation": "exact_source_value"
+        }
+      ],
+      "modeling_constraints": [
+        "Protect the obelisk silhouette from nearby supernatural clutter at baseline world state.",
+        "Stone-tone differences may be represented only after reference-backed placement, not invented as random patch noise."
+      ]
+    },
+    {
+      "id": "constitution-gardens-landscape",
+      "label": "Constitution Gardens organic landscape counterpoint",
+      "zone": "northwest_landscape",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/articles/600012.htm",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "B",
+      "accuracy_class": "landscape",
+      "art_use": [
+        "formal-versus-organic composition contrast",
+        "terrain grade variation",
+        "lake and island massing",
+        "soft pedestrian-space reference"
+      ],
+      "facts": [
+        "Constitution Gardens uses grade changes, curving shoreline and an informal planted landscape rather than the Mall's rigid central geometry.",
+        "The Vietnam Veterans Memorial modified the west end of the landscape after the gardens were completed."
+      ],
+      "measurements": [
+        {
+          "label": "lake_area",
+          "value": 6.75,
+          "unit": "acres",
+          "source_relation": "exact_source_value"
+        },
+        {
+          "label": "island_area",
+          "value": 0.5,
+          "unit": "acres",
+          "source_relation": "approximate"
+        }
+      ],
+      "modeling_constraints": [
+        "Preserve the visual contrast between this softer landscape and the formal Mall axis.",
+        "Do not flatten the entire zone into a level lawn during blockout."
+      ]
+    },
+    {
+      "id": "vietnam-veterans-memorial-material",
+      "label": "Vietnam Veterans Memorial wall material and orientation",
+      "zone": "northwest_memorial",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/vive/learn/historyculture/vvmoverview.htm",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "B",
+      "accuracy_class": "materials",
+      "art_use": [
+        "black-granite reflectance target",
+        "V-shaped memorial geometry",
+        "orientation toward Lincoln Memorial and Washington Monument"
+      ],
+      "facts": [
+        "The central memorial uses polished black granite walls arranged in a broad V set into the earth.",
+        "One arm is directed toward the Lincoln Memorial and the other toward the Washington Monument.",
+        "The reflective finish is integral to the memorial's visual experience."
+      ],
+      "measurements": [],
+      "modeling_constraints": [
+        "Treat the polished black granite as a distinct reflective material family, not generic dark stone.",
+        "Do not add decorative glow or surface noise that destroys the wall's reflective reading in the baseline world state."
+      ]
+    },
+    {
+      "id": "wwii-memorial-materials",
+      "label": "World War II Memorial stone, bronze and plaza hierarchy",
+      "zone": "west_axis",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/wwii/faqs.htm",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "B",
+      "accuracy_class": "materials",
+      "art_use": [
+        "granite-family separation",
+        "bronze accent planning",
+        "plaza material hierarchy"
+      ],
+      "facts": [
+        "The memorial is predominantly granite and uses different named granites for vertical pillars, paving, plaza accents and pool coping.",
+        "Bronze elements are structurally and visually distinct from the stone architecture."
+      ],
+      "measurements": [],
+      "modeling_constraints": [
+        "Use separate source materials for major granite roles rather than one plaza-wide stone shader.",
+        "Keep bronze accents readable without pushing them into exaggerated fantasy metallic color."
+      ]
+    },
+    {
+      "id": "wwii-memorial-massing",
+      "label": "World War II Memorial pillar and pavilion massing",
+      "zone": "west_axis",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/places/national-world-war-ii-memorial.htm",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "B",
+      "accuracy_class": "axis_scale",
+      "art_use": [
+        "pavilion height reference",
+        "pillar rhythm",
+        "elliptical-plaza hierarchy",
+        "east-west axis preservation"
+      ],
+      "facts": [
+        "The memorial centers on an elliptical plaza and Rainbow Pool between the Washington Monument and Lincoln Memorial.",
+        "Fifty-six granite pillars encircle the plaza and two pavilions anchor opposite sides."
+      ],
+      "measurements": [
+        {
+          "label": "pillar_count",
+          "value": 56,
+          "unit": "count",
+          "source_relation": "exact_count"
+        },
+        {
+          "label": "pavilion_height",
+          "value": 43,
+          "unit": "feet",
+          "source_relation": "exact_source_value"
+        }
+      ],
+      "modeling_constraints": [
+        "Preserve the 56-pillar rhythm and two-pavilion hierarchy before adding memorial detail.",
+        "Keep the memorial composition subordinate to the larger Washington Monument-Lincoln Memorial vista rather than blocking the axis."
+      ]
+    },
+    {
+      "id": "mall-elm-allees",
+      "label": "National Mall elm allees",
+      "zone": "mall_core",
+      "authority": "U.S. National Park Service",
+      "url": "https://www.nps.gov/articles/600213.htm",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "B",
+      "accuracy_class": "vegetation",
+      "art_use": [
+        "tree spacing and canopy rhythm",
+        "edge framing",
+        "species-family reference",
+        "seasonal silhouette planning"
+      ],
+      "facts": [
+        "The Mall's central grass panels are flanked north and south by four rows each of American elm trees.",
+        "The cultural-landscape inventory describes almost six hundred elms, including historical trees and later replacements."
+      ],
+      "measurements": [
+        {
+          "label": "elm_rows_each_side",
+          "value": 4,
+          "unit": "count",
+          "source_relation": "exact_count"
+        },
+        {
+          "label": "elm_population",
+          "value": 600,
+          "unit": "count",
+          "source_relation": "approximate"
+        }
+      ],
+      "modeling_constraints": [
+        "Preserve allee rhythm and canopy framing before adding high-frequency foliage detail.",
+        "Do not imply one genetically uniform tree asset; use controlled silhouette variation within the same family."
+      ]
+    },
+    {
+      "id": "capitol-grounds-context",
+      "label": "U.S. Capitol Grounds east-anchor context",
+      "zone": "east_anchor",
+      "authority": "Architect of the Capitol",
+      "url": "https://www.aoc.gov/explore-capitol-campus/buildings-grounds/capitol-grounds",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "B",
+      "accuracy_class": "context_boundary",
+      "art_use": [
+        "east-anchor boundary",
+        "formal-building versus curved-landscape contrast",
+        "tree and planting density reference"
+      ],
+      "facts": [
+        "The grounds immediately surrounding the Capitol cover 58.8 acres and are bounded by Constitution Avenue, Independence Avenue and First Streets east and west.",
+        "Curved walkways and park-like planting contrast with the Capitol building's straight neoclassical lines.",
+        "The grounds contain more than 100 varieties of trees and bushes."
+      ],
+      "measurements": [
+        {
+          "label": "immediate_capitol_grounds_area",
+          "value": 58.8,
+          "unit": "acres",
+          "source_relation": "exact_source_value"
+        },
+        {
+          "label": "woody_plant_varieties_minimum",
+          "value": 100,
+          "unit": "count",
+          "source_relation": "minimum"
+        }
+      ],
+      "modeling_constraints": [
+        "Treat the Capitol grounds as an east orientation anchor and context boundary, not interchangeable Mall lawn.",
+        "Any playable simplification of the grounds boundary must be documented before detailed dressing."
+      ]
+    },
+    {
+      "id": "smithsonian-mall-edge",
+      "label": "Smithsonian museum edge and north-south context",
+      "zone": "museum_edges",
+      "authority": "Smithsonian Institution",
+      "url": "https://www.si.edu/visit/maps",
+      "source_kind": "official_webpage",
+      "rights_mode": "reference_only_no_media_redistribution",
+      "embedded_media": false,
+      "modeling_priority": "C",
+      "accuracy_class": "context_boundary",
+      "art_use": [
+        "museum-edge occupancy",
+        "street-to-building context",
+        "future per-building reference queue"
+      ],
+      "facts": [
+        "Smithsonian's visitor map describes museums around the National Mall between 3rd and 15th Streets and between Constitution and Independence Avenues.",
+        "Ten Smithsonian museums are located along the National Mall."
+      ],
+      "measurements": [
+        {
+          "label": "smithsonian_museums_on_mall",
+          "value": 10,
+          "unit": "count",
+          "source_relation": "exact_count"
+        },
+        {
+          "label": "mall_map_span",
+          "value": 1,
+          "unit": "mile",
+          "source_relation": "approximate"
+        }
+      ],
+      "modeling_constraints": [
+        "This entry establishes occupancy/context only; each museum needs its own authoritative geometry/material reference before detailed modeling.",
+        "Do not infer facade detail or redistribution rights from the visitor map alone."
+      ]
+    }
+  ],
+  "required_coverage": [
+    "axis_scale",
+    "materials",
+    "landscape",
+    "vegetation",
+    "context_boundary"
+  ],
+  "review_note": "This ledger stores links and modeling facts only. No source images, scans, map tiles, measured drawings, or third-party media are copied into the repository."
+}

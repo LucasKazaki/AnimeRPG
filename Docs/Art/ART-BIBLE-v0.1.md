@@ -81,6 +81,21 @@ The National Mall must remain recognizable through proportion, axes, spacing and
 - Shadow Crypt contrasts through compressed space, repeated structural rhythm and directional mana intrusion.
 - Mana Reactor contrasts through engineered modules, visible mechanical function, conduits and controlled high-energy zones rather than random sci-fi panel noise.
 
+### National Mall source-control and simplification rule, proposed 2026-09-23
+
+`Content/Reference/NationalMall/reference-ledger.json` is the proposed first source of truth for environment blockout/material facts. It supplements this art bible; it is not a survey, a map asset, or a replacement art bible.
+
+- **A / axis-scale references** protect primary vistas, landmark spacing and major water/ground proportions before gameplay-driven compression.
+- **B / material-landscape references** keep source-backed stone, water, grade and vegetation distinctions instead of flattening DC into one generic civic kit.
+- **C / context-boundary references** establish adjacent museum/Capitol occupancy but do not authorize detailed facade invention.
+- Keep the original source-unit value in the ledger and convert to metres only at the authoring/import boundary.
+- Any compression, rerouting, merged stairs, omitted street, reduced pool/park extent or simplified building footprint must be recorded as an intentional gameplay simplification.
+- Do not copy website photography, map tiles, measured drawings or scans into the repository without item-level rights review. A reference URL alone is not a redistribution license.
+- Preserve the compositional contrast between the formal Mall/Reflecting Pool axes and the softer, graded Constitution Gardens landscape.
+- Monument-specific materials stay distinct where the authoritative source supports the distinction. Do not reduce Colorado Yule marble, Milford granite, Indiana limestone, polished black granite and named WWII Memorial granites to a single recolored material family.
+
+This rule is still proposed. Detailed production meshes remain gated by engine import/runtime proof and visual review.
+
 ## VFX readability
 
 Every combat effect communicates a gameplay fact before spectacle.
@@ -107,7 +122,7 @@ A production asset is not art-approved from one flattering render. Capture the r
 
 ## Reference evidence used for v0.1
 
-Accessed 2026-09-22:
+Accessed 2026-09-22 unless otherwise noted:
 
 - PlayStation, Genshin Impact: https://www.playstation.com/en-us/games/genshin-impact/
 - PlayStation Store, Genshin Impact: https://store.playstation.com/en-au/concept/10000896
@@ -115,5 +130,6 @@ Accessed 2026-09-22:
 - Epic UE 5.8 PBR: https://dev.epicgames.com/documentation/unreal-engine/physically-based-materials-in-unreal-engine
 - Unity 6 URP Lit: https://docs.unity3d.com/6000.0/Manual/urp/prebuilt-shader-graphs-urp-lit.html
 - Khronos glTF 2.0.1: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+- National Mall authoritative environment source set: see `Content/Reference/NationalMall/README.md` (retrieved 2026-09-23).
 
-These references support quality targets and material-channel conventions. They do not grant rights to copy game or engine assets.
+These references support quality targets, material-channel conventions and environment source-control rules. They do not grant rights to copy game, engine, website or institutional media assets.
