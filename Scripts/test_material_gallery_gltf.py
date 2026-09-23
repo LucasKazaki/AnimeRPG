@@ -41,6 +41,20 @@ def scale_position_accessor(g, accessor_index, factor):
             offset=base+(vertex*3+component)*4; value=struct.unpack_from("<f",buf,offset)[0]; struct.pack_into("<f",buf,offset,value*factor)
     g["buffers"][0]["uri"]=prefix+base64.b64encode(buf).decode()
 
+def append_float_accessor(g, values, accessor_type, include_minmax=False):
+    components={"SCALAR":1,"VEC3":3}[accessor_type]; prefix="data:application/octet-stream;base64,"; uri=g["buffers"][0]["uri"]; assert uri.startswith(prefix)
+    buf=bytearray(base64.b64decode(uri[len(prefix):]));
+    while len(buf)%4: buf.append(0)
+    offset=len(buf)
+    for value in values:
+        row=(value,) if accessor_type=="SCALAR" and not isinstance(value,(tuple,list)) else tuple(value)
+        assert len(row)==components; buf.extend(struct.pack("<"+"f"*components,*row))
+    byte_length=len(buf)-offset; g["buffers"][0]["uri"]=prefix+base64.b64encode(buf).decode(); g["buffers"][0]["byteLength"]=len(buf)
+    g["bufferViews"].append({"buffer":0,"byteOffset":offset,"byteLength":byte_length}); accessor={"bufferView":len(g["bufferViews"])-1,"componentType":5126,"count":len(values),"type":accessor_type}
+    if include_minmax:
+        flat=[float(v if accessor_type=="SCALAR" and not isinstance(v,(tuple,list)) else v[0]) for v in values]; accessor["min"]=[min(flat)]; accessor["max"]=[max(flat)]
+    g["accessors"].append(accessor); return len(g["accessors"])-1
+
 def test_expected_pin_matches_generator(tmp):
     out=generate(tmp); assert (out/"manifest.json").read_bytes()==PIN.read_bytes(); run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json","--expected-manifest",PIN])
 
@@ -104,6 +118,13 @@ def test_primitive_morph_target_semantics(tmp):
         primitive=g["meshes"][1]["primitives"][0]; primitive["targets"]=[{"POSITION":primitive["attributes"]["POSITION"]}]
     mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "primitive properties" in p.stderr
 
+def test_animation_transform_override_semantics(tmp):
+    out=generate(tmp)
+    def mutate(g):
+        time_accessor=append_float_accessor(g,[0.0],"SCALAR",include_minmax=True); scale_accessor=append_float_accessor(g,[(2.0,2.0,2.0)],"VEC3")
+        g["animations"]=[{"name":"StationScaleBypass","samplers":[{"input":time_accessor,"output":scale_accessor,"interpolation":"STEP"}],"channels":[{"sampler":0,"target":{"node":1,"path":"scale"}}]}]
+    mutate_gltf(out,mutate); p=run([VER,out/"material_gallery.gltf","--source",SOURCE,"--manifest",out/"manifest.json"],ok=False); assert "gallery animations unsupported" in p.stderr
+
 def test_floor_tangent_handedness(tmp):
     out=generate(tmp)
     def mutate(g):
@@ -146,7 +167,7 @@ def test_expected_pin_negative(tmp):
 def test_crlf_source_and_pin_portability(tmp):
     source=tmp/"source-crlf.json"; source.write_bytes(SOURCE.read_bytes().replace(b"\n",b"\r\n")); pin=tmp/"pin-crlf.json"; pin.write_bytes(PIN.read_bytes().replace(b"\n",b"\r\n")); out=generate(tmp,source); assert (out/"manifest.json").read_bytes()==PIN.read_bytes(); run([VER,out/"material_gallery.gltf","--source",source,"--manifest",out/"manifest.json","--expected-manifest",pin])
 
-TESTS=[test_expected_pin_matches_generator,test_exact_check,test_light_intensity_semantics,test_material_binding_semantics,test_uncontracted_material_property_semantics,test_camera_fov_semantics,test_camera_rotation_semantics,test_light_rotation_semantics,test_all_triangle_vertex_normals_semantics,test_station_geometry_sharing_semantics,test_sphere_radius_semantics,test_cube_extent_semantics,test_mesh_morph_weights_semantics,test_primitive_morph_target_semantics,test_floor_tangent_handedness,test_floor_tangent_direction_semantics,test_camera_transform_override_semantics,test_light_transform_override_semantics,test_source_status_rejected_by_generator,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,test_reject_embedded_texture_or_baked_lighting_path,test_accessor_bounds,test_expected_pin_negative,test_crlf_source_and_pin_portability]
+TESTS=[test_expected_pin_matches_generator,test_exact_check,test_light_intensity_semantics,test_material_binding_semantics,test_uncontracted_material_property_semantics,test_camera_fov_semantics,test_camera_rotation_semantics,test_light_rotation_semantics,test_all_triangle_vertex_normals_semantics,test_station_geometry_sharing_semantics,test_sphere_radius_semantics,test_cube_extent_semantics,test_mesh_morph_weights_semantics,test_primitive_morph_target_semantics,test_animation_transform_override_semantics,test_floor_tangent_handedness,test_floor_tangent_direction_semantics,test_camera_transform_override_semantics,test_light_transform_override_semantics,test_source_status_rejected_by_generator,test_runtime_status_semantics,test_uncontracted_runtime_claim_semantics,test_reject_embedded_texture_or_baked_lighting_path,test_accessor_bounds,test_expected_pin_negative,test_crlf_source_and_pin_portability]
 
 def main():
     passed=0
