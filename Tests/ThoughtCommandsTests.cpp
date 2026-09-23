@@ -186,6 +186,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "ManaReactorExpeditionPass21Tests.inc"
 #include "ManaReactorStrategyPass22Tests.inc"
 #include "ShadowbladeTrainingPathPass23Tests.inc"
+#include "ShadowbladeTrainingAssignmentPass23Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -205,6 +206,7 @@ int main() {
     TestManaReactorExpeditionPass21();
     TestManaReactorStrategyPass22();
     TestShadowbladeTrainingPathPass23();
+    TestShadowbladeTrainingAssignmentPass23();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;
