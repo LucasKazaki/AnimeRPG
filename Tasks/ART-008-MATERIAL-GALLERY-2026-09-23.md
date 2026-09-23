@@ -35,6 +35,7 @@ Forbidden: `Engine/`, renderer, editor, gameplay, CMake, workflow, dependencies,
 - deterministic generation plus exact `--check`;
 - independent standard-library verifier;
 - canonical source status is `proposed_art_reference_not_runtime`;
+- source `schema_version` must be a genuine JSON integer exactly equal to 1; JSON booleans and floating-point lookalikes are rejected independently by generator and verifier;
 - generated runtime status stays `source_validated_not_imported`;
 - canonical source `capture_intent` and generated manifest `intent` must equal their exact source-only sentences;
 - generated manifest is a closed schema-version-1 contract, and schema version must be a JSON integer exactly equal to 1;
@@ -58,7 +59,7 @@ Forbidden: `Engine/`, renderer, editor, gameplay, CMake, workflow, dependencies,
 - camera and directional-light nodes reject scale, matrix or other transform overrides and use source-derived rotations;
 - no images/textures/samplers;
 - pinned source hash and generated glTF hash in `expected-manifest.json`;
-- negative regressions cover material/light/camera contracts, statuses and evidence claims, nested `extras`, nested accessor `name` evidence claims, manifest schema/intent, texture insertion, bounds and semantic formats, canonical index bounds, boolean accessor references, accessor alignment, topology, full canonical cube payload, geometry dimensions/sharing, normals/tangent frames, morphs/animation and transform overrides;
+- negative regressions cover source/manifest schema typing, material/light/camera contracts, statuses and evidence claims, nested `extras`, nested accessor `name` evidence claims, manifest intent, texture insertion, bounds and semantic formats, canonical index bounds, boolean accessor references, accessor alignment, topology, full canonical cube payload, geometry dimensions/sharing, normals/tangent frames, morphs/animation and transform overrides;
 - no claim of Astral import, runtime rendering, native GPU evidence or art approval.
 
 ## Verification commands
@@ -73,8 +74,12 @@ python -m py_compile Scripts/generate_material_gallery_gltf.py Scripts/verify_ma
 
 ## Current bounded repair
 
-The fourteenth independent review of PR #33 at `5baec92ac55329f4f462386c6fb113d2eb15b452` found three P2 gaps: JSON booleans could satisfy accessor references because Python treats `True` as an integer; index accessors only required `min`/`max` keys rather than truthful payload bounds; and a repinned embedded buffer could shift every bufferView by two bytes while preserving decoded payloads but violating glTF alignment rules.
+The fourteenth repaired candidate reached exact head `7e750d2b16371d5fe6d3edd62fd7731b2d700da1`. GitHub-hosted Windows workflow `35882948488` passed on that exact head, and the requested Codex review completed with no new inline finding observed plus a Codex bot `+1` reaction. The hosted workflow still does not execute `Scripts/test_material_gallery_gltf.py`.
 
-The current repair introduces exact integer index/reference validation, verifies decoded index minima/maxima against declared accessor bounds, enforces component-size and 4-byte vertex-attribute alignment before decoding, emits truthful generator index bounds with `min(idx)` / `max(idx)`, and adds three dedicated negative regressions. The focused suite definition is now 47 tests. Exact-head hosted Windows workflow `35881340721` passed on code head `00f3d3e4fc5f946841174a324a6fbfa186787faf`. A fresh 47-test focused source-suite execution is not claimed in this pass because the available sandbox could not resolve GitHub for a clean checkout; hosted CI does not substitute for that suite or for independent re-review.
+A subsequent bounded source-contract audit found one additional fail-closed gap: both `load_source` implementations compared `schema_version == 1` without checking the JSON value's actual type. In Python, `True == 1`, so a source document using `"schema_version": true` could pass the source-schema gate even though the manifest gate already rejected the same type confusion.
 
-The generator correction exposed and repaired a stale pin. The canonical 12x24 sphere stores vertices 0 through 324, but its pole-trimmed triangle list actually references indices 1 through 323. The old accessor bounds `[0,324]` were therefore false metadata. `expected-manifest.json` now pins the corrected deterministic 38,604-byte glTF SHA-256 `e229624b789733eabc0955a61fc769e4b2a25dbb40a99ed8e8b83773fb080b43`; the repinned manifest SHA-256 is `50fa14e850e20deacbfc7f1a04f42ee2a4c13c1a1d7b9af36f5d1ad833632d7e`. These hashes were derived by an independent deterministic reconstruction that reproduced the historical glTF hash exactly before applying the bounds correction. The repository's 47-test runner still requires fresh execution.
+The current repair makes both the generator and independent verifier require `type(schema_version) is int` and value exactly `1`. It adds `test_source_schema_bool_semantics`, which exercises both entry points against a boolean schema value. The focused suite definition is now 48 tests. An isolated executable predicate check confirmed parsed JSON `true` and numeric `1.0` are rejected while integer `1` is accepted. This isolated check is not a substitute for running the repository's complete 48-test suite.
+
+The gallery payload and pins are unchanged by this schema-only repair. Canonical source SHA-256 remains `517833a990db74f97d8046aa7fafa2d2d73859538d59c3c41ff4a8a7fb63f530`; `expected-manifest.json` continues to pin the corrected deterministic 38,604-byte glTF SHA-256 `e229624b789733eabc0955a61fc769e4b2a25dbb40a99ed8e8b83773fb080b43`, with expected-manifest SHA-256 `50fa14e850e20deacbfc7f1a04f42ee2a4c13c1a1d7b9af36f5d1ad833632d7e`.
+
+PR #33 remains draft and unmerged. A fresh exact-head hosted workflow, focused 48-test execution, and independent source re-review are still required before marking it ready for review. Astral import/render, Blender round-trip, native GPU/performance evidence and independent visual-art approval remain separate later gates.
