@@ -920,6 +920,12 @@ int wmain(int argc, wchar_t** argv) {
                    800, 600, kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
     } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics, buttons,
+                   1280, 720, kCubeInspectorText, 3, failure)) {
+        // failure set by resize validator.
+    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics, buttons,
+                   1440, 900, kCubeInspectorText, 3, failure)) {
+        // failure set by resize validator.
+    } else if (!ResizeAndCheck(window, process.dwProcessId, initialControls, statics, buttons,
                    420, 260, kCubeInspectorText, 3, failure)) {
         // failure set by resize validator.
     } else {
@@ -973,10 +979,11 @@ int wmain(int argc, wchar_t** argv) {
         << L"interaction; the original 12 process-owned child HWND identities, bound semantic Static HWNDs and "
         << L"left-to-right semantic toolbar Button HWNDs, disabled pending tools, enabled Outliner/assets surfaces, "
         << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
-        << L"every bounded cross-process read and after both normal+narrow resizes; Cube selection stayed synchronized, "
-        << L"all direct children remained contained from startup through both resizes, the retained CreateProcess handle "
-        << L"remained nonsignaled around PID-based HWND ownership checks, the original window-owning launch thread was "
-        << L"suspended and a valid suspended thread context was captured before the final asynchronous WM_CLOSE enqueue, "
-        << L"then the thread was resumed before any wait and shutdown exited cleanly.\n";
+        << L"every bounded cross-process read and after 800x600, 1280x720, 1440x900, and 420x260 resizes; "
+        << L"Cube selection stayed synchronized, all direct children remained contained from startup through every resize, "
+        << L"the retained CreateProcess handle remained nonsignaled around PID-based HWND ownership checks, "
+        << L"the original window-owning launch thread was suspended and a valid suspended thread context was captured "
+        << L"before the final asynchronous WM_CLOSE enqueue, then the thread was resumed before any wait and shutdown "
+        << L"exited cleanly.\n";
     return 0;
 }
