@@ -12,7 +12,7 @@ def canonical_text_bytes(path):
 def load_source(path):
     raw=canonical_text_bytes(path)
     source=json.loads(raw)
-    if source.get("schema_version")!=1:
+    if type(source.get("schema_version")) is not int or source.get("schema_version") != 1:
         raise ValueError("source schema")
     if source.get("status")!=SOURCE_STATUS:
         raise ValueError("source status")
