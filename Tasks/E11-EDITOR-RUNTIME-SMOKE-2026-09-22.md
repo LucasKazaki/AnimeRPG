@@ -6,61 +6,87 @@ Bounded verification-only packet for the already-integrated Win32 `AstralEditor`
 
 Owned branch: `engine/2026-09-22-editor-runtime-smoke`.
 Baseline admitted from `main`: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`.
-Latest independently moving `main` observed during this packet: `dece8fbb47b6a937b9bafafa3faea837a359fb4d`.
-Current code candidate: `1cbef2242fb79edda068751dd71996b5548ec739`.
+Latest independently moving `main` observed during this packet: `1042339ee7052fcbff60b1b8bba6840b43019c4e`.
+Current code candidate: `81e7052f47cab06060ea69c9f9d4f25ec42145e4`.
 `CMakeLists.txt` blob: `ed6a7f44d87241560faf32a57465befd536b59f9`.
-`Tests/EditorRuntimeSmoke.cpp` blob: `3ca40bccd15950ebd8774ed36902ab15213035bb`.
+`Tests/EditorRuntimeSmoke.cpp` blob: `117c101acc9d65e297c3e0f948a6c3724ff2416d`.
 Production editor source is unchanged by this pass.
 
 Allowed paths only: `CMakeLists.txt`, `Tests/EditorRuntimeSmoke.cpp`, this task, `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`, and `Docs/Research/ENGINE-CAPABILITIES.json`. One active writer only. Do not rebase, merge, force-push, or absorb unrelated work.
 
-## Selected verification gap and implemented repair
+## Previous evidence gate now clean
 
-Independent review of candidate `7d38e2cd7ffc6b76952711212e7da78d66c7f1af` found that the synthetic zero-exit-parent/lingering-descendant containment test manually checked Job Object primitives rather than exercising the exact normal supervisor success path. Candidate `1cbef2242fb79edda068751dd71996b5548ec739` fixed that by factoring normal acceptance into `SupervisorRunNormalWorkerAcceptance(...)` and routing both the real supervisor and deterministic containment self-test through that same function.
+Receipt-repair head `973403eeaa93313f0ec68f41d962ef6083eab01e` received a clean Codex re-review completed at `2026-09-23T01:28:13Z` with no new finding. Its exact hosted workflows also completed successfully: Windows build/deterministic tests `35806022252`, profiling capture portability `35806022245`, and release-manifest integrity `35806022278`. This closes the receipt re-review gate for that older exact tree, but it is not independent acceptance of source changed after `973403ee...` and is not native GUI evidence.
 
-The shared route bounds the direct worker wait, verifies its exit code, rejects nonzero exits, requires a zero-exit worker to leave `ActiveProcesses == 0`, and uses controlled `TerminateJobObject` cleanup plus an empty-job proof on failure. The synthetic success parent creates a long-lived contained grandchild and exits `0`; the registered self-test passes that state through the same normal acceptance function and succeeds only when the real path rejects the lingering descendant for the expected reason and cleanup proves the job empty. The existing live parent-plus-grandchild forced-cleanup test remains.
+## Selected verification gap and implementation
 
-No runtime/editor code changed in the present evidence-reconciliation pass.
+The E11 smoke previously treated the five pending toolbar buttons as an unordered caption set. `ValidateShellState` searched the current child inventory for `Select (pending)`, `Move (pending)`, `Rotate (pending)`, `Scale (pending)`, and `Play (pending)`, then checked only visibility and disabled state. Because the original child-HWND inventory check is order-independent, two original Button HWNDs could exchange captions/semantic roles while all expected captions still existed and the smoke would pass. The analogous Static-control ambiguity had already been repaired by binding semantic HWNDs, but toolbar semantics were not equivalently bound.
 
-## Exact reviewed evidence checkpoint
+Candidate `81e7052f47cab06060ea69c9f9d4f25ec42145e4` repairs that false-pass path without changing the production editor. At initial capture the smoke now:
 
-The exact evidence tree `13a6d220125ede24c9eea1662ecb287837740763` was independently reviewed by Codex at `2026-09-23T00:41:26Z`. The review produced one P2 evidence-traceability finding, review comment `4077992187`: the authoritative receipts named code candidate `1cbef224...` but did not explicitly anchor the three subsequent evidence-only commits or their exact-head checks. The review did not identify a new runtime-smoke or containment-code defect at `13a6d220...`.
+1. collects the five original process-owned visible disabled Button HWNDs;
+2. maps their screen rectangles into the editor client coordinate space;
+3. orders them left-to-right and rejects zero-width or overlapping slots;
+4. requires those slots to be exactly Select, Move, Rotate, Scale, Play; and
+5. retains the exact HWND for every semantic toolbar slot.
 
-Exact hosted verification for `13a6d220125ede24c9eea1662ecb287837740763`:
+Every later `ValidateShellState`, including post-selection, both 800x600 and 420x260 resize validations, and the final state validation, rechecks each retained Button HWND for process ownership, direct parent, class, visibility, disabled state, exact semantic caption, positive width, and left-to-right non-overlap/order. The existing original 12-child HWND/class continuity check remains in force, so replacement controls are still rejected separately.
 
-- Windows Server 2022 run `35802790099`, job `106996725906`: `completed/success` at `2026-09-23T00:38:28Z`. Repository/R0 safety contracts, Release assertion/CTest safety checks, VS2022 x64 configure, Debug build and deterministic tests, Release build and deterministic tests, dependency/prerequisite checks, static verifiers, and clean tracked-tree verification passed.
-- Profiling capture portability run `35802790114`: `completed/success`.
-- Release manifest integrity run `35802790175`: `completed/success`.
+This packet deliberately does not enable any toolbar action. The five tools remain truthful pending/disabled fixtures.
 
-These checks are evidence for the exact evidence tree. Hosted deterministic CTest still excludes tests whose names end in `RuntimeSmoke`, so the interactive GUI `EditorRuntimeSmoke` did not run in hosted CI.
+## Research basis, rechecked 2026-09-23 UTC
 
-### Receipt self-reference rule
+- Epic Games, UE 5.8 Viewport Toolbar: https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar
+  - applicability: Epic documents transform tools as ordered, semantically distinct Select/Move/Rotate/Scale workflow controls and says the newer toolbar keeps features in consistent locations by logical category. This is a workflow comparison only.
+- Microsoft Learn, `GetWindowRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect
+  - applicability: retrieves a window/control bounding rectangle in screen coordinates, used before mapping the retained Button HWNDs into editor-client coordinates.
+- Microsoft Learn, `WM_GETTEXT`: https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-gettext
+  - applicability: button window text is the button name/caption, which is the semantic identity checked through the existing bounded cross-process text helper.
+- Unity Technologies, Unity 6 `Tool` enum: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/Tool.html
+  - applicability: Unity exposes semantically distinct Move/Rotate/Scale editor tools; workflow comparison only.
 
-A commit cannot generally contain its own not-yet-computed Git commit SHA because the commit ID is content-addressed from the tree and commit metadata. Therefore this receipt anchors the last independently reviewed and fully hosted-verified tree, `13a6d220...`. The exact post-receipt-repair head and its workflow results must be recorded in PR #13 metadata/commentary after the write, without creating another receipt-only commit solely to chase its own SHA. This avoids an infinite evidence-only commit loop while preserving exact traceability.
+No proprietary source was copied and no dependency was added.
 
-## Primary-source basis, rechecked 2026-09-23 UTC
+## Portable mutation fixture
 
-- Microsoft Learn, Job Objects: https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects
-- Microsoft Learn, `TerminateJobObject`: https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-terminatejobobject
-- Microsoft Learn, `QueryInformationJobObject`: https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-queryinformationjobobject
-- Microsoft Learn, `JOBOBJECT_BASIC_ACCOUNTING_INFORMATION`: https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_accounting_information
-- Microsoft Learn, `UpdateProcThreadAttribute`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute
-- CMake, `TIMEOUT`: https://cmake.org/cmake/help/latest/prop_test/TIMEOUT.html
-- Epic Games, UE 5.8 Outliner: https://dev.epicgames.com/documentation/unreal-engine/outliner-in-unreal-engine
-- Epic Games, UE 5.8 Editor Interface: https://dev.epicgames.com/documentation/unreal-engine/unreal-editor-interface
-- Unity Technologies, Unity 6.0 Hierarchy: https://docs.unity3d.com/6000.0/Documentation/Manual/hierarchy-window.html
+A disposable C++17 source-logic fixture modeled five stable toolbar handles and semantic slots. It passes the correct Select/Move/Rotate/Scale/Play arrangement and rejects caption swaps, positional swaps, enabled/hidden controls, and overlapping slots.
 
-Microsoft documents that child processes created by a job-member process remain in the same Job Object by default unless breakaway is enabled; E11 enables neither breakaway flag. `TerminateJobObject` terminates all currently associated processes, and `JobObjectBasicAccountingInformation::ActiveProcesses` supplies the contained-process count used for the empty-job proof. Epic UE 5.8 and Unity 6.0 remain workflow references only for hierarchy, selection, details/inspector, and asset/editor-surface expectations. No proprietary source was copied and no dependency was added.
+Fixture SHA-256: `23ae0ee31850aab8df8ddcf68ca4a11137c1b3529ca9c9ced1d589cf6606b210`.
+
+Commands/results in the coordinator sandbox:
+
+```text
+g++ (Debian 14.2.0-19) 14.2.0
+g++ -std=c++17 -Wall -Wextra -Werror /tmp/e11_toolbar_semantic_fixture.cpp -o /tmp/e11_toolbar_gcc
+/tmp/e11_toolbar_gcc
+=> toolbar semantic binding fixture: PASS
+
+clang version 17.0.0
+a clang++ C++17 -Wall -Wextra -Werror ASan+UBSan build of the same fixture
+=> toolbar semantic binding fixture: PASS
+```
+
+The leading `a` in the prose above is not a command; the exact executed sanitizer command was `clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer /tmp/e11_toolbar_semantic_fixture.cpp -o /tmp/e11_toolbar_clang`, followed by `ASAN_OPTIONS=detect_leaks=1 /tmp/e11_toolbar_clang`. This fixture is source-logic evidence only, not Win32 GUI execution.
+
+## Hosted candidate verification
+
+GitHub Actions triggered for exact code candidate `81e7052f47cab06060ea69c9f9d4f25ec42145e4`:
+
+- Windows build and deterministic tests run `35810233080`, job `107019946669`: in progress at this receipt write;
+- profiling capture portability run `35810232976`: in progress at this receipt write;
+- release manifest integrity run `35810233015`: in progress at this receipt write.
+
+No pending workflow is counted as passed. Hosted deterministic CTest intentionally excludes tests whose names end in `RuntimeSmoke`, so even a green hosted build will not be native editor GUI evidence.
 
 ## Retained acceptance surface
 
-All established E11 checks remain required: one stable visible/enabled process-owned top-level editor; original 12-child HWND/class continuity; bound semantic controls; exact five ordered Outliner rows and four ordered Assets rows; Outliner `LBS_NOTIFY`; exact Scene Root/Cube Inspector fixtures; post-notification Cube synchronization; truthful disabled pending tools; bounded 800x600 and 420x260 resizes with complete-state and containment checks; bounded cross-process messages; clean process-owned normal shutdown; worker-local cleanup; and supervisor-level process-tree cleanup verification.
+All established E11 checks remain required: one stable visible/enabled process-owned top-level editor; original 12-child HWND/class continuity; bound semantic Static controls; bound semantic toolbar Button controls; exact five ordered Outliner rows and four ordered Assets rows; Outliner `LBS_NOTIFY`; exact Scene Root/Cube Inspector fixtures; post-notification Cube synchronization; truthful disabled pending tools; bounded 800x600 and 420x260 resizes with complete-state and containment checks; bounded cross-process messages; clean process-owned normal shutdown; worker-local cleanup; and supervisor-level process-tree cleanup verification.
 
-`native_evidence` remains empty. Issue #7 remains open, so the historical R0 runner is blocked and was not invoked. E11 remains partial and is not UE5/Unity parity.
+`native_evidence` remains empty. Issue #7 is still open, so the historical R0 runner is blocked and was not invoked. E11 remains partial and is not UE5/Unity parity.
 
 ## Registered native handoff
 
-After the receipt repair receives clean independent re-review, the registered Windows executor should run the exact reviewed branch head on one owned interactive desktop:
+After the current candidate has completed hosted verification and receives clean independent review, the registered Windows executor should run the exact reviewed branch head on one owned interactive desktop:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -74,4 +100,4 @@ Retain exact source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driv
 
 ## Single next useful action
 
-Re-review the evidence-only receipt repair while keeping the code candidate fixed. If clean, run the registered Windows Debug/Release GUI smoke and preserve the complete native receipt set. Do not create another documentation-only commit merely to embed that commit's own SHA.
+Finish exact-candidate hosted verification, then obtain fresh independent review of the toolbar semantic-binding diff. If clean, execute the registered Windows Debug/Release GUI smoke and preserve the complete native receipt set. Do not rebase onto the separately moving `main` within this packet.
