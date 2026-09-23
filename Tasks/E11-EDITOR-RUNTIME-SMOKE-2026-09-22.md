@@ -6,84 +6,82 @@ Bounded verification-only packet for the already-integrated Win32 `AstralEditor`
 
 Owned branch: `engine/2026-09-22-editor-runtime-smoke`.
 Admitted baseline from `main`: `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`.
-Latest independently observed `main` before this pass: `a356b4ac9ae30e755962a782d2fc4d74e3b5fc5e` (separate game-worker work, not absorbed here).
-Previously reviewed receipt head: `b4997045acf0e85c7a805d98f86657756492e3df`.
-Startup-containment implementation candidate: `6f1ad24ab6b394bd69bebc940fde2ddf5fe8eefb`.
-`Tests/EditorRuntimeSmoke.cpp` blob after the repair: `b9985b3a33abfd558545dfcebc1437f18c91d5d5`.
+Current PID-reuse hardening implementation candidate: `b9eebe721b7907245caaad5771bc9e96bac20680`.
+`Tests/EditorRuntimeSmoke.cpp` blob after this repair: `8cb031fe7ddcf50af1d95be8b7086456a42d32f1`.
 `CMakeLists.txt` remains blob `4fd471151acb4b5919ccef4a92f49da12bd8d1f1`.
 
 Allowed paths only: `CMakeLists.txt`, `Tests/EditorRuntimeSmoke.cpp`, this task, `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`, and `Docs/Research/ENGINE-CAPABILITIES.json`. One active writer only. Do not rebase, merge, force-push, or absorb unrelated work.
 
 ## Selected reproducible verification defect
 
-The smoke already verifies the original 12 direct child HWND/class identities, semantic shell state, process ownership, visibility, positive area, client containment, and exact state after the explicit 800x600 and 420x260 resizes. It did not run `DirectChildrenContained` on the default startup layout before the first `SetWindowPos`.
+Before `b9eebe721...`, editor HWND ownership was accepted from `GetWindowThreadProcessId(hwnd) == launched_pid` alone. Windows process identifiers are valid only for a process lifetime and can later be reused. If the launched editor terminated during a smoke operation and another process was assigned the same numeric PID, the PID-only predicate could accept that unrelated process's window. The smoke could then enumerate, query, resize, send messages to, or close a window it did not launch.
 
-That leaves a false-pass path: a required editor surface can start outside the client rectangle or with zero/non-positive extent, then a later `WM_SIZE` caused by the test's first resize can repair the layout. The old sequence would accept the repaired post-resize state and never prove that the editor's actual default startup layout was usable.
-
-Microsoft documents that `GetClientRect` returns the current client width/height with exclusive lower-right coordinates, while `GetWindowRect` returns each child bounding rectangle with the same exclusive right/bottom convention. The existing containment predicate is therefore suitable for the startup gate too. Epic UE 5.8 and Unity 6.0 document their viewport/outliner/details or hierarchy/inspector surfaces as immediately usable editor surfaces, so an editor-parity smoke should not allow an invalid initial shell merely because a later synthetic resize repairs it.
+The smoke already retains the process HANDLE returned by `CreateProcessW`. Windows process handles are waitable and stay valid until closed, so the retained handle is a stronger liveness anchor than a reusable numeric PID.
 
 ## Bounded implementation
 
-Commit `6f1ad24ab6b394bd69bebc940fde2ddf5fe8eefb` changes only `Tests/EditorRuntimeSmoke.cpp`:
+Commit `b9eebe721b7907245caaad5771bc9e96bac20680` changes only `Tests/EditorRuntimeSmoke.cpp`:
 
-- after initial semantic `ValidateShellState` and before any selection or resize, the real worker now calls `DirectChildrenContained` on the captured original control inventory;
-- failure at startup therefore enters the existing owned-process cleanup path before any test resize can normalize the editor layout;
-- the PASS receipt now says the children remained contained from startup through both resizes.
+- retains the launched editor process handle in `gOwnedProcessHandle` for the smoke lifetime;
+- adds `OwnedProcessStillRunning()`, requiring a zero-time `WaitForSingleObject` result of `WAIT_TIMEOUT`;
+- changes `WindowOwnedByProcess` to require the retained process handle to remain nonsignaled both before and after `GetWindowThreadProcessId` verifies the HWND's PID;
+- routes top-level window enumeration through the same hardened ownership predicate instead of a raw PID equality check;
+- clears the global retained-handle reference before closing the process handle;
+- updates the PASS receipt to state that the retained `CreateProcess` handle remained nonsignaled around PID-based HWND ownership checks.
 
-The commit diff is intentionally 4 additions / 1 deletion. No production editor source, CMake registration, workflow, dependency, graphics API, game content, scheduler configuration, release state, or architecture changed.
+GitHub commit inspection shows 15 additions and 6 deletions, all in `Tests/EditorRuntimeSmoke.cpp`. No production editor source, CMake registration, workflow, dependency, graphics API, game content, scheduler configuration, release state, or architecture changed.
 
 ## Research basis, rechecked 2026-09-23 UTC
 
-- Microsoft Learn, `GetClientRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclientrect
-  - applicability: returns the window client area with `(0,0)` upper-left and width/height in right/bottom; lower-right is exclusive.
-- Microsoft Learn, `GetWindowRect`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect
-  - applicability: returns the child bounding rectangle in screen coordinates; lower-right is exclusive and can be mapped into the parent client space.
-- Epic Games, Unreal Engine 5.8, `Unreal Editor Interface`: https://dev.epicgames.com/documentation/unreal-engine/unreal-editor-interface
-  - applicability: the Level Viewport, Outliner, Details panel and content access are normal editor surfaces, with selection synchronization between viewport/outliner/details.
-- Epic Games, Unreal Engine 5.8, `Viewport Toolbar`: https://dev.epicgames.com/documentation/unreal-engine/viewport-toolbar
-  - applicability: current UE toolbar explicitly manages smaller-viewport overflow instead of treating collapsed controls as acceptable.
-- Unity 6.0 Manual, `The Hierarchy window`: https://docs.unity3d.com/6000.0/Documentation/Manual/hierarchy-window.html
-  - applicability: Hierarchy views and manages all objects in the scene.
-- Unity 6.0 Manual, `Inspect items`: https://docs.unity3d.com/6000.0/Documentation/Manual/InspectorItems.html
-  - applicability: Inspector is the selected-object/component/property surface.
+- Microsoft Learn, `Process Handles and Identifiers`: https://learn.microsoft.com/en-us/windows/win32/procthread/process-handles-and-identifiers
+  - applicability: `CreateProcess` returns process handles that remain valid until closed; process identifiers are valid only from process creation until process termination.
+- Microsoft Learn, `GetWindowThreadProcessId`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid
+  - applicability: reports the process identifier that created a specified window.
+- Microsoft Learn, `WaitForSingleObject`: https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject
+  - applicability: process handles are waitable; zero timeout returns immediately; `WAIT_TIMEOUT` means nonsignaled and `WAIT_OBJECT_0` means signaled.
+- Microsoft Learn, `TerminateProcess`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess
+  - applicability: cross-process termination is asynchronous and a process handle can be waited on when confirmed termination matters.
 
-Behavioral/API comparison only. No proprietary engine source was copied and no dependency was added.
+These are Win32 API semantics used to harden the verification harness. No proprietary UE/Unity source was copied and no dependency was added.
 
 ## Portable verification
 
-Disposable C++17 startup-sequence fixture SHA-256: `18f7bc0e6e099f2fef439f79c024e0fd4a87a6c765296f34e7eb0776089068af`.
+Disposable C++17 PID-reuse ownership fixture SHA-256: `3cff1d8e63622d5943c61ee9e1827c12e7dc63a7d46b17aeae7a9e7793c70ad6`.
 
 - `g++ -std=c++17 -Wall -Wextra -Werror`: PASS.
 - `clang++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer`, leak detection enabled: PASS.
-- fixture proves the old sequence can pass when startup has a zero-width required child but the first resize repairs it;
-- repaired sequence rejects that startup state before the resize;
-- positive-control startup and resized layouts remain accepted.
+- live retained process + matching PID: accepted;
+- original process exited + same PID reused by another process: old predicate accepts, repaired predicate rejects;
+- process alive before lookup but terminates before final acceptance: old predicate accepts, repaired predicate rejects;
+- mismatched PID: rejected.
 
-This is source-logic evidence only. The sandbox cannot resolve `github.com` for a checkout and has no Windows SDK/interactive desktop, so no sandbox Win32 build or GUI execution is claimed.
+This is source-logic evidence only, not Win32 runtime evidence. Sandbox repository access failed with `Could not resolve host: github.com`, and no usable Windows SDK/interactive desktop was available, so no sandbox production Win32 compile or GUI result is claimed.
 
 ## Hosted verification state
 
-The implementation write triggered fresh pull-request workflows for source candidate `6f1ad24ab6b394bd69bebc940fde2ddf5fe8eefb`:
+For implementation source candidate `b9eebe721b7907245caaad5771bc9e96bac20680`, GitHub generated synthetic pull-request merge `1968d7d40a3c9199bbd53a4bcce7027cdcc98e70` with tested base parent `3c3babd46c4539d474b7ea78ab01d5ed71dde7ac` and source parent `b9eebe721...`.
 
-- Windows build and deterministic tests: run `35848735600`, observed `in_progress` during this record write;
-- profiling capture portability: run `35848735553`, observed `in_progress`;
-- release manifest integrity: run `35848735669`, observed `in_progress`.
+All three observed pull-request workflows completed successfully:
 
-Do not count those runs as passed until their final conclusions are read. Because these are `pull_request` workflows with default checkout, final evidence must record the source head separately from GitHub's synthetic PR merge and tested base.
+- Windows build and deterministic tests: run `35854249505`, job `107158864423`, PASS. All reported steps passed, including R0/repository safety contracts, Release assertion/CTest safety, VS2022 x64 configure, Debug build/tests, Release build/tests, prerequisite/runtime checks, static verifiers, and clean tracked tree.
+- profiling capture portability: run `35854249577`, PASS.
+- release manifest integrity: run `35854249522`, PASS.
+
+These `pull_request` workflows validate the synthetic merge, not raw-head execution. Preserve source SHA, tested synthetic merge SHA, and tested base SHA separately.
 
 ## Retained E11 hardening and gates
 
 1. deterministic `EditorContainmentTests` is selected by hosted suites while interactive `EditorRuntimeSmoke` remains excluded;
-2. the containment self-test exercises real worker-local `CleanupProcess`, proves the descendant backstop remains, then requires supervisor whole-job cleanup to zero active processes;
-3. the shared normal-success path rejects a zero-exit worker that leaves a contained descendant;
-4. source SHA, tested synthetic PR merge SHA, and tested base SHA are distinct evidence identities;
-5. the runtime smoke requires original HWND/class continuity, semantic Static/Button identity, `LBS_NOTIFY`, bounded cross-process reads, selection/Inspector synchronization, stable single top-level-window identity, positive width/height and client containment at startup, and the same invariants after normal and narrow resizes.
+2. containment self-test executes real worker-local `CleanupProcess`, then requires supervisor whole-job cleanup to zero active processes;
+3. normal-success containment rejects a zero-exit worker that leaves a descendant;
+4. original 12 child HWND/class identity, semantic Static/Button binding, exact Outliner/assets rows, selection/Inspector synchronization, `LBS_NOTIFY`, bounded messages, positive area, startup containment, normal-size containment, narrow-size containment, and stable single top-level identity remain required;
+5. HWND ownership now also requires retained launched-process liveness before and after PID lookup, closing the PID-reuse false-pass path.
 
-`native_evidence` remains empty. Independent acceptance for this changed source is false until fresh review completes. Issue #7 remains open, so the historical R0 runner is blocked and must not be invoked.
+`native_evidence` remains empty. Independent acceptance for the changed source remains false until a fresh independent review of the final receipt head completes. Issue #7 remains open, so the historical R0 runner is blocked and must not be invoked.
 
 ## Registered native handoff
 
-Only after this exact changed source/receipt tree has green hosted checks and a fresh clean independent review, the registered Windows executor should use one owned interactive desktop:
+Only after this changed source/receipt tree has green hosted checks and a fresh clean independent review, the registered Windows executor should use one owned interactive desktop:
 
 ```powershell
 cmake -S . -B ../AnimeRPG-e11-runtime-build -G "Visual Studio 17 2022" -A x64
@@ -95,12 +93,12 @@ ctest --test-dir ../AnimeRPG-e11-runtime-build -C Release --output-on-failure -R
 ctest --test-dir ../AnimeRPG-e11-runtime-build -C Release --output-on-failure -R "^EditorRuntimeSmoke$" --no-tests=error
 ```
 
-Retain exact reviewed source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driver identity, exact commands, complete stdout/stderr, exit codes, UTC timestamps, default-startup plus normal and 420x260 narrow-window screenshots, and process inspection proving zero owned contained processes after any failure or interruption. The default-startup screenshot/output must establish that every required direct child already has positive area and lies inside the editor client before the smoke changes the top-level size.
+Retain exact reviewed source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driver identity, exact commands, complete stdout/stderr, exit codes, UTC timestamps, default-startup plus normal and 420x260 narrow-window screenshots, and process inspection proving zero owned contained processes after any failure or interruption. A failure/interruption receipt must also establish that the smoke never accepts or acts on an unrelated window after the launched editor process handle has signaled.
 
 ## Rollback and stop conditions
 
-Rollback only the startup containment call if the approved default fixture has valid required surfaces but the predicate demonstrably misclassifies their mapped Win32 geometry. Stop before production-runtime change, workflow edit outside packet authority, rebase, merge, R0 execution, scheduler operation, dependency addition, graphics/API change, or game-content work. Never weaken a native acceptance assertion to make the gate green.
+Rollback only the new retained-handle liveness check if native evidence shows the launched editor remains valid while the retained process handle is spuriously signaled, or if the handle lifecycle itself is proven incorrect. Stop before production-runtime change, workflow edit outside packet authority, rebase, merge, R0 execution, scheduler operation, dependency addition, graphics/API change, or game-content work. Never weaken a native acceptance assertion to make the gate green.
 
 ## Single next useful action
 
-Finish the fresh hosted checks for the changed tree, record the tested synthetic merge/base identity, and obtain a fresh independent review. If clean, hand that exact reviewed tree to the registered Windows executor for Debug/Release containment plus interactive GUI acceptance.
+Update the QA/capability receipts for `b9eebe721...`, obtain a fresh independent review of the final receipt head, then hand that exact reviewed tree to the registered Windows executor for Debug/Release containment plus interactive GUI acceptance.
