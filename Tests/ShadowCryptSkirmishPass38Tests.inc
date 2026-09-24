@@ -157,6 +157,26 @@ void TestShadowCryptSkirmishPass38() {
             && failedDefense.damageTaken == 18
             && owner.ShadowCryptBriefing().damageTaken == 18,
         "pass38 failed room defense is charged into authoritative mission damage exactly once");
+
+    int capGuard = 0;
+    while (owner.ShadowCryptSkirmishState().DamageTaken() < 9999 && capGuard++ < 600) {
+        const int skirmishBefore = owner.ShadowCryptSkirmishState().DamageTaken();
+        const int missionBefore = owner.ShadowCryptBriefing().damageTaken;
+        const ShadowCryptThreatTelegraph capThreat = owner.ShadowCryptSkirmishThreat();
+        const ShadowCryptDefenseReport capReport = owner.ResolveShadowCryptSkirmishThreat(
+            ShadowCryptDefenseResponse::None, 0.0);
+        const int expectedApplied = std::min(capThreat.failureDamage, 9999 - skirmishBefore);
+        Expect(capThreat.valid && capReport.accepted && !capReport.successful
+                && capReport.damageTaken == expectedApplied
+                && owner.ShadowCryptSkirmishState().DamageTaken()
+                    == skirmishBefore + expectedApplied
+                && owner.ShadowCryptBriefing().damageTaken == missionBefore + expectedApplied,
+            "pass38 capped defense damage reports only the applied delta and keeps mission damage synchronized");
+    }
+    Expect(owner.ShadowCryptSkirmishState().DamageTaken() == 9999
+            && owner.ShadowCryptBriefing().damageTaken == 9999,
+        "pass38 skirmish and mission damage remain equal at the skirmish tracking cap");
+
     const int progressBeforeClear = owner.ShadowCryptBriefing().objectiveProgress;
     DefeatProductionShadowCryptSkirmishPass38(owner);
     Expect(owner.ShadowCryptSkirmishState().Complete()
@@ -167,13 +187,21 @@ void TestShadowCryptSkirmishPass38() {
     Expect(!afterComplete.accepted
             && owner.ShadowCryptBriefing().objectiveProgress == progressBeforeClear + 1,
         "pass38 completed encounter cannot duplicate objective advancement");
-    Expect(owner.BeginShadowCryptSkirmish(),
-        "pass38 same room can start its next required skirmish after the prior one completes");
+
     Expect(owner.ReportShadowCryptDefeat()
             && !owner.ShadowCryptSkirmishState().Active()
+            && !owner.ShadowCryptSkirmishState().Complete()
+            && owner.ShadowCryptSkirmishState().EnemyCount() == 0
+            && owner.ShadowCryptBriefing().objectiveProgress == 0,
+        "pass38 defeat after completion clears stale inactive skirmish state and resets mission progress");
+    Expect(owner.BeginShadowCryptSkirmish(),
+        "pass38 clean retry can begin after completed-skirmish defeat cleanup");
+    Expect(owner.ReportShadowCryptDefeat()
+            && !owner.ShadowCryptSkirmishState().Active()
+            && !owner.ShadowCryptSkirmishState().Complete()
             && owner.ShadowCryptBriefing().objectiveProgress == 0
             && owner.BeginShadowCryptSkirmish(),
-        "pass38 defeat cancels the detached room encounter, resets mission progress, and permits a clean retry");
+        "pass38 active defeat cancels room combat, resets mission progress, and permits another clean retry");
 }
 
 } // namespace
