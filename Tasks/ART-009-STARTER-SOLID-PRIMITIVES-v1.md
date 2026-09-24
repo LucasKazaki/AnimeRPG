@@ -41,7 +41,7 @@ This packet adopts only cube, sphere, cylinder and plane as a bounded first slic
 - exact vertex/index budgets pinned by source and manifest
 - finite positions, unit normals/tangents, tangent-normal orthogonality, normalized UV range
 - each shape's declared UV mapping policy is checked against its exact seams/corners/parameterization, not only `[0,1]` bounds
-- triangle position/UV derivatives must agree with the supplied tangent direction and reconstructed bitangent handedness (`TANGENT.w`)
+- every supplied triangle-vertex tangent must individually agree with the independently derived triangle `dP/du` direction; the triangle-average tangent/reconstructed-bitangent check remains a supplemental handedness/consistency gate (`TANGENT.w`)
 - nondegenerate outward winding checked against vertex normals
 - shape-specific bounds and surface equations checked independently
 - source, manifest and glTF runtime state remain `source_validated_not_imported`

@@ -22,7 +22,7 @@ Total: 249 vertices, 906 indices. These are functional source meshes, not render
 - glTF SHA-256: `e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17`
 - expected manifest SHA-256: `653d120860b9fcf248d2c50ab3b880d98d26a69b4c681ec212a3b39d8f90f71e`
 - generator Git blob: `412892fea68f152cf58ae0d6d107932359699f72`
-- repaired verifier Git blob: `b954395531bea0571684f2e8b131dd72bddfcf9f`
+- follow-up repaired verifier Git blob: `fb04167b4473b2b2b88070b3be0753e1750aaf09`
 - repaired tests Git blob: `7e65524c09cd4569c22b21ab3770d3c690e0afc7`
 
 ## Review-driven repair
@@ -33,11 +33,11 @@ The first independent review on candidate `3a8b174a4cba0e07bf368cd6369b937e8d608
 2. checks the declared per-shape UV mapping policies directly, including cube/plane corners, sphere seam and latitude/longitude parameterization, and cylinder side/cap mappings;
 3. applies strict JSON-integer validation to every attribute accessor binding so `false` cannot alias integer accessor `0` in Python equality semantics.
 
-The regression suite adds one negative test for each finding, increasing focused coverage from 27 to 30 cases.
+The regression suite adds one negative test for each first-review finding, increasing focused coverage from 27 to 30 cases. A follow-up independent review then found that two opposing bad vertex tangents could cancel in the triangle-average tangent check. The verifier now checks every supplied vertex tangent directly against the independently derived triangle `dP/du` direction before retaining the average tangent/bitangent check as supplemental consistency evidence. The `0.975` per-vertex dot threshold is intentionally above the 16-segment sphere/cylinder chord case observed analytically (`cos(11.25 degrees) ~= 0.980785`) while decisively rejecting the reported approximately +/-80 degree cancellation case (`cos(80 degrees) ~= 0.173648`).
 
 ## Sandbox execution
 
-A fresh sandbox reproduction used the exact checked-in source contract and reproduced the pinned generator output byte-for-byte (`26,172` bytes, SHA-256 `e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17`). Against the repaired verifier/test definitions:
+The following sandbox evidence was recorded on repaired candidate `d0c61b25f2ac3e29a0b50882933d1f77c58a88fb`, before the follow-up per-vertex tangent repair. It reproduced the pinned generator output byte-for-byte (`26,172` bytes, SHA-256 `e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17`). Do not reuse the 30/30 result below as exact-head acceptance for the follow-up verifier-only repair:
 
 ```text
 python Scripts/test_starter_solid_primitives.py
@@ -51,7 +51,7 @@ The 30 focused tests include deterministic/stale-output behavior, overwrite refu
 
 ## Gate state
 
-The repaired exact branch head still requires its own hosted workflow and fresh independent review. Earlier green workflow evidence and the first review apply only to the pre-repair candidate and are not reused as exact-head acceptance.
+The current verifier-only repair still requires the packet's exact generator/check/verifier/regression/compile commands on the exact branch head plus a fresh independent review. The repository-wide hosted Windows lane is useful compatibility evidence but does not currently execute this ART-009 focused Python suite, so a green hosted lane alone is not ART-009 source acceptance.
 
 ## Evidence boundary
 
