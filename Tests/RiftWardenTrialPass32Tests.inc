@@ -1,5 +1,18 @@
 namespace {
 
+bool SameRiftWardenRecord(const Astral::Scene::RiftWardenRecord& left,
+    const Astral::Scene::RiftWardenRecord& right) {
+    return left.valid == right.valid
+        && left.score == right.score
+        && left.mastery == right.mastery
+        && left.damageTaken == right.damageTaken
+        && left.perfectDefenses == right.perfectDefenses
+        && left.punishes == right.punishes
+        && left.missedOpenings == right.missedOpenings
+        && left.bestStreak == right.bestStreak
+        && left.clearSeconds == right.clearSeconds;
+}
+
 void ClearRiftWardenDirect(Astral::Scene::RiftWardenTrial& trial) {
     using namespace Astral::Scene;
     int guard = 0;
@@ -35,6 +48,62 @@ void ClearRiftWardenOwner(Astral::Scene::LandmarkInteraction& owner) {
         "pass32 production owner reaches a deterministic bounded Warden completion");
 }
 
+void VerifyRiftWardenTimingMatrix(Astral::Scene::RiftWardenTrial& trial) {
+    using namespace Astral::Scene;
+    struct TimingCase {
+        RiftWardenDifficulty difficulty;
+        RiftWardenPhase phase;
+        RiftWardenAttack firstAttack;
+        double windowSeconds;
+    };
+    const TimingCase cases[]{
+        {RiftWardenDifficulty::Story, RiftWardenPhase::Opening,
+            RiftWardenAttack::RiftSlash, 1.20},
+        {RiftWardenDifficulty::Story, RiftWardenPhase::Fracture,
+            RiftWardenAttack::GravityPulse, 1.15},
+        {RiftWardenDifficulty::Story, RiftWardenPhase::Overload,
+            RiftWardenAttack::EchoBurst, 1.10},
+        {RiftWardenDifficulty::Standard, RiftWardenPhase::Opening,
+            RiftWardenAttack::RiftSlash, 0.90},
+        {RiftWardenDifficulty::Standard, RiftWardenPhase::Fracture,
+            RiftWardenAttack::GravityPulse, 0.85},
+        {RiftWardenDifficulty::Standard, RiftWardenPhase::Overload,
+            RiftWardenAttack::EchoBurst, 0.80},
+        {RiftWardenDifficulty::Expert, RiftWardenPhase::Opening,
+            RiftWardenAttack::RiftSlash, 0.65},
+        {RiftWardenDifficulty::Expert, RiftWardenPhase::Fracture,
+            RiftWardenAttack::GravityPulse, 0.60},
+        {RiftWardenDifficulty::Expert, RiftWardenPhase::Overload,
+            RiftWardenAttack::EchoBurst, 0.55},
+    };
+
+    for (const TimingCase& timing : cases) {
+        Expect(trial.BeginPractice(true, timing.difficulty, timing.phase),
+            "pass32 timing matrix starts the requested unlocked difficulty and learned phase");
+        const RiftWardenTelegraph boundaryTelegraph = trial.CurrentTelegraph();
+        Expect(boundaryTelegraph.attack == timing.firstAttack
+                && std::abs(boundaryTelegraph.responseWindowSeconds - timing.windowSeconds) < 1e-9
+                && boundaryTelegraph.responseWindowSeconds > 0.0,
+            "pass32 timing matrix exposes the expected difficulty- and phase-specific positive window");
+        const RiftWardenActionReport boundary = trial.Resolve(
+            boundaryTelegraph.recommendedResponse, boundaryTelegraph.responseWindowSeconds);
+        Expect(boundary.accepted && boundary.resolution == RiftWardenResolution::PerfectDefense,
+            "pass32 exact timing-window boundary remains a successful defense");
+        ClearRiftWardenDirect(trial);
+
+        Expect(trial.BeginPractice(true, timing.difficulty, timing.phase),
+            "pass32 timing matrix restarts the same practice slice for outside-boundary verification");
+        const RiftWardenTelegraph outsideTelegraph = trial.CurrentTelegraph();
+        const RiftWardenActionReport outside = trial.Resolve(
+            outsideTelegraph.recommendedResponse,
+            outsideTelegraph.responseWindowSeconds + 0.000001);
+        Expect(outside.accepted && outside.resolution == RiftWardenResolution::Hit
+                && outside.playerDamage > 0,
+            "pass32 response just outside each timing window becomes an authoritative hit");
+        ClearRiftWardenDirect(trial);
+    }
+}
+
 void TestRiftWardenTrialPass32() {
     using namespace Astral::Scene;
 
@@ -47,6 +116,8 @@ void TestRiftWardenTrialPass32() {
             && !progressionTrial.DifficultyUnlocked(RiftWardenDifficulty::Standard)
             && !progressionTrial.DifficultyUnlocked(RiftWardenDifficulty::Expert),
         "pass32 Warden trial keeps harder difficulties locked before ranked progression");
+    Expect(!progressionTrial.Begin(true, static_cast<RiftWardenDifficulty>(255)),
+        "pass32 invalid difficulty fails closed before trial mutation");
     Expect(!progressionTrial.BeginPractice(true, RiftWardenDifficulty::Story,
             RiftWardenPhase::Opening),
         "pass32 boss practice is unavailable before a ranked clear");
@@ -65,16 +136,17 @@ void TestRiftWardenTrialPass32() {
             && repeatedTelegraph.sequence == telegraph.sequence,
         "pass32 reading the current telegraph is non-mutating");
 
-    // GAME-159: timing is part of defense acceptance. Negative and nonfinite
-    // input fail closed without mutation; a late finite response becomes a hit.
+    // GAME-159: negative, nonfinite and invalid response input fail closed with
+    // no mutation. A late finite response is accepted as an authoritative hit.
     const RiftWardenBriefing beforeInfinity = progressionTrial.Briefing();
     Expect(!progressionTrial.Resolve(RiftWardenResponse::Dodge,
             std::numeric_limits<double>::infinity()).accepted,
         "pass32 positive-infinite reaction timing is rejected before combat mutation");
     Expect(progressionTrial.Briefing().bossHealth == beforeInfinity.bossHealth
             && progressionTrial.Briefing().damageTaken == beforeInfinity.damageTaken
+            && progressionTrial.Briefing().posture == beforeInfinity.posture
             && progressionTrial.Briefing().telegraph.sequence == beforeInfinity.telegraph.sequence,
-        "pass32 positive-infinite timing leaves boss/player/sequence state unchanged");
+        "pass32 positive-infinite timing leaves boss/player/posture/sequence state unchanged");
 
     const RiftWardenBriefing beforeNegative = progressionTrial.Briefing();
     Expect(!progressionTrial.Resolve(RiftWardenResponse::Dodge, -0.01).accepted,
@@ -95,14 +167,23 @@ void TestRiftWardenTrialPass32() {
             && progressionTrial.Briefing().telegraph.sequence == beforeNaN.telegraph.sequence,
         "pass32 NaN timing leaves boss/player/posture/sequence state unchanged");
 
+    const RiftWardenBriefing beforeInvalidResponse = progressionTrial.Briefing();
+    Expect(!progressionTrial.Resolve(static_cast<RiftWardenResponse>(255), 0.10).accepted,
+        "pass32 invalid response enum is rejected before combat mutation");
+    Expect(progressionTrial.Briefing().bossHealth == beforeInvalidResponse.bossHealth
+            && progressionTrial.Briefing().damageTaken == beforeInvalidResponse.damageTaken
+            && progressionTrial.Briefing().posture == beforeInvalidResponse.posture
+            && progressionTrial.Briefing().telegraph.sequence == beforeInvalidResponse.telegraph.sequence,
+        "pass32 invalid response leaves authoritative combat state unchanged");
+
     const RiftWardenActionReport late = progressionTrial.Resolve(
         telegraph.recommendedResponse, telegraph.responseWindowSeconds + 0.01);
     Expect(late.accepted && late.resolution == RiftWardenResolution::Hit
             && late.playerDamage > 0 && progressionTrial.Briefing().damageTaken > 0,
         "pass32 late response is accepted as an authoritative hit rather than a perfect defense");
 
-    // GAME-160: clean defenses fill bounded posture, expose one strike-only
-    // punish opening, and consuming/missing that opening resets posture once.
+    // GAME-160: clean defenses fill bounded posture and expose one strike-only
+    // punish opening. Missing it resets posture without boss damage.
     while (!progressionTrial.Briefing().staggerOpen) {
         telegraph = progressionTrial.CurrentTelegraph();
         Expect(progressionTrial.Resolve(telegraph.recommendedResponse, 0.10).accepted,
@@ -131,17 +212,86 @@ void TestRiftWardenTrialPass32() {
             && !progressionTrial.DifficultyUnlocked(RiftWardenDifficulty::Expert),
         "pass32 Story clear stores missed-opening evidence and unlocks Standard but not Expert");
 
+    // QOL-033: practice is deliberately checked while Expert remains locked so
+    // the test can prove practice does not mutate records or difficulty unlocks.
+    const RiftWardenRecord recordBeforePractice = progressionTrial.BestRecord(
+        RiftWardenDifficulty::Story);
+    const bool standardBeforePractice = progressionTrial.DifficultyUnlocked(
+        RiftWardenDifficulty::Standard);
+    const bool expertBeforePractice = progressionTrial.DifficultyUnlocked(
+        RiftWardenDifficulty::Expert);
+    Expect(!progressionTrial.BeginPractice(true, RiftWardenDifficulty::Story,
+            RiftWardenPhase::Defeated),
+        "pass32 defeated state is never a valid practice starting phase");
+    Expect(!progressionTrial.BeginPractice(true, RiftWardenDifficulty::Story,
+            static_cast<RiftWardenPhase>(255)),
+        "pass32 invalid practice phase fails closed");
+    Expect(progressionTrial.BeginPractice(true, RiftWardenDifficulty::Story,
+            RiftWardenPhase::Overload),
+        "pass32 learned boss practice starts directly at the requested Overload phase");
+    const RiftWardenBriefing practice = progressionTrial.Briefing();
+    Expect(practice.active && practice.practice && practice.phase == RiftWardenPhase::Overload
+            && practice.bossHealth * 100 <= practice.bossMaxHealth * 35,
+        "pass32 phase practice uses bounded phase-appropriate boss health and marks the run non-ranked");
+    ClearRiftWardenDirect(progressionTrial);
+    const RiftWardenRecord recordAfterPractice = progressionTrial.BestRecord(
+        RiftWardenDifficulty::Story);
+    Expect(SameRiftWardenRecord(recordAfterPractice, recordBeforePractice)
+            && progressionTrial.DifficultyUnlocked(RiftWardenDifficulty::Standard)
+                == standardBeforePractice
+            && progressionTrial.DifficultyUnlocked(RiftWardenDifficulty::Expert)
+                == expertBeforePractice,
+        "pass32 practice preserves every ranked record field and all difficulty unlock bits");
+
+    const RiftWardenRecord storyBeforeStandard = progressionTrial.BestRecord(
+        RiftWardenDifficulty::Story);
     Expect(progressionTrial.Begin(true, RiftWardenDifficulty::Standard),
         "pass32 ranked Story completion admits Standard difficulty");
     ClearRiftWardenDirect(progressionTrial);
     const RiftWardenRecord standardRecord = progressionTrial.BestRecord(
         RiftWardenDifficulty::Standard);
+    const RiftWardenRecord storyAfterStandard = progressionTrial.BestRecord(
+        RiftWardenDifficulty::Story);
     Expect(standardRecord.valid
+            && SameRiftWardenRecord(storyAfterStandard, storyBeforeStandard)
             && progressionTrial.DifficultyUnlocked(RiftWardenDifficulty::Expert),
-        "pass32 Standard clear stores a separate record and unlocks Expert");
+        "pass32 Standard clear stores a separate record without overwriting Story and unlocks Expert");
 
-    // Review repair: deliberately skipping stagger openings cannot farm a better
-    // score/mastery by accumulating otherwise-perfect defense cycles.
+    // GAME-159 exact matrix coverage: all nine difficulty/phase windows are
+    // positive, phase-specific, difficulty-specific, inclusive on the boundary,
+    // and rejecting just-outside responses as hits.
+    VerifyRiftWardenTimingMatrix(progressionTrial);
+
+    // GAME-160 successful punish path is one-shot even at the exact stagger
+    // boundary. A second Strike after consumption is ordinary wrong input.
+    RiftWardenTrial punishTrial;
+    Expect(punishTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass32 one-shot punish regression begins");
+    while (!punishTrial.Briefing().staggerOpen) {
+        const RiftWardenTelegraph defense = punishTrial.CurrentTelegraph();
+        Expect(punishTrial.Resolve(defense.recommendedResponse, 0.10).accepted,
+            "pass32 one-shot punish setup reaches the stagger opening");
+    }
+    const int beforePunishHealth = punishTrial.Briefing().bossHealth;
+    const RiftWardenActionReport punish = punishTrial.Resolve(
+        RiftWardenResponse::Strike, RiftWardenTrial::StaggerResponseWindowSeconds);
+    Expect(punish.accepted && punish.resolution == RiftWardenResolution::Punish
+            && punish.bossDamage > 0
+            && punishTrial.Briefing().bossHealth < beforePunishHealth
+            && punishTrial.Briefing().posture == 0
+            && !punishTrial.Briefing().staggerOpen,
+        "pass32 exact-boundary strike consumes the stagger once and resets posture");
+    const int afterPunishHealth = punishTrial.Briefing().bossHealth;
+    const RiftWardenActionReport duplicatePunish = punishTrial.Resolve(
+        RiftWardenResponse::Strike, 0.10);
+    Expect(duplicatePunish.accepted
+            && duplicatePunish.resolution == RiftWardenResolution::Hit
+            && punishTrial.Briefing().bossHealth == afterPunishHealth,
+        "pass32 consumed stagger cannot be punished twice");
+
+    // Review repair: deliberately skipping stagger openings lowers the actual
+    // run quality, and replaying that worse run on the same trial cannot replace
+    // the already-established Gold personal best.
     RiftWardenTrial cleanScoreTrial;
     Expect(cleanScoreTrial.Begin(true, RiftWardenDifficulty::Story),
         "pass32 anti-farming clean baseline begins");
@@ -152,9 +302,26 @@ void TestRiftWardenTrialPass32() {
             && cleanScoreRecord.mastery == RiftWardenMastery::Gold,
         "pass32 clean Story execution establishes a Gold no-miss score baseline");
 
+    Expect(cleanScoreTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass32 worse same-owner replay begins on the trial holding the Gold record");
+    for (int cycle = 0; cycle < 3; ++cycle) {
+        while (!cleanScoreTrial.Briefing().staggerOpen) {
+            const RiftWardenTelegraph farmTelegraph = cleanScoreTrial.CurrentTelegraph();
+            Expect(cleanScoreTrial.Resolve(farmTelegraph.recommendedResponse, 0.10).accepted,
+                "pass32 worse replay earns a legitimate stagger opening");
+        }
+        Expect(cleanScoreTrial.Resolve(RiftWardenResponse::Guard, 0.10).resolution
+                == RiftWardenResolution::MissedOpening,
+            "pass32 worse replay intentionally skips the stagger opening");
+    }
+    ClearRiftWardenDirect(cleanScoreTrial);
+    Expect(SameRiftWardenRecord(cleanScoreTrial.BestRecord(RiftWardenDifficulty::Story),
+            cleanScoreRecord),
+        "pass32 lower-mastery replay on the same trial cannot roll back the Gold personal best");
+
     RiftWardenTrial missedScoreTrial;
     Expect(missedScoreTrial.Begin(true, RiftWardenDifficulty::Story),
-        "pass32 anti-farming missed-opening run begins");
+        "pass32 anti-farming independent missed-opening run begins");
     for (int cycle = 0; cycle < 3; ++cycle) {
         while (!missedScoreTrial.Briefing().staggerOpen) {
             const RiftWardenTelegraph farmTelegraph = missedScoreTrial.CurrentTelegraph();
@@ -171,11 +338,10 @@ void TestRiftWardenTrialPass32() {
     Expect(missedScoreRecord.valid && missedScoreRecord.missedOpenings == 3
             && missedScoreRecord.mastery == RiftWardenMastery::Bronze
             && missedScoreRecord.score < cleanScoreRecord.score,
-        "pass32 skipped stagger openings lower mastery/score instead of farming a better ranked record");
+        "pass32 skipped stagger openings lower mastery and score instead of farming a better ranked record");
 
-    // Exact-head review repairs: pathological repeated misses saturate before the
-    // signed score penalty can overflow, and a later run beyond the saturation
-    // sentinel cannot masquerade as an equal-miss run and win damage/time ties.
+    // Pathological repeated misses saturate before signed score overflow, and a
+    // later run beyond the saturation sentinel cannot win uncertain tie-breaks.
     RiftWardenTrial saturatedScoreTrial;
     Expect(saturatedScoreTrial.Begin(true, RiftWardenDifficulty::Story),
         "pass32 overflow regression begins a bounded Story trial");
@@ -230,25 +396,6 @@ void TestRiftWardenTrialPass32() {
             && retainedSaturatedRecord.damageTaken == firstSaturatedRecord.damageTaken
             && retainedSaturatedRecord.score == firstSaturatedRecord.score,
         "pass32 later unknown-or-worse saturated replay cannot replace the established personal best through damage/time ties");
-
-    // QOL-033: community-requested boss practice can start at a chosen learned
-    // phase after a ranked clear. It preserves the ranked personal best and does
-    // not create a shortcut for a still-locked difficulty.
-    const RiftWardenRecord retainedStory = progressionTrial.BestRecord(
-        RiftWardenDifficulty::Story);
-    Expect(progressionTrial.BeginPractice(true, RiftWardenDifficulty::Story,
-            RiftWardenPhase::Overload),
-        "pass32 learned boss practice starts directly at the requested Overload phase");
-    RiftWardenBriefing practice = progressionTrial.Briefing();
-    Expect(practice.active && practice.practice && practice.phase == RiftWardenPhase::Overload
-            && practice.bossHealth * 100 <= practice.bossMaxHealth * 35,
-        "pass32 phase practice uses bounded phase-appropriate boss health and marks the run non-ranked");
-    ClearRiftWardenDirect(progressionTrial);
-    const RiftWardenRecord afterPractice = progressionTrial.BestRecord(
-        RiftWardenDifficulty::Story);
-    Expect(afterPractice.valid && afterPractice.score == retainedStory.score
-            && afterPractice.mastery == retainedStory.mastery,
-        "pass32 practice completion cannot overwrite the ranked Story personal best");
 
     // Production-owner integration: the Warden trial is unavailable on a fresh
     // owner, then consumes the already-authoritative completed Shadow Crypt path.
