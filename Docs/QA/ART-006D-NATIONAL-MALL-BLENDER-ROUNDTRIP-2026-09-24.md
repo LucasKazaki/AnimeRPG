@@ -12,48 +12,42 @@ This packet covers only the ART-006D Blender background driver, independent stan
 
 Blender 5.2.2 LTS remains the pinned DCC for this representative round trip. Official Blender 5.2 release, manual, API and command-line sources are recorded in `Docs/Art/BLENDER-GLTF-ROUNDTRIP-PROFILE-v0.1.md`. No dependency was installed or downloaded by this task.
 
-## Independent review repairs
+## Independent review repair history
 
-The initial Codex review of `cb0de51ff52119ab6a9e790faedcc6ebfadcda52` found three issues. They were repaired before `64ffc277811b8cb8f95578b862384f0593f5841f`: the verifier owns the ART-006B source hash independently, computes bounds from indexed vertices, and compares visible material semantics.
+The initial Codex review of `cb0de51ff52119ab6a9e790faedcc6ebfadcda52` found three issues. Later repairs pinned the ART-006B source independently, derived bounds from indexed vertices, and compared visible material semantics.
 
-A second exact-head Codex review of `64ffc277811b8cb8f95578b862384f0593f5841f` found one P1 and four P2 issues. Those were repaired on `fb2867ae5f3151e27c7cfaa2b109379c705e9fc1` by fixing the acceptance tolerance, winding-preserving triangle signatures, attribute payload validation, receipt type checks, and exact active-scene mesh inventory.
+Subsequent exact-head reviews tightened the fixed `1e-4` tolerance, winding/topology and attribute payload checks, receipt type checking, exact active-scene inventory, transform parity and full inherited transforms, GPU-instancing/light/camera rejection, optional collection types, morph rejection, exact rendering attributes across reachable and unreachable primitives, and regression independence. The repaired head `1393c786527c4ef29f59b3766ec47d19aceac36f` restored the original center/dimension error contract while covering inherited parent transforms and hidden primitive payloads.
 
-A third exact-head Codex review of `fb2867ae5f3151e27c7cfaa2b109379c705e9fc1` found two P2 issues. Head `2ad3bab391088419349cc27125f10df555efee0a` repaired reflected-transform parity and root/reachable-node GPU-instancing acceptance.
+The exact-head review of `1393c786527c4ef29f59b3766ec47d19aceac36f` found two P2 issues. The following repair applied every primitive's accessor/index decoder contract to unreachable meshes and replaced component quantization with pairwise `1e-4` triangle/corner matching. This added unreachable accessor/index regressions plus a positive `0.00006` attribute-drift case that must remain accepted.
 
-The exact-head review of `2ad3bab391088419349cc27125f10df555efee0a` then found three additional P2 issues. The subsequent repair rejected GPU instancing and punctual-light payloads on every node, including unreachable nodes, rejected node cameras, and required optional animation/image/texture/camera collections to be absent or actual empty arrays.
+The fresh review of exact head `2c9813bc53d20a797dfc67f23ec753c3a8c94b3f` then found one remaining P2: an accessor could use bytes wholly inside the binary payload while its enclosing `bufferView.byteLength` extended past the end of the embedded buffer. The current repair closes that gap by requiring the full declared bufferView range, `byteOffset + byteLength`, to stay inside its referenced buffer before any accessor decode. A dedicated unreachable-normal regression clones a valid view, extends only its declared length past EOF while keeping the used accessor bytes in range, and requires fail-closed rejection.
 
-The review that completed on `78c9acbc2dbbac312d0c9ca6cd4b0c82555b1b86` surfaced four remaining issues: one P1 regression in the committed GPU-instancing error-text expectation, plus P2 gaps for same-AABB world rotation, morph-target deformation, and extra `COLOR_0` rendering attributes. Those were repaired by restoring a distinct GPU-instancing error path, comparing complete inherited 3x4 world transforms, rejecting primitive/mesh/node morph payloads across the bounded glTF, and requiring the exact four source rendering attributes.
+## Source-only verification executed for the current repair
 
-A fresh review of `918ec775c73c1e6b6f91fe7fcdf2ba973be6fa80` found one P1 and three P2 issues. Head `1393c786527c4ef29f59b3766ec47d19aceac36f` repaired all four by preserving the committed center/dimension error contract, extending exact attribute-name checks to unreachable mesh primitives, splitting morph regressions by branch, and exercising inherited parent-transform composition directly.
-
-The next exact-head review of `1393c786527c4ef29f59b3766ec47d19aceac36f` found two P2 issues. This repair addresses both:
-
-1. every mesh primitive is now passed through the same accessor decoder/contract gate before active-scene traversal, including unreachable meshes. Float attribute accessor indices/formats, nonzero matching counts, buffer-view offsets/lengths, decoded finite payloads, unsigned scalar index accessors, nonempty triangle-multiple index payloads, vertex-range bounds and material references all fail closed before an unreachable primitive can be ignored by scene traversal;
-2. topology comparison no longer quantizes each component independently into `1e-4` buckets. It preserves material grouping, triangle winding and cyclic-corner equivalence, then uses pairwise absolute `1e-4` comparisons with bipartite triangle matching. This accepts legitimate values that differ by less than the documented tolerance even when they straddle an arbitrary quantization boundary.
-
-The hidden suite adds distinct regressions for unreachable invalid/incorrect `NORMAL` accessors, zero attribute counts, buffer-bound escapes, invalid index formats, zero index counts, plus a positive `0.00006` normal-component drift that must remain accepted under the `1e-4` gate.
-
-## Source-only verification commands
-
-The exact commands for this repaired head are:
+A clean sandbox reconstruction of the branch scripts ran the packet's primary suite, the repaired hidden suite, and Python compilation. Results:
 
 ```text
 python Scripts/test_blender_roundtrip_national_mall_panel.py
+PASS: 37/37 Blender round-trip verifier tests
+
 python Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
+PASS: 24/24 Blender hidden-payload verifier tests
+
 python -m py_compile Scripts/blender_roundtrip_national_mall_panel.py Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
+exit 0
 ```
 
-The original suite remains 37 cases. The hidden suite now contains 23 cases, for 60 focused cases total. Fresh exact-head hosted execution and independent review are required after this repair; earlier pass receipts remain historical evidence for earlier heads only.
+The two suites now provide 61 focused cases total. These are source/tooling tests only. They do not establish Blender execution or Astral runtime behavior.
 
 ## Verification model
 
-The verifier does not require byte-identical glTF output. It decodes embedded buffers/accessors, validates the fixed source and receipt identities, scans the complete node and mesh collections for disabled or unverified payloads, validates every primitive's accessor/index payload contract even when unreachable, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, checks full inherited world transforms and handedness, compares material semantics, and compares winding-preserving triangle/corner payloads with the fixed pairwise tolerance for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
+The verifier does not require byte-identical glTF output. It validates the pinned ART-006B source and evidence receipt, embedded buffers, complete declared bufferView ranges, accessor/index formats and payload bounds for every mesh primitive including unreachable content, active-scene inventory, inherited world transforms and handedness, indexed world bounds, material semantics, and winding-preserving triangle/corner payloads using the fixed pairwise `1e-4` tolerance.
 
-The bounded output rejects GPU instancing, punctual lights, node cameras, morph targets/weights and rendering attributes outside the four-source-attribute profile. Optional animation/image/texture/camera collections must be absent or exact empty arrays. This gate is intentionally stricter than a filename/count check but is still only a DCC source-workflow gate. It cannot establish Astral compatibility.
+The bounded output also rejects GPU instancing, punctual lights, node cameras, morph targets/weights and rendering attributes outside `POSITION`, `NORMAL`, `TANGENT`, and `TEXCOORD_0`. Optional animation/image/texture/camera collections must be absent or exact empty arrays. This remains a DCC source-workflow gate only and cannot establish Astral compatibility.
 
 ## Hosted and independent gates
 
-A fresh exact-head Windows workflow and fresh independent review are required after the newest repair commits. Do not reuse workflow or review evidence from `1393c786...` or older heads for the repaired candidate.
+Windows workflow `36003846237`, run #1090, completed successfully on earlier exact head `2c9813bc53d20a797dfc67f23ec753c3a8c94b3f`. That evidence is historical after the current source repair. A fresh exact-head Windows workflow and independent source review are required for the new candidate before this PR can leave draft state.
 
 ## Not run / not claimed
 
