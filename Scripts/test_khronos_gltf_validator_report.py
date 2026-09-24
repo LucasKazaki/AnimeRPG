@@ -60,6 +60,9 @@ def main() -> int:
         r = copy.deepcopy(valid); r["issues"]["messages"][0]["severity"] = True; cases.append(("bool severity", r, "JSON integer"))
         r = copy.deepcopy(valid); r["info"]["version"] = "1.0"; cases.append(("wrong gltf version", r, "must be '2.0'"))
         r = copy.deepcopy(valid); r["info"]["resources"][0] = {"pointer": "/buffers/0", "storage": "external", "uri": "buf.bin"}; cases.append(("external resource", r, "is external"))
+        r = copy.deepcopy(valid); del r["info"]["resources"][0]["storage"]; cases.append(("missing storage", r, "required to prove self-contained"))
+        r = copy.deepcopy(valid); r["info"]["resources"][0]["storage"] = True; cases.append(("bool storage", r, "known Khronos storage string"))
+        r = copy.deepcopy(valid); r["info"]["resources"][0]["storage"] = "mystery"; cases.append(("unknown storage", r, "known Khronos storage string"))
         r = copy.deepcopy(valid); r["unexpected"] = 1; cases.append(("unknown root", r, "unknown fields"))
         r = copy.deepcopy(valid); r["issues"]["messages"][0]["offset"] = 5; cases.append(("pointer and offset", r, "exactly one"))
 
@@ -77,7 +80,7 @@ def main() -> int:
         ])
         assert rc == 0
 
-    print("PASS: 15/15 Khronos glTF report adapter tests")
+    print("PASS: 18/18 Khronos glTF report adapter tests")
     return 0
 
 
