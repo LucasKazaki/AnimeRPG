@@ -30,6 +30,7 @@ DEFAULT_COMMAND_TIMEOUT_SECONDS = 1800.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 120.0
 TERMINATION_GRACE_SECONDS = 10.0
 SUPERVISOR_SPAWN_ERROR_PREFIX = "__ASTRAL_R0_SUPERVISOR_SPAWN_ERROR__="
+SUPERVISOR_SETUP_ERROR_PREFIX = "__ASTRAL_R0_SUPERVISOR_SETUP_ERROR__="
 CAPTURE_SUPERVISOR_CODE = r"""import os, signal, subprocess, sys
 if os.name == "nt":
     import ctypes
@@ -80,17 +81,25 @@ if os.name == "nt":
     kernel32.GetCurrentProcess.argtypes = []
     kernel32.GetCurrentProcess.restype = wintypes.HANDLE
 
-    job = kernel32.CreateJobObjectW(None, None)
-    if not job:
-        raise ctypes.WinError(ctypes.get_last_error())
-    limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
-    limits.BasicLimitInformation.LimitFlags = 0x00002000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-    if not kernel32.SetInformationJobObject(
-        job, 9, ctypes.byref(limits), ctypes.sizeof(limits)
-    ):
-        raise ctypes.WinError(ctypes.get_last_error())
-    if not kernel32.AssignProcessToJobObject(job, kernel32.GetCurrentProcess()):
-        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        job = kernel32.CreateJobObjectW(None, None)
+        if not job:
+            raise ctypes.WinError(ctypes.get_last_error())
+        limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
+        limits.BasicLimitInformation.LimitFlags = 0x00002000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not kernel32.SetInformationJobObject(
+            job, 9, ctypes.byref(limits), ctypes.sizeof(limits)
+        ):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if not kernel32.AssignProcessToJobObject(job, kernel32.GetCurrentProcess()):
+            raise ctypes.WinError(ctypes.get_last_error())
+    except OSError as exc:
+        print(
+            "__ASTRAL_R0_SUPERVISOR_SETUP_ERROR__=" + f"{type(exc).__name__}: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise SystemExit(126)
 
 try:
     process = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -478,6 +487,7 @@ class R0Runner:
         interrupted = False
         spawn_error: str | None = None
         supervisor_spawn_error: str | None = None
+        supervisor_setup_error: str | None = None
         supervisor_control: list[str] = []
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("w", encoding="utf-8", newline="\n") as log:
@@ -539,13 +549,17 @@ class R0Runner:
                     return
 
             def copy_supervisor_control() -> None:
-                nonlocal supervisor_spawn_error
+                nonlocal supervisor_spawn_error, supervisor_setup_error
                 try:
                     for line in process.stderr:
                         supervisor_control.append(line)
                         if line.startswith(SUPERVISOR_SPAWN_ERROR_PREFIX):
                             supervisor_spawn_error = line[
                                 len(SUPERVISOR_SPAWN_ERROR_PREFIX) :
+                            ].strip()
+                        elif line.startswith(SUPERVISOR_SETUP_ERROR_PREFIX):
+                            supervisor_setup_error = line[
+                                len(SUPERVISOR_SETUP_ERROR_PREFIX) :
                             ].strip()
                 except (OSError, ValueError):
                     return
@@ -584,9 +598,12 @@ class R0Runner:
                 if supervisor_control:
                     log.write("\nsupervisor_control:\n")
                     log.writelines(supervisor_control)
-                if not timed_out and not interrupted and exit_code == 127 and supervisor_spawn_error:
-                    spawn_error = supervisor_spawn_error
+                if not timed_out and not interrupted and exit_code == 126 and supervisor_setup_error:
+                    spawn_error = f"supervisor setup failed: {supervisor_setup_error}"
                     recorded_exit_code: int | None = None
+                elif not timed_out and not interrupted and exit_code == 127 and supervisor_spawn_error:
+                    spawn_error = supervisor_spawn_error
+                    recorded_exit_code = None
                 else:
                     recorded_exit_code = exit_code
                 log.write(f"\nfinished_at: {finished}\n")
