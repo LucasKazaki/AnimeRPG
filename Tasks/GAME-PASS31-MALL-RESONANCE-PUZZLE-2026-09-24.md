@@ -12,9 +12,12 @@ This is a bounded GAME-domain packet. It adds one original National Mall environ
 Allowed paths:
 - `Engine/Scene/MallResonancePuzzle.h`
 - thin production-owner integration in `Engine/Scene/LandmarkInteraction.h`
+- narrow persistent first-clear entitlement ledger in the existing game-owned `Engine/Scene/CharacterProgression.h`
 - `Tests/MallResonancePuzzlePass31Tests.inc`
 - test registration only in `Tests/ThoughtCommandsTests.cpp`
 - this task and `Docs/Agents/animerpg-hourly/` pass records
+
+The `CharacterProgression.h` allowance is limited to the Mall-resonance entitlement needed to make GAME-156 persistent-protagonist/idempotency semantics truthful across copied or reconstructed transient interaction owners. It does not authorize unrelated progression redesign.
 
 The puzzle is original project content: three National Mall resonance anchors tied to the game's quantum-cooling/mana premise. Reference games supply interaction, difficulty, assist, record, retry, and recovery lessons only.
 
@@ -51,13 +54,13 @@ Acceptance: assist-off exposes no guidance; assist-on points to the deterministi
 
 ### GAME-155: per-difficulty mastery record
 Gap: repeated puzzle clears have no mastery feedback.
-Adaptation: completion produces Bronze/Silver/Gold plus deterministic score, moves and elapsed time. The best record is retained separately for each difficulty and cannot be replaced by a worse replay.
-Acceptance: par/fast/no-failed-attempt clear reaches Gold; slower extra-move replay does not lower the best; untouched/invalid records fail closed.
+Adaptation: completion produces Bronze/Silver/Gold plus deterministic score, moves and elapsed time. The best record is retained separately for each difficulty and cannot be replaced by a worse replay. Rank is the primary mastery ordering, followed by score/moves/time only within the same rank, so a lower-rank run can never roll the displayed best rank backward merely because its raw score is higher.
+Acceptance: par/fast/no-failed-attempt clear reaches Gold; slower extra-move replay does not lower the best; a higher-score Bronze cannot replace a Silver; untouched/invalid records fail closed.
 
 ### GAME-156: repeatable clear with one first-clear progression entitlement
 Gap: environmental puzzle replay should support mastery without becoming an unlimited progression farm or allowing reward ownership to move between protagonists.
-Adaptation: completed runs can start again while one bounded first-clear reward remains tied to the persistent `CharacterProgression` owner that first entered the production puzzle.
-Acceptance: first clear exposes one entitlement; owner swap cannot claim or restart it; correct owner claims exactly once; replay preserves personal best and claimed history.
+Adaptation: completed runs can start again while one bounded first-clear reward remains tied to the persistent `CharacterProgression` owner that first entered the production puzzle. The persistent progression ledger, not a transient puzzle object alone, prevents duplicate grants across copied or reconstructed production owners.
+Acceptance: first clear exposes one entitlement; owner swap cannot claim or restart it; correct owner claims exactly once; a reconstructed interaction owner using the same persistent progression cannot claim again; replay preserves personal best and claimed history.
 
 ### QOL-032: explicit in-game active-puzzle reset
 Gap: recent player reports from a comparator describe resorting to relog/teleport/area transitions when puzzle state becomes stuck.
@@ -66,7 +69,7 @@ Acceptance: reset is active-run-only, idempotently returns to a clean board, can
 
 ## Verification requirements
 
-The registered `ThoughtCommandsTests` aggregation must compile and execute pass-31 production-owner regressions in Debug and Release. Required coverage includes quest/progression entry gates, all three solutions, invalid enum/time handling, assist read-only behavior, mismatch handling, personal-best monotonicity, owner-bound first-clear reward, replay, and explicit recovery reset. All previously registered game regressions remain in the same aggregate.
+The registered `ThoughtCommandsTests` aggregation must compile and execute pass-31 production-owner regressions in Debug and Release. Required coverage includes quest/progression entry gates, all three solutions, invalid enum/time handling, assist read-only behavior, mismatch handling, rank-first personal-best monotonicity including lower-rank/higher-score replay, owner-bound first-clear reward including reconstructed-owner replay against the same persistent progression, replay, and explicit recovery reset. All previously registered game regressions remain in the same aggregate.
 
 Exact-final-head acceptance requires:
 1. hosted Windows Debug/Release deterministic workflow success,
