@@ -270,11 +270,22 @@ def verify_triangle_tangent_frame(pid, tri_index, positions, normals, tangents, 
     dpos_dv=[(e2[j]*du1-e1[j]*du2)*inv for j in range(3)]
     expected_t=unit(dpos_du,f"{pid} triangle {tri_index} dP/du")
     expected_b=unit(dpos_dv,f"{pid} triangle {tri_index} dP/dv")
-    avg_t=unit([sum(tangents[i][j] for i in ids) for j in range(3)],f"{pid} triangle {tri_index} tangent average")
-    avg_n=unit([sum(normals[i][j] for i in ids) for j in range(3)],f"{pid} triangle {tri_index} normal average")
     w_values=[tangents[i][3] for i in ids]
     if not (w_values[0]==w_values[1]==w_values[2] and w_values[0] in (-1.0,1.0)):
         fail(f"{pid} triangle {tri_index} tangent handedness inconsistent")
+    for vertex_index in ids:
+        supplied_t=unit(tangents[vertex_index][:3],f"{pid} triangle {tri_index} vertex {vertex_index} tangent")
+        supplied_n=unit(normals[vertex_index],f"{pid} triangle {tri_index} vertex {vertex_index} normal")
+        if dot(expected_t,supplied_t)<0.975:
+            fail(f"{pid} triangle {tri_index} tangent/UV vertex mismatch at {vertex_index}")
+        reconstructed_vertex_b=unit(
+            vec3_scale(cross(supplied_n,supplied_t),tangents[vertex_index][3]),
+            f"{pid} triangle {tri_index} vertex {vertex_index} bitangent",
+        )
+        if dot(expected_b,reconstructed_vertex_b)<0.965:
+            fail(f"{pid} triangle {tri_index} bitangent/UV vertex mismatch at {vertex_index}")
+    avg_t=unit([sum(tangents[i][j] for i in ids) for j in range(3)],f"{pid} triangle {tri_index} tangent average")
+    avg_n=unit([sum(normals[i][j] for i in ids) for j in range(3)],f"{pid} triangle {tri_index} normal average")
     reconstructed_b=unit(vec3_scale(cross(avg_n,avg_t),w_values[0]),f"{pid} triangle {tri_index} bitangent")
     if dot(expected_t,avg_t)<0.99 or dot(expected_b,reconstructed_b)<0.985:
         fail(f"{pid} triangle {tri_index} tangent/UV derivative mismatch")
