@@ -297,14 +297,20 @@ public:
         briefing.perfectDefenseResourceRestore =
             DefensePerfectRestorePerBonusRank * static_cast<float>(defenseBonusRanks);
 
+        const float followUpWeaponReduction =
+            loadout_.EquippedWeapon() == ShadowbladeWeapon::RiftsteelSabre
+                ? RiftsteelFollowUpCostReduction
+                : 0.0f;
         briefing.dashEffectiveCost =
             std::max(0.0f, DashCost - briefing.dashResourceRefund);
         briefing.fatalStrikeEffectiveCost =
             std::max(0.0f, FatalStrikeCost - briefing.fatalStrikeResourceRefund);
         briefing.defenseCounterEffectiveCost = std::max(
-            0.0f, DefenseCounterFatalStrikeCost - briefing.defenseCounterResourceRefund);
+            0.0f, DefenseCounterFatalStrikeCost - followUpWeaponReduction
+                - briefing.defenseCounterResourceRefund);
         briefing.staggerFollowUpEffectiveCost = std::max(
-            0.0f, StaggerFollowUpCost - briefing.staggerFollowUpResourceRefund);
+            0.0f, StaggerFollowUpCost - followUpWeaponReduction
+                - briefing.staggerFollowUpResourceRefund);
         return briefing;
     }
 
