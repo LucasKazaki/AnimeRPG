@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "repository": "LucasKazaki/AnimeRPG",
+  "target_branch": "main",
+  "pass": "GAME-PASS34-RIFT-WARDEN-COMBAT-GUIDANCE-2026-09-24",
+  "baseline": "4c6cc97cacd191f8441b69a1d51d40914bdc88b2",
+  "branch": "game/pass34-rift-warden-combat-guidance",
+  "sources": [
+    {
+      "id": "ZZZ-APPSTORE-CURRENT-20260924",
+      "kind": "developer_description",
+      "url": "https://apps.apple.com/us/app/zenless-zone-zero/id1606356401",
+      "accessed": "2026-09-24",
+      "version_context": "current listing describes Dodge/Parry counterplay, Stun into Chain Attacks, and opponent-specific traits",
+      "used_for": ["semantic response cues", "attack-specific learning", "response correctness feedback"]
+    },
+    {
+      "id": "GRANBLUE-PS-CURRENT-20260924",
+      "kind": "official_platform_overview",
+      "url": "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "accessed": "2026-09-24",
+      "version_context": "current PlayStation accessibility section documents adjustable assists, Control Reminders, Tutorial Reminders, Practice Mode and pausing",
+      "used_for": ["learned attack records", "practice recommendation", "timing feedback"]
+    },
+    {
+      "id": "ZZZ-PLAYER-DODGING-20260619",
+      "kind": "original_player_discussion",
+      "published": "2026-06-19",
+      "accessed": "2026-09-24",
+      "url": "https://www.reddit.com/r/ZenlessZoneZero/comments/1uag4q6/dodging/",
+      "used_for": ["QOL-035"],
+      "sentiment": "specific player confusion about orange/red/gold prompts and where to relearn dodge/parry; replies clarify mappings and point to existing tutorial, so this is anecdote not consensus"
+    },
+    {
+      "id": "ZZZ-PLAYER-VISUAL-CLARITY-20260628",
+      "kind": "original_player_discussion",
+      "published": "2026-06-28",
+      "accessed": "2026-09-24",
+      "url": "https://www.reddit.com/r/ZZZ_Discussion/comments/1ui9kg4/visual_clarity_isnt_great/",
+      "used_for": ["independent corroboration for semantic non-color combat feedback"],
+      "sentiment": "high-engagement player discussion requesting clearer enemy tells when effects obscure reaction-heavy combat; not proof of consensus or current official deficiency"
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-167",
+      "kind": "reference_feature",
+      "title": "Semantic Warden combat cues",
+      "gap": "Warden telegraphs exposed attack and response but no stable non-color semantic cue for presentation/accessibility.",
+      "adaptation": "Evade, Brace and Punish cue enum is emitted with every authoritative telegraph.",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h"],
+      "acceptance": "RiftSlash/EchoBurst map to Evade, GravityPulse to Brace, StaggerOpening to Punish without changing combat timing.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-168",
+      "kind": "reference_feature",
+      "title": "Learned attack catalog",
+      "gap": "Existing phase practice did not retain which specific attacks the player had actually faced.",
+      "adaptation": "Accepted ranked/practice resolutions mark only the resolved attack as learned; rejected inputs cannot fabricate knowledge.",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h"],
+      "acceptance": "AttackLearned is false initially, true after accepted resolution, and invalid enum queries fail closed.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-169",
+      "kind": "reference_feature",
+      "title": "Per-attack training performance",
+      "gap": "Practice recorded no attack-specific attempts, successes or best success streaks.",
+      "adaptation": "Each resolved attack records bounded attempts/successes/best streak and last-seen phase across attempt resets.",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h"],
+      "acceptance": "Success/failure update the correct attack only, counters are bounded, and ranked records/unlocks remain separate.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-170",
+      "kind": "reference_feature",
+      "title": "Weakest learned attack practice recommendation",
+      "gap": "Existing phase practice required the player to decide what to rehearse without game-domain evidence.",
+      "adaptation": "Read-only recommendation selects the learned attack with most failures, then lower success rate, and reports its last-seen phase and response.",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h"],
+      "acceptance": "No recommendation exists before learning; recommendation is deterministic and non-mutating.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-171",
+      "kind": "reference_feature",
+      "title": "Exact action timing feedback",
+      "gap": "Resolve reported outcome but not whether the response choice was correct separately from whether it was on time.",
+      "adaptation": "Accepted actions report responseMatched plus signed timingMarginSeconds against the authoritative window.",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h"],
+      "acceptance": "Boundary is zero, early is positive, late is negative; invalid/nonfinite inputs remain rejected before mutation.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "QOL-035",
+      "kind": "community_improvement",
+      "title": "Post-mistake response coach",
+      "gap": "A failed Warden response did not explain whether the player chose the wrong action, acted too late, or missed the punish opening.",
+      "adaptation": "Last accepted mistake retains attack, expected response, semantic cue, reason, authoritative window and observed timing for presentation by future UI.",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h"],
+      "acceptance": "Wrong response, late correct response and missed punish are distinguished; rejected input never creates coaching evidence.",
+      "sentiment": "corroborating player anecdotes, not consensus; existing ZZZ tutorial acknowledged and exact current post-mistake breakdown resolution unestablished",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    }
+  ],
+  "verification": {
+    "sandbox_header_compile": "passed locally in isolated cloud sandbox with g++ -std=c++17 -Wall -Wextra -Werror against the updated standalone header; not native Windows evidence",
+    "registered_target": "ThoughtCommandsTests via existing aggregation; pass34 regressions appended to already-registered ShadowbladeProgressionCombatPass33Tests.inc to avoid shared CMake/test-runner ownership",
+    "hosted_windows_debug_release": "pending_exact_final_head",
+    "release_manifest": "pending_exact_final_head",
+    "native_interactive": "not_run_not_claimed_no_Win32_controller_menu_or_rendered_UI_changes",
+    "independent_review": "pending_fresh_exact_final_head_review"
+  },
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "registered_regression_covered": 6,
+    "game_domain_integrated": 6,
+    "hosted_verified_exact_final_head": 0,
+    "native_playable_verified": 0,
+    "independently_reviewed_clean_exact_final_head": 0,
+    "merged": 0
+  },
+  "next_action": "Open the scoped implementation PR, require exact-head Windows Debug/Release, Release-manifest integrity and fresh Codex review; repair and rerun on any material finding, then reread main/head/diff/threads and merge only with the expected-head guard if all gates are clean."
+}

@@ -228,6 +228,176 @@ void TestShadowbladeProgressionCombatPass33() {
             && briefingActions.PlayerHealth() == briefingHealth
             && briefingActions.GuardIntegrity() == briefingGuard,
         "pass33 build briefing is read-only and safe to inspect repeatedly");
+
+    // Pass 34 is appended to this already-registered aggregation include so the
+    // game worker does not take over shared CMake or the central test runner.
+    RiftWardenTrial guidanceTrial;
+    Expect(guidanceTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass34 guidance fixture begins a ranked Story Warden trial");
+    const RiftWardenTelegraph openingCue = guidanceTrial.CurrentTelegraph();
+    Expect(openingCue.attack == RiftWardenAttack::RiftSlash
+            && openingCue.recommendedResponse == RiftWardenResponse::Dodge
+            && openingCue.cue == RiftWardenCue::Evade,
+        "pass34 telegraph exposes a color-independent semantic evade cue");
+    Expect(!guidanceTrial.AttackLearned(RiftWardenAttack::RiftSlash)
+            && !guidanceTrial.PracticeRecommendation().available
+            && !guidanceTrial.LastCoachTip().available,
+        "pass34 training knowledge starts empty and non-mutating");
+
+    const RiftWardenTrainingRecord invalidTraining =
+        guidanceTrial.TrainingRecord(static_cast<RiftWardenAttack>(255));
+    Expect(invalidTraining.attempts == 0
+            && !guidanceTrial.AttackLearned(static_cast<RiftWardenAttack>(255)),
+        "pass34 invalid attack training queries fail closed");
+    const RiftWardenBriefing beforeRejectedGuidance = guidanceTrial.Briefing();
+    Expect(!guidanceTrial.Resolve(static_cast<RiftWardenResponse>(255), 0.10).accepted,
+        "pass34 invalid response still rejects before training mutation");
+    Expect(guidanceTrial.TrainingRecord(RiftWardenAttack::RiftSlash).attempts == 0
+            && !guidanceTrial.LastCoachTip().available
+            && guidanceTrial.Briefing().telegraph.sequence
+                == beforeRejectedGuidance.telegraph.sequence,
+        "pass34 rejected input cannot fabricate learned attacks, coaching, or progress");
+
+    const RiftWardenActionReport wrongCue = guidanceTrial.Resolve(
+        RiftWardenResponse::Guard, 0.10);
+    const RiftWardenTrainingRecord slashTraining =
+        guidanceTrial.TrainingRecord(RiftWardenAttack::RiftSlash);
+    const RiftWardenCoachTip wrongTip = guidanceTrial.LastCoachTip();
+    Expect(wrongCue.accepted && !wrongCue.responseMatched
+            && wrongCue.timingMarginSeconds > 0.0
+            && slashTraining.attempts == 1 && slashTraining.successes == 0
+            && slashTraining.bestSuccessStreak == 0
+            && guidanceTrial.AttackLearned(RiftWardenAttack::RiftSlash),
+        "pass34 wrong but timely response records learned attack performance separately from timing");
+    Expect(wrongTip.available && wrongTip.attack == RiftWardenAttack::RiftSlash
+            && wrongTip.expectedResponse == RiftWardenResponse::Dodge
+            && wrongTip.cue == RiftWardenCue::Evade
+            && wrongTip.reason == RiftWardenCoachReason::WrongResponse,
+        "pass34 mistake coach explains the expected semantic response without relying on cue color");
+
+    const RiftWardenPracticeRecommendation firstRecommendation =
+        guidanceTrial.PracticeRecommendation();
+    Expect(firstRecommendation.available
+            && firstRecommendation.attack == RiftWardenAttack::RiftSlash
+            && firstRecommendation.phase == RiftWardenPhase::Opening
+            && firstRecommendation.response == RiftWardenResponse::Dodge
+            && firstRecommendation.attempts == 1 && firstRecommendation.successes == 0,
+        "pass34 practice recommendation targets the learned attack with demonstrated failure");
+
+    const RiftWardenTelegraph guardCue = guidanceTrial.CurrentTelegraph();
+    Expect(guardCue.attack == RiftWardenAttack::GravityPulse
+            && guardCue.cue == RiftWardenCue::Brace
+            && guardCue.recommendedResponse == RiftWardenResponse::Guard,
+        "pass34 Gravity Pulse exposes an explicit brace cue and guard response");
+    const RiftWardenActionReport exactGuard = guidanceTrial.Resolve(
+        guardCue.recommendedResponse, guardCue.responseWindowSeconds);
+    const RiftWardenTrainingRecord guardTraining =
+        guidanceTrial.TrainingRecord(RiftWardenAttack::GravityPulse);
+    Expect(exactGuard.accepted && exactGuard.responseMatched
+            && std::abs(exactGuard.timingMarginSeconds) < 1e-9
+            && exactGuard.resolution == RiftWardenResolution::PerfectDefense
+            && guardTraining.attempts == 1 && guardTraining.successes == 1
+            && guardTraining.bestSuccessStreak == 1,
+        "pass34 exact-boundary success reports zero timing margin and updates per-attack mastery");
+
+    const RiftWardenTelegraph echoCue = guidanceTrial.CurrentTelegraph();
+    const RiftWardenActionReport lateEcho = guidanceTrial.Resolve(
+        echoCue.recommendedResponse, echoCue.responseWindowSeconds + 0.05);
+    const RiftWardenCoachTip lateTip = guidanceTrial.LastCoachTip();
+    Expect(lateEcho.accepted && lateEcho.responseMatched
+            && lateEcho.timingMarginSeconds < 0.0
+            && lateEcho.resolution == RiftWardenResolution::Hit
+            && lateTip.available && lateTip.attack == RiftWardenAttack::EchoBurst
+            && lateTip.reason == RiftWardenCoachReason::LateResponse,
+        "pass34 timing feedback distinguishes a correct response executed too late");
+
+    RiftWardenTrial punishGuidanceTrial;
+    Expect(punishGuidanceTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass34 punish coaching fixture begins");
+    while (!punishGuidanceTrial.Briefing().staggerOpen) {
+        const RiftWardenTelegraph defense = punishGuidanceTrial.CurrentTelegraph();
+        Expect(punishGuidanceTrial.Resolve(defense.recommendedResponse, 0.10).accepted,
+            "pass34 punish coaching reaches a stagger opening through valid defenses");
+    }
+    const RiftWardenTelegraph punishCue = punishGuidanceTrial.CurrentTelegraph();
+    Expect(punishCue.attack == RiftWardenAttack::StaggerOpening
+            && punishCue.cue == RiftWardenCue::Punish
+            && punishCue.recommendedResponse == RiftWardenResponse::Strike,
+        "pass34 stagger opening exposes explicit punish semantics");
+    const RiftWardenActionReport missedPunish = punishGuidanceTrial.Resolve(
+        RiftWardenResponse::Guard, 0.10);
+    const RiftWardenTrainingRecord punishTraining =
+        punishGuidanceTrial.TrainingRecord(RiftWardenAttack::StaggerOpening);
+    const RiftWardenCoachTip punishTip = punishGuidanceTrial.LastCoachTip();
+    Expect(missedPunish.resolution == RiftWardenResolution::MissedOpening
+            && punishTraining.attempts == 1 && punishTraining.successes == 0
+            && punishTip.available && punishTip.reason == RiftWardenCoachReason::MissedPunish
+            && punishTip.expectedResponse == RiftWardenResponse::Strike,
+        "pass34 missed punish is retained as attack-specific practice and coaching evidence");
+
+    RiftWardenTrial saturatedGuidanceTrial;
+    Expect(saturatedGuidanceTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass34 saturation fixture begins a ranked Story Warden trial");
+    int saturationSteps = 0;
+    while (saturatedGuidanceTrial.TrainingRecord(RiftWardenAttack::RiftSlash).attempts
+               < RiftWardenTrial::MaximumTrainingAttempts
+           && saturationSteps < 25000) {
+        const RiftWardenTelegraph telegraph = saturatedGuidanceTrial.CurrentTelegraph();
+        const RiftWardenResponse response =
+            telegraph.attack == RiftWardenAttack::StaggerOpening
+                ? RiftWardenResponse::Guard
+                : telegraph.recommendedResponse;
+        Expect(saturatedGuidanceTrial.Resolve(response, 0.10).accepted,
+            "pass34 saturation fixture accepts each bounded training sample");
+        ++saturationSteps;
+    }
+    const RiftWardenTrainingRecord saturatedOpening =
+        saturatedGuidanceTrial.TrainingRecord(RiftWardenAttack::RiftSlash);
+    Expect(saturatedOpening.attempts == RiftWardenTrial::MaximumTrainingAttempts
+            && saturatedOpening.successes <= saturatedOpening.attempts
+            && saturatedOpening.lastSeenPhase == RiftWardenPhase::Opening,
+        "pass34 training counters saturate without corrupting success ratios");
+
+    int phaseAdvanceSteps = 0;
+    while (saturatedGuidanceTrial.Briefing().phase == RiftWardenPhase::Opening
+           && phaseAdvanceSteps < 32) {
+        const RiftWardenTelegraph telegraph = saturatedGuidanceTrial.CurrentTelegraph();
+        Expect(saturatedGuidanceTrial.Resolve(telegraph.recommendedResponse, 0.10).accepted,
+            "pass34 saturation fixture advances to a later phase through valid play");
+        ++phaseAdvanceSteps;
+    }
+    Expect(saturatedGuidanceTrial.Briefing().phase == RiftWardenPhase::Fracture,
+        "pass34 saturation fixture reaches Fracture after bounded successful punishes");
+    int seekRiftSlashSteps = 0;
+    while (saturatedGuidanceTrial.CurrentTelegraph().attack != RiftWardenAttack::RiftSlash
+           && seekRiftSlashSteps < 8) {
+        const RiftWardenTelegraph telegraph = saturatedGuidanceTrial.CurrentTelegraph();
+        const RiftWardenResponse response =
+            telegraph.attack == RiftWardenAttack::StaggerOpening
+                ? RiftWardenResponse::Guard
+                : telegraph.recommendedResponse;
+        Expect(saturatedGuidanceTrial.Resolve(response, 0.10).accepted,
+            "pass34 saturation fixture seeks a Fracture Rift Slash without leaving the phase");
+        ++seekRiftSlashSteps;
+    }
+    const RiftWardenTelegraph saturatedRiftSlash = saturatedGuidanceTrial.CurrentTelegraph();
+    Expect(saturatedRiftSlash.attack == RiftWardenAttack::RiftSlash,
+        "pass34 saturation fixture deterministically reaches Rift Slash in Fracture");
+    Expect(saturatedGuidanceTrial.Resolve(saturatedRiftSlash.recommendedResponse, 0.10).accepted,
+        "pass34 saturated Rift Slash remains an accepted encounter sample");
+    const RiftWardenTrainingRecord saturatedFracture =
+        saturatedGuidanceTrial.TrainingRecord(RiftWardenAttack::RiftSlash);
+    Expect(saturatedFracture.attempts == RiftWardenTrial::MaximumTrainingAttempts
+            && saturatedFracture.successes == saturatedOpening.successes
+            && saturatedFracture.lastSeenPhase == RiftWardenPhase::Fracture,
+        "pass34 saturated counters stay frozen while last-seen phase tracks later encounters");
+
+    const RiftWardenBriefing guidanceBriefing = guidanceTrial.Briefing();
+    Expect(guidanceBriefing.practiceRecommendation.available
+            && guidanceBriefing.coachTip.available
+            && guidanceBriefing.telegraph.cue
+                == RiftWardenTrial::CueFor(guidanceBriefing.telegraph.attack),
+        "pass34 production briefing carries deterministic recommendation, coach, and cue data together");
 }
 
 } // namespace
