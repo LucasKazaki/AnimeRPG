@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS41-SHADOW-CRYPT-PRESSURE-STATES-2026-09-24",
+  "baseline": "2958741188279a0b438dd489ad00cac546012c25",
+  "target": "main",
+  "branch": "game/animerpg-hourly-pass41-status-pressure",
+  "accessed": "2026-09-24",
+  "sources": [
+    {
+      "id": "ZZZ-32-DEVELOPER-ANNOUNCEMENT-20260828",
+      "kind": "developer_announcement_via_press",
+      "url": "https://www.gematsu.com/2026/08/zenless-zone-zero-version-3-2-update-their-secret-histories-launches-september-9",
+      "published": "2026-08-28",
+      "accessed": "2026-09-24",
+      "version_context": "Zenless Zone Zero 3.2, launched September 9, 2026",
+      "notes": "Quotes miHoYo's Version 3.2 overview: Claret stacks Gash on enemies, triggers Maim for additional damage/buffs, and Armorer can Counter Assist certain enemy Control Skills."
+    },
+    {
+      "id": "ZZZ-COMBAT-TRAINING-20260831",
+      "kind": "official_event_details",
+      "url": "https://zenless.hoyoverse.com/m/en-us/news/165921",
+      "published": "2026-08-31",
+      "accessed": "2026-09-24",
+      "version_context": "Combat Training - Triple Bounty, September 2-7, 2026",
+      "notes": "Official event lets players select enemy cards and rotates five buffed enemy cards each day. Used only as a tactical enemy-state/reference pattern, not copied content."
+    },
+    {
+      "id": "WUWA-APPSTORE-20260924",
+      "kind": "developer_description",
+      "url": "https://apps.apple.com/us/app/wuthering-waves/id6475033368",
+      "accessed": "2026-09-24",
+      "version_context": "current developer listing",
+      "notes": "Current listing explicitly describes Extreme Evasion, Dodge Counter, Echo Skill, and QTE combat mechanisms."
+    },
+    {
+      "id": "GRANBLUE-ER-20260708",
+      "kind": "official_developer_release_notes",
+      "url": "https://relink-ragnarok.granbluefantasy.com/en/updates/381/",
+      "published": "2026-07-08",
+      "updated": "2026-09-04",
+      "accessed": "2026-09-24",
+      "version_context": "Granblue Fantasy: Relink - Endless Ragnarok Ver. 2.0.2",
+      "notes": "Official notes cover perfect guards during ongoing actions, stackable effects, Shield feedback, target-lock improvements, status-effect icon settings, and visibility/noise improvements."
+    },
+    {
+      "id": "ZZZ-PLAYER-BUFF-UI-20260923",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZZZ_Discussion/comments/1woiqg5/most_important_buffs_not_displayed_in_the_ui/",
+      "published": "2026-09-23",
+      "accessed": "2026-09-24",
+      "notes": "Player says important buff uptimes can be hard to track because some effects are not visible in combat UI/effect details. Anecdote, not consensus and not evidence that ZZZ lacks all buff indicators."
+    },
+    {
+      "id": "ZZZ-PLAYER-CUSTOM-HUD-20260915",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZenlessZoneZero/comments/1wgp9w0/my_custom_zzz_hud_now_tracks_wengine_buffs_claret/",
+      "published": "2026-09-15",
+      "accessed": "2026-09-24",
+      "notes": "Independent custom HUD post tracks W-Engine buffs; a commenter asks for an optional high-information mode. Supports visibility preference, not consensus."
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-202",
+      "title": "Rift Mark one-shot vulnerability",
+      "sources": ["ZZZ-32-DEVELOPER-ANNOUNCEMENT-20260828"],
+      "gap": "Shadow Crypt failure consequences were immediate damage only; no bounded enemy-created pressure survived into the next read.",
+      "adaptation": "A failed Rift Skirmisher read applies one source-tracked mark that adds +6 to the next authoritative failed-defense telegraph, capped by the existing 40-damage threat ceiling, then consumes once.",
+      "acceptance": "initial failure remains 18; ledger exposes +6; next threat advertises true 36 damage in Entry Seal; one failed read consumes the old mark before applying any new role pressure",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-203",
+      "title": "Veil Ward ally protection",
+      "sources": ["GRANBLUE-ER-20260708", "ZZZ-32-DEVELOPER-ANNOUNCEMENT-20260828"],
+      "gap": "Veil Channeler had interruptible pressure but no support behavior that changes target choice or damage routing.",
+      "adaptation": "A failed interrupt grants one 14-point health-only ward to the deterministic lowest-health-ratio living ally. The ward reports actual absorbed damage and cannot go negative.",
+      "acceptance": "deterministic target; exactly 14 durability; health-only absorption; one-shot depletion; source defeat/purge removes it",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-204",
+      "title": "Gravebound guard link",
+      "sources": ["GRANBLUE-ER-20260708"],
+      "gap": "Gravebound Bulwark could pressure posture but did not protect another enemy or create a tactical support target.",
+      "adaptation": "A failed brace creates a one-attack link to the highest-priority living ally, reducing exactly 10 posture pressure. Staggering/defeating the Bulwark or consuming the link removes it.",
+      "acceptance": "deterministic ally; exactly 10 posture protected; consumed once; no negative posture; inactive when source is staggered/defeated",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-205",
+      "title": "Pressure-aware target recommendation",
+      "sources": ["ZZZ-COMBAT-TRAINING-20260831", "ZZZ-32-DEVELOPER-ANNOUNCEMENT-20260828"],
+      "gap": "Recommendation prioritized role/stagger/counter state but did not react to an enemy actively sustaining a mark, ward, or guard link.",
+      "adaptation": "A living enemy that sources active pressure receives a bounded +60 tactical recommendation priority while manual player lock remains authoritative.",
+      "acceptance": "support source can outrank ordinary role priority; dead/inactive pressure stops contributing; manual target lock behavior is unchanged",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-206",
+      "title": "Skillful pressure purge",
+      "sources": ["WUWA-APPSTORE-20260924", "GRANBLUE-ER-20260708"],
+      "gap": "Adding pressure without an earned removal route would turn mistakes into passive attrition instead of action-combat counterplay.",
+      "adaptation": "Pressure sourced by an enemy is removed by either a precision semantic defense against that source or a role-matched attack that consumes an earned breach.",
+      "acceptance": "ordinary successful defense does not purge; precision defense purges; matching breach exploit purges; timing thresholds and existing breach costs are not weakened",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "QOL-042",
+      "title": "Read-only combat status ledger",
+      "sources": ["ZZZ-PLAYER-BUFF-UI-20260923", "ZZZ-PLAYER-CUSTOM-HUD-20260915", "GRANBLUE-ER-20260708"],
+      "gap": "The new pressure states need exact source/target/magnitude visibility without taking renderer or HUD ownership.",
+      "adaptation": "Expose a bounded deterministic game-domain ledger for Rift Mark, Veil Ward, and Bulwark Guard Link. It is presentation-agnostic and does not claim a rendered HUD.",
+      "acceptance": "source, target, kind, and magnitude are exact; capacity is bounded; repeated reads do not mutate threat state; invalid timing does not mutate; cancel clears transient entries",
+      "status": "implemented_backend_pending_exact_head_gates_and_UI_wiring"
+    }
+  ],
+  "allowed_paths": [
+    "Engine/Scene/ShadowCryptSkirmish.h",
+    "Tests/ShadowCryptSkirmishPass41Tests.inc",
+    "Tests/ThoughtCommandsTests.cpp",
+    "Tasks/GAME-PASS41-SHADOW-CRYPT-PRESSURE-STATES-2026-09-24.md",
+    "Docs/Agents/animerpg-hourly/PASS41-BACKLOG.json",
+    "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS41.md",
+    "Docs/Agents/animerpg-hourly/STATE.json"
+  ],
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "explicit_regression_coverage": 6,
+    "production_game_domain_integrated": 6,
+    "native_player_playable_verified": 0,
+    "exact_head_hosted_verified": 0,
+    "independent_reviewed_clean": 0,
+    "merged": 0
+  },
+  "next_action": "Freeze the exact candidate head, run hosted Windows Debug/Release and release-manifest gates, request fresh Codex review, repair any findings, then reread main/head/diff/threads and guarded-merge only if every applicable gate is clean."
+}

@@ -3,44 +3,43 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "43051845a6f663cdd2942ce4d321f2c9583e1dcb",
+  "last_verified_main_at_pass_start": "2958741188279a0b438dd489ad00cac546012c25",
   "last_merged_pass": {
-    "id": "GAME-PASS39-SHADOW-CRYPT-THREAT-DEPTH-2026-09-24",
-    "pr": 64,
-    "merge_sha": "43051845a6f663cdd2942ce4d321f2c9583e1dcb",
+    "id": "GAME-PASS40-SHADOW-CRYPT-MASTERY-REPLAY-2026-09-24",
+    "pr": 66,
+    "merge_sha": "2958741188279a0b438dd489ad00cac546012c25",
     "native_playable": false
   },
-  "working_branch": "game/pass40-shadow-crypt-flow-replay",
-  "pass": "GAME-PASS40-SHADOW-CRYPT-MASTERY-REPLAY-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS40-SHADOW-CRYPT-MASTERY-REPLAY-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS40-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS40.md",
-  "pr": 66,
+  "working_branch": "game/animerpg-hourly-pass41-status-pressure",
+  "pass": "GAME-PASS41-SHADOW-CRYPT-PRESSURE-STATES-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS41-SHADOW-CRYPT-PRESSURE-STATES-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS41-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS41.md",
+  "pr": null,
   "final_head": "this_state_commit_is_the_candidate_for_exact_head_gates",
-  "final_receipt_location": "PR_66_comment_after_exact_head_acceptance_and_merge",
+  "final_receipt_location": "implementation_PR_comment_after_exact_head_acceptance_and_merge",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
     "increments_implemented": 6,
     "increments_with_explicit_regression_coverage": 6,
-    "increments_production_owner_reachable": 5,
-    "increments_backend_only": 1,
+    "increments_production_game_domain_integrated": 6,
     "increments_hosted_verified_on_exact_final_head": 0,
     "increments_native_playable_verified": 0,
     "increments_independently_reviewed_clean_on_final_head": 0,
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-197","title":"Role weakness intel","status":"implemented_pending_exact_head_acceptance"},
-    {"id":"GAME-198","title":"Defense-created breach opening","status":"implemented_pending_exact_head_acceptance"},
-    {"id":"GAME-199","title":"Role-matched breach exploit","status":"implemented_pending_exact_head_acceptance"},
-    {"id":"GAME-200","title":"Bounded Shadow Flow reads","status":"implemented_pending_exact_head_acceptance"},
-    {"id":"GAME-201","title":"Earned Flow Break heavy finisher","status":"implemented_pending_exact_head_acceptance"},
-    {"id":"QOL-041","title":"Immediate completed-room replay primitive","status":"implemented_backend_pending_exact_head_acceptance_and_player_command_wiring"}
+    {"id":"GAME-202","title":"Rift Mark one-shot vulnerability","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-203","title":"Veil Ward ally protection","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-204","title":"Gravebound guard link","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-205","title":"Pressure-aware target recommendation","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-206","title":"Skillful pressure purge","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"QOL-042","title":"Read-only combat status ledger","status":"implemented_backend_pending_exact_head_acceptance_and_UI_wiring"}
   ],
   "verification": {
-    "sandbox_cpp17": "proposed ShadowCryptSkirmish header compiled with g++ -std=c++17 -Wall -Wextra -Werror -pedantic and standalone pass40 smoke exited 0 before repository publication",
-    "registered_test_target": "ThoughtCommandsTests_with_ShadowCryptSkirmishPass40Tests_inc",
+    "sandbox_cpp17": "proposed ShadowCryptSkirmish header compiled with g++ -std=c++17 -Wall -Wextra -Werror and standalone pass41 smoke exited 0 before final state freeze",
+    "registered_test_target": "ThoughtCommandsTests_with_ShadowCryptSkirmishPass41Tests_inc",
     "hosted_windows_ci": "pending_exact_final_head_after_state_freeze",
     "release_manifest": "pending_exact_final_head_after_state_freeze",
     "native_windows_interactive": "not_run_not_claimed_no_input_UI_renderer_changes",
@@ -53,9 +52,9 @@
     "test_registration": "existing_ThoughtCommandsTests_target_extended_without_CMake_change"
   },
   "research": {
-    "reference_context": "current ZZZ 3.2 opponent traits/weaknesses and dodge/parry/stun follow-up design, current Wuthering Waves extreme evasion/dodge-counter design, and Granblue Relink distinct combat styles/link follow-up design",
-    "community_request": "2026-09-18 ZZZ player request for direct post-boss Shiyu replay, with historical in-fight restart corroboration",
-    "current_resolution": "player report states direct replay differs across ZZZ modes; not independently verified as an official current UI contract and not treated as consensus"
+    "reference_context": "ZZZ 3.2 target-side Gash/Maim and Counter Assist, ZZZ Combat Training enemy-card buffs, Wuthering Waves Extreme Evasion/Dodge Counter, and Granblue Relink 2.0.2 perfect-guard/status/visibility behavior",
+    "community_request": "2026-09-23 ZZZ player request for clearer visibility of important combat buff uptimes, corroborated by a 2026-09-15 custom-HUD discussion",
+    "current_resolution": "not treated as consensus or proof that current ZZZ lacks all status UI; this pass exposes a backend ledger only"
   },
   "next_action": "Bind hosted Windows Debug/Release plus release-manifest checks and fresh Codex review to this exact state commit, repair findings if any, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
 }
