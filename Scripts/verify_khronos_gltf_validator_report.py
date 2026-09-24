@@ -176,9 +176,12 @@ def verify_report(
         if field in info and type(info[field]) is not str:
             _fail(f"info.{field} must be a string")
 
+    resources_present = "resources" in info
     resources = info.get("resources", [])
     if type(resources) is not list:
         _fail("info.resources must be an array when present")
+    if require_self_contained and (not resources_present or not resources):
+        _fail("info.resources must be present and non-empty to prove self-contained status")
     for index, raw in enumerate(resources):
         resource = _expect_keys(raw, RESOURCE_KEYS, {"pointer"}, f"info.resources[{index}]")
         if type(resource["pointer"]) is not str:
