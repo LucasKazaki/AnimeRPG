@@ -3,19 +3,19 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "23a0fd258b170864893cf953b25ddf2c7e99491a",
+  "last_verified_main_at_pass_start": "4c6cc97cacd191f8441b69a1d51d40914bdc88b2",
   "last_merged_pass": {
-    "id": "GAME-PASS32-RIFT-WARDEN-TRIAL-2026-09-24",
-    "pr": 54,
-    "merge_sha": "23a0fd258b170864893cf953b25ddf2c7e99491a",
-    "head_sha": "12cf31c6fa17bbc68f8cb65d47504760b0c23505",
+    "id": "GAME-PASS33-SHADOWBLADE-PROGRESSION-COMBAT-2026-09-24",
+    "pr": 57,
+    "merge_sha": "4c6cc97cacd191f8441b69a1d51d40914bdc88b2",
+    "head_sha": "8d76a4ec47c8c51eeb66de50a0e7a4ae0ee39bfb",
     "native_playable": false
   },
-  "working_branch": "game/pass33-shadowblade-progression-combat",
-  "pass": "GAME-PASS33-SHADOWBLADE-PROGRESSION-COMBAT-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS33-SHADOWBLADE-PROGRESSION-COMBAT-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS33-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS33.md",
+  "working_branch": "game/pass34-rift-warden-combat-guidance",
+  "pass": "GAME-PASS34-RIFT-WARDEN-COMBAT-GUIDANCE-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS34-RIFT-WARDEN-COMBAT-GUIDANCE-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS34-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS34.md",
   "pr": null,
   "final_head": "pending_exact_head_gates_and_review",
   "final_receipt_location": "implementation_PR_comment_after_exact_head_acceptance_and_merge",
@@ -31,31 +31,30 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-162","title":"Equipped Shadowblade specialization authority","status":"pending_exact_final_head_acceptance"},
-    {"id":"GAME-163","title":"ShadowStep dash efficiency","status":"pending_exact_final_head_acceptance"},
-    {"id":"GAME-164","title":"EclipseEdge perfect-defense counter economy","status":"pending_exact_final_head_acceptance"},
-    {"id":"GAME-165","title":"BreakerFocus stagger follow-up economy","status":"pending_exact_final_head_acceptance"},
-    {"id":"GAME-166","title":"Action-family skill ranks affect live combat economy","status":"pending_exact_final_head_acceptance"},
-    {"id":"QOL-034","title":"Exact progression combat impact briefing","status":"pending_exact_final_head_acceptance"}
+    {"id":"GAME-167","title":"Semantic Warden combat cues","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-168","title":"Learned attack catalog","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-169","title":"Per-attack training performance","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-170","title":"Weakest learned attack practice recommendation","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-171","title":"Exact action timing feedback","status":"pending_exact_final_head_acceptance"},
+    {"id":"QOL-035","title":"Post-mistake response coach","status":"pending_exact_final_head_acceptance"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ShadowbladeProgressionCombatPass33Tests",
+    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_and_registered_pass34_assertions",
+    "sandbox_header_compile": "passed_gpp_cxx17_Wall_Wextra_Werror_direct_smoke_not_native",
     "hosted_windows_ci": "pending_exact_final_head",
     "release_manifest": "pending_exact_final_head",
-    "native_windows_interactive": "not_run_not_claimed_no_Win32_controller_menu_or_rendered_build_UI_changes",
+    "native_windows_interactive": "not_run_not_claimed_no_input_UI_or_renderer_changes",
     "independent_review": "pending_fresh_exact_final_head_review",
-    "integration": "new progression-aware ShadowbladeActions APIs consume const CharacterProgression snapshots and delegate existing base action/defense implementations; base APIs remain unchanged",
-    "persistent_cross_process_save": "not_claimed; CharacterProgression persistence is outside this packet"
+    "cross_process_persistence": "not_claimed_training_evidence_is_in_session_only"
   },
   "coordination": {
-    "open_non_game_prs_inspected": "52_55_49_45_33_28_26_23_13_left_unchanged_at_pass_start",
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "ShadowbladeActions_h_plus_registered_pass33_game_tests_and_operating_records"
+    "gameplay_paths": "RiftWardenTrial_h_plus_reused_registered_pass33_test_include_and_operating_records"
   },
   "research": {
-    "reference_context": "Genshin_distinct_abilities_and_combat_styles_ZZZ_dodge_parry_counter_stun_chain_and_enemy_traits_Granblue_unique_skills_combat_styles_practice_clarity",
-    "community_request": "ZZZ_player_discussions_requesting_or_seeking clearer build explanation while acknowledging existing suggestions_readiness",
-    "current_resolution": "current_ZZZ_Version_3_2_listing_does_not_establish_whether_exact_build_delta_explanations_resolve_the_request"
+    "reference_context": "ZZZ_dodge_parry_stun_opponent_traits_plus_Granblue_adjustable_assists_control_tutorial_reminders_and_practice_mode",
+    "community_request": "ZZZ_player_confusion_about_attack_prompt_meaning_and_relearning_plus_independent_visual_clarity_feedback",
+    "current_resolution": "existing_ZZZ_tutorial_acknowledged_exact_post_mistake_wrong_action_vs_late_timing_breakdown_unestablished"
   },
-  "next_action": "Commit these records, open the scoped PR, require exact-head hosted Windows Debug/Release and Release-manifest success plus fresh independent review, repair/rerun if needed, reread main/head/diff/threads, and merge with expected-head guard only if every gate is clean."
+  "next_action": "Open the scoped PR, require exact-head hosted Windows Debug/Release and Release-manifest success plus fresh independent review, repair and rerun if needed, then reread main/head/diff/threads and merge with expected-head guard only if every gate is clean."
 }
