@@ -34,7 +34,7 @@ The verifier owns this ART-006B hash independently. A caller-supplied manifest c
 1. A Blender-native background driver pinned to Blender 5.2.2.
 2. One editable `.blend`, one embedded glTF and one strict JSON receipt when the driver is actually executed natively.
 3. A standard-library verifier that compares DCC output with ART-006B scene semantics rather than byte equality.
-4. Focused positive/negative regressions for evidence tampering, source substitution, receipt type confusion, scene inventory, transforms, topology/winding, vertex attributes, materials and buffer/profile violations.
+4. Focused positive/negative regressions for evidence tampering, source substitution, receipt type confusion, scene inventory, transforms and transform parity, topology/winding, vertex attributes, materials, GPU-instancing rejection and buffer/profile violations.
 5. A versioned art-facing Blender/glTF profile based on current official Blender documentation.
 
 ## Round-trip semantic gate
@@ -48,10 +48,12 @@ For the active scene it requires:
 - float `POSITION`, `NORMAL`, `TANGENT` and `TEXCOORD_0` accessors plus an unsigned-integer scalar index accessor;
 - nonzero `POSITION` count and identical `NORMAL`, `TANGENT` and `TEXCOORD_0` counts;
 - world-space center/dimensions derived from referenced vertices and matching the ART-006B source within the verifier-owned, non-overridable `1e-4` metre tolerance;
+- matching world-transform orientation parity for each semantic instance, so a reflected transform cannot preserve the AABB while reversing world-space winding;
 - semantic material bindings and base-color, metallic, roughness, emissive, alpha and sidedness preservation;
 - canonical triangle signatures that preserve winding and include referenced position/normal/tangent/UV payloads, so connectivity, culling orientation, shading basis or UV drift fails closed;
 - exact JSON array/string types for imported names and exact types/values for every fixed export setting;
-- embedded buffers and no newly introduced animation/image/texture payloads.
+- no `EXT_mesh_gpu_instancing` declaration or node payload in the bounded output profile;
+- embedded buffers and no newly introduced animation/image/texture/camera payloads.
 
 ## Native execution command
 
