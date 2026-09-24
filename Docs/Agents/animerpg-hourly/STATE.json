@@ -17,7 +17,7 @@
   "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS30-BACKLOG.json",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS30.md",
   "pr": 51,
-  "final_head": "pending_exact_head_gates_and_review",
+  "final_head": "pending_post_review_repair_exact_head_gates_and_rereview",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -35,14 +35,14 @@
     {"id":"GAME-149","title":"Idempotent ending archive","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
     {"id":"GAME-150","title":"Evidence-gated story episodes","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
     {"id":"GAME-151","title":"Non-mutating checkpoint revisit","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"QOL-031","title":"Interruption-safe latest dialogue recovery","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"}
+    {"id":"QOL-031","title":"Interruption-safe latest dialogue recovery","status":"review_repaired_owner_integrated_registered_regression_pending_exact_head_gates"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_LandmarkDialogueContinuityPass30Tests",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
+    "hosted_windows_ci": "pre_repair_head_31cac5f_passed_run_938_stale_after_review_repair; fresh_exact_head_required",
+    "release_manifest": "pre_repair_head_31cac5f_passed_run_696_stale_after_review_repair; fresh_exact_head_required",
     "native_windows_interactive": "not_run_not_claimed_no_rendered_dialogue_ui_or_input_changes",
-    "independent_review": "pending_fresh_exact_head_review",
+    "independent_review": "Codex_exact_head_31cac5f_found_one_P2_recapture_after_acknowledgement; repaired_with_acknowledged_sequence_witness_and_regressions; fresh_rereview_required",
     "integration": "LandmarkInteraction owns LandmarkDialogueContinuity and records existing authoritative dialogue beats/outcomes after LandmarkDialogue mutations",
     "persistent_cross_process_save": "continuity_state_in_memory_only_not_claimed_cross_process"
   },
@@ -56,5 +56,11 @@
     "community_request": "corroborated_ZZZ_dialogue_retrigger_and_interruption_reports",
     "current_resolution": "specific_retrigger_interruption_fix_not_established_in_inspected_later_official_material"
   },
-  "next_action": "Treat the post-receipt PR 51 head as candidate, require hosted Windows Debug/Release and Release-manifest gates plus fresh independent review, repair and rerun if necessary, then reread main/head/diff/threads before expected-head merge if clean."
+  "review_history": {
+    "material_findings_repaired_this_pass": 1,
+    "summary": [
+      "P2: acknowledged latest beat remained recapturable before any new dialogue; now acknowledgement records the consumed sequence, capture requires a strictly newer beat, invalid accepted-looking topics fail closed, and both constexpr and registered owner regressions cover the boundary"
+    ]
+  },
+  "next_action": "Treat the final post-repair documentation head as candidate, require fresh hosted Windows Debug/Release and Release-manifest success plus fresh independent Codex review, then resolve the repaired thread and reread main/head/diff/threads before expected-head merge if clean."
 }
