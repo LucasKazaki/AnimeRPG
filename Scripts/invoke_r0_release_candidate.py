@@ -1088,17 +1088,18 @@ def main() -> int:
         runner = R0Runner(parse_args())
         runner.execute()
         return 0
-    except Exception as exc:
+    except (Exception, KeyboardInterrupt) as exc:
+        blocker = "KeyboardInterrupt" if isinstance(exc, KeyboardInterrupt) else str(exc)
         if runner is not None:
             try:
                 runner.set_heartbeat(
                     "blocked",
                     current_command=runner.last_command,
                     last_result=(
-                        "R0 stopped at the first deterministic failure. "
+                        "R0 stopped at the first deterministic failure or operator interruption. "
                         f"Latest log: {runner.last_log}"
                     ),
-                    blocker=str(exc),
+                    blocker=blocker,
                     next_action=(
                         "Inspect the named log and preserve the current checkpoint. Change one material condition before retrying. "
                         "If tracked evidence exists, use a new clean worktree/output set rather than overwriting or discarding it."
@@ -1106,8 +1107,8 @@ def main() -> int:
                 )
             except Exception as heartbeat_error:
                 print(f"WARNING: heartbeat update failed: {heartbeat_error}", file=sys.stderr)
-        print(f"R0 AUTOMATED GATE: BLOCKED\n{exc}", file=sys.stderr)
-        return 1
+        print(f"R0 AUTOMATED GATE: BLOCKED\n{blocker}", file=sys.stderr)
+        return 130 if isinstance(exc, KeyboardInterrupt) else 1
 
 
 if __name__ == "__main__":
