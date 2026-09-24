@@ -30,6 +30,14 @@ void TestShadowbladeProgressionCombatPass33() {
             && Near(dash.effectiveResourceSpent, 19.0f)
             && Near(dashActions.Resource(), 81.0f),
         "pass33 ShadowStep and dash mastery reduce live dash resource spend");
+    const float dashResourceBeforeRejectedRetry = dashActions.Resource();
+    const ProgressionShadowActionReport rejectedDash = dashActions.TryProgressionDash(
+        {}, {1.0f, 0.0f, 0.0f}, dashProgression);
+    Expect(rejectedDash.action.result == ShadowActionResult::Cooldown
+            && Near(rejectedDash.resourceRestored, 0.0f)
+            && Near(rejectedDash.effectiveResourceSpent, 0.0f)
+            && Near(dashActions.Resource(), dashResourceBeforeRejectedRetry),
+        "pass33 rejected progression dash cannot mint a refund or mutate resource");
 
     CharacterProgression unequippedProgression;
     unequippedProgression.GrantMasteryPoints(200);
@@ -70,6 +78,17 @@ void TestShadowbladeProgressionCombatPass33() {
             && Near(counterStrike.effectiveResourceSpent, 29.0f)
             && Near(counterActions.Resource(), 71.0f),
         "pass33 EclipseEdge and fatal mastery reduce counter follow-up cost");
+
+    ShadowbladeActions rejectedStrikeActions;
+    CombatSandbox rejectedStrikeCombat;
+    const ProgressionShadowActionReport rejectedStrike =
+        rejectedStrikeActions.TryProgressionFatalStrike(
+            {-10.0f, 0.0f, 0.0f}, rejectedStrikeCombat, counterProgression);
+    Expect(rejectedStrike.action.result == ShadowActionResult::OutOfRange
+            && Near(rejectedStrike.resourceRestored, 0.0f)
+            && Near(rejectedStrike.effectiveResourceSpent, 0.0f)
+            && Near(rejectedStrikeActions.Resource(), ShadowbladeActions::MaximumResource),
+        "pass33 rejected progression Fatal Strike cannot mint a refund or spend resource");
 
     CharacterProgression staggerProgression;
     staggerProgression.GrantMasteryPoints(200);
@@ -122,6 +141,31 @@ void TestShadowbladeProgressionCombatPass33() {
             && Near(perfectDodge.resourceRestored, 8.0f)
             && Near(defenseActions.Resource(), 96.5f),
         "pass33 defense mastery rewards precise defense with bounded resource recovery");
+
+    ShadowbladeActions ordinaryDefenseActions;
+    Expect(ordinaryDefenseActions.TryDash({}).result == ShadowActionResult::Activated
+            && ordinaryDefenseActions.BeginIncomingAttack({0.50f, 20, 20, true}),
+        "pass33 ordinary-defense fixture creates resource room and a blockable threat");
+    const float ordinaryDefenseResource = ordinaryDefenseActions.Resource();
+    const ProgressionDefenseReport ordinaryDefense =
+        ordinaryDefenseActions.TryProgressionDefend(DefenseInput::Guard, defenseProgression);
+    Expect(ordinaryDefense.defense.result == DefenseResult::Guarded
+            && Near(ordinaryDefense.resourceRestored, 0.0f)
+            && Near(ordinaryDefenseActions.Resource(), ordinaryDefenseResource),
+        "pass33 non-perfect defense cannot receive mastery resource recovery");
+
+    ShadowbladeActions cappedDefenseActions;
+    Expect(cappedDefenseActions.TryDash({}).result == ShadowActionResult::Activated
+            && Near(cappedDefenseActions.RestoreResource(23.0f), 23.0f)
+            && Near(cappedDefenseActions.Resource(), 98.0f)
+            && cappedDefenseActions.BeginIncomingAttack({0.10f, 20, 20, true}),
+        "pass33 capped-defense fixture starts two resource below the maximum");
+    const ProgressionDefenseReport cappedDefense =
+        cappedDefenseActions.TryProgressionDefend(DefenseInput::Guard, defenseProgression);
+    Expect(cappedDefense.defense.result == DefenseResult::PerfectGuard
+            && Near(cappedDefense.resourceRestored, 2.0f)
+            && Near(cappedDefenseActions.Resource(), ShadowbladeActions::MaximumResource),
+        "pass33 perfect-defense mastery restore reports only the amount admitted by the cap");
 
     CharacterProgression briefingProgression;
     briefingProgression.GrantMasteryPoints(500);
