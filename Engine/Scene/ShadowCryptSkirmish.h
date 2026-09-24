@@ -42,6 +42,16 @@ enum class ShadowCryptSkirmishTier : std::uint8_t {
     Count,
 };
 
+enum class ShadowCryptThreatVariant : std::uint8_t {
+    RiftLunge,
+    RiftCrosscut,
+    VeilBind,
+    VeilBurst,
+    GraveHammer,
+    GraveRush,
+    Count,
+};
+
 struct ShadowCryptEnemyState {
     ShadowCryptEnemyRole role{ShadowCryptEnemyRole::RiftSkirmisher};
     int health{};
@@ -56,18 +66,24 @@ struct ShadowCryptThreatTelegraph {
     bool valid{};
     std::size_t enemyIndex{};
     ShadowCryptEnemyRole role{ShadowCryptEnemyRole::RiftSkirmisher};
+    ShadowCryptThreatVariant variant{ShadowCryptThreatVariant::RiftLunge};
     ShadowCryptThreatCue cue{ShadowCryptThreatCue::None};
     ShadowCryptDefenseResponse expected{ShadowCryptDefenseResponse::None};
     double responseWindowSeconds{};
     int failureDamage{};
     bool defensiveCounterAllowed{};
+    bool enraged{};
+    std::uint8_t patternStep{};
 };
 
 struct ShadowCryptDefenseReport {
     bool accepted{};
     bool successful{};
+    bool precision{};
     bool openedCounter{};
     bool interruptedChannel{};
+    bool staggerOpened{};
+    int postureDamageApplied{};
     int damageTaken{};
     std::size_t enemyIndex{};
 };
@@ -88,6 +104,12 @@ struct ShadowCryptTargetRecommendation {
     std::size_t enemyIndex{};
     ShadowCryptEnemyRole role{ShadowCryptEnemyRole::RiftSkirmisher};
     int priority{};
+};
+
+struct ShadowCryptThreatQueue {
+    static constexpr std::size_t Capacity = 3;
+    std::array<ShadowCryptThreatTelegraph, Capacity> threats{};
+    std::size_t count{};
 };
 
 // Game-domain Shadow Crypt room combat. This models original enemy roles and
@@ -144,37 +166,21 @@ public:
     ShadowCryptThreatTelegraph CurrentThreat() const {
         if (!active_ || complete_ || threatIndex_ >= enemyCount_
             || enemies_[threatIndex_].defeated) return {};
-        const auto role = enemies_[threatIndex_].role;
-        ShadowCryptThreatTelegraph telegraph{};
-        telegraph.valid = true;
-        telegraph.enemyIndex = threatIndex_;
-        telegraph.role = role;
-        switch (role) {
-        case ShadowCryptEnemyRole::RiftSkirmisher:
-            telegraph.cue = ShadowCryptThreatCue::Evade;
-            telegraph.expected = ShadowCryptDefenseResponse::Dodge;
-            telegraph.responseWindowSeconds = 0.42;
-            telegraph.failureDamage = 18;
-            telegraph.defensiveCounterAllowed = true;
-            break;
-        case ShadowCryptEnemyRole::VeilChanneler:
-            telegraph.cue = ShadowCryptThreatCue::Interrupt;
-            telegraph.expected = ShadowCryptDefenseResponse::Interrupt;
-            telegraph.responseWindowSeconds = 0.70;
-            telegraph.failureDamage = 24;
-            telegraph.defensiveCounterAllowed = true;
-            break;
-        case ShadowCryptEnemyRole::GraveboundBulwark:
-            telegraph.cue = ShadowCryptThreatCue::Brace;
-            telegraph.expected = ShadowCryptDefenseResponse::Guard;
-            telegraph.responseWindowSeconds = 0.55;
-            telegraph.failureDamage = 30;
-            telegraph.defensiveCounterAllowed = false;
-            break;
-        case ShadowCryptEnemyRole::Count:
-            return {};
+        return ThreatForIndex(threatIndex_);
+    }
+
+    ShadowCryptThreatQueue ThreatQueue(
+        std::size_t maxCount = ShadowCryptThreatQueue::Capacity) const {
+        ShadowCryptThreatQueue queue{};
+        if (!active_ || complete_ || enemyCount_ == 0 || maxCount == 0) return queue;
+        const std::size_t wanted = std::min(maxCount, ShadowCryptThreatQueue::Capacity);
+        for (std::size_t offset = 0; offset < enemyCount_ && queue.count < wanted; ++offset) {
+            const std::size_t index = (threatIndex_ + offset) % enemyCount_;
+            if (enemies_[index].defeated) continue;
+            const ShadowCryptThreatTelegraph threat = ThreatForIndex(index);
+            if (threat.valid) queue.threats[queue.count++] = threat;
         }
-        return telegraph;
+        return queue;
     }
 
     ShadowCryptDefenseReport ResolveThreat(ShadowCryptDefenseResponse response,
@@ -188,17 +194,36 @@ public:
         report.successful = response == threat.expected
             && reactionSeconds <= threat.responseWindowSeconds;
         if (report.successful) {
+            report.precision = reactionSeconds
+                <= threat.responseWindowSeconds * PrecisionResponseFraction;
             report.openedCounter = threat.defensiveCounterAllowed;
             counterTarget_ = report.openedCounter ? threat.enemyIndex : EnemyCapacity;
+            precisionCounterTarget_ =
+                report.openedCounter && report.precision ? threat.enemyIndex : EnemyCapacity;
             report.interruptedChannel =
                 threat.role == ShadowCryptEnemyRole::VeilChanneler
                 && response == ShadowCryptDefenseResponse::Interrupt;
+            if (threat.role == ShadowCryptEnemyRole::GraveboundBulwark
+                && response == ShadowCryptDefenseResponse::Guard) {
+                auto& enemy = enemies_[threat.enemyIndex];
+                if (!enemy.staggered && !enemy.defeated) {
+                    const int postureBefore = enemy.posture;
+                    enemy.posture = std::max(0, enemy.posture - BracePostureDamage);
+                    report.postureDamageApplied = postureBefore - enemy.posture;
+                    if (enemy.posture == 0) {
+                        enemy.staggered = true;
+                        report.staggerOpened = true;
+                    }
+                }
+            }
         } else {
             const int damageBefore = damageTaken_;
             damageTaken_ = std::min(MaxTrackedDamage, damageTaken_ + threat.failureDamage);
             report.damageTaken = damageTaken_ - damageBefore;
             counterTarget_ = EnemyCapacity;
+            precisionCounterTarget_ = EnemyCapacity;
         }
+        AdvanceThreatPattern(threat.enemyIndex);
         AdvanceThreatCursor();
         return report;
     }
@@ -231,7 +256,12 @@ public:
             }
             healthDamage = 36;
             postureDamage = 24;
+            if (precisionCounterTarget_ == index) {
+                healthDamage += PrecisionCounterHealthBonus;
+                postureDamage += PrecisionCounterPostureBonus;
+            }
             counterTarget_ = EnemyCapacity;
+            precisionCounterTarget_ = EnemyCapacity;
             break;
         }
 
@@ -260,6 +290,7 @@ public:
             report.defeated = true;
             if (lockedTarget_ == index) lockedTarget_ = EnemyCapacity;
             if (counterTarget_ == index) counterTarget_ = EnemyCapacity;
+            if (precisionCounterTarget_ == index) precisionCounterTarget_ = EnemyCapacity;
         }
         complete_ = AllDefeated();
         if (complete_) {
@@ -318,6 +349,10 @@ public:
 
 private:
     static constexpr int MaxTrackedDamage = 9999;
+    static constexpr int BracePostureDamage = 10;
+    static constexpr int PrecisionCounterHealthBonus = 8;
+    static constexpr int PrecisionCounterPostureBonus = 6;
+    static constexpr double PrecisionResponseFraction = 0.30;
 
     static constexpr bool ValidTier(ShadowCryptSkirmishTier tier) {
         return static_cast<std::uint8_t>(tier)
@@ -345,12 +380,88 @@ private:
         return 0;
     }
 
+    ShadowCryptThreatTelegraph ThreatForIndex(std::size_t index) const {
+        if (!active_ || complete_ || index >= enemyCount_ || enemies_[index].defeated) return {};
+        const auto role = enemies_[index].role;
+        const std::uint8_t patternStep = static_cast<std::uint8_t>(patternSteps_[index] % 2);
+        ShadowCryptThreatTelegraph telegraph{};
+        telegraph.valid = true;
+        telegraph.enemyIndex = index;
+        telegraph.role = role;
+        telegraph.patternStep = patternStep;
+        telegraph.enraged = enemies_[index].health > 0
+            && enemies_[index].health * 2 <= enemies_[index].maxHealth;
+        switch (role) {
+        case ShadowCryptEnemyRole::RiftSkirmisher:
+            if (patternStep == 0) {
+                telegraph.variant = ShadowCryptThreatVariant::RiftLunge;
+                telegraph.cue = ShadowCryptThreatCue::Evade;
+                telegraph.expected = ShadowCryptDefenseResponse::Dodge;
+                telegraph.responseWindowSeconds = 0.42;
+                telegraph.failureDamage = 18;
+                telegraph.defensiveCounterAllowed = true;
+            } else {
+                telegraph.variant = ShadowCryptThreatVariant::RiftCrosscut;
+                telegraph.cue = ShadowCryptThreatCue::Evade;
+                telegraph.expected = ShadowCryptDefenseResponse::Dodge;
+                telegraph.responseWindowSeconds = 0.34;
+                telegraph.failureDamage = 22;
+                telegraph.defensiveCounterAllowed = true;
+            }
+            break;
+        case ShadowCryptEnemyRole::VeilChanneler:
+            if (patternStep == 0) {
+                telegraph.variant = ShadowCryptThreatVariant::VeilBind;
+                telegraph.cue = ShadowCryptThreatCue::Interrupt;
+                telegraph.expected = ShadowCryptDefenseResponse::Interrupt;
+                telegraph.responseWindowSeconds = 0.70;
+                telegraph.failureDamage = 24;
+                telegraph.defensiveCounterAllowed = true;
+            } else {
+                telegraph.variant = ShadowCryptThreatVariant::VeilBurst;
+                telegraph.cue = ShadowCryptThreatCue::Interrupt;
+                telegraph.expected = ShadowCryptDefenseResponse::Interrupt;
+                telegraph.responseWindowSeconds = 0.52;
+                telegraph.failureDamage = 28;
+                telegraph.defensiveCounterAllowed = true;
+            }
+            break;
+        case ShadowCryptEnemyRole::GraveboundBulwark:
+            if (patternStep == 0) {
+                telegraph.variant = ShadowCryptThreatVariant::GraveHammer;
+                telegraph.cue = ShadowCryptThreatCue::Brace;
+                telegraph.expected = ShadowCryptDefenseResponse::Guard;
+                telegraph.responseWindowSeconds = 0.55;
+                telegraph.failureDamage = 30;
+                telegraph.defensiveCounterAllowed = false;
+            } else {
+                telegraph.variant = ShadowCryptThreatVariant::GraveRush;
+                telegraph.cue = ShadowCryptThreatCue::Brace;
+                telegraph.expected = ShadowCryptDefenseResponse::Guard;
+                telegraph.responseWindowSeconds = 0.42;
+                telegraph.failureDamage = 34;
+                telegraph.defensiveCounterAllowed = false;
+            }
+            break;
+        case ShadowCryptEnemyRole::Count:
+            return {};
+        }
+        if (telegraph.enraged) {
+            telegraph.responseWindowSeconds =
+                std::max(0.20, telegraph.responseWindowSeconds * 0.80);
+            telegraph.failureDamage = std::min(40, telegraph.failureDamage + 6);
+        }
+        return telegraph;
+    }
+
     void Reset() {
         enemies_ = {};
+        patternSteps_ = {};
         enemyCount_ = 0;
         threatIndex_ = 0;
         lockedTarget_ = EnemyCapacity;
         counterTarget_ = EnemyCapacity;
+        precisionCounterTarget_ = EnemyCapacity;
         damageTaken_ = 0;
         complete_ = false;
         active_ = false;
@@ -375,6 +486,11 @@ private:
         }
     }
 
+    void AdvanceThreatPattern(std::size_t index) {
+        if (index >= enemyCount_) return;
+        patternSteps_[index] = static_cast<std::uint8_t>((patternSteps_[index] + 1) % 2);
+    }
+
     void AdvanceThreatCursor() {
         if (enemyCount_ == 0) return;
         threatIndex_ = (threatIndex_ + 1) % enemyCount_;
@@ -382,10 +498,12 @@ private:
     }
 
     std::array<ShadowCryptEnemyState, EnemyCapacity> enemies_{};
+    std::array<std::uint8_t, EnemyCapacity> patternSteps_{};
     std::size_t enemyCount_{};
     std::size_t threatIndex_{};
     std::size_t lockedTarget_{EnemyCapacity};
     std::size_t counterTarget_{EnemyCapacity};
+    std::size_t precisionCounterTarget_{EnemyCapacity};
     int damageTaken_{};
     ShadowCryptSkirmishTier tier_{ShadowCryptSkirmishTier::EntrySeal};
     bool active_{};
