@@ -243,6 +243,72 @@ class R0RunnerSafetyTests(unittest.TestCase):
             time.sleep(2.4)
             self.assertFalse(sentinel.exists(), "a capture descendant survived timeout cleanup")
 
+    def test_capture_timeout_cleanup_drain_remains_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            process = mock.Mock()
+            process.returncode = -9
+            process.communicate.side_effect = [
+                subprocess.TimeoutExpired(["fixture"], 0.1, output="initial-partial\n"),
+                subprocess.TimeoutExpired(
+                    ["fixture"], r0.TERMINATION_GRACE_SECONDS, output="cleanup-partial\n"
+                ),
+                ("final-output\n", None),
+            ]
+            with mock.patch.object(r0.subprocess, "Popen", return_value=process), mock.patch.object(
+                runner, "_terminate_process_tree"
+            ):
+                with self.assertRaisesRegex(r0.RecoveryFailure, "Command timed out after 0.1s"):
+                    runner.capture(["fixture"], timeout_seconds=0.1)
+            self.assertEqual(
+                [call.kwargs.get("timeout") for call in process.communicate.call_args_list],
+                [0.1, r0.TERMINATION_GRACE_SECONDS, r0.TERMINATION_GRACE_SECONDS],
+            )
+            process.kill.assert_called_once_with()
+
+    def test_capture_timeout_cleanup_exhaustion_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            process = mock.Mock()
+            process.returncode = None
+            process.communicate.side_effect = [
+                subprocess.TimeoutExpired(["fixture"], 0.1, output="initial-partial\n"),
+                subprocess.TimeoutExpired(
+                    ["fixture"], r0.TERMINATION_GRACE_SECONDS, output="cleanup-partial\n"
+                ),
+                subprocess.TimeoutExpired(
+                    ["fixture"], r0.TERMINATION_GRACE_SECONDS, output="final-partial\n"
+                ),
+            ]
+            with mock.patch.object(r0.subprocess, "Popen", return_value=process), mock.patch.object(
+                runner, "_terminate_process_tree"
+            ):
+                with self.assertRaisesRegex(
+                    r0.RecoveryFailure, "cleanup remained incomplete"
+                ) as failure:
+                    runner.capture(["fixture"], timeout_seconds=0.1)
+            self.assertIn("bounded pipe-drain budget", str(failure.exception))
+            self.assertIn("final-partial", str(failure.exception))
+            self.assertEqual(len(process.communicate.call_args_list), 3)
+            process.kill.assert_called_once_with()
+
+    def test_capture_rejects_non_positive_override_before_spawn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            with mock.patch.object(r0.subprocess, "Popen") as popen:
+                with self.assertRaisesRegex(r0.RecoveryFailure, "non-positive timeout"):
+                    runner.capture(["fixture"], timeout_seconds=0)
+                popen.assert_not_called()
+
     def test_interrupted_run_command_cleans_owned_tree_and_records_interrupt(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
