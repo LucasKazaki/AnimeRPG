@@ -84,6 +84,9 @@ def det3(m):
 def parity(m):
     d=det3(m);req(math.isfinite(d) and abs(d)>1e-12,"mesh world transform singular");return 1 if d>0 else -1
 
+def world_signature(m):
+    return tuple(float(m[r][c]) for r in range(3) for c in range(4))
+
 def pt(m,p):
     v=[float(p[0]),float(p[1]),float(p[2]),1.]
     return tuple(sum(m[r][k]*v[k] for k in range(4)) for r in range(3))
@@ -108,25 +111,37 @@ def tri(c):
 def semantics(g):
     used=g.get("extensionsUsed",[]);required=g.get("extensionsRequired",[])
     req(type(used) is list and all(type(x) is str for x in used) and type(required) is list and all(type(x) is str for x in required),"glTF extensions declarations invalid")
-    req(FORBIDDEN_EXTENSIONS.isdisjoint(used) and FORBIDDEN_EXTENSIONS.isdisjoint(required),"GPU instancing/lights unsupported in ART-006D")
+    req("EXT_mesh_gpu_instancing" not in used and "EXT_mesh_gpu_instancing" not in required,"GPU instancing unsupported in ART-006D")
+    req("KHR_lights_punctual" not in used and "KHR_lights_punctual" not in required,"lights unsupported in ART-006D")
     root_ext=g.get("extensions",{})
     req(type(root_ext) is dict,"glTF root extensions invalid")
-    req(FORBIDDEN_EXTENSIONS.isdisjoint(root_ext),"GPU instancing/lights unsupported in ART-006D")
+    req("EXT_mesh_gpu_instancing" not in root_ext,"GPU instancing unsupported in ART-006D")
+    req("KHR_lights_punctual" not in root_ext,"lights unsupported in ART-006D")
     ns=g.get("nodes");meshes=g.get("meshes");ms=g.get("materials",[]);sc=g.get("scenes");si=g.get("scene",0)
     req(type(ns) is list and type(meshes) is list and type(sc) is list and jint(si) and 0<=si<len(sc),"scene graph invalid")
     for n in ns:
         req(type(n) is dict,"node invalid")
         ext=n.get("extensions",{})
         req(type(ext) is dict,"node extensions invalid")
-        req(FORBIDDEN_EXTENSIONS.isdisjoint(ext),"GPU instancing/lights unsupported in ART-006D")
+        req("EXT_mesh_gpu_instancing" not in ext,"GPU instancing unsupported in ART-006D")
+        req("KHR_lights_punctual" not in ext,"lights unsupported in ART-006D")
         req("camera" not in n,"cameras unsupported in ART-006D")
+        req("weights" not in n,"morph targets unsupported in ART-006D")
+    for mesh in meshes:
+        req(type(mesh) is dict,"mesh invalid")
+        req("weights" not in mesh,"morph targets unsupported in ART-006D")
+        primitives=mesh.get("primitives")
+        req(type(primitives) is list and primitives,"mesh primitives missing")
+        for primitive in primitives:
+            req(type(primitive) is dict,"primitive invalid")
+            req("targets" not in primitive,"morph targets unsupported in ART-006D")
     scene=sc[si];req(type(scene) is dict,"scene invalid");roots=scene.get("nodes");req(type(roots) is list,"scene roots invalid");bs=buffers(g);seen=set();out={}
     def walk(i,parent):
         req(jint(i) and 0<=i<len(ns) and i not in seen,"node graph invalid/cyclic");seen.add(i);n=ns[i];world=mul(parent,local(n));name=n.get("name");mi=n.get("mesh")
         if mi is not None:
-            req(type(name) is str and name in NAMES,f"unexpected mesh instance {name!r}");req(name not in out,f"duplicate mesh instance {name}");req(jint(mi) and 0<=mi<len(meshes),f"{name} mesh invalid");mesh=meshes[mi];req(type(mesh) is dict,f"{name} mesh invalid");ps=mesh.get("primitives");req(type(ps) is list and ps,f"{name} primitives missing");mins=[math.inf]*3;maxs=[-math.inf]*3;bound=set();top=[]
+            req(type(name) is str and name in NAMES,f"unexpected mesh instance {name!r}");req(name not in out,f"duplicate mesh instance {name}");req(jint(mi) and 0<=mi<len(meshes),f"{name} mesh invalid");mesh=meshes[mi];ps=mesh.get("primitives");req(type(ps) is list and ps,f"{name} primitives missing");mins=[math.inf]*3;maxs=[-math.inf]*3;bound=set();top=[]
             for p in ps:
-                req(type(p) is dict and p.get("mode",4)==4 and jint(p.get("indices")),f"{name} requires indexed TRIANGLES");at=p.get("attributes");req(type(at) is dict and ATTR<=set(at),f"{name} required attributes missing")
+                req(type(p) is dict and p.get("mode",4)==4 and jint(p.get("indices")),f"{name} requires indexed TRIANGLES");at=p.get("attributes");req(type(at) is dict and ATTR<=set(at),f"{name} required attributes missing");req(set(at)==ATTR,f"{name} unexpected rendering attributes")
                 for key,ty in (("POSITION","VEC3"),("NORMAL","VEC3"),("TANGENT","VEC4"),("TEXCOORD_0","VEC2")):acontract(g,at[key],5126,ty,f"{name} {key}")
                 iai=p["indices"];ia=g["accessors"][iai];req(type(ia) is dict and ia.get("componentType") in (5121,5123,5125) and ia.get("type")=="SCALAR",f"{name} index accessor format invalid")
                 pos=accessor(g,bs,at["POSITION"]);nor=accessor(g,bs,at["NORMAL"]);tan=accessor(g,bs,at["TANGENT"]);uv=accessor(g,bs,at["TEXCOORD_0"]);req(len(pos)>0 and len(nor)==len(pos)==len(tan)==len(uv),f"{name} attribute counts invalid")
@@ -136,7 +151,7 @@ def semantics(g):
                     wv=pt(world,pos[ii])
                     for a in range(3):mins[a]=min(mins[a],wv[a]);maxs[a]=max(maxs[a],wv[a])
                 for j in range(0,len(idx),3):top.append((mn,tri([corner(pos,nor,tan,uv,idx[j+k]) for k in range(3)])))
-            out[name]={"center":tuple((mins[a]+maxs[a])/2 for a in range(3)),"dimensions":tuple(maxs[a]-mins[a] for a in range(3)),"materials":bound,"topology":tuple(sorted(top)),"parity":parity(world)}
+            out[name]={"center":tuple((mins[a]+maxs[a])/2 for a in range(3)),"dimensions":tuple(maxs[a]-mins[a] for a in range(3)),"materials":bound,"topology":tuple(sorted(top)),"parity":parity(world),"world":world_signature(world)}
         elif name in NAMES:raise VerificationError(f"{name} expected mesh instance missing mesh")
         ch=n.get("children",[]);req(type(ch) is list,"children invalid")
         for c in ch:walk(c,world)
@@ -178,7 +193,7 @@ def verify(source:Path,manifest:Path,roundtrip:Path,blend:Path,receipt_path:Path
     for n in MATS:req(matclose(sm[n],om[n]),f"{n} material property drift")
     ss=semantics(src);os=semantics(out)
     for n in NAMES:
-        req(ss[n]["parity"]==os[n]["parity"],f"{n} transform parity drift");req(close(ss[n]["center"],os[n]["center"]) and close(ss[n]["dimensions"],os[n]["dimensions"]) and ss[n]["materials"]==os[n]["materials"],f"{n} transform/material binding drift");req(ss[n]["topology"]==os[n]["topology"],f"{n} topology/attribute drift")
+        req(ss[n]["parity"]==os[n]["parity"],f"{n} transform parity drift");req(close(ss[n]["world"],os[n]["world"]),f"{n} world transform drift");req(close(ss[n]["center"],os[n]["center"]) and close(ss[n]["dimensions"],os[n]["dimensions"]) and ss[n]["materials"]==os[n]["materials"],f"{n} transform/material binding drift");req(ss[n]["topology"]==os[n]["topology"],f"{n} topology/attribute drift")
     return {"nodes":7,"source_sha256":sha(source),"roundtrip_sha256":sha(roundtrip),"blend_sha256":sha(blend),"blender":"5.2.2","tolerance_m":TOLERANCE,"status":"dcc_roundtrip_verified_not_astral_imported"}
 
 def main():
