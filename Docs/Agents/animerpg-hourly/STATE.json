@@ -3,20 +3,20 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "4c6cc97cacd191f8441b69a1d51d40914bdc88b2",
+  "last_verified_main_at_pass_start": "3fcc9a003799dc23dddf8c7cadac4c857f826428",
   "last_merged_pass": {
-    "id": "GAME-PASS33-SHADOWBLADE-PROGRESSION-COMBAT-2026-09-24",
-    "pr": 57,
-    "merge_sha": "4c6cc97cacd191f8441b69a1d51d40914bdc88b2",
-    "head_sha": "8d76a4ec47c8c51eeb66de50a0e7a4ae0ee39bfb",
+    "id": "GAME-PASS34-RIFT-WARDEN-COMBAT-GUIDANCE-2026-09-24",
+    "pr": 58,
+    "merge_sha": "3fcc9a003799dc23dddf8c7cadac4c857f826428",
+    "head_sha": "85fee4212c42fa0e6c05a43f71d55c581fce0f6e",
     "native_playable": false
   },
-  "working_branch": "game/pass34-rift-warden-combat-guidance",
-  "pass": "GAME-PASS34-RIFT-WARDEN-COMBAT-GUIDANCE-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS34-RIFT-WARDEN-COMBAT-GUIDANCE-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS34-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS34.md",
-  "pr": 58,
+  "working_branch": "game/pass35-rift-warden-focused-practice",
+  "pass": "GAME-PASS35-RIFT-WARDEN-FOCUSED-PRACTICE-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS35-RIFT-WARDEN-FOCUSED-PRACTICE-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS35-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS35.md",
+  "pr": "pending",
   "final_head": "pending_exact_head_gates_and_review",
   "final_receipt_location": "implementation_PR_comment_after_exact_head_acceptance_and_merge",
   "counts": {
@@ -31,36 +31,30 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-167","title":"Semantic Warden combat cues","status":"pending_exact_final_head_acceptance"},
-    {"id":"GAME-168","title":"Learned attack catalog","status":"pending_exact_final_head_acceptance"},
-    {"id":"GAME-169","title":"Per-attack training performance","status":"pending_exact_final_head_acceptance"},
-    {"id":"GAME-170","title":"Weakest learned attack practice recommendation","status":"pending_exact_final_head_acceptance"},
-    {"id":"GAME-171","title":"Exact action timing feedback","status":"pending_exact_final_head_acceptance"},
-    {"id":"QOL-035","title":"Post-mistake response coach","status":"pending_exact_final_head_acceptance"}
+    {"id":"GAME-172","title":"Focused learned boss-attack drill","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-173","title":"Guided Standard Expert practice pace","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-174","title":"Authoritative control reminder","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-175","title":"Learned Warden attack guide","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-176","title":"Practice-only pause and resume","status":"pending_exact_final_head_acceptance"},
+    {"id":"QOL-036","title":"Looping focused boss-move rehearsal","status":"pending_exact_final_head_acceptance"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_and_registered_pass34_assertions",
-    "sandbox_header_compile": "passed_gpp_cxx17_Wall_Wextra_Werror_direct_smoke_not_native",
+    "registered_test_target": "ThoughtCommandsTests_with_RiftWardenFocusedPracticePass35Tests_inc",
     "hosted_windows_ci": "pending_exact_final_head",
     "release_manifest": "pending_exact_final_head",
     "native_windows_interactive": "not_run_not_claimed_no_input_UI_or_renderer_changes",
     "independent_review": "pending_fresh_exact_final_head_review",
-    "cross_process_persistence": "not_claimed_training_evidence_is_in_session_only"
+    "cross_process_persistence": "not_changed_or_claimed"
   },
-  "review_repairs": [
-    "receipt_now_records_exact_standalone_compile_and_run_commands_with_exit_zero",
-    "training_successes_no_longer_advance_without_a_corresponding_attempt_after_counter_saturation",
-    "lastSeenPhase_now_updates_on_later_accepted_encounters_even_after_attempt_and_success_counters_saturate",
-    "registered_regression_saturates_RiftSlash_in_Opening_then_requires_frozen_counters_and_Fracture_lastSeenPhase_after_a_later_encounter"
-  ],
   "coordination": {
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "RiftWardenTrial_h_plus_reused_registered_pass33_test_include_and_operating_records"
+    "gameplay_paths": "RiftWardenTrial_h_and_thin_LandmarkInteraction_owner_wiring",
+    "test_registration": "ThoughtCommandsTests_cpp_include_and_call_only_no_CMake_change"
   },
   "research": {
-    "reference_context": "ZZZ_dodge_parry_stun_opponent_traits_plus_Granblue_adjustable_assists_control_tutorial_reminders_and_practice_mode",
-    "community_request": "ZZZ_player_confusion_about_attack_prompt_meaning_and_relearning_plus_independent_visual_clarity_feedback",
-    "current_resolution": "existing_ZZZ_tutorial_acknowledged_exact_post_mistake_wrong_action_vs_late_timing_breakdown_unestablished"
+    "reference_context": "ZZZ selectable Combat Simulation target plus Granblue adjustable difficulty, Control Reminders, Tutorial Reminders, Practice Mode and pausing",
+    "community_request": "repeated ZZZ requests for boss-specific free training and repeatable boss-mechanic rehearsal",
+    "current_resolution": "current official ZZZ Combat Training page confirms selectable enemy cards but universal boss-training availability is not established"
   },
-  "next_action": "Require exact-head hosted Windows Debug/Release and Release-manifest success plus fresh independent review on PR 58, repair and rerun if needed, then reread main/head/diff/threads and merge with expected-head guard only if every gate is clean."
+  "next_action": "Create the scoped PR, run exact-head hosted Windows Debug/Release and Release-manifest checks, obtain fresh Codex review, repair/rerun if needed, then reread main/head/diff/threads and merge with expected-head guard only if every gate is clean."
 }
