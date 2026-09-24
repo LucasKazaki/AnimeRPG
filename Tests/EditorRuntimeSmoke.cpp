@@ -790,8 +790,12 @@ bool PostShowStateWhileOwnerPinned(HWND window, DWORD processId, DWORD threadId,
 }
 
 bool PostSelectionMutationWhileOwnerPinned(HWND window, HWND outliner, DWORD processId,
-    DWORD threadId, HANDLE thread, HANDLE process, bool notifySelection,
+    DWORD threadId, HANDLE thread, HANDLE process, ULONGLONG deadline, bool notifySelection,
     std::wstring& failure) {
+    if (GetTickCount64() >= deadline) {
+        failure = L"selection deadline exhausted before selection owner pin";
+        return false;
+    }
     if (!WindowOwnedByProcess(window, processId)
         || !ValidatedControlHasStyle(outliner, window, processId,
             kOutlinerId, L"ListBox", static_cast<LONG_PTR>(LBS_NOTIFY))
@@ -820,6 +824,7 @@ bool PostSelectionMutationWhileOwnerPinned(HWND window, HWND outliner, DWORD pro
 
     bool suspendedContextCaptured = false;
     bool postedSelectionMutation = false;
+    bool deadlineExpiredBeforePost = false;
     if (previousSuspendCount == 0) {
         CONTEXT context{};
         context.ContextFlags = CONTEXT_CONTROL;
@@ -838,19 +843,31 @@ bool PostSelectionMutationWhileOwnerPinned(HWND window, HWND outliner, DWORD pro
             && IsWindowVisible(window) && IsWindowEnabled(window)
             && ValidatedControlHasStyle(outliner, window, processId,
                 kOutlinerId, L"ListBox", static_cast<LONG_PTR>(LBS_NOTIFY))) {
-            postedSelectionMutation = notifySelection
-                ? PostMessageW(window, WM_COMMAND,
-                    MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
-                    reinterpret_cast<LPARAM>(outliner)) != FALSE
-                : PostMessageW(outliner, LB_SETCURSEL, 3, 0) != FALSE;
+            if (GetTickCount64() >= deadline) {
+                deadlineExpiredBeforePost = true;
+            } else {
+                postedSelectionMutation = notifySelection
+                    ? PostMessageW(window, WM_COMMAND,
+                        MAKEWPARAM(kOutlinerId, LBN_SELCHANGE),
+                        reinterpret_cast<LPARAM>(outliner)) != FALSE
+                    : PostMessageW(outliner, LB_SETCURSEL, 3, 0) != FALSE;
+            }
         }
     }
 
     const DWORD resumePreviousCount = ResumeThread(thread);
     if (resumePreviousCount == static_cast<DWORD>(-1)
         || previousSuspendCount != 0 || !suspendedContextCaptured
-        || resumePreviousCount != 1 || !postedSelectionMutation) {
-        failure = L"failed to pin, post, and resume the editor owner thread for selection mutation";
+        || resumePreviousCount != 1) {
+        failure = L"failed to pin and resume the editor owner thread for selection mutation";
+        return false;
+    }
+    if (deadlineExpiredBeforePost) {
+        failure = L"selection deadline exhausted immediately before asynchronous selection post";
+        return false;
+    }
+    if (!postedSelectionMutation) {
+        failure = L"failed to post selection mutation while the editor owner thread was pinned";
         return false;
     }
     return true;
@@ -1093,7 +1110,7 @@ bool SelectCubeAndNotify(HWND window, DWORD processId, DWORD threadId, HANDLE th
     const ULONGLONG deadline = GetTickCount64() + kSelectionTimeoutMs;
     ScopedMessageDeadline phaseDeadline(deadline);
     if (!PostSelectionMutationWhileOwnerPinned(
-            window, outliner, processId, threadId, thread, process, false, failure)) {
+            window, outliner, processId, threadId, thread, process, deadline, false, failure)) {
         return false;
     }
 
@@ -1113,7 +1130,13 @@ bool SelectCubeAndNotify(HWND window, DWORD processId, DWORD threadId, HANDLE th
             failure = L"failed to read Outliner selection after asynchronous Cube selection post";
             return false;
         }
-        if (selection == 3) break;
+        if (selection == 3) {
+            if (GetTickCount64() >= deadline) {
+                failure = L"Cube selection was first observed at or after the selection deadline";
+                return false;
+            }
+            break;
+        }
         if (GetTickCount64() >= deadline) {
             failure = L"Cube selection did not settle before the selection deadline";
             return false;
@@ -1127,7 +1150,7 @@ bool SelectCubeAndNotify(HWND window, DWORD processId, DWORD threadId, HANDLE th
     }
 
     if (!PostSelectionMutationWhileOwnerPinned(
-            window, outliner, processId, threadId, thread, process, true, failure)) {
+            window, outliner, processId, threadId, thread, process, deadline, true, failure)) {
         return false;
     }
 
@@ -1387,7 +1410,7 @@ int wmain(int argc, wchar_t** argv) {
         << L"left-to-right semantic toolbar Button HWNDs, disabled pending tools, enabled Outliner/assets surfaces, "
         << L"required Outliner LBS_NOTIFY style, exact row identities, and Inspector state were revalidated around "
         << L"every bounded cross-process read and after 800x600, 1280x720, 1440x900, maximized+restored, and 420x260 states; "
-        << L"Cube selection and its WM_COMMAND notification were posted only while the exact launched editor/Outliner owner thread was suspended behind a valid thread-context barrier, then resumed before bounded polling confirmed selection and Inspector synchronization; "
+        << L"Cube selection and its WM_COMMAND notification were admitted before the same three-second selection deadline and posted only while the exact launched editor/Outliner owner thread was suspended behind a valid thread-context barrier, then resumed before bounded polling confirmed selection and Inspector synchronization; "
         << L"each asynchronous resize post was issued while the exact launched window-owner thread was suspended behind a valid thread-context barrier, then resumed before polling, "
         << L"and resize containment/shell validation stayed inside its 1.5-second phase deadline; "
         << L"maximize/restore show-state posts were also issued while that exact owner thread was suspended behind a valid thread-context barrier, then resumed before show-state polling, with nested shell-message waits capped to each show-state deadline; "
