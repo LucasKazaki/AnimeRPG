@@ -24,39 +24,36 @@ The exact-head review of `2ad3bab391088419349cc27125f10df555efee0a` then found t
 
 The review that completed on `78c9acbc2dbbac312d0c9ca6cd4b0c82555b1b86` surfaced four remaining issues: one P1 regression in the committed GPU-instancing error-text expectation, plus P2 gaps for same-AABB world rotation, morph-target deformation, and extra `COLOR_0` rendering attributes. Those were repaired by restoring a distinct GPU-instancing error path, comparing complete inherited 3x4 world transforms, rejecting primitive/mesh/node morph payloads across the bounded glTF, and requiring the exact four source rendering attributes.
 
-A fresh review of `918ec775c73c1e6b6f91fe7fcdf2ba973be6fa80` found one P1 and three P2 issues. The current repair addresses all four:
+A fresh review of `918ec775c73c1e6b6f91fe7fcdf2ba973be6fa80` found one P1 and three P2 issues. Head `1393c786527c4ef29f59b3766ec47d19aceac36f` repaired all four by preserving the committed center/dimension error contract, extending exact attribute-name checks to unreachable mesh primitives, splitting morph regressions by branch, and exercising inherited parent-transform composition directly.
 
-1. the verifier checks center/dimensions/material binding before the stricter world-transform comparison, preserving the committed `transform/material binding drift` contract for the existing dimension and center regressions while still catching same-AABB orientation drift afterward;
-2. every mesh primitive in the bounded glTF, including unreachable meshes, must use indexed `TRIANGLES` and exactly `POSITION`, `NORMAL`, `TANGENT`, and `TEXCOORD_0`; missing attributes preserve the existing `required attributes missing` contract, and extras fail as `unexpected rendering attributes`;
-3. the hidden suite now exercises primitive `targets`, mesh `weights`, and node `weights` independently, including unreachable-content variants, rather than allowing one earlier rejection to mask another branch;
-4. the inherited-world-transform regression now wraps `Lawn` beneath a rotated parent instead of rotating the semantic mesh locally, so ancestor transform composition is directly covered.
+The next exact-head review of `1393c786527c4ef29f59b3766ec47d19aceac36f` found two P2 issues. This repair addresses both:
 
-## Author verification executed in sandbox
+1. every mesh primitive is now passed through the same accessor decoder/contract gate before active-scene traversal, including unreachable meshes. Float attribute accessor indices/formats, nonzero matching counts, buffer-view offsets/lengths, decoded finite payloads, unsigned scalar index accessors, nonempty triangle-multiple index payloads, vertex-range bounds and material references all fail closed before an unreachable primitive can be ignored by scene traversal;
+2. topology comparison no longer quantizes each component independently into `1e-4` buckets. It preserves material grouping, triangle winding and cyclic-corner equivalence, then uses pairwise absolute `1e-4` comparisons with bipartite triangle matching. This accepts legitimate values that differ by less than the documented tolerance even when they straddle an arbitrary quantization boundary.
 
-The repaired repository-source copies were executed in a clean sandbox with the same standard-library fixture used by the committed tests. Results:
+The hidden suite adds distinct regressions for unreachable invalid/incorrect `NORMAL` accessors, zero attribute counts, buffer-bound escapes, invalid index formats, zero index counts, plus a positive `0.00006` normal-component drift that must remain accepted under the `1e-4` gate.
+
+## Source-only verification commands
+
+The exact commands for this repaired head are:
 
 ```text
 python Scripts/test_blender_roundtrip_national_mall_panel.py
-PASS: 37/37 Blender round-trip verifier tests
-
 python Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
-PASS: 16/16 Blender hidden-payload verifier tests
-
 python -m py_compile Scripts/blender_roundtrip_national_mall_panel.py Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
-exit 0
 ```
 
-The two suites now provide 53 focused cases total. These are source/tooling tests only. They do not establish Blender execution or Astral runtime behavior.
+The original suite remains 37 cases. The hidden suite now contains 23 cases, for 60 focused cases total. Fresh exact-head hosted execution and independent review are required after this repair; earlier pass receipts remain historical evidence for earlier heads only.
 
 ## Verification model
 
-The verifier does not require byte-identical glTF output. It decodes embedded buffers/accessors, validates the fixed source and receipt identities, scans the complete node and mesh collections for disabled or unverified payloads, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, checks full inherited world transforms and handedness, compares material semantics, and compares canonical winding-preserving triangle/attribute signatures for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
+The verifier does not require byte-identical glTF output. It decodes embedded buffers/accessors, validates the fixed source and receipt identities, scans the complete node and mesh collections for disabled or unverified payloads, validates every primitive's accessor/index payload contract even when unreachable, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, checks full inherited world transforms and handedness, compares material semantics, and compares winding-preserving triangle/corner payloads with the fixed pairwise tolerance for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
 
 The bounded output rejects GPU instancing, punctual lights, node cameras, morph targets/weights and rendering attributes outside the four-source-attribute profile. Optional animation/image/texture/camera collections must be absent or exact empty arrays. This gate is intentionally stricter than a filename/count check but is still only a DCC source-workflow gate. It cannot establish Astral compatibility.
 
 ## Hosted and independent gates
 
-A fresh exact-head Windows workflow and fresh independent review are required after the current repair commits. Earlier Windows workflow evidence applies only to earlier heads and is historical for the final repaired packet.
+A fresh exact-head Windows workflow and fresh independent review are required after the newest repair commits. Do not reuse workflow or review evidence from `1393c786...` or older heads for the repaired candidate.
 
 ## Not run / not claimed
 
