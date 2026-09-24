@@ -273,6 +273,29 @@ public:
         }
         return riftWardenTrial_.BeginPractice(true, difficulty, phase);
     }
+    bool BeginFocusedRiftWardenPractice(RiftWardenDifficulty difficulty,
+        RiftWardenAttack attack,
+        RiftWardenPracticePace pace = RiftWardenPracticePace::Standard,
+        bool looping = false) {
+        if (progression_ == nullptr || progression_ != riftWardenProgressionOwner_
+            || !shadowCryptMission_.Briefing().complete) {
+            return false;
+        }
+        return riftWardenTrial_.BeginFocusedPractice(
+            true, difficulty, attack, pace, looping);
+    }
+    bool SetRiftWardenPracticePace(RiftWardenPracticePace pace) {
+        if (progression_ == nullptr || progression_ != riftWardenProgressionOwner_) return false;
+        return riftWardenTrial_.SetPracticePace(pace);
+    }
+    bool SetRiftWardenPracticePaused(bool paused) {
+        if (progression_ == nullptr || progression_ != riftWardenProgressionOwner_) return false;
+        return riftWardenTrial_.SetPracticePaused(paused);
+    }
+    bool SetRiftWardenLoopingFocusedPractice(bool looping) {
+        if (progression_ == nullptr || progression_ != riftWardenProgressionOwner_) return false;
+        return riftWardenTrial_.SetLoopingFocusedPractice(looping);
+    }
     RiftWardenActionReport ResolveRiftWardenAction(RiftWardenResponse response,
         double reactionSeconds) {
         if (progression_ == nullptr || progression_ != riftWardenProgressionOwner_) return {};
@@ -284,6 +307,10 @@ public:
     }
     RiftWardenBriefing RiftWardenTrialBriefing() const {
         return riftWardenTrial_.Briefing();
+    }
+    RiftWardenAttackGuide RiftWardenAttackGuideFor(RiftWardenAttack attack,
+        RiftWardenDifficulty difficulty) const {
+        return riftWardenTrial_.AttackGuide(attack, difficulty);
     }
     RiftWardenRecord RiftWardenBestRecord(RiftWardenDifficulty difficulty) const {
         return riftWardenTrial_.BestRecord(difficulty);
