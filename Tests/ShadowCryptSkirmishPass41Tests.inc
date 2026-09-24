@@ -83,8 +83,8 @@ void TestShadowCryptSkirmishPass41() {
     const auto pressureRecommendation = pressureTarget.RecommendedTarget();
     Expect(pressureRecommendation.valid && pressureRecommendation.enemyIndex == 1
             && pressureRecommendation.role == ShadowCryptEnemyRole::GraveboundBulwark
-            && pressureRecommendation.priority > baselineTarget.priority,
-        "GAME-205 active support pressure raises its source above the static priority");
+            && pressureRecommendation.priority == 70,
+        "GAME-205 active support pressure raises its source to the bounded pressure priority");
 
     // GAME-206: status pressure has two skillful removal routes. A matching
     // breach exploit can purge the source's pressure, and a precision semantic
