@@ -225,7 +225,10 @@ public:
         shadowCryptProgressionOwner_ = progression_;
         return true;
     }
-    bool AdvanceShadowCryptObjective() { return shadowCryptMission_.RecordObjectiveStep(); }
+    bool AdvanceShadowCryptObjective() {
+        if (shadowCryptSkirmish_.Active()) return false;
+        return shadowCryptMission_.RecordObjectiveStep();
+    }
     bool DiscoverShadowCryptCoolingCache() {
         return shadowCryptMission_.DiscoverCoolingCache();
     }
@@ -233,8 +236,18 @@ public:
     int RecordShadowCryptDamageTaken(int amount) {
         return shadowCryptMission_.RecordDamageTaken(amount);
     }
-    bool ReportShadowCryptDefeat() { return shadowCryptMission_.ReportDefeat(); }
-    bool SuspendShadowCrypt() { return shadowCryptMission_.SuspendAtSafeBoundary(); }
+    bool ReportShadowCryptDefeat() {
+        const bool reported = shadowCryptMission_.ReportDefeat();
+        if (reported && shadowCryptSkirmish_.Active()) {
+            shadowCryptSkirmish_.Cancel();
+            shadowCryptSkirmishObjectiveAdvanced_ = false;
+        }
+        return reported;
+    }
+    bool SuspendShadowCrypt() {
+        if (shadowCryptSkirmish_.Active()) return false;
+        return shadowCryptMission_.SuspendAtSafeBoundary();
+    }
     bool ResumeShadowCrypt() { return shadowCryptMission_.ResumeSuspendedRun(); }
     bool ReplayCompletedShadowCrypt() {
         if (progression_ != shadowCryptProgressionOwner_) return false;
@@ -317,7 +330,10 @@ public:
     }
     ShadowCryptDefenseReport ResolveShadowCryptSkirmishThreat(
         ShadowCryptDefenseResponse response, double reactionSeconds) {
-        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return {};
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptSkirmish_.Active() || !shadowCryptMission_.Briefing().active) {
+            return {};
+        }
         const ShadowCryptDefenseReport report =
             shadowCryptSkirmish_.ResolveThreat(response, reactionSeconds);
         if (report.accepted && report.damageTaken > 0) {
@@ -327,7 +343,10 @@ public:
     }
     ShadowCryptAttackReport AttackShadowCryptSkirmishTarget(
         std::size_t index, ShadowCryptAttackStyle style) {
-        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return {};
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptSkirmish_.Active() || !shadowCryptMission_.Briefing().active) {
+            return {};
+        }
         ShadowCryptAttackReport report = shadowCryptSkirmish_.AttackTarget(index, style);
         if (report.encounterComplete && !shadowCryptSkirmishObjectiveAdvanced_
             && shadowCryptMission_.RecordObjectiveStep()) {
@@ -336,11 +355,13 @@ public:
         return report;
     }
     bool LockShadowCryptSkirmishTarget(std::size_t index) {
-        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return false;
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptMission_.Briefing().active) return false;
         return shadowCryptSkirmish_.LockTarget(index);
     }
     bool ClearShadowCryptSkirmishTargetLock() {
-        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return false;
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptMission_.Briefing().active) return false;
         return shadowCryptSkirmish_.ClearTargetLock();
     }
     std::size_t ShadowCryptSkirmishSelectedTarget() const {
