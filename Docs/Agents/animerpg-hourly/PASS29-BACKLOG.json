@@ -6,7 +6,7 @@
   "pass": "GAME-PASS29-FIELD-GUIDE-MAP-QOL-2026-09-24",
   "baseline": "e38760070e0d021293e9f907834e61e6a6edca23",
   "branch": "game/2026-09-24-field-guide-map-qol-pass29",
-  "pr": null,
+  "pr": 50,
   "sources": [
     {
       "id": "GENSHIN-5.4-MAP",
@@ -145,5 +145,5 @@
     "independently_reviewed_clean_exact_final_head": 0,
     "merged": 0
   },
-  "next_action": "Finish durable receipt/state, open one scoped PR, then require exact-head hosted Debug/Release, Release-manifest and independent Codex review before expected-head merge."
+  "next_action": "Require exact-head hosted Windows Debug/Release, Release-manifest and independent Codex review on PR 50; repair and rerun if needed, then expected-head merge if clean."
 }
