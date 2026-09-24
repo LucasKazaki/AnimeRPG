@@ -114,6 +114,23 @@ void TestShadowCryptSkirmishPass38() {
             && posture.Enemy(1).posture == posture.Enemy(1).maxPosture,
         "pass38 one follow-up consumes stagger, reports no phantom posture damage, and restores posture");
 
+    ShadowCryptSkirmish lethalStagger;
+    Expect(lethalStagger.Begin(ShadowCryptSkirmishTier::EntrySeal),
+        "pass38 lethal-stagger fixture begins");
+    Expect(lethalStagger.ResolveThreat(ShadowCryptDefenseResponse::Dodge, 0.10).openedCounter,
+        "pass38 lethal-stagger fixture earns the first skirmisher counter");
+    Expect(lethalStagger.AttackTarget(0, ShadowCryptAttackStyle::Counter).accepted
+            && lethalStagger.AttackTarget(0, ShadowCryptAttackStyle::Light).accepted,
+        "pass38 lethal-stagger fixture reduces skirmisher health and posture");
+    Expect(lethalStagger.ResolveThreat(ShadowCryptDefenseResponse::Guard, 0.10).successful
+            && lethalStagger.ResolveThreat(ShadowCryptDefenseResponse::Dodge, 0.10).openedCounter,
+        "pass38 lethal-stagger fixture cycles back to an earned finishing counter");
+    const auto lethalCounter = lethalStagger.AttackTarget(0, ShadowCryptAttackStyle::Counter);
+    Expect(lethalCounter.accepted && lethalCounter.defeated
+            && lethalCounter.postureDamage == 4 && !lethalCounter.staggerOpened
+            && !lethalStagger.Enemy(0).staggered,
+        "pass38 a lethal posture break suppresses an impossible stagger follow-up signal");
+
     // QOL-039: an explicit manual target lock stays sticky until that target is
     // defeated, then the deterministic role/threat fallback resumes.
     ShadowCryptSkirmish targeting;
@@ -177,6 +194,23 @@ void TestShadowCryptSkirmishPass38() {
             && owner.ShadowCryptBriefing().damageTaken == 9999,
         "pass38 skirmish and mission damage remain equal at the skirmish tracking cap");
 
+    LandmarkInteraction missionCapOwner;
+    WorldBlockout missionCapWorld;
+    ShadowbladeActions missionCapActions;
+    CharacterProgression missionCapProgression;
+    UnlockShadowCryptProductionOwnerPass38(missionCapOwner, missionCapWorld, missionCapActions);
+    missionCapOwner.SetCharacterProgression(&missionCapProgression);
+    Expect(missionCapOwner.BeginShadowCrypt()
+            && missionCapOwner.RecordShadowCryptDamageTaken(999995) == 999995
+            && missionCapOwner.BeginShadowCryptSkirmish(),
+        "pass38 mission-cap fixture reaches five points below the authoritative damage cap");
+    const auto missionCapDefense = missionCapOwner.ResolveShadowCryptSkirmishThreat(
+        ShadowCryptDefenseResponse::Guard, 0.10);
+    Expect(missionCapDefense.accepted && !missionCapDefense.successful
+            && missionCapDefense.damageTaken == 5
+            && missionCapOwner.ShadowCryptBriefing().damageTaken == 1000000,
+        "pass38 production defense report exposes only damage accepted by the authoritative mission cap");
+
     const int progressBeforeClear = owner.ShadowCryptBriefing().objectiveProgress;
     DefeatProductionShadowCryptSkirmishPass38(owner);
     Expect(owner.ShadowCryptSkirmishState().Complete()
@@ -202,6 +236,31 @@ void TestShadowCryptSkirmishPass38() {
             && owner.ShadowCryptBriefing().objectiveProgress == 0
             && owner.BeginShadowCryptSkirmish(),
         "pass38 active defeat cancels room combat, resets mission progress, and permits another clean retry");
+
+    LandmarkInteraction replayOwner;
+    WorldBlockout replayWorld;
+    ShadowbladeActions replayActions;
+    CharacterProgression replayProgression;
+    UnlockShadowCryptProductionOwnerPass38(replayOwner, replayWorld, replayActions);
+    replayOwner.SetCharacterProgression(&replayProgression);
+    Expect(replayOwner.BeginShadowCrypt() && replayOwner.BeginShadowCryptSkirmish(),
+        "pass38 replay fixture begins a production Entry Seal skirmish");
+    DefeatProductionShadowCryptSkirmishPass38(replayOwner);
+    int replayGuard = 0;
+    while (!replayOwner.ShadowCryptBriefing().complete && replayGuard++ < 16) {
+        Expect(replayOwner.AdvanceShadowCryptObjective(),
+            "pass38 replay fixture advances the remaining accepted mission objectives");
+    }
+    Expect(replayOwner.ShadowCryptBriefing().complete
+            && replayOwner.ShadowCryptSkirmishState().Complete(),
+        "pass38 replay fixture preserves completed encounter evidence until replay is accepted");
+    Expect(replayOwner.ReplayCompletedShadowCrypt()
+            && replayOwner.ShadowCryptBriefing().active
+            && replayOwner.ShadowCryptBriefing().room == ShadowCryptRoom::EntrySeal
+            && !replayOwner.ShadowCryptSkirmishState().Active()
+            && !replayOwner.ShadowCryptSkirmishState().Complete()
+            && replayOwner.ShadowCryptSkirmishState().EnemyCount() == 0,
+        "pass38 successful mission replay clears stale skirmish state before the new Entry Seal run");
 }
 
 } // namespace
