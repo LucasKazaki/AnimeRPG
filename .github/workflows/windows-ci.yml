@@ -51,6 +51,143 @@ jobs:
       - name: Verify R0 runner safety contracts
         run: python Scripts/test_r0_runner_safety.py
 
+      - name: Verify R0 Windows Job Object containment contract
+        shell: pwsh
+        run: |
+          $probe = Join-Path $env:RUNNER_TEMP "r0-windows-job-object-probe.py"
+          @'
+          import argparse
+          import ctypes
+          import importlib.util
+          import sys
+          import tempfile
+          from ctypes import wintypes
+          from pathlib import Path
+
+          script = Path("Scripts/invoke_r0_release_candidate.py").resolve()
+          spec = importlib.util.spec_from_file_location("r0_runner_job_probe", script)
+          if spec is None or spec.loader is None:
+              raise RuntimeError("could not load the R0 runner for the Windows Job Object probe")
+          r0 = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = r0
+          spec.loader.exec_module(r0)
+
+          probe_code = r'''
+          import ctypes
+          from ctypes import wintypes
+
+          class IO_COUNTERS(ctypes.Structure):
+              _fields_ = [
+                  ("ReadOperationCount", ctypes.c_ulonglong),
+                  ("WriteOperationCount", ctypes.c_ulonglong),
+                  ("OtherOperationCount", ctypes.c_ulonglong),
+                  ("ReadTransferCount", ctypes.c_ulonglong),
+                  ("WriteTransferCount", ctypes.c_ulonglong),
+                  ("OtherTransferCount", ctypes.c_ulonglong),
+              ]
+
+          class JOBOBJECT_BASIC_LIMIT_INFORMATION(ctypes.Structure):
+              _fields_ = [
+                  ("PerProcessUserTimeLimit", ctypes.c_longlong),
+                  ("PerJobUserTimeLimit", ctypes.c_longlong),
+                  ("LimitFlags", wintypes.DWORD),
+                  ("MinimumWorkingSetSize", ctypes.c_size_t),
+                  ("MaximumWorkingSetSize", ctypes.c_size_t),
+                  ("ActiveProcessLimit", wintypes.DWORD),
+                  ("Affinity", ctypes.c_size_t),
+                  ("PriorityClass", wintypes.DWORD),
+                  ("SchedulingClass", wintypes.DWORD),
+              ]
+
+          class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
+              _fields_ = [
+                  ("BasicLimitInformation", JOBOBJECT_BASIC_LIMIT_INFORMATION),
+                  ("IoInfo", IO_COUNTERS),
+                  ("ProcessMemoryLimit", ctypes.c_size_t),
+                  ("JobMemoryLimit", ctypes.c_size_t),
+                  ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                  ("PeakJobMemoryUsed", ctypes.c_size_t),
+              ]
+
+          kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+          kernel32.GetCurrentProcess.argtypes = []
+          kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+          kernel32.IsProcessInJob.argtypes = [wintypes.HANDLE, wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)]
+          kernel32.IsProcessInJob.restype = wintypes.BOOL
+          kernel32.QueryInformationJobObject.argtypes = [
+              wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)
+          ]
+          kernel32.QueryInformationJobObject.restype = wintypes.BOOL
+          kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+          kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+          kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+          kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+          kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+          kernel32.CloseHandle.restype = wintypes.BOOL
+
+          current = kernel32.GetCurrentProcess()
+          in_job = wintypes.BOOL()
+          if not kernel32.IsProcessInJob(current, None, ctypes.byref(in_job)):
+              raise ctypes.WinError(ctypes.get_last_error())
+          if not in_job.value:
+              raise RuntimeError("supervised command is not associated with any Windows Job Object")
+
+          limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
+          if not kernel32.QueryInformationJobObject(
+              None, 9, ctypes.byref(limits), ctypes.sizeof(limits), None
+          ):
+              raise ctypes.WinError(ctypes.get_last_error())
+          if not (limits.BasicLimitInformation.LimitFlags & 0x00002000):
+              raise RuntimeError("immediate Job Object is missing JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE")
+
+          nested = kernel32.CreateJobObjectW(None, None)
+          if not nested:
+              raise ctypes.WinError(ctypes.get_last_error())
+          try:
+              if not kernel32.AssignProcessToJobObject(nested, current):
+                  raise ctypes.WinError(ctypes.get_last_error())
+              print("ASTRAL_WINDOWS_JOB_OBJECT_PROBE_OK", flush=True)
+          finally:
+              kernel32.CloseHandle(nested)
+          '''
+
+          with tempfile.TemporaryDirectory() as temp:
+              root = Path(temp)
+              source = root / "source"
+              worktree = root / "worktree"
+              source.mkdir()
+              worktree.mkdir()
+              args = argparse.Namespace(
+                  source_repository=source,
+                  worktree=worktree,
+                  build_root=root / "build",
+                  release_root=root / "release",
+                  evidence_root=root / "evidence",
+                  recovery_branch="probe/r0-job-object",
+                  base_ref="HEAD",
+                  skip_fetch=True,
+                  command_timeout_seconds=10.0,
+                  capture_timeout_seconds=10.0,
+              )
+              runner = r0.R0Runner(args)
+              runner.run_command(
+                  "windows-job-object-probe",
+                  [sys.executable, "-c", probe_code],
+                  cwd=worktree,
+                  timeout_seconds=10.0,
+              )
+              log = (args.evidence_root / "01-windows-job-object-probe.log").read_text(encoding="utf-8")
+              if "ASTRAL_WINDOWS_JOB_OBJECT_PROBE_OK" not in log:
+                  raise RuntimeError("Job Object probe marker is missing from retained command evidence")
+              if len(runner.records) != 1 or runner.records[0].exit_code != 0:
+                  raise RuntimeError("Job Object probe did not retain a successful command record")
+              if runner.records[0].timed_out or runner.records[0].interrupted or runner.records[0].spawn_error:
+                  raise RuntimeError("Job Object probe retained an unexpected failure state")
+              print("Hosted Windows Job Object containment contract passed.")
+          '@ | Set-Content -Path $probe -Encoding utf8
+          python $probe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Verify PE dependency inspector contracts
         run: python Scripts/test_pe_dependencies.py
 
