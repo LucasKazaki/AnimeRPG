@@ -3,9 +3,11 @@
 #include "Engine/Math/Math.h"
 #include "Engine/Scene/CombatSandbox.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
+#include "Engine/Scene/ShadowbladeLoadoutWorkbench.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace Astral::Scene {
 
@@ -198,6 +200,33 @@ public:
 
     ShadowbladeLoadout& Loadout() { return loadout_; }
     const ShadowbladeLoadout& Loadout() const { return loadout_; }
+    const ShadowbladeLoadoutWorkbench& LoadoutWorkbench() const { return loadoutWorkbench_; }
+    LoadoutActionResult ApplyLoadoutPreset(std::size_t slot,
+        const CharacterProgression& progression) {
+        return loadoutWorkbench_.ApplyPreset(loadout_, slot, progression);
+    }
+    LoadoutActionResult ReapplyLastLoadoutPreset(const CharacterProgression& progression) {
+        return loadoutWorkbench_.ReapplyLastPreset(loadout_, progression);
+    }
+    bool HasLastAppliedLoadoutPreset() const {
+        return loadoutWorkbench_.HasLastAppliedPreset(loadout_);
+    }
+    std::size_t LastAppliedLoadoutPreset() const {
+        return loadoutWorkbench_.LastAppliedPreset(loadout_);
+    }
+    PresetLabelResult SetLoadoutPresetLabel(std::size_t slot,
+        const std::string& label) {
+        return loadoutWorkbench_.SetPresetLabel(loadout_, slot, label);
+    }
+    PresetLabelResult ClearLoadoutPresetLabel(std::size_t slot) {
+        return loadoutWorkbench_.ClearPresetLabel(loadout_, slot);
+    }
+    bool HasLoadoutPresetLabel(std::size_t slot) const {
+        return loadoutWorkbench_.HasPresetLabel(loadout_, slot);
+    }
+    std::string LoadoutPresetLabel(std::size_t slot) const {
+        return loadoutWorkbench_.PresetLabel(loadout_, slot);
+    }
     static ShadowbladeActionTuning ActionTuningForProfile(
         const ShadowbladeLoadoutProfile& profile);
     ShadowbladeActionTuning CurrentLoadoutTuning() const;
@@ -217,6 +246,7 @@ private:
     DefenseReport ResolveIncomingHit(DefenseResult result);
 
     ShadowbladeLoadout loadout_{};
+    ShadowbladeLoadoutWorkbench loadoutWorkbench_{};
     float resource_{MaximumResource};
     float dashCooldownRemaining_{};
     float fatalStrikeCooldownRemaining_{};

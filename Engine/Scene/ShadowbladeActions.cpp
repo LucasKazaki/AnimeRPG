@@ -430,9 +430,11 @@ void ShadowbladeActions::ResetDefenseState() {
 
 void ShadowbladeActions::ResetTransientStatePreservingLoadout() {
     const ShadowbladeLoadout persistentLoadout = loadout_;
+    const ShadowbladeLoadoutWorkbench persistentWorkbench = loadoutWorkbench_;
     const DefenseTimingPreset timingPreset = defenseTimingPreset_;
     *this = ShadowbladeActions{};
     loadout_ = persistentLoadout;
+    loadoutWorkbench_ = persistentWorkbench;
     defenseTimingPreset_ = timingPreset;
 }
 

@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "repository": "LucasKazaki/AnimeRPG",
+  "target_branch": "main",
+  "pass": "GAME-PASS28-SHADOWBLADE-LOADOUT-WORKBENCH-2026-09-24",
+  "baseline": "6d22da88402db71843ecd5a35766c0c77e62dca6",
+  "branch": "game/2026-09-24-shadowblade-loadout-workbench-pass28",
+  "pr": 48,
+  "sources": [
+    {
+      "id": "GENSHIN-5.7-UPDATE",
+      "kind": "developer_release_notes",
+      "url": "https://www.hoyolab.com/article/39384127",
+      "published": "2025-06-17",
+      "accessed": "2026-09-23",
+      "context": "Official Genshin Impact Version 5.7 equipment/configuration UX details; design reference only."
+    },
+    {
+      "id": "ZZZ-PLAYER-PRESET-NAMES-20260711",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZenlessZoneZero/comments/1utacze/agent_presets_delete_how/",
+      "published": "2026-07-11",
+      "accessed": "2026-09-23",
+      "context": "Small anecdotal thread; replies specifically complain about preset naming/default-name friction and spaces. Current official resolution not established.",
+      "consensus": false
+    }
+  ],
+  "increments": [
+    {
+      "id": "GAME-137",
+      "kind": "reference_feature",
+      "title": "Non-mutating equipment comparison",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Owned compatible module/weapon previews expose exact authoritative profile deltas without mutating the live loadout; rejected previews fail atomically."
+    },
+    {
+      "id": "GAME-138",
+      "kind": "reference_feature",
+      "title": "Focus-aware owned-module recommendation",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Balanced/Assault/Guard/Recovery/Mobility focuses deterministically rank only owned slot-compatible modules and never auto-equip."
+    },
+    {
+      "id": "GAME-139",
+      "kind": "reference_feature",
+      "title": "Resonance-family recommendation filter",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Any/Cooling/Rift/Civic filters restrict suggestions; missing or malformed families return unavailable without mutation."
+    },
+    {
+      "id": "GAME-140",
+      "kind": "reference_feature",
+      "title": "Current-slot versus whole-build recommendation scope",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "CurrentSlot scores direct module contribution without newly activated family synergy; WholeBuild scores the full resulting profile and can legitimately choose a different candidate."
+    },
+    {
+      "id": "GAME-141",
+      "kind": "reference_feature",
+      "title": "Last-successful preset recall and reapply",
+      "source_ids": ["GENSHIN-5.7-UPDATE"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeLoadout.h", "Engine/Scene/ShadowbladeActions.h", "Engine/Scene/ShadowbladeActions.cpp"],
+      "acceptance": "Only successful authoritative preset application becomes remembered, including the established direct loadout apply path; failed applies do not replace it; transient encounter/training resets preserve the remembered selection; reapply routes through existing preset validation."
+    },
+    {
+      "id": "QOL-029",
+      "kind": "community_improvement",
+      "title": "Human-readable clearable preset labels with spaces",
+      "source_ids": ["ZZZ-PLAYER-PRESET-NAMES-20260711"],
+      "status": "implemented_registered_regression_pending_exact_head_gates",
+      "production_paths": ["Engine/Scene/ShadowbladeLoadoutWorkbench.h", "Engine/Scene/ShadowbladeLoadout.h", "Engine/Scene/ShadowbladeActions.h", "Engine/Scene/ShadowbladeActions.cpp"],
+      "acceptance": "Saved slots accept bounded labels with internal spaces through their paired Shadowblade owner; invalid/cross-owner edits fail atomically; labels remain paired with saved presets across whole-loadout assignment; the public workbench view is const-only; transient resets preserve labels; label clearing does not alter the saved build or current equipment."
+    }
+  ],
+  "counts": {
+    "reference_researched": 5,
+    "community_researched": 1,
+    "implemented": 6,
+    "registered_regression_covered": 6,
+    "game_domain_integrated": 6,
+    "hosted_exact_head_verified": 0,
+    "native_playable_verified": 0,
+    "independently_reviewed_clean": 0,
+    "merged": 0
+  },
+  "review_repairs": [
+    "P1: CurrentSlot scoring now removes newly activated family synergy before focus scoring.",
+    "P1: The bounded task, backlog, and receipt records were added so allowed paths and gates are reviewable.",
+    "P2: Stateful preset metadata operations are bound to the paired ShadowbladeActions owner rather than accepting an arbitrary foreign loadout.",
+    "P2: ResetTransientStatePreservingLoadout preserves the new persistent preset metadata alongside the authoritative loadout.",
+    "P2: The public LoadoutWorkbench accessor is const-only, closing implicit cross-owner workbench assignment.",
+    "P2: Preset labels and last-applied metadata live in ShadowbladeLoadout so whole-loadout replacement copies or clears them atomically with the saved build.",
+    "P2: Authoritative ShadowbladeLoadout::ApplyPreset records recall on every successful apply, including the established direct mutable-loadout path, with direct-path regression coverage.",
+    "P2: The retained run receipt now lists and describes ShadowbladeLoadout.h and its metadata/bookkeeping changes.",
+    "P2: GAME-141, QOL-029, and durable coordination path inventories now include ShadowbladeLoadout.h.",
+    "P2: Backlog, STATE, and run receipt now consistently retain the complete review-repair history.",
+    "P2: The task and receipt now retain literal hosted configure/build/test/scope commands, observed success-to-exit-zero semantics, and the explicit no-native-runtime evidence boundary."
+  ],
+  "known_failed_gate": {
+    "head": "6957ff8d913e0a70c18df7deb0bc13b572bc304c",
+    "windows_run": 35930449020,
+    "result": "failed_debug_build_before_tests",
+    "cause": "registered tests still called stateful workbench methods after those methods became private owner-only APIs; repaired on a later head",
+    "release_manifest_run": 35930449015,
+    "release_manifest_result": "success"
+  },
+  "superseded_green_gate": {
+    "head": "768185c95c5478e12fe6859dfe33d2055fd688f3",
+    "windows_run": 35931582989,
+    "windows_result": "success",
+    "release_manifest_run": 35931582978,
+    "release_manifest_result": "success",
+    "reason_not_final": "fresh independent review found a const-ownership escape via the non-const workbench accessor; repaired on a later head"
+  },
+  "superseded_green_gate_after_code_repairs": {
+    "head": "0b9e6d88bb70070475b052e426b7b25d8f148ff4",
+    "windows_run": 35934146994,
+    "windows_result": "success",
+    "release_manifest_run": 35934146841,
+    "release_manifest_result": "success",
+    "reason_not_final": "fresh independent review found stale durable path inventories and review-history records; repaired by later documentation-only commits"
+  },
+  "superseded_green_gate_before_command_receipt_repair": {
+    "head": "06b5f57e880737ab286e421244d75234139968bc",
+    "windows_run": 35934957614,
+    "windows_result": "success",
+    "release_manifest_run": 35934957584,
+    "release_manifest_result": "success",
+    "reason_not_final": "fresh independent review found that literal gate commands and exit semantics were not retained in the durable task/receipt; repaired by later documentation-only commits"
+  },
+  "next_action": "Use the complete command-evidence repair commit as the exact candidate, require green Windows Debug/Release and release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
+}

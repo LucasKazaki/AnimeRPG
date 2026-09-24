@@ -3,21 +3,21 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "40311ba7dcf1035656b6b2d0dbeb589030071dc7",
+  "last_verified_main_at_pass_start": "6d22da88402db71843ecd5a35766c0c77e62dca6",
   "last_merged_pass": {
-    "id": "GAME-PASS26-MANA-REACTOR-LIVE-2026-09-24",
-    "pr": 46,
-    "merge_sha": "40311ba7dcf1035656b6b2d0dbeb589030071dc7",
-    "head_sha": "6546b7239059238d022d9b3cd102d24b2ae697cd",
+    "id": "GAME-PASS27-SHADOW-CRYPT-LIVE-2026-09-24",
+    "pr": 47,
+    "merge_sha": "6d22da88402db71843ecd5a35766c0c77e62dca6",
+    "head_sha": "2882d496089ffeec3911b182d2c02b249d43984b",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-24-shadow-crypt-live-pass27",
-  "pass": "GAME-PASS27-SHADOW-CRYPT-LIVE-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS27-SHADOW-CRYPT-LIVE-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS27-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS27.md",
-  "pr": "pending",
-  "final_head": "record_in_pr_after_exact_head_gates",
+  "working_branch": "game/2026-09-24-shadowblade-loadout-workbench-pass28",
+  "pass": "GAME-PASS28-SHADOWBLADE-LOADOUT-WORKBENCH-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS28-SHADOWBLADE-LOADOUT-WORKBENCH-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS28-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS28.md",
+  "pr": 48,
+  "final_head": "record_in_PR_gate_comment_after_exact_head_checks_and_review",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -30,27 +30,53 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-132","title":"Production-owned Shadow Crypt entry","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-133","title":"Authoritative Shadow Crypt room briefing","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-134","title":"Safe room-boundary suspend and one-shot resume","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-135","title":"Monotonic Shadow Crypt best-clear record","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-136","title":"Live first-clear reward and full expedition replay","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"QOL-028","title":"Authoritative Shadow Crypt next-objective guidance","status":"implemented_registered_regression_pending_exact_head_gates"}
+    {"id":"GAME-137","title":"Non-mutating equipment comparison","status":"implemented_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-138","title":"Focus-aware owned-module recommendation","status":"implemented_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-139","title":"Resonance-family recommendation filter","status":"implemented_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-140","title":"Current-slot versus whole-build recommendation scope","status":"implemented_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-141","title":"Last-successful preset recall and reapply","status":"implemented_authoritative_apply_recall_owner_bound_reset_persistent_registered_regression_pending_exact_head_gates"},
+    {"id":"QOL-029","title":"Human-readable clearable preset labels with spaces","status":"implemented_paired_loadout_metadata_owner_bound_reset_persistent_registered_regression_pending_exact_head_gates"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ShadowCryptMissionPass27Tests",
-    "sandbox_cpp17": "not_run_previous_container_DNS_failure_not_retried_no_product_claim",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
-    "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "pending_exact_final_head",
-    "integration": "LandmarkInteraction now owns ShadowCryptMission and routes existing field evidence, room progress, suspend/resume, best record, CharacterProgression reward entitlement, and replay APIs; native input/UI not wired",
-    "persistent_cross_process_save": "not_changed_not_claimed"
+    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ShadowbladeLoadoutWorkbenchPass28Tests",
+    "sandbox_cpp17": "not_run_repo_not_materialized_no_product_claim",
+    "known_failed_windows_head": "6957ff8d913e0a70c18df7deb0bc13b572bc304c",
+    "known_failed_windows_run": 35930449020,
+    "known_failed_windows_result": "Debug_build_failed_before_tests_after_owner_API_repair; registered tests still called now-private stateful methods; repaired_on_later_head",
+    "known_release_manifest_run": 35930449015,
+    "known_release_manifest_result": "success_on_6957ff8_but_not_final_acceptance",
+    "superseded_green_head": "06b5f57e880737ab286e421244d75234139968bc",
+    "superseded_green_windows_run": 35934957614,
+    "superseded_green_release_manifest_run": 35934957584,
+    "superseded_green_reason": "fresh independent review found that literal hosted gate commands and exit semantics were not retained in the durable task/receipt; documentation repair moved the head",
+    "hosted_windows_ci": "pending_exact_final_head_after_command_evidence_repair",
+    "release_manifest": "pending_exact_final_head_after_command_evidence_repair",
+    "native_windows_interactive": "not_applicable_to_backend_only_pass_not_run_not_claimed",
+    "independent_review": "two_P1_and_nine_P2_material_findings_repaired; prior_threads_resolved_and_command_evidence_thread_repaired_pending_resolution; fresh_exact_final_head_review_pending",
+    "integration": "ShadowbladeActions exposes a const ShadowbladeLoadoutWorkbench beside authoritative ShadowbladeLoadout; preset labels and last-applied metadata live with ShadowbladeLoadout; successful direct or owner-wrapped preset apply shares authoritative recall bookkeeping; transient reset preserves the loadout; native input/UI not wired",
+    "persistent_cross_process_save": "workbench_session_metadata_not_persisted_not_claimed"
   },
   "coordination": {
     "open_engine_and_art_prs": "left_unchanged",
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "ShadowCryptMission_h_plus_LandmarkInteraction_h_plus_registered_game_tests_only"
+    "gameplay_paths": "ShadowbladeLoadoutWorkbench_h_plus_ShadowbladeLoadout_h_plus_ShadowbladeActions_h_plus_narrow_existing_ShadowbladeActions_cpp_reset_helper_plus_registered_game_tests_only"
   },
-  "next_action": "Open the bounded PR, run exact-head hosted Windows Debug/Release and Release-manifest gates, obtain fresh independent Codex review on the same head, repair and rerun if needed, then re-read live main/head/full diff and expected-head merge if clean."
+  "review_history": {
+    "material_findings_repaired": 11,
+    "severity_breakdown": "2_P1_9_P2",
+    "summary": [
+      "CurrentSlot family-synergy leakage repaired.",
+      "Missing bounded task/receipt records repaired.",
+      "Cross-owner stateful metadata path repaired.",
+      "Transient-reset metadata loss repaired.",
+      "Mutable workbench copy-assignment escape repaired.",
+      "Whole-loadout replacement metadata split repaired.",
+      "Direct preset-apply recall bypass repaired.",
+      "Run-receipt ShadowbladeLoadout.h omission repaired.",
+      "Backlog and STATE ShadowbladeLoadout.h inventory omissions repaired.",
+      "Durable independent-review history reconciled across retained records.",
+      "Literal hosted configure/build/test/scope commands and observed exit semantics retained; no native runtime command applies to this backend-only pass."
+    ]
+  },
+  "next_action": "Use the complete command-evidence repair commit as the exact candidate, require green Windows Debug/Release and Release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
 }
