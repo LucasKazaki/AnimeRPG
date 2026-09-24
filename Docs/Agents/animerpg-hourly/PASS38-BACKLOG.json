@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS38-SHADOW-CRYPT-SKIRMISH-2026-09-24",
+  "baseline": "cc491c87253ccaf8affc3b91055036a7af143e10",
+  "target_branch": "main",
+  "working_branch": "game/pass38-shadow-crypt-skirmish",
+  "accessed": "2026-09-24",
+  "sources": [
+    {
+      "id": "ZZZ-3.2-20260909",
+      "kind": "official_update_announcement",
+      "published": "2026-09-09",
+      "url": "https://zenless.hoyoverse.com/en-us/news/166000?catchSpider=1&lang=en-us&page=news",
+      "use": "new enemy classes, Defensive Assist counterability, attack flash semantics, stun multiplier and recovery behavior"
+    },
+    {
+      "id": "GENSHIN-STYGIAN-20260302",
+      "kind": "official_event_details",
+      "published": "2026-03-02",
+      "url": "https://www.hoyolab.com/article/44016747",
+      "use": "escalating combat difficulty with tougher enemies and restrictive rules"
+    },
+    {
+      "id": "ZZZ-COMBAT-TRAINING-20260831",
+      "kind": "official_event_details",
+      "published": "2026-08-31",
+      "url": "https://zenless.hoyoverse.com/m/en-us/news/165921",
+      "use": "enemy-card combat training confirms enemy-specific encounter selection as a current design surface"
+    },
+    {
+      "id": "GENSHIN-PLAYER-TARGETLOCK-20260330",
+      "kind": "original_player_discussion",
+      "published": "2026-03-30",
+      "url": "https://www.reddit.com/r/Genshin_Impact/comments/1s7gon1/i_wish_hoyo_adds_a_targetlock_enemy_feature/",
+      "use": "manual target focus request when automatic targeting selects an unintended enemy",
+      "sentiment": "corroborated in-thread preference, not consensus",
+      "current_resolution": "unverified"
+    },
+    {
+      "id": "ZZZ-PLAYER-TARGETING-20240820",
+      "kind": "original_player_discussion",
+      "published": "2024-08-20",
+      "url": "https://www.reddit.com/r/ZZZ_Official/comments/1ewmn2i",
+      "use": "older independent discussion of multi-enemy target focus and switching; replies note a manual lock already exists in ZZZ",
+      "sentiment": "historical corroboration plus counterargument; not a current-defect claim"
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-187",
+      "title": "Distinct Shadow Crypt enemy roles",
+      "status": "implemented_pending_exact_head_acceptance",
+      "acceptance": "RiftSkirmisher, VeilChanneler and GraveboundBulwark expose distinct bounded health/posture and behavior."
+    },
+    {
+      "id": "GAME-188",
+      "title": "Room-scaled enemy formations",
+      "status": "implemented_pending_exact_head_acceptance",
+      "acceptance": "Entry Seal, Archive Gallery and Rift Nave use deterministic formations with bounded escalation."
+    },
+    {
+      "id": "GAME-189",
+      "title": "Semantic counterability telegraphs",
+      "status": "implemented_pending_exact_head_acceptance",
+      "acceptance": "Every threat exposes non-color-only cue, expected defense, timing window, failure damage and counterability."
+    },
+    {
+      "id": "GAME-190",
+      "title": "Interruptible channel and earned counter",
+      "status": "implemented_pending_exact_head_acceptance",
+      "acceptance": "Exact-boundary Channeler interrupt succeeds, opens one counter and duplicate counter use fails."
+    },
+    {
+      "id": "GAME-191",
+      "title": "Posture break and bounded recovery",
+      "status": "implemented_pending_exact_head_acceptance",
+      "acceptance": "Posture bottoms at zero, opens one stagger punish, then restores after consumption without stun lock."
+    },
+    {
+      "id": "QOL-039",
+      "title": "Sticky manual target focus",
+      "status": "implemented_pending_exact_head_acceptance",
+      "acceptance": "Manual target selection survives unrelated enemy actions and releases only on clear or target defeat before deterministic fallback."
+    }
+  ],
+  "allowed_paths": [
+    "Engine/Scene/ShadowCryptSkirmish.h",
+    "Engine/Scene/LandmarkInteraction.h",
+    "Tests/ShadowCryptSkirmishPass38Tests.inc",
+    "Tests/ThoughtCommandsTests.cpp",
+    "Tasks/GAME-PASS38-SHADOW-CRYPT-SKIRMISH-2026-09-24.md",
+    "Docs/Agents/animerpg-hourly/PASS38-BACKLOG.json",
+    "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS38.md",
+    "Docs/Agents/animerpg-hourly/STATE.json"
+  ],
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "registered_regression_covered": 6,
+    "game_domain_integrated": 6,
+    "hosted_verified_exact_final_head": 0,
+    "native_playable_verified": 0,
+    "independent_reviewed_clean_exact_final_head": 0,
+    "merged": 0
+  },
+  "next_action": "Open the scoped PR, require hosted Windows Debug/Release and release-manifest integrity plus independent Codex review on the exact candidate head, repair any findings, then expected-head merge only when all gates are clean."
+}

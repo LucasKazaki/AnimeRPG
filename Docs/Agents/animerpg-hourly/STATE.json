@@ -3,20 +3,20 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "02bca71b2da473626578f89b9876afb4045f0de0",
+  "last_verified_main_at_pass_start": "cc491c87253ccaf8affc3b91055036a7af143e10",
   "last_merged_pass": {
-    "id": "GAME-PASS36-ENCOUNTER-SPECIAL-OFFENSIVE-2026-09-24",
-    "pr": 61,
-    "merge_sha": "02bca71b2da473626578f89b9876afb4045f0de0",
+    "id": "GAME-PASS37-SHADOW-CRYPT-MISSION-PLANNING-2026-09-24",
+    "pr": 62,
+    "merge_sha": "cc491c87253ccaf8affc3b91055036a7af143e10",
     "native_playable": false
   },
-  "working_branch": "game/pass37-shadow-crypt-mission-planning",
-  "pass": "GAME-PASS37-SHADOW-CRYPT-MISSION-PLANNING-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS37-SHADOW-CRYPT-MISSION-PLANNING-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS37-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS37.md",
-  "pr": 62,
-  "final_head": "pending_exact_head_gates_and_review_after_review_repairs",
+  "working_branch": "game/pass38-shadow-crypt-skirmish",
+  "pass": "GAME-PASS38-SHADOW-CRYPT-SKIRMISH-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS38-SHADOW-CRYPT-SKIRMISH-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS38-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS38.md",
+  "pr": 63,
+  "final_head": "this_state_commit_pending_exact_head_gates_and_review",
   "final_receipt_location": "implementation_PR_comment_after_exact_head_acceptance_and_merge",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -30,30 +30,42 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-182","title":"Focused Shadow Crypt guidance","status":"review_repaired_pending_exact_final_head_acceptance"},
-    {"id":"GAME-183","title":"Explicit entry prerequisite report","status":"review_repaired_pending_exact_final_head_acceptance"},
-    {"id":"GAME-184","title":"Prerequisite-specific next action","status":"review_repaired_pending_exact_final_head_acceptance"},
-    {"id":"GAME-185","title":"Latest clear versus personal-best result","status":"pending_exact_final_head_acceptance"},
-    {"id":"GAME-186","title":"Bounded All Records clear archive","status":"pending_exact_final_head_acceptance"},
-    {"id":"QOL-038","title":"Pre-entry Shadow Crypt encounter intel","status":"pending_exact_final_head_acceptance"}
+    {"id":"GAME-187","title":"Distinct Shadow Crypt enemy roles","status":"implemented_pending_exact_final_head_acceptance"},
+    {"id":"GAME-188","title":"Room-scaled enemy formations","status":"implemented_pending_exact_final_head_acceptance"},
+    {"id":"GAME-189","title":"Semantic counterability telegraphs","status":"implemented_pending_exact_final_head_acceptance"},
+    {"id":"GAME-190","title":"Interruptible channel and earned counter","status":"implemented_pending_exact_final_head_acceptance"},
+    {"id":"GAME-191","title":"Posture break and bounded recovery","status":"implemented_pending_exact_final_head_acceptance"},
+    {"id":"QOL-039","title":"Sticky manual target focus","status":"implemented_pending_exact_final_head_acceptance"}
   ],
+  "review_repairs": {
+    "stale_room_timeline": "repaired_and_regression_covered",
+    "actual_posture_delta": "repaired_and_regression_covered",
+    "actual_capped_failure_damage_delta": "repaired_and_regression_covered",
+    "completed_skirmish_defeat_cleanup": "repaired_and_regression_covered",
+    "latest_implementation_commits": [
+      "7a9cf9d2caa35cc02d6cfb6be67b369a4e190b9b",
+      "3549f472f52a4d806453f0f291966a7f61e67d06",
+      "cae55b6093cb308f02b4def64cb7ca5979c05db5"
+    ]
+  },
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_with_ShadowCryptMissionPlanningPass37Tests_inc",
-    "hosted_windows_ci": "initial_49113d2_passed_but_stale_after_review_repairs_final_head_pending",
-    "release_manifest": "initial_49113d2_passed_but_stale_after_review_repairs_final_head_pending",
+    "sandbox_cpp17": "standalone ShadowCryptSkirmish logic compiled and ran with g++ -std=c++17 -Wall -Wextra -Werror -pedantic before PR; exit 0",
+    "registered_test_target": "ThoughtCommandsTests_with_ShadowCryptSkirmishPass38Tests_inc",
+    "hosted_windows_ci": "pending_exact_final_head_after_state_freeze",
+    "release_manifest": "pending_exact_final_head_after_state_freeze",
     "native_windows_interactive": "not_run_not_claimed_no_input_UI_or_renderer_changes",
-    "independent_review": "initial_49113d2_found_two_P2_integration_gaps_both_repaired_fresh_exact_final_head_review_pending",
+    "independent_review": "pending_fresh_exact_final_head_rereview",
     "cross_process_persistence": "not_changed_or_claimed"
   },
   "coordination": {
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "ShadowCryptMission_h_and_LandmarkInteraction_h_pass37_wrappers",
+    "gameplay_paths": "new_ShadowCryptSkirmish_h_plus_narrow_LandmarkInteraction_h_owner_integration",
     "test_registration": "existing_ThoughtCommandsTests_target_include_call_only_no_CMake_change"
   },
   "research": {
-    "reference_context": "Genshin Impact 7.1 quest prerequisites, Focused Experience Mode, quest-guide direction, historical-best result presentation and All Records surface",
-    "community_request": "historical player request to inspect domain encounter information before commitment adapted as pre-entry Shadow Crypt room and boss intel",
-    "current_resolution": "exact current Genshin resolution unverified; no current unresolved comparator defect is claimed"
+    "reference_context": "ZZZ 3.2 enemy roles, Defensive Assist counterability and stun semantics; Genshin Stygian escalating combat; ZZZ enemy-card Combat Training",
+    "community_request": "manual/sticky target focus request adapted without claiming a current comparator defect",
+    "current_resolution": "current Genshin target-lock resolution unverified; older ZZZ discussion explicitly notes an existing manual-lock option"
   },
-  "next_action": "Resolve the two repaired review threads, freeze the repaired exact head, require fresh exact-head Windows Debug/Release and Release-manifest checks plus fresh independent review, repair/rerun if needed, then reread main/head/diff/threads and merge with expected-head guard only if every gate is clean."
+  "next_action": "Treat this state commit as the candidate freeze, require fresh exact-head Windows Debug/Release plus Release-manifest checks and a fresh Codex review, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
 }

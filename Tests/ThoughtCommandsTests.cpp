@@ -9,6 +9,7 @@
 #include "Engine/Scene/RiftWardenTrial.h"
 #include "Engine/Scene/ShadowCryptExpedition.h"
 #include "Engine/Scene/ShadowCryptMission.h"
+#include "Engine/Scene/ShadowCryptSkirmish.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
 #include "Engine/Scene/ShadowbladeLoadoutWorkbench.h"
 #include "Engine/Scene/ShadowbladeTrainingPath.h"
@@ -217,6 +218,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "ShadowbladeProgressionCombatPass33Tests.inc"
 #include "RiftWardenFocusedPracticePass35Tests.inc"
 #include "ShadowCryptMissionPlanningPass37Tests.inc"
+#include "ShadowCryptSkirmishPass38Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -250,6 +252,7 @@ int main() {
     TestShadowbladeProgressionCombatPass33();
     TestRiftWardenFocusedPracticePass35();
     TestShadowCryptMissionPlanningPass37();
+    TestShadowCryptSkirmishPass38();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;

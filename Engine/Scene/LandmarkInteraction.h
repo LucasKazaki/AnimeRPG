@@ -8,6 +8,7 @@
 #include "Engine/Scene/ManaReactorMission.h"
 #include "Engine/Scene/RiftWardenTrial.h"
 #include "Engine/Scene/ShadowCryptMission.h"
+#include "Engine/Scene/ShadowCryptSkirmish.h"
 #include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/WorldBlockout.h"
 
@@ -218,13 +219,13 @@ public:
     // owner that produces the authoritative ShadowCryptLead evidence.
     bool BeginShadowCrypt() {
         if (progression_ == nullptr || !shadowCryptMission_.Begin(fieldGuide_)) return false;
-        // Bind reward/replay authority to the protagonist owner that entered the
-        // run. A later pointer swap cannot redirect a completed clear to a
-        // different progression object.
         shadowCryptProgressionOwner_ = progression_;
         return true;
     }
-    bool AdvanceShadowCryptObjective() { return shadowCryptMission_.RecordObjectiveStep(); }
+    bool AdvanceShadowCryptObjective() {
+        if (shadowCryptSkirmish_.Active()) return false;
+        return shadowCryptMission_.RecordObjectiveStep();
+    }
     bool DiscoverShadowCryptCoolingCache() {
         return shadowCryptMission_.DiscoverCoolingCache();
     }
@@ -232,12 +233,25 @@ public:
     int RecordShadowCryptDamageTaken(int amount) {
         return shadowCryptMission_.RecordDamageTaken(amount);
     }
-    bool ReportShadowCryptDefeat() { return shadowCryptMission_.ReportDefeat(); }
-    bool SuspendShadowCrypt() { return shadowCryptMission_.SuspendAtSafeBoundary(); }
+    bool ReportShadowCryptDefeat() {
+        const bool reported = shadowCryptMission_.ReportDefeat();
+        if (reported && (shadowCryptSkirmish_.Active() || shadowCryptSkirmish_.Complete())) {
+            shadowCryptSkirmish_ = ShadowCryptSkirmish{};
+            shadowCryptSkirmishObjectiveAdvanced_ = false;
+        }
+        return reported;
+    }
+    bool SuspendShadowCrypt() {
+        if (shadowCryptSkirmish_.Active()) return false;
+        return shadowCryptMission_.SuspendAtSafeBoundary();
+    }
     bool ResumeShadowCrypt() { return shadowCryptMission_.ResumeSuspendedRun(); }
     bool ReplayCompletedShadowCrypt() {
         if (progression_ != shadowCryptProgressionOwner_) return false;
-        return shadowCryptMission_.ReplayCompletedRun(fieldGuide_);
+        if (!shadowCryptMission_.ReplayCompletedRun(fieldGuide_)) return false;
+        shadowCryptSkirmish_ = ShadowCryptSkirmish{};
+        shadowCryptSkirmishObjectiveAdvanced_ = false;
+        return true;
     }
     ShadowCryptMissionBriefing ShadowCryptBriefing() const {
         return shadowCryptMission_.Briefing();
@@ -250,9 +264,6 @@ public:
         return shadowCryptMission_.ClaimFirstClearReward(*progression_);
     }
 
-    // Pass 37 mission-planning and records integration. Keep protagonist identity
-    // authority in this live owner so entry guidance never advertises an action
-    // that Begin/Replay would reject.
     bool SetShadowCryptFocusMode(ShadowCryptMissionFocusMode mode) {
         return shadowCryptMission_.SetFocusMode(mode);
     }
@@ -288,9 +299,78 @@ public:
     }
     const ShadowCryptMission& ShadowCrypt() const { return shadowCryptMission_; }
 
-    // Pass 32 game-owned Rift Warden mastery trial. Entry is dependency-ready:
-    // it consumes the already-authoritative completed Shadow Crypt state and a
-    // persistent protagonist owner, without changing engine/runtime facilities.
+    bool BeginShadowCryptSkirmish() {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return false;
+        const ShadowCryptMissionBriefing briefing = shadowCryptMission_.Briefing();
+        if (!briefing.active || briefing.complete || briefing.suspended) return false;
+        ShadowCryptSkirmishTier tier{};
+        switch (briefing.room) {
+        case ShadowCryptRoom::EntrySeal:
+            tier = ShadowCryptSkirmishTier::EntrySeal;
+            break;
+        case ShadowCryptRoom::ArchiveGallery:
+            tier = ShadowCryptSkirmishTier::ArchiveGallery;
+            break;
+        case ShadowCryptRoom::RiftNave:
+            tier = ShadowCryptSkirmishTier::RiftNave;
+            break;
+        case ShadowCryptRoom::WardenSanctum:
+        case ShadowCryptRoom::Complete:
+            return false;
+        }
+        if (!shadowCryptSkirmish_.Begin(tier)) return false;
+        shadowCryptSkirmishObjectiveAdvanced_ = false;
+        return true;
+    }
+    ShadowCryptDefenseReport ResolveShadowCryptSkirmishThreat(
+        ShadowCryptDefenseResponse response, double reactionSeconds) {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptSkirmish_.Active() || !shadowCryptMission_.Briefing().active) {
+            return {};
+        }
+        ShadowCryptDefenseReport report =
+            shadowCryptSkirmish_.ResolveThreat(response, reactionSeconds);
+        if (report.accepted && report.damageTaken > 0) {
+            report.damageTaken = shadowCryptMission_.RecordDamageTaken(report.damageTaken);
+        }
+        return report;
+    }
+    ShadowCryptAttackReport AttackShadowCryptSkirmishTarget(
+        std::size_t index, ShadowCryptAttackStyle style) {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptSkirmish_.Active() || !shadowCryptMission_.Briefing().active) {
+            return {};
+        }
+        ShadowCryptAttackReport report = shadowCryptSkirmish_.AttackTarget(index, style);
+        if (report.encounterComplete && !shadowCryptSkirmishObjectiveAdvanced_
+            && shadowCryptMission_.RecordObjectiveStep()) {
+            shadowCryptSkirmishObjectiveAdvanced_ = true;
+        }
+        return report;
+    }
+    bool LockShadowCryptSkirmishTarget(std::size_t index) {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptMission_.Briefing().active) return false;
+        return shadowCryptSkirmish_.LockTarget(index);
+    }
+    bool ClearShadowCryptSkirmishTargetLock() {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptMission_.Briefing().active) return false;
+        return shadowCryptSkirmish_.ClearTargetLock();
+    }
+    std::size_t ShadowCryptSkirmishSelectedTarget() const {
+        return shadowCryptSkirmish_.SelectedTarget();
+    }
+    ShadowCryptTargetRecommendation ShadowCryptSkirmishRecommendedTarget() const {
+        return shadowCryptSkirmish_.RecommendedTarget();
+    }
+    ShadowCryptThreatTelegraph ShadowCryptSkirmishThreat() const {
+        return shadowCryptSkirmish_.CurrentThreat();
+    }
+    const ShadowCryptSkirmish& ShadowCryptSkirmishState() const {
+        return shadowCryptSkirmish_;
+    }
+
     bool BeginRiftWardenTrial(RiftWardenDifficulty difficulty) {
         if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
             || !shadowCryptMission_.Briefing().complete
@@ -414,16 +494,18 @@ private:
     LandmarkObjectiveActivationMode objectiveActivationMode_{
         LandmarkObjectiveActivationMode::AutoStart};
     bool objectiveStarted_{true};
-    CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
-    CharacterProgression* shadowCryptProgressionOwner_{}; // Identity only; never dereferenced directly.
-    CharacterProgression* mallResonanceProgressionOwner_{}; // Identity only; puzzle reward authority.
-    CharacterProgression* riftWardenProgressionOwner_{}; // Identity only; trial action authority.
+    CharacterProgression* progression_{};
+    CharacterProgression* shadowCryptProgressionOwner_{};
+    CharacterProgression* mallResonanceProgressionOwner_{};
+    CharacterProgression* riftWardenProgressionOwner_{};
     LandmarkDialogue dialogue_{};
     LandmarkDialogueContinuity dialogueContinuity_{};
     ExplorationFieldGuide fieldGuide_{};
     MallResonancePuzzle mallResonancePuzzle_{};
     ManaReactorMission manaReactorMission_{};
     ShadowCryptMission shadowCryptMission_{};
+    ShadowCryptSkirmish shadowCryptSkirmish_{};
+    bool shadowCryptSkirmishObjectiveAdvanced_{};
     RiftWardenTrial riftWardenTrial_{};
     LandmarkInteractionReport lastReport_{};
 };
