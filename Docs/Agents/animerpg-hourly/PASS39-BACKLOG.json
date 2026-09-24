@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS39-SHADOW-CRYPT-THREAT-DEPTH-2026-09-24",
+  "baseline": "a607cb671712e974fcc324cd1619b39ec84b9646",
+  "target_branch": "main",
+  "working_branch": "game/pass39-shadow-crypt-threat-depth",
+  "accessed": "2026-09-24",
+  "features": [
+    {"id":"GAME-192","title":"Deterministic two-variant enemy attack patterns","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-193","title":"Bounded low-health desperation pressure","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-194","title":"Precision-defense timing classification","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-195","title":"One-shot precision counter bonus","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-196","title":"Bulwark brace-to-posture counterplay","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"QOL-040","title":"Read-only semantic multi-enemy threat queue","status":"implemented_pending_exact_head_acceptance"}
+  ],
+  "sources": [
+    {"id":"ZZZ-APPSTORE-3.2","kind":"developer_description","url":"https://apps.apple.com/us/app/zenless-zone-zero/id1606356401","accessed":"2026-09-24","context":"Current Version 3.2 listing; Dodge/Parry, Stun/Chain follow-up, opponent traits/weaknesses."},
+    {"id":"GENSHIN-STYGIAN-20260302","kind":"official_event_details","url":"https://www.hoyolab.com/article/44016747","published":"2026-03-02","accessed":"2026-09-24","context":"Three-phase combat and tougher/more restrictive higher difficulty."},
+    {"id":"ZZZ-PLAYER-CLARITY-20260311","kind":"original_player_discussion","url":"https://www.reddit.com/r/ZenlessZoneZero/comments/1rqo45m/literally_my_only_problem_with_the_game/","published":"2026-03-11","accessed":"2026-09-24","context":"Enemy indicators and off-screen enemies can be hard to read amid effects/camera movement; thread includes lock-on counterargument."},
+    {"id":"ZZZ-PLAYER-CLARITY-20260628","kind":"original_player_discussion","url":"https://www.reddit.com/r/ZZZ_Discussion/comments/1ui9kg4/visual_clarity_isnt_great/","published":"2026-06-28","accessed":"2026-09-24","context":"Requests less obscuring VFX/camera disruption for reaction-heavy combat; not treated as consensus."},
+    {"id":"ZZZ-PLAYER-CAMERA-20260515","kind":"original_player_discussion","url":"https://www.reddit.com/r/ZZZ_Official/comments/1tdvoz1/camera_in_battle/","published":"2026-05-15","accessed":"2026-09-24","context":"Camera/focus complaint with disengage-lock workaround in replies; current resolution unverified."}
+  ],
+  "allowed_paths": [
+    "Engine/Scene/ShadowCryptSkirmish.h",
+    "Tests/ShadowCryptSkirmishPass38Tests.inc",
+    "Tasks/GAME-PASS39-SHADOW-CRYPT-THREAT-DEPTH-2026-09-24.md",
+    "Docs/Agents/animerpg-hourly/PASS39-BACKLOG.json",
+    "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS39.md",
+    "Docs/Agents/animerpg-hourly/STATE.json"
+  ],
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "registered_regression_covered": 6,
+    "game_domain_integrated": 6,
+    "hosted_verified_exact_final_head": 0,
+    "native_playable_verified": 0,
+    "independent_reviewed_clean_exact_final_head": 0,
+    "merged": 0
+  },
+  "next_action": "Freeze exact candidate head, require hosted Windows Debug/Release and release-manifest checks plus fresh Codex review, repair material findings, then expected-head merge only if all gates are clean."
+}
