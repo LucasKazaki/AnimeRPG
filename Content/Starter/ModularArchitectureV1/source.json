@@ -1,0 +1,247 @@
+{
+  "coordinate_system": {
+    "forward": "+Z",
+    "handedness": "right_handed",
+    "right": "-X",
+    "up": "+Y"
+  },
+  "materials": [
+    {
+      "base_color_factor": [
+        0.58,
+        0.6,
+        0.63,
+        1.0
+      ],
+      "id": "starter_neutral",
+      "metallic_factor": 0.0,
+      "roughness_factor": 0.82
+    },
+    {
+      "base_color_factor": [
+        0.9,
+        0.28,
+        0.15,
+        1.0
+      ],
+      "id": "collision_debug",
+      "metallic_factor": 0.0,
+      "roughness_factor": 0.68
+    }
+  ],
+  "modules": [
+    {
+      "collision_type": "box",
+      "gallery_translation_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "id": "floor_4x4",
+      "kind": "floor",
+      "pivot_rule": "top_left_back_at_origin",
+      "size_m": [
+        4.0,
+        0.25,
+        4.0
+      ],
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          4.0
+        ],
+        [
+          4.0,
+          0.0,
+          4.0
+        ]
+      ]
+    },
+    {
+      "collision_type": "box",
+      "gallery_translation_m": [
+        6.0,
+        0.0,
+        0.0
+      ],
+      "height_m": 3.0,
+      "id": "wall_4x3",
+      "kind": "wall",
+      "pivot_rule": "base_left_back_at_origin",
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "thickness_m": 0.25,
+      "width_m": 4.0
+    },
+    {
+      "collision_type": "box",
+      "gallery_translation_m": [
+        12.0,
+        0.0,
+        0.0
+      ],
+      "height_m": 3.0,
+      "id": "wall_2x3",
+      "kind": "wall",
+      "pivot_rule": "base_left_back_at_origin",
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "thickness_m": 0.25,
+      "width_m": 2.0
+    },
+    {
+      "collision_type": "two_box_L",
+      "gallery_translation_m": [
+        16.0,
+        0.0,
+        0.0
+      ],
+      "height_m": 3.0,
+      "id": "corner_2x2x3",
+      "kind": "corner",
+      "leg_m": 2.0,
+      "pivot_rule": "inside_base_corner_at_origin",
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          2.0
+        ]
+      ],
+      "thickness_m": 0.25
+    },
+    {
+      "collision_type": "three_box_frame",
+      "gallery_translation_m": [
+        21.0,
+        0.0,
+        0.0
+      ],
+      "height_m": 3.0,
+      "id": "doorway_4x3",
+      "kind": "doorway",
+      "opening_height_m": 2.25,
+      "opening_width_m": 1.5,
+      "pivot_rule": "base_left_back_at_origin",
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "thickness_m": 0.25,
+      "width_m": 4.0
+    },
+    {
+      "collision_type": "walkable_ramp_prism",
+      "gallery_translation_m": [
+        27.0,
+        0.0,
+        0.0
+      ],
+      "id": "stairs_2x4x2",
+      "kind": "stairs",
+      "pivot_rule": "lower_entry_left_at_origin",
+      "rise_m": 2.0,
+      "run_m": 4.0,
+      "snap_points_m": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          2.0,
+          4.0
+        ]
+      ],
+      "steps": 8,
+      "width_m": 2.0
+    },
+    {
+      "collision_type": "box",
+      "depth_m": 0.5,
+      "gallery_translation_m": [
+        33.0,
+        0.0,
+        0.0
+      ],
+      "height_m": 3.0,
+      "id": "pillar_0p5x3",
+      "kind": "pillar",
+      "pivot_rule": "base_left_back_at_origin",
+      "snap_points_m": [
+        [
+          0.25,
+          0.0,
+          0.25
+        ],
+        [
+          0.25,
+          3.0,
+          0.25
+        ]
+      ],
+      "width_m": 0.5
+    }
+  ],
+  "provenance": {
+    "distribution_scope": "repository_source_only",
+    "generator_family": "python_standard_library",
+    "origin": "original_project_procedural",
+    "third_party_content": false
+  },
+  "schema_version": 1,
+  "snap_grid_m": 0.25,
+  "status": "source_validated_not_imported",
+  "units": "metres",
+  "uv_units_per_meter": 1.0
+}
