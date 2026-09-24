@@ -921,27 +921,29 @@ See RECOVERY-2026-08-11.md, R0-COMMAND-EVIDENCE.json, the evidence directory, an
 
 
 def main() -> int:
-    runner = R0Runner(parse_args())
+    runner: R0Runner | None = None
     try:
+        runner = R0Runner(parse_args())
         runner.execute()
         return 0
     except Exception as exc:
-        try:
-            runner.set_heartbeat(
-                "blocked",
-                current_command=runner.last_command,
-                last_result=(
-                    "R0 stopped at the first deterministic failure. "
-                    f"Latest log: {runner.last_log}"
-                ),
-                blocker=str(exc),
-                next_action=(
-                    "Inspect the named log and preserve the current checkpoint. Change one material condition before retrying. "
-                    "If tracked evidence exists, use a new clean worktree/output set rather than overwriting or discarding it."
-                ),
-            )
-        except Exception as heartbeat_error:
-            print(f"WARNING: heartbeat update failed: {heartbeat_error}", file=sys.stderr)
+        if runner is not None:
+            try:
+                runner.set_heartbeat(
+                    "blocked",
+                    current_command=runner.last_command,
+                    last_result=(
+                        "R0 stopped at the first deterministic failure. "
+                        f"Latest log: {runner.last_log}"
+                    ),
+                    blocker=str(exc),
+                    next_action=(
+                        "Inspect the named log and preserve the current checkpoint. Change one material condition before retrying. "
+                        "If tracked evidence exists, use a new clean worktree/output set rather than overwriting or discarding it."
+                    ),
+                )
+            except Exception as heartbeat_error:
+                print(f"WARNING: heartbeat update failed: {heartbeat_error}", file=sys.stderr)
         print(f"R0 AUTOMATED GATE: BLOCKED\n{exc}", file=sys.stderr)
         return 1
 
