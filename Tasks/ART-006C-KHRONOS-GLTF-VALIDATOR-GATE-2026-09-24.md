@@ -31,6 +31,7 @@ KhronosGroup/glTF-Validator is the selected primary specification validator for 
 - purpose: validate assets against glTF 2.0 and emit JSON reports with issue counts and asset statistics;
 - CLI contract: `gltf_validator [options] <input>`, `--stdout` emits JSON to stdout, resource validation defaults on, and a non-zero return code indicates at least one error;
 - upstream report schema requires `validatorVersion` and `issues`, with `numErrors`, `numWarnings`, `numInfos`, `numHints`, `messages`, and `truncated` inside `issues`;
+- current upstream report implementation also emits asset statistics including animation/material counts, morph/skin/texture/default-scene flags, draw calls, total vertices/triangles and maximum UV/influence/attribute counts;
 - upstream web frontend operates client-side, but this task does not upload or validate project assets through a hosted page.
 
 No package, binary, Dart SDK, npm dependency, or external service is installed or invoked by this packet. The exact validator version available on Lucas's authorized workstation remains `not_measured` until a native receipt exists.
@@ -41,18 +42,19 @@ The adapter must fail closed unless all of the following hold:
 
 1. The report is structurally bounded to the known upstream fields used by this gate.
 2. `validatorVersion` is a semver string and `mimeType` is `model/gltf+json`.
-3. The report URI identifies the exact target filename.
+3. The report URI resolves to the exact target asset path, not merely the same filename.
 4. Every issue count and severity is a real JSON integer, not a Python-equal boolean.
 5. Message severities exactly reproduce the report summary counts and output is not truncated.
 6. Error count is zero and warnings stay at or below the explicit limit, default zero.
 7. glTF version is `2.0`.
-8. The ART-006B self-contained asset has no validator-reported external resource.
-9. The source asset SHA-256 equals the explicitly supplied expected pin.
-10. Focused regressions and `py_compile` pass before publication.
+8. The ART-006B self-contained asset has no validator-reported external resource, and every reported resource has a recognized storage mode.
+9. Current upstream info statistic fields are accepted with strict integer/boolean typing when present.
+10. The source asset SHA-256 equals the explicitly supplied expected pin. A detached report still requires a native invocation receipt to prove which bytes produced it.
+11. Focused regressions and `py_compile` pass before publication.
 
 ## Future authorized validator command
 
-When the Khronos executable is already available through an authorized workstation/runtime, run it without installing anything and retain the raw report. The upstream CLI supports stdout JSON; exact executable path/version must be captured in the native receipt. A representative command shape is:
+When the Khronos executable is already available through an authorized workstation/runtime, run it without installing anything and retain the raw report. The upstream CLI supports stdout JSON; exact executable path/version must be captured in the native receipt. Run from the repository root so the report URI and adapter resolve the same input path. A representative command shape is:
 
 ```text
 gltf_validator --stdout --all Content/Reference/NationalMall/Blockout/mall_core_panel_blockout.gltf > <evidence>/mall_core_panel_blockout.report.json
@@ -66,6 +68,8 @@ python Scripts/verify_khronos_gltf_validator_report.py \
   --report <evidence>/mall_core_panel_blockout.report.json \
   --expected-sha256 6c51463332199c65bcfbde04ee8e5883e03a94aba710980eebfaa6945f2759b7
 ```
+
+Capture executable version/path, working directory, pre/post asset SHA-256, raw JSON report, command, exit code, and this adapter's result.
 
 ## Stop condition
 
