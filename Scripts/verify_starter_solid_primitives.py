@@ -114,7 +114,7 @@ def verify_source(source_path):
                 fail("cylinder dimensions/tessellation changed")
     layout=s["scene_layout"]
     if type(layout) is not list or len(layout)!=4: fail("scene layout invalid")
-    for i,(entry,pid,t) in enumerate(zip(layout,ORDER,EXPECTED_TRANSLATIONS)):
+    for entry,pid,t in zip(layout,ORDER,EXPECTED_TRANSLATIONS):
         if type(entry) is not dict or set(entry)!={"primitive_id","translation_m"}: fail("scene layout entry invalid")
         if entry["primitive_id"]!=pid or vector(entry["translation_m"],3,"translation")!=t: fail("scene translation changed")
     refs=s["reference_scope"]
@@ -211,9 +211,73 @@ def accessor_values(g,data,index):
 def close(a,b,tol=1e-5): return abs(a-b)<=tol
 
 def vec3_sub(a,b): return [a[i]-b[i] for i in range(3)]
+def vec3_scale(a,s): return [a[i]*s for i in range(3)]
 def cross(a,b): return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]
 def dot(a,b): return sum(a[i]*b[i] for i in range(3))
 def norm(a): return math.sqrt(dot(a,a))
+
+def unit(v,label):
+    length=norm(v)
+    if length<=1e-12:
+        fail(f"{label} has zero length")
+    return [x/length for x in v]
+
+def uv_close(got,want,tol=2e-5):
+    return close(float(got[0]),float(want[0]),tol) and close(float(got[1]),float(want[1]),tol)
+
+def verify_uv_policy(pid,uvs):
+    expected=[]
+    if pid=="cube-1m":
+        expected=[(0.0,0.0),(1.0,0.0),(1.0,1.0),(0.0,1.0)]*6
+    elif pid=="plane-1m":
+        expected=[(0.0,0.0),(1.0,0.0),(1.0,1.0),(0.0,1.0)]
+    elif pid=="sphere-1m":
+        segments=16; bands=8
+        expected.extend(((j+0.5)/segments,0.0) for j in range(segments))
+        for band in range(1,bands):
+            expected.extend((j/segments,band/bands) for j in range(segments+1))
+        expected.extend(((j+0.5)/segments,1.0) for j in range(segments))
+    elif pid=="cylinder-1x2m":
+        segments=16
+        for j in range(segments+1):
+            expected.extend(((j/segments,0.0),(j/segments,1.0)))
+        expected.append((0.5,0.5))
+        expected.extend((0.5+0.5*math.cos(2.0*math.pi*j/segments),
+                         0.5+0.5*math.sin(2.0*math.pi*j/segments)) for j in range(segments+1))
+        expected.append((0.5,0.5))
+        expected.extend((0.5+0.5*math.cos(2.0*math.pi*j/segments),
+                         0.5+0.5*math.sin(2.0*math.pi*j/segments)) for j in range(segments+1))
+    else:
+        fail(f"{pid} UV policy unknown")
+    if len(uvs)!=len(expected):
+        fail(f"{pid} UV policy vertex count changed")
+    for i,(got,want) in enumerate(zip(uvs,expected)):
+        if not uv_close(got,want):
+            fail(f"{pid} UV policy mismatch at vertex {i}")
+
+def verify_triangle_tangent_frame(pid, tri_index, positions, normals, tangents, uvs, ids):
+    ia,ib,ic=ids
+    a,b,c=positions[ia],positions[ib],positions[ic]
+    uv0,uv1,uv2=uvs[ia],uvs[ib],uvs[ic]
+    e1=vec3_sub(b,a); e2=vec3_sub(c,a)
+    du1=uv1[0]-uv0[0]; dv1=uv1[1]-uv0[1]
+    du2=uv2[0]-uv0[0]; dv2=uv2[1]-uv0[1]
+    det=du1*dv2-dv1*du2
+    if abs(det)<=1e-10:
+        fail(f"{pid} triangle {tri_index} UV derivative degenerate")
+    inv=1.0/det
+    dpos_du=[(e1[j]*dv2-e2[j]*dv1)*inv for j in range(3)]
+    dpos_dv=[(e2[j]*du1-e1[j]*du2)*inv for j in range(3)]
+    expected_t=unit(dpos_du,f"{pid} triangle {tri_index} dP/du")
+    expected_b=unit(dpos_dv,f"{pid} triangle {tri_index} dP/dv")
+    avg_t=unit([sum(tangents[i][j] for i in ids) for j in range(3)],f"{pid} triangle {tri_index} tangent average")
+    avg_n=unit([sum(normals[i][j] for i in ids) for j in range(3)],f"{pid} triangle {tri_index} normal average")
+    w_values=[tangents[i][3] for i in ids]
+    if not (w_values[0]==w_values[1]==w_values[2] and w_values[0] in (-1.0,1.0)):
+        fail(f"{pid} triangle {tri_index} tangent handedness inconsistent")
+    reconstructed_b=unit(vec3_scale(cross(avg_n,avg_t),w_values[0]),f"{pid} triangle {tri_index} bitangent")
+    if dot(expected_t,avg_t)<0.99 or dot(expected_b,reconstructed_b)<0.985:
+        fail(f"{pid} triangle {tri_index} tangent/UV derivative mismatch")
 
 def verify_mesh_geometry(pid,positions,normals,tangents,uvs,indices):
     exp=EXPECTED[pid]
@@ -255,6 +319,7 @@ def verify_mesh_geometry(pid,positions,normals,tangents,uvs,indices):
                 if not close(abs(p[1]),1.0,2e-5) or radial>0.50001 or abs(abs(n[1])-1.0)>2e-5: fail("cylinder cap vertex invalid")
         elif pid=="plane-1m":
             if abs(p[1])>2e-5 or n!=[0.0,1.0,0.0]: fail("plane surface contract invalid")
+    verify_uv_policy(pid,uvs)
     for tri in range(0,len(flat_indices),3):
         ia,ib,ic=flat_indices[tri:tri+3]
         a,b,c=positions[ia],positions[ib],positions[ic]
@@ -263,6 +328,7 @@ def verify_mesh_geometry(pid,positions,normals,tangents,uvs,indices):
         if area2<=1e-8: fail(f"{pid} degenerate triangle")
         avg=[(normals[ia][j]+normals[ib][j]+normals[ic][j])/3.0 for j in range(3)]
         if dot(geometric,avg)<=1e-8: fail(f"{pid} triangle winding disagrees with normals")
+        verify_triangle_tangent_frame(pid,tri//3,positions,normals,tangents,uvs,(ia,ib,ic))
 
 def verify_gltf(gltf_path):
     g=read_json(gltf_path)
@@ -307,7 +373,12 @@ def verify_gltf(gltf_path):
         if type(prims) is not list or len(prims)!=1: fail("mesh must have one primitive")
         prim=prims[0]
         if type(prim) is not dict or set(prim)!={"attributes","indices","material","mode"}: fail("primitive contract invalid")
-        if prim["attributes"]!={"POSITION":i*5,"NORMAL":i*5+1,"TANGENT":i*5+2,"TEXCOORD_0":i*5+3}: fail("attribute binding changed")
+        attrs=prim["attributes"]
+        expected_attrs={"POSITION":i*5,"NORMAL":i*5+1,"TANGENT":i*5+2,"TEXCOORD_0":i*5+3}
+        if type(attrs) is not dict or set(attrs)!=set(expected_attrs): fail("attribute binding changed")
+        for semantic,expected_index in expected_attrs.items():
+            if strict_int(attrs[semantic],f"primitive.attributes.{semantic}",0)!=expected_index:
+                fail("attribute binding changed")
         if strict_int(prim["indices"],"primitive.indices")!=i*5+4 or strict_int(prim["material"],"primitive.material")!=0 or strict_int(prim["mode"],"primitive.mode")!=4:
             fail("primitive binding/mode changed")
         positions=accessor_values(g,data,i*5)
