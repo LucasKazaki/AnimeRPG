@@ -365,17 +365,17 @@ private:
         if (snapshot.timeGrade == EncounterTimeGrade::Bronze) {
             return EncounterScoreCoachFocus::Time;
         }
-        if (breakdown.techniqueScore < breakdown.damageScore / 2) {
-            return EncounterScoreCoachFocus::Technique;
-        }
-        if (breakdown.damageScore < breakdown.techniqueScore / 2) {
-            return EncounterScoreCoachFocus::Damage;
-        }
         if (breakdown.activeTechniqueChain < MaximumTechniqueCombo) {
             return EncounterScoreCoachFocus::Combo;
         }
         if (snapshot.timeGrade != EncounterTimeGrade::Gold) {
             return EncounterScoreCoachFocus::Time;
+        }
+        if (breakdown.techniqueScore < breakdown.damageScore) {
+            return EncounterScoreCoachFocus::Technique;
+        }
+        if (breakdown.damageScore < breakdown.techniqueScore) {
+            return EncounterScoreCoachFocus::Damage;
         }
         return EncounterScoreCoachFocus::None;
     }
