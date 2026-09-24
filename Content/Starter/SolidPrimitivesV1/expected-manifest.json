@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-solid-primitives-v1",
+  "status": "source_validated_not_imported",
+  "generator_id": "Astral ART-009 Starter Solid Primitives 1",
+  "source_file": "source-contract.json",
+  "source_sha256": "12473281a43b46c8a41e04d9515c4d2b692387ba90ca175dcdd6e690c727b4cf",
+  "gltf_file": "starter_solid_primitives_v1.gltf",
+  "gltf_sha256": "e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17",
+  "gltf_bytes": 26172,
+  "mesh_count": 4,
+  "material_count": 1,
+  "vertex_count_total": 249,
+  "index_count_total": 906,
+  "primitive_ids": [
+    "cube-1m",
+    "sphere-1m",
+    "cylinder-1x2m",
+    "plane-1m"
+  ],
+  "runtime_state": "source_validated_not_imported"
+}
