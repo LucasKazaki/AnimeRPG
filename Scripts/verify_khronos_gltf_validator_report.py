@@ -26,6 +26,7 @@ ISSUE_KEYS = {"numErrors", "numWarnings", "numInfos", "numHints", "messages", "t
 MESSAGE_KEYS = {"code", "severity", "pointer", "offset", "message"}
 INFO_KEYS = {"version", "minVersion", "generator", "extensionsUsed", "extensionsRequired", "resources"}
 RESOURCE_KEYS = {"pointer", "storage", "mimeType", "byteLength", "uri", "image"}
+RESOURCE_STORAGE = {"data-uri", "buffer-view", "glb", "external"}
 
 
 class VerificationError(ValueError):
@@ -144,10 +145,23 @@ def verify_report(
         resource = _expect_keys(raw, RESOURCE_KEYS, {"pointer"}, f"info.resources[{index}]")
         if type(resource["pointer"]) is not str:
             _fail(f"info.resources[{index}].pointer must be a string")
+        if "storage" not in resource:
+            if require_self_contained:
+                _fail(f"info.resources[{index}].storage is required to prove self-contained status")
+        else:
+            storage = resource["storage"]
+            if type(storage) is not str or storage not in RESOURCE_STORAGE:
+                _fail(f"info.resources[{index}].storage must be a known Khronos storage string")
+            if require_self_contained and storage == "external":
+                _fail(f"info.resources[{index}] is external; ART-006B must remain self-contained")
         if "byteLength" in resource:
             _strict_int(resource["byteLength"], f"info.resources[{index}].byteLength", minimum=1)
-        if require_self_contained and resource.get("storage") == "external":
-            _fail(f"info.resources[{index}] is external; ART-006B must remain self-contained")
+        if "mimeType" in resource and type(resource["mimeType"]) is not str:
+            _fail(f"info.resources[{index}].mimeType must be a string")
+        if "uri" in resource and type(resource["uri"]) is not str:
+            _fail(f"info.resources[{index}].uri must be a string")
+        if "image" in resource and type(resource["image"]) is not dict:
+            _fail(f"info.resources[{index}].image must be an object")
 
     if not asset_path.is_file():
         _fail(f"asset does not exist: {asset_path}")
