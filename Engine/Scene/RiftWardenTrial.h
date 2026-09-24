@@ -35,6 +35,7 @@ enum class RiftWardenResponse : std::uint8_t {
 };
 
 enum class RiftWardenCue : std::uint8_t {
+    None,
     Evade,
     Brace,
     Punish,
@@ -65,7 +66,7 @@ enum class RiftWardenMastery : std::uint8_t {
 struct RiftWardenTelegraph {
     RiftWardenAttack attack{RiftWardenAttack::RiftSlash};
     RiftWardenResponse recommendedResponse{RiftWardenResponse::Dodge};
-    RiftWardenCue cue{RiftWardenCue::Evade};
+    RiftWardenCue cue{RiftWardenCue::None};
     double responseWindowSeconds{};
     std::uint32_t sequence{};
 };
@@ -115,7 +116,7 @@ struct RiftWardenCoachTip {
     bool available{};
     RiftWardenAttack attack{RiftWardenAttack::RiftSlash};
     RiftWardenResponse expectedResponse{RiftWardenResponse::Dodge};
-    RiftWardenCue cue{RiftWardenCue::Evade};
+    RiftWardenCue cue{RiftWardenCue::None};
     RiftWardenCoachReason reason{RiftWardenCoachReason::None};
     double responseWindowSeconds{};
     double observedReactionSeconds{};
@@ -351,7 +352,7 @@ public:
         case RiftWardenAttack::EchoBurst: return RiftWardenCue::Evade;
         case RiftWardenAttack::StaggerOpening: return RiftWardenCue::Punish;
         }
-        return RiftWardenCue::Evade;
+        return RiftWardenCue::None;
     }
 
 private:
@@ -518,18 +519,10 @@ private:
         if (candidate.missedOpenings != current.missedOpenings) {
             return candidate.missedOpenings < current.missedOpenings;
         }
-        // A saturated count only means "at least MaximumMissedOpenings". Once a
-        // valid record already has that sentinel, another saturated candidate
-        // cannot prove it had fewer misses, so do not let later tie-breakers make
-        // an unknown-or-worse run replace the established record.
         if (candidate.missedOpenings >= MaximumMissedOpenings) return false;
         if (candidate.damageTaken != current.damageTaken) {
             return candidate.damageTaken < current.damageTaken;
         }
-        // Saturated damage has the same information-loss problem: equal capped
-        // totals do not prove equal actual damage. Preserve the established
-        // record rather than allowing clear time to make an unknown-or-worse
-        // replay look better after both runs reach the cap.
         if (candidate.damageTaken >= MaximumDamageTaken) return false;
         return candidate.clearSeconds < current.clearSeconds;
     }
@@ -551,9 +544,10 @@ private:
         if (!AttackValid(attack) || !PhaseValid(phase)) return;
         const std::size_t index = AttackIndex(attack);
         RiftWardenTrainingRecord& record = trainingRecords_[index];
+        if (record.attempts >= MaximumTrainingAttempts) return;
         record.lastSeenPhase = phase;
-        if (record.attempts < MaximumTrainingAttempts) ++record.attempts;
-        if (success && record.successes < MaximumTrainingAttempts) ++record.successes;
+        ++record.attempts;
+        if (success) ++record.successes;
         if (success) {
             currentTrainingStreak_[index] = std::min(
                 MaximumTrainingAttempts, currentTrainingStreak_[index] + 1);
@@ -585,6 +579,7 @@ private:
         missedOpenings_ = 0;
         currentStreak_ = 0;
         bestStreak_ = 0;
+        currentTrainingStreak_.fill(0);
         lastCoachTip_ = {};
     }
 
