@@ -4,19 +4,17 @@ Status: **adopted source-workflow profile, native execution still required**
 Loop: `astral-art-hourly-20260922`  
 Task: `ART-006D`
 
-This profile defines one bounded, reproducible DCC round-trip for Astral Engine source assets before any asset is described as DCC-validated. It does not add Blender as a repository dependency and does not claim Astral runtime support for glTF.
+This profile defines one bounded, reproducible DCC round trip for Astral Engine source assets before an asset is described as DCC-validated. It does not add Blender as a repository dependency and does not claim Astral runtime support for glTF.
 
 ## Qualified tool and version
 
-Primary DCC for this profile: **Blender 5.2.2 LTS**.
+Primary DCC: **Blender 5.2.2 LTS**.
 
-Current official Blender evidence rechecked on 2026-09-24:
+Official Blender evidence rechecked for ART-006D on 2026-09-24:
 
-- Blender 5.2 LTS initially released 2026-07-14 and is supported through July 2028.
-- Blender 5.2.2 LTS was released 2026-09-15.
-- The Blender 5.2 glTF add-on is enabled by default and supports meshes, materials, textures, cameras, punctual lights, extras, animation and skinning.
-- The Blender 5.2 exporter exposes explicit controls for UVs, normals, tangents, materials, +Y-up glTF output, animation, GPU instancing and embedded glTF output.
-- Blender 5.2 command-line/background execution is an official supported automation workflow.
+- Blender 5.2 LTS released 2026-07-14 and is supported through July 2028.
+- Blender 5.2.2 LTS released 2026-09-15.
+- Blender 5.2 documents glTF import/export, explicit UV/normal/tangent/material controls, embedded glTF output and background command-line execution.
 
 Official sources:
 
@@ -29,61 +27,54 @@ Official sources:
 
 ## ART-006D import profile
 
-The native driver imports the ART-006B self-contained `mall_core_panel_blockout.gltf` into a factory-clean Blender scene with these relevant settings:
-
-- no vertex merge;
-- imported normals preserved;
-- `BLENDER` bone heuristic, although ART-006B contains no skeleton;
-- scene extras imported;
-- no collection wrapper requested by the importer;
-- imported material slots kept separate;
-- created objects selected for deterministic inspection.
-
-The driver requires the seven expected National Mall mesh-object names and three expected blockout materials before it writes any accepted receipt.
+The native driver imports ART-006B's self-contained `mall_core_panel_blockout.gltf` into a factory-clean Blender scene. It requires the seven expected National Mall mesh-object names and three expected blockout materials before writing accepted execution evidence.
 
 ## ART-006D export profile
 
-The round-trip glTF must use the following fixed settings:
+The round-trip glTF uses a fixed profile:
 
 | Setting | Value | Reason |
 |---|---:|---|
-| format | `GLTF_EMBEDDED` | one inspectable, self-contained text artifact |
+| format | `GLTF_EMBEDDED` | one self-contained text artifact |
 | UVs | on | preserve `TEXCOORD_0` |
 | normals | on | preserve surface shading basis |
 | tangents | on | preserve tangent-space contract |
 | materials | `EXPORT` | preserve semantic material bindings |
-| images | `NONE` | ART-006B has no textures; do not invent image payloads |
+| images | `NONE` | ART-006B has no textures |
 | cameras | off | source has none |
 | lights | off | source has none |
-| extras | on | preserve source metadata if Blender retains it |
+| extras | on | preserve source metadata where supported |
 | +Y up | on | emit standard glTF orientation |
 | apply modifiers | off | no silent geometry bake |
 | animation | off | source has none |
-| GPU instancing | off | avoid introducing an extension during this calibration round-trip |
+| GPU instancing | off | do not introduce an extension during calibration |
 
-The editable `.blend` is saved from the imported scene before glTF export. Both the `.blend` and re-exported `.gltf` remain native evidence artifacts until reviewed. They are not automatically committed.
+Receipt verification requires exact field types as well as values. JSON integer `1` is not accepted in place of boolean `true`, and imported object/material inventories must be arrays of strings rather than object-key lookalikes.
 
 ## Acceptance contract
 
 A successful native DCC pass requires all of the following:
 
-1. Blender reports exactly version `5.2.2` and background mode.
-2. The source glTF SHA-256 still matches ART-006B's checked-in expected manifest.
-3. Blender imports exactly the seven expected named mesh objects and three expected materials.
-4. The driver writes a fresh `.blend`, fresh embedded `.gltf`, and JSON receipt without overwriting existing outputs.
-5. The standard-library verifier independently hashes all three resources.
-6. The re-exported glTF keeps all seven named scene instances, required `POSITION`, `NORMAL`, `TANGENT`, `TEXCOORD_0` attributes, indexed triangle primitives and semantic material bindings.
-7. For every named instance, world-space center and world-space dimensions match the ART-006B source within `1e-4` metre.
-8. The round-trip output contains no animation, image or texture payload that was absent from the source.
-9. Native shell evidence separately records Blender command, executable/version, working directory and process exit code.
+1. Blender reports exactly version `5.2.2` in background mode.
+2. The source glTF SHA-256 matches ART-006B's verifier-owned source pin.
+3. The imported inventory contains exactly seven expected named mesh objects and three expected materials.
+4. The driver writes a fresh `.blend`, embedded `.gltf` and JSON receipt without overwriting prior evidence.
+5. The verifier independently hashes input/output resources and enforces the fixed export-profile types and values.
+6. The active exported scene contains exactly the seven expected mesh-bearing instances, with no extras or duplicates.
+7. Each primitive is indexed triangles with float `POSITION`, `NORMAL`, `TANGENT`, `TEXCOORD_0` accessors, equal nonzero attribute counts and an unsigned scalar index accessor.
+8. World center/dimensions match the source within the fixed, non-overridable `1e-4` metre tolerance.
+9. Canonical indexed-triangle signatures preserve winding and referenced position/normal/tangent/UV payloads. Triangle ordering and cyclic first-corner choice may vary, but connectivity, culling orientation and shading/UV semantics may not drift.
+10. Semantic material bindings and visible PBR factors remain equivalent within the same fixed numeric tolerance.
+11. The output introduces no animation, image or texture payload absent from the source.
+12. Native shell evidence separately records the real Blender command, executable/version, working directory and process exit code.
 
-The verifier compares functional scene semantics rather than requiring byte-identical glTF output. Blender is allowed to repack buffers/accessors or hierarchy representation as long as the externally meaningful geometry, transforms, attributes and material assignments survive.
+The verifier compares functional scene semantics rather than requiring byte-identical glTF output. Blender may repack buffers/accessors without weakening the acceptance gate.
 
 ## Evidence stages
 
 - `source_validated_not_imported`: ART-006B current state.
-- `dcc_roundtrip_executed_not_astral_imported`: Blender driver completed and wrote its receipt.
-- `dcc_roundtrip_verified_not_astral_imported`: independent ART-006D verifier accepted the receipt and round-trip files.
+- `dcc_roundtrip_executed_not_astral_imported`: real Blender driver completed and wrote native outputs/receipt.
+- `dcc_roundtrip_verified_not_astral_imported`: independent ART-006D verifier accepted those real files.
 - `imported`: reserved for an actual Astral importer receipt.
 - `runtime_verified`: reserved for actual Astral rendering/runtime checks.
 - `art_approved`: reserved for visual/creative approval after runtime evidence.
