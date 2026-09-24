@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "repository": "LucasKazaki/AnimeRPG",
+  "target_branch": "main",
+  "pass": "GAME-PASS30-DIALOGUE-CONTINUITY-2026-09-24",
+  "baseline": "332290bd9ba5f019aff182d74bf2d26eda7b681c",
+  "branch": "game/2026-09-24-dialogue-continuity-pass30",
+  "sources": [
+    {
+      "id": "GENSHIN-HANGOUT-1-4",
+      "kind": "official_update",
+      "url": "https://www.hoyolab.com/article/244378",
+      "published": "2021-03-15",
+      "accessed": "2026-09-24",
+      "lesson": "Permanent prerequisite-gated character dialogue content."
+    },
+    {
+      "id": "ZZZ-QUALITY-TIME-1-4",
+      "kind": "official_update",
+      "url": "https://www.hoyolab.com/article/35654082",
+      "published": "2024-12-17",
+      "accessed": "2026-09-24",
+      "lesson": "Trust-gated relationship content and first-completion progression."
+    },
+    {
+      "id": "GRANBLUE-FATE-DEV",
+      "kind": "developer_interview",
+      "url": "https://blog.playstation.com/2024/01/30/granblue-fantasy-relink-devs-discuss-crafting-an-immersive-rpg-world-for-ps5-ps4-out-feb-1/",
+      "published": "2024-01-30",
+      "accessed": "2026-09-24",
+      "lesson": "Multi-part Fate Episodes deepen character backstory and relationships."
+    },
+    {
+      "id": "GRANBLUE-PLAYSTATION",
+      "kind": "official_platform_overview",
+      "url": "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "published": null,
+      "accessed": "2026-09-24",
+      "lesson": "Journal/lore and Fate Episodes expose character/world history."
+    },
+    {
+      "id": "GENSHIN-HANGOUT-GUIDE",
+      "kind": "player_authored_supporting_guide",
+      "url": "https://www.hoyolab.com/article/279894",
+      "published": "2021-04-03",
+      "accessed": "2026-09-24",
+      "lesson": "Supporting evidence for branch endings and replayable Hangout memories; not developer authority."
+    },
+    {
+      "id": "ZZZ-PLAYER-DIALOGUE-REPEAT-20260102",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZenlessZoneZero/comments/1q1qhmg/is_it_just_me_or_does_anyone_has_experience_their/",
+      "published": "2026-01-02",
+      "accessed": "2026-09-24",
+      "lesson": "Completed exploration dialogue can feel immersion-breaking when retriggered; replies report similar repetition.",
+      "current_resolution": "not established from inspected later official material"
+    },
+    {
+      "id": "ZZZ-PLAYER-DIALOGUE-CUTOFF-20250717",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZenlessZoneZero/comments/1m2i08y",
+      "published": "2025-07-17",
+      "accessed": "2026-09-24",
+      "lesson": "Exploration/combat progression can interrupt dialogue; independent corroboration for recovery UX."
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-147",
+      "title": "Relationship tier readout",
+      "sources": ["ZZZ-QUALITY-TIME-1-4", "GRANBLUE-FATE-DEV"],
+      "adaptation": "Derive Wary/Acquainted/Confidant from existing authoritative trust with no second mutable relationship score.",
+      "allowed_paths": ["Engine/Scene/LandmarkDialogueContinuity.h", "Engine/Scene/LandmarkInteraction.h", "Tests/LandmarkDialogueContinuityPass30Tests.inc"],
+      "acceptance": "Thresholds are deterministic and reads do not mutate dialogue state.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-148",
+      "title": "Per-topic substantive dialogue checkpoints",
+      "sources": ["GENSHIN-HANGOUT-1-4", "GENSHIN-HANGOUT-GUIDE"],
+      "adaptation": "Retain the latest accepted substantive beat per existing topic with a sequence witness; previews/redundant beats do not replace it.",
+      "allowed_paths": ["Engine/Scene/LandmarkDialogueContinuity.h", "Engine/Scene/LandmarkInteraction.h", "Tests/LandmarkDialogueContinuityPass30Tests.inc"],
+      "acceptance": "Checkpoint is stable across preview/repeat/close beats and invalid IDs fail closed.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-149",
+      "title": "Idempotent ending archive",
+      "sources": ["GENSHIN-HANGOUT-1-4", "GENSHIN-HANGOUT-GUIDE"],
+      "adaptation": "Remember only authoritative committed AidCivilians/PursueRift outcomes, without copying comparator rewards or stories.",
+      "allowed_paths": ["Engine/Scene/LandmarkDialogueContinuity.h", "Engine/Scene/LandmarkInteraction.h", "Tests/LandmarkDialogueContinuityPass30Tests.inc"],
+      "acceptance": "Duplicate, None, or mismatched commits cannot inflate ending count.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-150",
+      "title": "Evidence-gated story episodes",
+      "sources": ["GRANBLUE-FATE-DEV", "GRANBLUE-PLAYSTATION", "ZZZ-QUALITY-TIME-1-4"],
+      "adaptation": "Original MallWitness/RiftConfidant/CryptPartner episodes derive from existing lore, clues, trust and outcome evidence.",
+      "allowed_paths": ["Engine/Scene/LandmarkDialogueContinuity.h", "Engine/Scene/LandmarkInteraction.h", "Tests/LandmarkDialogueContinuityPass30Tests.inc"],
+      "acceptance": "Episodes unlock monotonically only from existing authoritative evidence; invalid episode IDs fail closed.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-151",
+      "title": "Non-mutating checkpoint revisit",
+      "sources": ["GENSHIN-HANGOUT-1-4", "GENSHIN-HANGOUT-GUIDE"],
+      "adaptation": "Expose a saved branch beat for review without calling Choose or mutating story state.",
+      "allowed_paths": ["Engine/Scene/LandmarkDialogueContinuity.h", "Engine/Scene/LandmarkInteraction.h", "Tests/LandmarkDialogueContinuityPass30Tests.inc"],
+      "acceptance": "Revisit leaves trust/history/discussed/lore/clue/outcome state unchanged.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "QOL-031",
+      "title": "Interruption-safe latest dialogue recovery",
+      "sources": ["ZZZ-PLAYER-DIALOGUE-REPEAT-20260102", "ZZZ-PLAYER-DIALOGUE-CUTOFF-20250717"],
+      "adaptation": "Capture the latest accepted beat once and acknowledge it exactly once, without re-running dialogue mutation.",
+      "allowed_paths": ["Engine/Scene/LandmarkDialogueContinuity.h", "Engine/Scene/LandmarkInteraction.h", "Tests/LandmarkDialogueContinuityPass30Tests.inc"],
+      "acceptance": "Pending recovery cannot be overwritten, no-beat capture fails, acknowledge clears exactly once, and no story mutation is replayed.",
+      "status": "implemented_pending_exact_head_gates"
+    }
+  ],
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "registered_regression_coverage_authored": 6,
+    "production_game_domain_integrated": 6,
+    "exact_head_hosted_verified": 0,
+    "native_playable_verified": 0,
+    "independently_reviewed_clean": 0,
+    "merged": 0
+  },
+  "next_action": "Create/reuse the scoped PR, run exact-head hosted gates, obtain fresh independent review, repair any material finding, then expected-head merge only if clean."
+}
