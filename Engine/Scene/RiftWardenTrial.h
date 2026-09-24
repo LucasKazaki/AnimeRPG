@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 namespace Astral::Scene {
 
@@ -190,6 +191,12 @@ public:
     static constexpr double StaggerResponseWindowSeconds = 2.0;
     static constexpr double GuidedPracticeWindowMultiplier = 1.25;
     static constexpr double ExpertPracticeWindowMultiplier = 0.80;
+    static constexpr std::uint32_t MaximumTelegraphSequence =
+        std::numeric_limits<std::uint32_t>::max();
+
+    static constexpr std::uint32_t NextTelegraphSequence(std::uint32_t sequence) {
+        return sequence < MaximumTelegraphSequence ? sequence + 1U : MaximumTelegraphSequence;
+    }
 
     bool Begin(bool shadowCryptComplete, RiftWardenDifficulty difficulty) {
         if (!shadowCryptComplete || active_ || !DifficultyValid(difficulty)
@@ -319,7 +326,7 @@ public:
             }
 
             RecordTrainingAttempt(telegraph.attack, resolvedPhase, success);
-            ++attackCursor_;
+            attackCursor_ = NextTelegraphSequence(attackCursor_);
             if (loopingFocusedPractice_) {
                 posture_ = telegraph.attack == RiftWardenAttack::StaggerOpening
                     ? MaximumPosture
@@ -385,7 +392,7 @@ public:
                 reactionSeconds);
         }
         RecordTrainingAttempt(telegraph.attack, resolvedPhase, correct);
-        ++attackCursor_;
+        attackCursor_ = NextTelegraphSequence(attackCursor_);
         return report;
     }
 
