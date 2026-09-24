@@ -31,11 +31,17 @@ void TestLandmarkDialogueContinuityPass30() {
         "pass30 interruption capture is idempotent and preserves the original beat");
     Expect(owner.AcknowledgeInterruptedDialogue()
             && !owner.AcknowledgeInterruptedDialogue()
-            && !owner.InterruptedDialogue().pending,
-        "pass30 recovered dialogue is acknowledged exactly once");
+            && !owner.InterruptedDialogue().pending
+            && !owner.CaptureDialogueInterruption(),
+        "pass30 recovered dialogue is retired exactly once and cannot be recaptured without a new beat");
 
     const DialogueBeat reassure = owner.TryDialogueChoice(
         DialogueTopic::CivilianSafety, DialogueChoice::Reassure);
+    Expect(owner.CaptureDialogueInterruption()
+            && owner.InterruptedDialogue().sequence == 2
+            && owner.InterruptedDialogue().beat.response == DialogueResponse::CivilianRouteShared
+            && owner.AcknowledgeInterruptedDialogue(),
+        "pass30 a newer accepted beat becomes independently recoverable after the prior beat is retired");
     const DialogueBeat history = owner.TryDialogueChoice(
         DialogueTopic::LandmarkHistory, DialogueChoice::Reassure);
     Expect(reassure.response == DialogueResponse::CivilianRouteShared
@@ -78,6 +84,12 @@ void TestLandmarkDialogueContinuityPass30() {
     Expect(!directContinuity.Checkpoint(static_cast<DialogueTopic>(999)).available
             && !directContinuity.Revisit(static_cast<DialogueTopic>(999)).available,
         "pass30 invalid checkpoint queries fail closed");
+    DialogueBeat forgedInvalidTopic = challenged;
+    forgedInvalidTopic.topic = static_cast<DialogueTopic>(999);
+    const std::size_t sequenceBeforeInvalidBeat = directContinuity.Sequence();
+    Expect(!directContinuity.RecordBeat(directDialogue, forgedInvalidTopic)
+            && directContinuity.Sequence() == sequenceBeforeInvalidBeat,
+        "pass30 a forged accepted-looking beat with an invalid topic fails closed without advancing continuity");
 
     LandmarkDialogue story;
     LandmarkDialogueContinuity continuity;
