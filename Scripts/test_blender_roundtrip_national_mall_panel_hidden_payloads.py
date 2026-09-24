@@ -21,6 +21,7 @@ def wrap_lawn_under_rotated_parent(paths):
             }
         )
         roots.append(parent_index)
+
     base.mutate_output(paths, change)
 
 
@@ -29,7 +30,55 @@ def append_unreachable_mesh(paths, mutator):
         mesh = copy.deepcopy(gltf["meshes"][0])
         mutator(mesh)
         gltf["meshes"].append(mesh)
+
     base.mutate_output(paths, change)
+
+
+def append_unreachable_mesh_with_gltf(paths, mutator):
+    def change(gltf):
+        mesh = copy.deepcopy(gltf["meshes"][0])
+        mutator(gltf, mesh)
+        gltf["meshes"].append(mesh)
+
+    base.mutate_output(paths, change)
+
+
+def clone_accessor(gltf, accessor_index):
+    cloned = copy.deepcopy(gltf["accessors"][accessor_index])
+    gltf["accessors"].append(cloned)
+    return len(gltf["accessors"]) - 1
+
+
+def unreachable_normal_zero_count(paths):
+    def mutate(gltf, mesh):
+        accessor_index = clone_accessor(gltf, 1)
+        gltf["accessors"][accessor_index]["count"] = 0
+        mesh["primitives"][0]["attributes"]["NORMAL"] = accessor_index
+
+    append_unreachable_mesh_with_gltf(paths, mutate)
+
+
+def unreachable_normal_escapes_buffer(paths):
+    def mutate(gltf, mesh):
+        source_accessor = copy.deepcopy(gltf["accessors"][1])
+        source_view = copy.deepcopy(gltf["bufferViews"][source_accessor["bufferView"]])
+        source_view["byteOffset"] = gltf["buffers"][0]["byteLength"]
+        source_view["byteLength"] = 4
+        gltf["bufferViews"].append(source_view)
+        source_accessor["bufferView"] = len(gltf["bufferViews"]) - 1
+        gltf["accessors"].append(source_accessor)
+        mesh["primitives"][0]["attributes"]["NORMAL"] = len(gltf["accessors"]) - 1
+
+    append_unreachable_mesh_with_gltf(paths, mutate)
+
+
+def unreachable_index_zero_count(paths):
+    def mutate(gltf, mesh):
+        accessor_index = clone_accessor(gltf, 4)
+        gltf["accessors"][accessor_index]["count"] = 0
+        mesh["primitives"][0]["indices"] = accessor_index
+
+    append_unreachable_mesh_with_gltf(paths, mutate)
 
 
 def cases():
@@ -76,7 +125,8 @@ def cases():
             "camera node payload",
             fail("cameras unsupported"),
             lambda paths: base.mutate_output(
-                paths, lambda gltf: gltf["nodes"].append({"name": "Camera", "camera": 0})
+                paths,
+                lambda gltf: gltf["nodes"].append({"name": "Camera", "camera": 0}),
             ),
         ),
         (
@@ -182,6 +232,54 @@ def cases():
                     "COLOR_0", 0
                 ),
             ),
+        ),
+        (
+            "unreachable normal accessor index",
+            fail("NORMAL accessor invalid"),
+            lambda paths: append_unreachable_mesh(
+                paths,
+                lambda mesh: mesh["primitives"][0]["attributes"].__setitem__(
+                    "NORMAL", 999
+                ),
+            ),
+        ),
+        (
+            "unreachable normal accessor format",
+            fail("NORMAL accessor format invalid"),
+            lambda paths: append_unreachable_mesh(
+                paths,
+                lambda mesh: mesh["primitives"][0]["attributes"].__setitem__(
+                    "NORMAL", 4
+                ),
+            ),
+        ),
+        (
+            "unreachable normal accessor zero count",
+            fail("attribute counts invalid"),
+            unreachable_normal_zero_count,
+        ),
+        (
+            "unreachable normal accessor buffer bounds",
+            fail("escapes buffer"),
+            unreachable_normal_escapes_buffer,
+        ),
+        (
+            "unreachable index accessor format",
+            fail("index accessor format invalid"),
+            lambda paths: append_unreachable_mesh(
+                paths,
+                lambda mesh: mesh["primitives"][0].__setitem__("indices", 0),
+            ),
+        ),
+        (
+            "unreachable index accessor zero count",
+            fail("indices invalid"),
+            unreachable_index_zero_count,
+        ),
+        (
+            "attribute payload within tolerance",
+            lambda paths: base.run_verify(paths),
+            lambda paths: base.mutate_attribute_payload(paths, 1, 0, 0.00006),
         ),
     ]
 
