@@ -30,36 +30,38 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-142","title":"Operation-aware next-step hint","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-143","title":"Next-incomplete operation tracking","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-144","title":"Bounded multi-stop field route","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-145","title":"Unread field-journal notices","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-146","title":"Consolidated field briefing","status":"implemented_registered_regression_pending_exact_head_gates"},
-    {"id":"QOL-030","title":"Route-pin category visibility filter","status":"implemented_registered_regression_pending_exact_head_gates"}
+    {"id":"GAME-142","title":"Operation-aware next-step hint","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-143","title":"Next-incomplete operation tracking","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-144","title":"Bounded multi-stop field route","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-145","title":"Unread field-journal notices","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-146","title":"Consolidated field briefing","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"QOL-030","title":"Route-pin category visibility filter","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ExplorationFieldGuidePass29Tests",
-    "sandbox_cpp17": "pass29_domain_exit_0_and_pass14_compatibility_exit_0_using_disposable_WorldBlockout_type_stub",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
-    "native_windows_interactive": "not_applicable_to_backend_game_domain_packet_not_run_not_claimed",
-    "independent_review": "pending_exact_final_head",
-    "integration": "existing_LandmarkInteraction_owns_ExplorationFieldGuide_and_existing_ShadowCrypt_ManaReactor_gates_read_that_authoritative_guide; no_platform_or_renderer_changes",
+    "sandbox_cpp17": "initial_pass29_domain_and_pass14_compatibility_checks_passed_before_review_repair; final owner-integration acceptance relies_on_exact_head_hosted_gates",
+    "hosted_windows_ci": "pending_exact_final_head_after_owner_repair",
+    "release_manifest": "pending_exact_final_head_after_owner_repair",
+    "native_windows_interactive": "not_applicable_to_game_domain_packet_no_input_or_ui_wiring_not_run_not_claimed",
+    "independent_review": "initial_review_found_production_owner_reachability_gap; repaired; fresh_exact_head_review_required",
+    "integration": "LandmarkInteraction owns ExplorationFieldGuide and now forwards next-operation route filter journal-acknowledgement and briefing APIs; ShadowCrypt and ManaReactor continue reading the same authoritative guide",
     "persistent_cross_process_save": "field_guide_state_not_cross_process_persisted_not_claimed"
   },
   "coordination": {
     "open_engine_and_art_prs": "inspected_and_left_unchanged",
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "ExplorationFieldGuide_h_plus_registered_game_tests_and_pass29_operating_records_only"
+    "gameplay_paths": "ExplorationFieldGuide_h_plus_thin_LandmarkInteraction_h_forwarders_plus_registered_game_tests_and_pass29_operating_records"
   },
   "research": {
     "reference_context": "official_Genshin_Interactive_Map_2_6_update_plus_official_current-era_Luna_III_multi-objective_tracking_and_official_pin-sync_guide",
-    "community_request": "historical_pin_visibility_filter_request_with_2026_retrospective_corroboration",
+    "community_request": "historical_pin_visibility_filter_request_with_2026_retrospective_and_2020_independent_corroboration",
     "current_resolution": "later_pin_management_improvements_exist; equivalent_narrower_in-game_visibility_filter_not_established_in_inspected_current_sources"
   },
   "review_history": {
-    "material_findings_repaired_this_pass": 0,
-    "summary": []
+    "material_findings_repaired_this_pass": 1,
+    "summary": [
+      "P2: mutating pass29 APIs were only directly callable on standalone ExplorationFieldGuide objects; added thin LandmarkInteraction owner forwarding and live-owner regression coverage"
+    ]
   },
-  "next_action": "Require exact-head Windows Debug/Release and Release-manifest workflows plus fresh independent Codex review on PR 50; repair and rerun if needed, then re-read main/head/diff/threads and expected-head merge if clean."
+  "next_action": "Wait for exact-head Windows Debug/Release and Release-manifest workflows plus fresh independent Codex review on PR 50; repair and rerun if needed, then re-read main/head/diff/threads and expected-head merge if clean."
 }
