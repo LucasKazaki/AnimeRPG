@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS31-MALL-RESONANCE-PUZZLE-2026-09-24",
+  "baseline": "a32a729591bdf4dddf32494d08959c3e6f90d69e",
+  "target": "main",
+  "accessed": "2026-09-24",
+  "sources": [
+    {
+      "id": "GENSHIN-7.1-UPDATE",
+      "kind": "official_update",
+      "published": "2026-09-23",
+      "url": "https://genshin.hoyoverse.com/tr/news/detail/166383",
+      "use": "selectable challenge parameters, score, retained best score"
+    },
+    {
+      "id": "ZZZ-COMBAT-TRAINING-20260831",
+      "kind": "official_event",
+      "published": "2026-08-31",
+      "url": "https://zenless.hoyoverse.com/m/en-us/news/165921",
+      "use": "story prerequisite, selectable challenge target, challenge reward"
+    },
+    {
+      "id": "WUWA-1.2-DEV-COMM",
+      "kind": "developer_communication",
+      "published": "2024-08-06",
+      "url": "https://wutheringwaves.kurogames.com/kr/main/news/detail/1112",
+      "use": "class-neutral exploration helper and configurable targeting lesson"
+    },
+    {
+      "id": "GRANBLUE-PS-OVERVIEW",
+      "kind": "official_platform_overview",
+      "published": null,
+      "url": "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "use": "adjustable difficulty, assists, reminders, practice"
+    },
+    {
+      "id": "GENSHIN-PLAYER-PUZZLE-RESET-20260830",
+      "kind": "original_player_discussion",
+      "published": "2026-08-30",
+      "url": "https://www.reddit.com/r/Genshin_Impact/comments/1w2s6by/great_now_what/",
+      "use": "explicit request for an in-game puzzle reset after a movable object became stuck",
+      "corroboration": [
+        "https://www.reddit.com/r/Genshin_Impact/comments/1vn7qrr/stuck_on_puzzle/",
+        "https://www.reddit.com/r/Genshin_Impact/comments/1vp3ulj/my_statue_fell_and_is_stuck_in_wall_cant_move_it/",
+        "https://www.reddit.com/r/Genshin_Impact/comments/1vt3268/snezhnaya_puzzle_broken/",
+        "https://www.reddit.com/r/Genshin_Impact/comments/1vv1po1/puzzles_requiring_relog/",
+        "https://www.reddit.com/r/Genshin_Impact/comments/1w4c71w/statue_stuck_in_open_royal_hall_door_puzzle/"
+      ],
+      "current_resolution": "unestablished_in_inspected_official_7.1_material",
+      "consensus_claim": false
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-152",
+      "title": "Objective-gated three-anchor resonance puzzle",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "production owner requires completed National Mall objective plus persistent progression ownership"
+    },
+    {
+      "id": "GAME-153",
+      "title": "Selectable bounded puzzle difficulty",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "Survey/Standard/Expert use distinct deterministic target and mastery thresholds"
+    },
+    {
+      "id": "GAME-154",
+      "title": "Optional class-neutral guidance assist",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "guidance identifies next mismatch without mutating phases"
+    },
+    {
+      "id": "GAME-155",
+      "title": "Per-difficulty mastery record",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "rank/score/moves/time best is monotonic per difficulty"
+    },
+    {
+      "id": "GAME-156",
+      "title": "Repeatable clear with owner-bound first-clear reward",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "reward grants once to bound CharacterProgression owner and replay preserves history"
+    },
+    {
+      "id": "QOL-032",
+      "title": "Explicit in-game active-puzzle reset",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "reset clears only transient active-board state and preserves records/reward history"
+    }
+  ]
+}
