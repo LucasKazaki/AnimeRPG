@@ -47,7 +47,7 @@ For the bounded output it requires:
 - exactly the seven expected active-scene mesh-bearing semantic instances, with no extra or duplicate mesh instances;
 - indexed `TRIANGLES` only for every mesh primitive in the bounded glTF, including unreachable meshes;
 - an exact primitive rendering-attribute set of float `POSITION`, `NORMAL`, `TANGENT` and `TEXCOORD_0` on every mesh primitive in the bounded glTF, with no unverified `COLOR_0`, skinning, or other extra rendering attributes, including unreachable meshes;
-- valid in-range float attribute accessors, valid buffer views/payload bounds, identical nonzero attribute counts, and unsigned-integer scalar index accessors with nonempty triangle-multiple index payloads whose indices stay within the decoded vertex range, for every mesh primitive including unreachable meshes;
+- valid in-range float attribute accessors, valid buffer views whose entire declared ranges remain inside their embedded buffers, valid accessor payload bounds, identical nonzero attribute counts, and unsigned-integer scalar index accessors with nonempty triangle-multiple index payloads whose indices stay within the decoded vertex range, for every mesh primitive including unreachable meshes;
 - world-space center/dimensions derived from referenced vertices and matching the ART-006B source within the verifier-owned, non-overridable `1e-4` metre tolerance;
 - the complete inherited 3x4 world transform for each semantic instance matching the ART-006B source within `1e-4`, in addition to matching transform orientation parity, so rotations, reflections, translations, scale and shear cannot preserve the AABB while changing rendered orientation;
 - semantic material bindings and base-color, metallic, roughness, emissive, alpha and sidedness preservation;
@@ -98,7 +98,7 @@ python Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
 python -m py_compile Scripts/blender_roundtrip_national_mall_panel.py Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
 ```
 
-The two focused suites are additive: the original 37-case suite remains intact, and the hidden-payload suite now contains 23 regressions, for 60 focused cases total. The newest repairs validate accessor format/count/buffer/index contracts on unreachable primitives and prove that an attribute drift of `0.00006` is accepted under the documented `1e-4` pairwise tolerance instead of being rejected by quantization bucket boundaries.
+The two focused suites are additive: the original 37-case suite remains intact, and the hidden-payload suite now contains 24 regressions, for 61 focused cases total. The latest repairs validate accessor format/count/buffer/index contracts on unreachable primitives, reject a bufferView whose declared range exceeds the embedded buffer even if the accessor's used bytes still fit, and prove that an attribute drift of `0.00006` is accepted under the documented `1e-4` pairwise tolerance instead of being rejected by quantization bucket boundaries.
 
 ## Stop condition
 
