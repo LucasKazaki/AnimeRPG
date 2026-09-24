@@ -47,6 +47,12 @@
     "independent_review": "pending_fresh_exact_final_head_review",
     "cross_process_persistence": "not_claimed_training_evidence_is_in_session_only"
   },
+  "review_repairs": [
+    "receipt_now_records_exact_standalone_compile_and_run_commands_with_exit_zero",
+    "training_successes_no_longer_advance_without_a_corresponding_attempt_after_counter_saturation",
+    "lastSeenPhase_now_updates_on_later_accepted_encounters_even_after_attempt_and_success_counters_saturate",
+    "registered_regression_saturates_RiftSlash_in_Opening_then_requires_frozen_counters_and_Fracture_lastSeenPhase_after_a_later_encounter"
+  ],
   "coordination": {
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
     "gameplay_paths": "RiftWardenTrial_h_plus_reused_registered_pass33_test_include_and_operating_records"
