@@ -37,8 +37,11 @@ This packet adopts only cube, sphere, cylinder and plane as a bounded first slic
 - one neutral opaque material
 - every primitive is indexed `TRIANGLES`
 - exact attributes: `POSITION`, `NORMAL`, `TANGENT`, `TEXCOORD_0`
+- attribute and index bindings must be genuine JSON integers; booleans do not satisfy index semantics
 - exact vertex/index budgets pinned by source and manifest
 - finite positions, unit normals/tangents, tangent-normal orthogonality, normalized UV range
+- each shape's declared UV mapping policy is checked against its exact seams/corners/parameterization, not only `[0,1]` bounds
+- triangle position/UV derivatives must agree with the supplied tangent direction and reconstructed bitangent handedness (`TANGENT.w`)
 - nondegenerate outward winding checked against vertex normals
 - shape-specific bounds and surface equations checked independently
 - source, manifest and glTF runtime state remain `source_validated_not_imported`
