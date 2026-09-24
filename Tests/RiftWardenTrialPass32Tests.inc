@@ -65,16 +65,36 @@ void TestRiftWardenTrialPass32() {
             && repeatedTelegraph.sequence == telegraph.sequence,
         "pass32 reading the current telegraph is non-mutating");
 
-    // GAME-159: timing is part of defense acceptance. Nonfinite input fails
-    // closed, and a late otherwise-correct response becomes a real hit.
-    const RiftWardenBriefing beforeInvalid = progressionTrial.Briefing();
+    // GAME-159: timing is part of defense acceptance. Negative and nonfinite
+    // input fail closed without mutation; a late finite response becomes a hit.
+    const RiftWardenBriefing beforeInfinity = progressionTrial.Briefing();
     Expect(!progressionTrial.Resolve(RiftWardenResponse::Dodge,
             std::numeric_limits<double>::infinity()).accepted,
-        "pass32 nonfinite reaction timing is rejected before combat mutation");
-    Expect(progressionTrial.Briefing().bossHealth == beforeInvalid.bossHealth
-            && progressionTrial.Briefing().damageTaken == beforeInvalid.damageTaken
-            && progressionTrial.Briefing().telegraph.sequence == beforeInvalid.telegraph.sequence,
-        "pass32 rejected reaction timing leaves boss/player/sequence state unchanged");
+        "pass32 positive-infinite reaction timing is rejected before combat mutation");
+    Expect(progressionTrial.Briefing().bossHealth == beforeInfinity.bossHealth
+            && progressionTrial.Briefing().damageTaken == beforeInfinity.damageTaken
+            && progressionTrial.Briefing().telegraph.sequence == beforeInfinity.telegraph.sequence,
+        "pass32 positive-infinite timing leaves boss/player/sequence state unchanged");
+
+    const RiftWardenBriefing beforeNegative = progressionTrial.Briefing();
+    Expect(!progressionTrial.Resolve(RiftWardenResponse::Dodge, -0.01).accepted,
+        "pass32 negative reaction timing is rejected before combat mutation");
+    Expect(progressionTrial.Briefing().bossHealth == beforeNegative.bossHealth
+            && progressionTrial.Briefing().damageTaken == beforeNegative.damageTaken
+            && progressionTrial.Briefing().posture == beforeNegative.posture
+            && progressionTrial.Briefing().telegraph.sequence == beforeNegative.telegraph.sequence,
+        "pass32 negative timing leaves boss/player/posture/sequence state unchanged");
+
+    const RiftWardenBriefing beforeNaN = progressionTrial.Briefing();
+    Expect(!progressionTrial.Resolve(RiftWardenResponse::Dodge,
+            std::numeric_limits<double>::quiet_NaN()).accepted,
+        "pass32 NaN reaction timing is rejected before combat mutation");
+    Expect(progressionTrial.Briefing().bossHealth == beforeNaN.bossHealth
+            && progressionTrial.Briefing().damageTaken == beforeNaN.damageTaken
+            && progressionTrial.Briefing().posture == beforeNaN.posture
+            && progressionTrial.Briefing().telegraph.sequence == beforeNaN.telegraph.sequence,
+        "pass32 NaN timing leaves boss/player/posture/sequence state unchanged");
+
     const RiftWardenActionReport late = progressionTrial.Resolve(
         telegraph.recommendedResponse, telegraph.responseWindowSeconds + 0.01);
     Expect(late.accepted && late.resolution == RiftWardenResolution::Hit
