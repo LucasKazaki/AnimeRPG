@@ -161,14 +161,28 @@ public:
     }
     bool ResetMallResonancePuzzle() { return mallResonancePuzzle_.ResetActiveRun(); }
     MallResonanceBriefing MallResonancePuzzleBriefing() const {
-        return mallResonancePuzzle_.Briefing();
+        MallResonanceBriefing briefing = mallResonancePuzzle_.Briefing();
+        if (progression_ == nullptr || progression_ != mallResonanceProgressionOwner_
+            || progression_->MallResonanceFirstClearClaimed()) {
+            briefing.firstClearRewardAvailable = false;
+        }
+        return briefing;
     }
     MallResonanceRecord MallResonanceBestRecord(MallResonanceDifficulty difficulty) const {
         return mallResonancePuzzle_.BestRecord(difficulty);
     }
     MallResonanceRewardReport ClaimMallResonanceFirstClearReward() {
-        if (progression_ == nullptr || progression_ != mallResonanceProgressionOwner_) return {};
-        return mallResonancePuzzle_.ClaimFirstClearReward(*progression_);
+        MallResonanceRewardReport report{};
+        if (progression_ == nullptr || progression_ != mallResonanceProgressionOwner_
+            || progression_->MallResonanceFirstClearClaimed()) {
+            return report;
+        }
+        report = mallResonancePuzzle_.ClaimFirstClearReward(*progression_);
+        if (!report.granted) return report;
+        bool ledgerGranted = false;
+        progression_->ClaimMallResonanceFirstClearReward(0, 0, 0, ledgerGranted);
+        if (!ledgerGranted) return {};
+        return report;
     }
     const MallResonancePuzzle& MallResonancePuzzleState() const {
         return mallResonancePuzzle_;
