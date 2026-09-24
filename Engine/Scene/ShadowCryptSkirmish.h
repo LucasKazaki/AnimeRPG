@@ -256,6 +256,7 @@ public:
         if (enemy.health == 0) {
             enemy.defeated = true;
             enemy.staggered = false;
+            report.staggerOpened = false;
             report.defeated = true;
             if (lockedTarget_ == index) lockedTarget_ = EnemyCapacity;
             if (counterTarget_ == index) counterTarget_ = EnemyCapacity;
