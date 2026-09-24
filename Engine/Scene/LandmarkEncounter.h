@@ -54,8 +54,14 @@ public:
         ShadowbladeActions& shadowbladeActions);
     void ConfigureChallenge(EncounterChallengeDifficulty difficulty,
         EncounterTacticalFocus focus,
-        EncounterScoringMode scoringMode = EncounterScoringMode::Balanced) {
-        challengeTracker_.Configure(difficulty, focus, scoringMode);
+        EncounterScoringMode scoringMode = EncounterScoringMode::Balanced,
+        EncounterTacticalBuff tacticalBuff = EncounterTacticalBuff::None) {
+        // Challenge configuration is an admission decision. Once an encounter
+        // is active, changing scoring would lack the activation-local reset and
+        // baselines established by TryActivate. Keep the admitted configuration
+        // unchanged until the run reaches a terminal state.
+        if (state_ == LandmarkEncounterState::Active) return;
+        challengeTracker_.Configure(difficulty, focus, scoringMode, tacticalBuff);
     }
 
     bool ConfigureTraining(ShadowbladeTrainingFocus focus, DefensePracticePace pace,

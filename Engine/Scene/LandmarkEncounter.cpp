@@ -108,6 +108,10 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
     EncounterChallengeResult challenge{};
     if (challengeTracker_.Enabled()) {
         const TrainingStats& stats = combatSandbox.Stats();
+        const std::int64_t localDamage =
+            NonnegativeDelta(stats.totalDamage, activationTrainingStats_.totalDamage);
+        const std::int64_t localTechnique =
+            NonnegativeDelta(stats.techniqueScore, activationTrainingStats_.techniqueScore);
         challenge = challengeTracker_.Resolve({
             EncounterCombatScore(stats, activationTrainingStats_, completionSecondsPrecise),
             NonnegativeDelta(stats.reactionCount, activationTrainingStats_.reactionCount),
@@ -115,6 +119,9 @@ bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
             NonnegativeDelta(stats.finisherCount, activationTrainingStats_.finisherCount),
             shadowbladeActions.PlayerHealth() == ShadowbladeActions::MaximumPlayerHealth,
             ChallengeTimeGrade(grade),
+            localDamage,
+            localTechnique,
+            combatSandbox.TechniqueChain(),
         });
         if (challenge.firstClearRewardRequested > 0.0f) {
             challenge.firstClearRewardApplied =
