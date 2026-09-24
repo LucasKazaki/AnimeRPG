@@ -3,21 +3,22 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "332290bd9ba5f019aff182d74bf2d26eda7b681c",
+  "last_verified_main_at_pass_start": "a32a729591bdf4dddf32494d08959c3e6f90d69e",
   "last_merged_pass": {
-    "id": "GAME-PASS29-FIELD-GUIDE-MAP-QOL-2026-09-24",
-    "pr": 50,
-    "merge_sha": "332290bd9ba5f019aff182d74bf2d26eda7b681c",
-    "head_sha": "167b44e0fc2022f98a1b71ef0eb03413ad874766",
+    "id": "GAME-PASS30-DIALOGUE-CONTINUITY-2026-09-24",
+    "pr": 51,
+    "merge_sha": "a32a729591bdf4dddf32494d08959c3e6f90d69e",
+    "head_sha": "7b9d658f2388c57b1e657eacab785c65c5e5037f",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-24-dialogue-continuity-pass30",
-  "pass": "GAME-PASS30-DIALOGUE-CONTINUITY-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS30-DIALOGUE-CONTINUITY-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS30-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS30.md",
-  "pr": 51,
-  "final_head": "pending_post_review_repair_exact_head_gates_and_rereview",
+  "working_branch": "game/2026-09-24-mall-resonance-puzzle-pass31",
+  "pass": "GAME-PASS31-MALL-RESONANCE-PUZZLE-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS31-MALL-RESONANCE-PUZZLE-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS31-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS31.md",
+  "pr": 53,
+  "final_head": "pending_exact_head_gates_review_and_merge",
+  "final_receipt_location": "PR_53_comment_after_exact_head_acceptance_and_merge",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -30,37 +31,31 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-147","title":"Relationship tier readout","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-148","title":"Per-topic substantive dialogue checkpoint","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-149","title":"Idempotent ending archive","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-150","title":"Evidence-gated story episodes","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-151","title":"Non-mutating checkpoint revisit","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"QOL-031","title":"Interruption-safe latest dialogue recovery","status":"review_repaired_owner_integrated_registered_regression_pending_exact_head_gates"}
+    {"id":"GAME-152","title":"Objective-gated three-anchor resonance puzzle","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-153","title":"Selectable bounded puzzle difficulty","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-154","title":"Optional class-neutral guidance assist","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-155","title":"Per-difficulty mastery record","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-156","title":"Repeatable clear with owner-bound first-clear reward","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"QOL-032","title":"Explicit in-game active-puzzle reset","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_LandmarkDialogueContinuityPass30Tests",
-    "hosted_windows_ci": "pre_repair_head_31cac5f_passed_run_938_stale_after_review_repair; fresh_exact_head_required",
-    "release_manifest": "pre_repair_head_31cac5f_passed_run_696_stale_after_review_repair; fresh_exact_head_required",
-    "native_windows_interactive": "not_run_not_claimed_no_rendered_dialogue_ui_or_input_changes",
-    "independent_review": "Codex_exact_head_31cac5f_found_one_P2_recapture_after_acknowledgement; repaired_with_acknowledged_sequence_witness_and_regressions; fresh_rereview_required",
-    "integration": "LandmarkInteraction owns LandmarkDialogueContinuity and records existing authoritative dialogue beats/outcomes after LandmarkDialogue mutations",
-    "persistent_cross_process_save": "continuity_state_in_memory_only_not_claimed_cross_process"
+    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_MallResonancePuzzlePass31Tests",
+    "hosted_windows_ci": "pending_exact_final_head_after_state_and_receipt_commit",
+    "release_manifest": "pending_exact_final_head_after_state_and_receipt_commit",
+    "native_windows_interactive": "not_run_not_claimed_no_rendered_puzzle_ui_or_input_changes",
+    "independent_review": "pending_exact_final_head_after_state_and_receipt_commit",
+    "integration": "LandmarkInteraction owns MallResonancePuzzle and binds entry/reward authority to completed National Mall objective plus one CharacterProgression owner",
+    "persistent_cross_process_save": "puzzle_state_and_records_in_memory_only_not_claimed_cross_process"
   },
   "coordination": {
-    "open_engine_and_art_prs": "13_23_26_28_33_45_49_inspected_and_left_unchanged",
+    "open_non_game_prs_inspected": "52_49_45_33_28_26_23_13_left_unchanged",
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "new_LandmarkDialogueContinuity_h_plus_thin_LandmarkInteraction_h_integration_plus_registered_game_tests_and_pass30_records"
+    "gameplay_paths": "new_MallResonancePuzzle_h_plus_thin_LandmarkInteraction_h_integration_plus_registered_game_tests_and_pass31_records"
   },
   "research": {
-    "reference_context": "official_Genshin_Hangout_ZZZ_Trust_Quality_Time_Granblue_Fate_Episodes_and_journal",
-    "community_request": "corroborated_ZZZ_dialogue_retrigger_and_interruption_reports",
-    "current_resolution": "specific_retrigger_interruption_fix_not_established_in_inspected_later_official_material"
+    "reference_context": "current_Genshin_7_1_challenge_parameters_and_best_scores_ZZZ_Combat_Training_WuWa_exploration_tool_Granblue_difficulty_assists",
+    "community_request": "recent_corroborated_Genshin_stuck_puzzle_reports_requesting_explicit_in_game_reset_instead_of_relog_or_teleport",
+    "current_resolution": "specific_comparator_puzzle_reset_issue_resolution_unestablished_in_inspected_official_7_1_material"
   },
-  "review_history": {
-    "material_findings_repaired_this_pass": 1,
-    "summary": [
-      "P2: acknowledged latest beat remained recapturable before any new dialogue; now acknowledgement records the consumed sequence, capture requires a strictly newer beat, invalid accepted-looking topics fail closed, and both constexpr and registered owner regressions cover the boundary"
-    ]
-  },
-  "next_action": "Treat the final post-repair documentation head as candidate, require fresh hosted Windows Debug/Release and Release-manifest success plus fresh independent Codex review, then resolve the repaired thread and reread main/head/diff/threads before expected-head merge if clean."
+  "next_action": "Treat the documentation-complete branch head as candidate, require fresh hosted Windows Debug/Release and Release-manifest success plus fresh independent Codex review, then reread main/head/diff/threads and expected-head merge only if all gates remain clean."
 }
