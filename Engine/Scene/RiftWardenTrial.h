@@ -73,6 +73,7 @@ struct RiftWardenRecord {
     int damageTaken{};
     int perfectDefenses{};
     int punishes{};
+    int missedOpenings{};
     int bestStreak{};
     double clearSeconds{};
 };
@@ -90,6 +91,7 @@ struct RiftWardenBriefing {
     int damageTaken{};
     int perfectDefenses{};
     int punishes{};
+    int missedOpenings{};
     int currentStreak{};
     int bestStreak{};
     double elapsedSeconds{};
@@ -152,6 +154,7 @@ public:
                 bestStreak_ = std::max(bestStreak_, currentStreak_);
             } else {
                 report.resolution = RiftWardenResolution::MissedOpening;
+                ++missedOpenings_;
                 currentStreak_ = 0;
             }
             posture_ = 0;
@@ -217,6 +220,7 @@ public:
         result.damageTaken = damageTaken_;
         result.perfectDefenses = perfectDefenses_;
         result.punishes = punishes_;
+        result.missedOpenings = missedOpenings_;
         result.currentStreak = currentStreak_;
         result.bestStreak = bestStreak_;
         result.elapsedSeconds = elapsedSeconds_;
@@ -364,12 +368,12 @@ private:
     }
 
     static RiftWardenMastery MasteryFor(const RiftWardenRecord& record) {
-        if (record.damageTaken == 0 && record.perfectDefenses >= 8
-            && record.clearSeconds <= 180.0) {
+        if (record.damageTaken == 0 && record.missedOpenings == 0
+            && record.perfectDefenses >= 8 && record.clearSeconds <= 180.0) {
             return RiftWardenMastery::Gold;
         }
-        if (record.damageTaken <= 100 && record.perfectDefenses >= 4
-            && record.clearSeconds <= 300.0) {
+        if (record.damageTaken <= 100 && record.missedOpenings <= 1
+            && record.perfectDefenses >= 4 && record.clearSeconds <= 300.0) {
             return RiftWardenMastery::Silver;
         }
         return RiftWardenMastery::Bronze;
@@ -382,6 +386,9 @@ private:
             return MasteryRank(candidate.mastery) > MasteryRank(current.mastery);
         }
         if (candidate.score != current.score) return candidate.score > current.score;
+        if (candidate.missedOpenings != current.missedOpenings) {
+            return candidate.missedOpenings < current.missedOpenings;
+        }
         if (candidate.damageTaken != current.damageTaken) {
             return candidate.damageTaken < current.damageTaken;
         }
@@ -406,6 +413,7 @@ private:
         damageTaken_ = 0;
         perfectDefenses_ = 0;
         punishes_ = 0;
+        missedOpenings_ = 0;
         currentStreak_ = 0;
         bestStreak_ = 0;
     }
@@ -436,11 +444,13 @@ private:
         candidate.damageTaken = damageTaken_;
         candidate.perfectDefenses = perfectDefenses_;
         candidate.punishes = punishes_;
+        candidate.missedOpenings = missedOpenings_;
         candidate.bestStreak = bestStreak_;
         candidate.clearSeconds = elapsedSeconds_;
-        candidate.score = std::max(0, 10000 + perfectDefenses_ * 100
+        const int scoredPerfectDefenses = std::min(perfectDefenses_, 30);
+        candidate.score = std::max(0, 10000 + scoredPerfectDefenses * 100
             + punishes_ * 250 + bestStreak_ * 25 - damageTaken_ * 20
-            - static_cast<int>(elapsedSeconds_ * 5.0));
+            - missedOpenings_ * 600 - static_cast<int>(elapsedSeconds_ * 5.0));
         candidate.mastery = MasteryFor(candidate);
         RiftWardenRecord& best = bestRecords_[DifficultyIndex(difficulty_)];
         if (BetterRecord(candidate, best)) best = candidate;
@@ -465,6 +475,7 @@ private:
     int damageTaken_{};
     int perfectDefenses_{};
     int punishes_{};
+    int missedOpenings_{};
     int currentStreak_{};
     int bestStreak_{};
     bool active_{};
