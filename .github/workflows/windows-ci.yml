@@ -59,6 +59,7 @@ jobs:
           import argparse
           import ctypes
           import importlib.util
+          import subprocess
           import sys
           import tempfile
           from ctypes import wintypes
@@ -258,17 +259,27 @@ jobs:
                       capture_timeout_seconds=10.0,
                   )
                   runner = r0.R0Runner(args)
+                  probe_command = [sys.executable, "-c", probe_code]
                   runner.run_command(
                       "windows-job-object-probe",
-                      [sys.executable, "-c", probe_code],
+                      probe_command,
                       cwd=worktree,
                       timeout_seconds=10.0,
                   )
+                  if len(runner.records) != 1:
+                      raise RuntimeError("Job Object probe did not retain exactly one command record")
+                  record = runner.records[0]
                   log = (args.evidence_root / "01-windows-job-object-probe.log").read_text(encoding="utf-8")
-                  header_end = log.find("\n\n")
-                  if header_end < 0:
-                      raise RuntimeError("Job Object probe evidence is missing the command/output separator")
-                  output_start = header_end + 2
+                  expected_header = (
+                      "label: windows-job-object-probe\n"
+                      f"started_at: {record.started_at}\n"
+                      "timeout_seconds: 10\n"
+                      f"working_directory: {worktree}\n"
+                      "command: " + subprocess.list2cmdline(probe_command) + "\n\n"
+                  )
+                  if not log.startswith(expected_header):
+                      raise RuntimeError("Job Object probe evidence header no longer matches run_command provenance")
+                  output_start = len(expected_header)
                   boundaries = []
                   for boundary in ("\nsupervisor_control:\n", "\nfinished_at:"):
                       position = log.find(boundary, output_start)
@@ -277,13 +288,13 @@ jobs:
                   if not boundaries:
                       raise RuntimeError("Job Object probe evidence is missing completion metadata")
                   streamed_output = log[output_start:min(boundaries)]
-                  if PROBE_MARKER not in log[:output_start]:
+                  if PROBE_MARKER not in expected_header:
                       raise RuntimeError("Job Object probe no longer exercises the command-header marker collision")
                   if PROBE_MARKER not in streamed_output:
                       raise RuntimeError("Job Object probe marker is missing from retained streamed command output")
-                  if len(runner.records) != 1 or runner.records[0].exit_code != 0:
+                  if record.exit_code != 0:
                       raise RuntimeError("Job Object probe did not retain a successful command record")
-                  if runner.records[0].timed_out or runner.records[0].interrupted or runner.records[0].spawn_error:
+                  if record.timed_out or record.interrupted or record.spawn_error:
                       raise RuntimeError("Job Object probe retained an unexpected failure state")
                   print("Hosted Windows Job Object containment contract passed.")
           finally:
