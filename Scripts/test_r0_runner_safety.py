@@ -408,6 +408,46 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertEqual(runner.records[0].exit_code, 127)
             self.assertIsNone(runner.records[0].spawn_error)
 
+    def test_capture_supervisor_setup_failure_is_pre_start_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            setup_prefix = r0.SUPERVISOR_SETUP_ERROR_PREFIX
+            sentinel = root / "capture-requested-command-ran.txt"
+            supervisor_code = (
+                "import sys; "
+                f"print({setup_prefix!r} + 'synthetic capture setup failure', "
+                "file=sys.stderr, flush=True); "
+                "raise SystemExit(126)"
+            )
+            requested = [
+                sys.executable,
+                "-c",
+                (
+                    "from pathlib import Path; "
+                    f"Path({str(sentinel)!r}).write_text('ran', encoding='utf-8')"
+                ),
+            ]
+            with mock.patch.object(r0, "CAPTURE_SUPERVISOR_CODE", supervisor_code):
+                with self.assertRaisesRegex(r0.RecoveryFailure, "supervisor setup failed"):
+                    runner.capture(requested, check=False, timeout_seconds=1.0)
+            self.assertFalse(sentinel.exists(), "capture requested command ran after setup failure")
+
+            spoof = setup_prefix + "spoofed requested-command output"
+            ordinary = runner.capture(
+                [
+                    sys.executable,
+                    "-c",
+                    f"import sys; print({spoof!r}, flush=True); sys.exit(126)",
+                ],
+                check=False,
+                timeout_seconds=1.0,
+            )
+            self.assertEqual(ordinary.returncode, 126)
+            self.assertIn(spoof, ordinary.stdout)
+
     def test_run_command_rejects_non_finite_override_before_spawn(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
