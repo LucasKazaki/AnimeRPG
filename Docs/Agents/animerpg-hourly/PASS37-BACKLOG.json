@@ -18,24 +18,24 @@
       "title": "Focused Shadow Crypt guidance",
       "reference_feature": "Focused Experience Mode on supported quests",
       "gap": "Standard Rift Nave guidance prioritizes the optional Cooling Cache before the main objective.",
-      "adaptation": "Reversible Focused guidance points at StabilizeRiftNode while preserving optional cache state and actions.",
-      "acceptance": "Invalid or repeated mode requests do not mutate state; Focused mode cannot remove or auto-complete the cache."
+      "adaptation": "Reversible Focused guidance points at StabilizeRiftNode while preserving optional cache state and actions, with a live-owner setter.",
+      "acceptance": "The production owner can select Focused guidance; invalid or repeated mode requests do not mutate state; Focused mode cannot remove or auto-complete the cache."
     },
     {
       "id": "GAME-183",
       "title": "Explicit entry prerequisite report",
       "reference_feature": "Visible quest unlock criteria",
       "gap": "Fresh Shadow Crypt entry returns only success/failure to its direct mission caller.",
-      "adaptation": "Read-only lead progress and exact mission-state blocker for initial entry.",
-      "acceptance": "Incomplete lead, active run, checkpoint, completed replay requirement, and ready state are distinct and deterministic."
+      "adaptation": "Read-only lead progress and exact mission-state blocker, with the live owner adding required protagonist availability before declaring entry ready.",
+      "acceptance": "Incomplete lead, missing protagonist, active run, checkpoint, completed replay requirement, and ready state are distinct and deterministic."
     },
     {
       "id": "GAME-184",
       "title": "Prerequisite-specific next action",
       "reference_feature": "Adventurer Handbook Guide quest guidance",
-      "gap": "Callers otherwise have to duplicate field-guide and mission-state interpretation.",
+      "gap": "Callers otherwise have to duplicate field-guide, mission-state, and protagonist-authority interpretation.",
       "adaptation": "Return the exact next authored action without changing the currently tracked field operation.",
-      "acceptance": "Missing sigil, missing lore, ready entry, active run, checkpoint, and completed replay produce bounded distinct guidance."
+      "acceptance": "Bind protagonist, missing sigil, missing lore, ready entry, active run, checkpoint, and completed replay produce bounded distinct guidance that agrees with live owner authority."
     },
     {
       "id": "GAME-185",
@@ -61,17 +61,22 @@
       "current_resolution": "Unverified. Treated as a historical player preference for seeing encounter information before commitment, not as proof of a current Genshin defect.",
       "gap": "No compact pre-run mission-structure preview exists.",
       "adaptation": "Read-only room requirements, optional-cache availability point, and Rift Warden finale using existing authored facts only.",
-      "acceptance": "Preview is available before Begin and cannot mutate mission or field state."
+      "acceptance": "Preview is available through the production owner before Begin and cannot mutate mission or field state."
     }
   ],
   "allowed_paths": [
     "Engine/Scene/ShadowCryptMission.h",
+    "Engine/Scene/LandmarkInteraction.h",
     "Tests/ShadowCryptMissionPlanningPass37Tests.inc",
     "Tests/ThoughtCommandsTests.cpp",
     "Tasks/GAME-PASS37-SHADOW-CRYPT-MISSION-PLANNING-2026-09-24.md",
     "Docs/Agents/animerpg-hourly/PASS37-BACKLOG.json",
     "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS37.md",
     "Docs/Agents/animerpg-hourly/STATE.json"
+  ],
+  "review_repairs": [
+    "P2 production Focused-mode reachability repaired by LandmarkInteraction::SetShadowCryptFocusMode",
+    "P2 entry-readiness mismatch repaired by live-owner protagonist-aware status and guidance"
   ],
   "counts": {
     "reference_features_researched": 5,
