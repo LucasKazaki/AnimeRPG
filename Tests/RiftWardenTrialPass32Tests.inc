@@ -397,6 +397,67 @@ void TestRiftWardenTrialPass32() {
             && retainedSaturatedRecord.score == firstSaturatedRecord.score,
         "pass32 later unknown-or-worse saturated replay cannot replace the established personal best through damage/time ties");
 
+    // Damage saturation is independently information-losing. A later replay
+    // that takes strictly more actual hits after the cap must not replace an
+    // established capped record merely because its stored clear time is shorter.
+    RiftWardenTrial saturatedDamageTrial;
+    Expect(saturatedDamageTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass32 damage-saturation baseline begins");
+    Expect(saturatedDamageTrial.AdvanceTime(100.0),
+        "pass32 damage-saturation baseline records a slower authoritative clear time");
+    while (saturatedDamageTrial.Briefing().damageTaken < RiftWardenTrial::MaximumDamageTaken) {
+        const RiftWardenTelegraph hitTelegraph = saturatedDamageTrial.CurrentTelegraph();
+        const RiftWardenResponse wrongResponse = hitTelegraph.recommendedResponse
+                == RiftWardenResponse::Dodge
+            ? RiftWardenResponse::Guard
+            : RiftWardenResponse::Dodge;
+        Expect(saturatedDamageTrial.Resolve(wrongResponse, 0.10).resolution
+                == RiftWardenResolution::Hit,
+            "pass32 damage-saturation baseline accumulates authoritative hits to the cap");
+    }
+    Expect(saturatedDamageTrial.Briefing().damageTaken == RiftWardenTrial::MaximumDamageTaken,
+        "pass32 damage evidence saturates at the explicit safe bound");
+    ClearRiftWardenDirect(saturatedDamageTrial);
+    const RiftWardenRecord firstSaturatedDamageRecord = saturatedDamageTrial.BestRecord(
+        RiftWardenDifficulty::Story);
+    Expect(firstSaturatedDamageRecord.valid
+            && firstSaturatedDamageRecord.damageTaken == RiftWardenTrial::MaximumDamageTaken
+            && firstSaturatedDamageRecord.mastery == RiftWardenMastery::Bronze
+            && firstSaturatedDamageRecord.score == 0,
+        "pass32 saturated-damage baseline stores a bounded zero-score Bronze record");
+
+    Expect(saturatedDamageTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass32 damage-saturation ordering replay begins");
+    Expect(saturatedDamageTrial.AdvanceTime(50.0),
+        "pass32 damage-saturation replay is deliberately faster in stored time");
+    while (saturatedDamageTrial.Briefing().damageTaken < RiftWardenTrial::MaximumDamageTaken) {
+        const RiftWardenTelegraph hitTelegraph = saturatedDamageTrial.CurrentTelegraph();
+        const RiftWardenResponse wrongResponse = hitTelegraph.recommendedResponse
+                == RiftWardenResponse::Dodge
+            ? RiftWardenResponse::Guard
+            : RiftWardenResponse::Dodge;
+        Expect(saturatedDamageTrial.Resolve(wrongResponse, 0.10).resolution
+                == RiftWardenResolution::Hit,
+            "pass32 damage-saturation replay reaches the same stored damage cap");
+    }
+    for (int extraHit = 0; extraHit < 100; ++extraHit) {
+        const RiftWardenTelegraph hitTelegraph = saturatedDamageTrial.CurrentTelegraph();
+        const RiftWardenResponse wrongResponse = hitTelegraph.recommendedResponse
+                == RiftWardenResponse::Dodge
+            ? RiftWardenResponse::Guard
+            : RiftWardenResponse::Dodge;
+        Expect(saturatedDamageTrial.Resolve(wrongResponse, 0.10).resolution
+                == RiftWardenResolution::Hit
+                && saturatedDamageTrial.Briefing().damageTaken
+                    == RiftWardenTrial::MaximumDamageTaken,
+            "pass32 damage-saturation replay takes provably additional hits while stored damage remains capped");
+    }
+    ClearRiftWardenDirect(saturatedDamageTrial);
+    Expect(SameRiftWardenRecord(
+            saturatedDamageTrial.BestRecord(RiftWardenDifficulty::Story),
+            firstSaturatedDamageRecord),
+        "pass32 unknown-or-worse capped-damage replay cannot replace the established personal best through clear time");
+
     // Production-owner integration: the Warden trial is unavailable on a fresh
     // owner, then consumes the already-authoritative completed Shadow Crypt path.
     WorldBlockout world;
