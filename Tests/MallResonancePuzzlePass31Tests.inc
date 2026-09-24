@@ -167,6 +167,38 @@ void TestMallResonancePuzzlePass31() {
             && direct.BestRecord(MallResonanceDifficulty::Standard).score == standardBest.score,
         "pass31 a slower extra-move replay cannot roll back the retained Standard best");
 
+    // Review regression: rank is the primary mastery record. A faster Bronze run
+    // can have a numerically higher score than a slow Silver run, but may not roll
+    // the displayed mastery tier backward.
+    MallResonancePuzzle rankMonotonic;
+    Expect(rankMonotonic.Begin(true, MallResonanceDifficulty::Survey),
+        "pass31 rank regression starts an isolated Survey record fixture");
+    Expect(rankMonotonic.TryStabilize().result == MallResonanceActionResult::Mismatch,
+        "pass31 rank regression records one failed stabilization for a Silver clear");
+    rankMonotonic.Rotate(MallResonanceAnchor::LincolnMemorial);
+    rankMonotonic.Rotate(MallResonanceAnchor::ReflectingPool);
+    rankMonotonic.Rotate(MallResonanceAnchor::WashingtonMonument);
+    rankMonotonic.AdvanceTime(180.0f);
+    Expect(rankMonotonic.TryStabilize().rank == MallResonanceRank::Silver,
+        "pass31 rank regression establishes a Silver personal best");
+    const MallResonanceRecord silverBest = rankMonotonic.BestRecord(
+        MallResonanceDifficulty::Survey);
+    Expect(rankMonotonic.Begin(true, MallResonanceDifficulty::Survey),
+        "pass31 rank regression starts the comparison replay");
+    Expect(rankMonotonic.TryStabilize().result == MallResonanceActionResult::Mismatch
+            && rankMonotonic.TryStabilize().result == MallResonanceActionResult::Mismatch,
+        "pass31 rank regression creates a Bronze run with a higher raw score opportunity");
+    rankMonotonic.Rotate(MallResonanceAnchor::LincolnMemorial);
+    rankMonotonic.Rotate(MallResonanceAnchor::ReflectingPool);
+    rankMonotonic.Rotate(MallResonanceAnchor::WashingtonMonument);
+    Expect(rankMonotonic.TryStabilize().rank == MallResonanceRank::Bronze,
+        "pass31 rank regression completes the higher-score Bronze replay");
+    const MallResonanceRecord retainedSilver = rankMonotonic.BestRecord(
+        MallResonanceDifficulty::Survey);
+    Expect(retainedSilver.rank == MallResonanceRank::Silver
+            && retainedSilver.score == silverBest.score,
+        "pass31 personal best keeps the higher mastery rank even when a lower rank scores more");
+
     // Production-owner integration plus GAME-156: only the completed National Mall
     // objective and one bound persistent progression owner can start/reward runs.
     LandmarkInteraction lockedOwner;
@@ -214,6 +246,23 @@ void TestMallResonancePuzzlePass31() {
                 == MallResonancePuzzle::FirstClearEnhancementMaterials
             && !owner.ClaimMallResonanceFirstClearReward().granted,
         "pass31 first clear grants bounded progression exactly once through the bound protagonist owner");
+
+    // Review regression: reconstructing the production interaction/puzzle owner
+    // against the same persistent CharacterProgression cannot mint the first-clear
+    // reward a second time. The entitlement survives the transient puzzle object.
+    WorldBlockout reconstructedWorld;
+    ShadowbladeActions reconstructedActions;
+    LandmarkInteraction reconstructedOwner;
+    CompleteMallObjectivePass31(reconstructedOwner, reconstructedWorld, reconstructedActions);
+    reconstructedOwner.SetCharacterProgression(&progression);
+    Expect(reconstructedOwner.BeginMallResonancePuzzle(MallResonanceDifficulty::Survey),
+        "pass31 reconstructed production owner can replay with the same persistent protagonist");
+    SolveMallResonancePass31(reconstructedOwner, MallResonanceDifficulty::Survey);
+    Expect(reconstructedOwner.StabilizeMallResonancePuzzle().result
+                == MallResonanceActionResult::Completed
+            && !reconstructedOwner.MallResonancePuzzleBriefing().firstClearRewardAvailable
+            && !reconstructedOwner.ClaimMallResonanceFirstClearReward().granted,
+        "pass31 persistent progression ledger prevents duplicate reward after owner reconstruction");
 
     Expect(owner.BeginMallResonancePuzzle(MallResonanceDifficulty::Survey)
             && owner.ResetMallResonancePuzzle()
