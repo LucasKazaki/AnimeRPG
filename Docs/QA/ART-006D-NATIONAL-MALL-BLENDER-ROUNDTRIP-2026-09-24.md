@@ -18,34 +18,39 @@ The initial Codex review of `cb0de51ff52119ab6a9e790faedcc6ebfadcda52` found thr
 
 A second exact-head Codex review of `64ffc277811b8cb8f95578b862384f0593f5841f` found one P1 and four P2 issues. Those were repaired on `fb2867ae5f3151e27c7cfaa2b109379c705e9fc1` by fixing the acceptance tolerance, winding-preserving triangle signatures, attribute payload validation, receipt type checks, and exact active-scene mesh inventory.
 
-A third exact-head Codex review of `fb2867ae5f3151e27c7cfaa2b109379c705e9fc1` found two additional P2 issues. This repair addresses both:
+A third exact-head Codex review of `fb2867ae5f3151e27c7cfaa2b109379c705e9fc1` found two P2 issues. Head `2ad3bab391088419349cc27125f10df555efee0a` repaired reflected-transform parity and root/reachable-node GPU-instancing acceptance.
 
-1. Each semantic mesh instance now records the handedness of its full inherited world transform. A negative-scale reflection that preserves center, dimensions and local topology is rejected as `transform parity drift` instead of being accepted with reversed world-space winding.
-2. The bounded profile now rejects `EXT_mesh_gpu_instancing` both when declared at the glTF root and when attached to a scene node. One mesh-bearing node can therefore no longer hide multiple rendered instances behind a single semantic node count.
+The exact-head review of `2ad3bab391088419349cc27125f10df555efee0a` then found three additional P2 issues. Verifier repair commit `732537429dd555972098dd66d8fc926e81c58a77` addresses all three:
 
-The verifier also rejects newly introduced camera payloads in the bounded output scope and validates that extension declaration lists and node extension containers have the expected JSON types before applying the instancing rule.
+1. `EXT_mesh_gpu_instancing` is rejected in declarations, root payloads and every node extension container, including unreachable nodes.
+2. `KHR_lights_punctual` is rejected in declarations, root payloads and every node extension container because the fixed exporter profile has `export_lights=false`; node `camera` payloads are likewise rejected for `export_cameras=false`.
+3. Optional `animations`, `images`, `textures`, and `cameras` collections may be absent or actual empty JSON arrays only. Falsy non-array substitutions fail closed.
+
+All three review threads were answered and resolved after the verifier repair.
 
 ## Author verification executed in sandbox
 
-Executed after the third review repair:
+The repaired verifier was exercised with a supplemental local harness containing the prior semantic/evidence cases plus seven focused hidden-payload/type cases:
 
 ```text
-python Scripts/test_blender_roundtrip_national_mall_panel.py
-# PASS: 37/37 Blender round-trip verifier tests
+python test_blender_roundtrip_national_mall_panel.py
+# PASS: 44/44 Blender round-trip verifier tests
 
-python -m py_compile Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py
+python -m py_compile verify_blender_roundtrip_national_mall_panel.py test_blender_roundtrip_national_mall_panel.py
 # exit 0
 ```
 
-Regression coverage now includes the earlier source/hash/manifest/version/resource/material/transform cases plus fixed-tolerance enforcement, type-invalid receipt arrays/settings, unexpected and duplicate mesh instances, winding reversal, zero/mismatched attribute counts, normal/UV payload drift, reflected world transforms, node-level GPU instancing and root-level GPU-instancing declarations.
+The seven supplemental cases cover unreachable-node GPU instancing, punctual-light payloads, node cameras, and wrong-type `animations` / `images` / `textures` / `cameras` collections.
 
-The prior exact-head Windows workflow `35986951177` (run #1035) passed on `fb2867ae...`, but this repair changes the candidate head. That run is historical evidence only. A new exact-head hosted run and a fresh independent review are required before this PR leaves draft.
+The repository's persisted `Scripts/test_blender_roundtrip_national_mall_panel.py` is still the prior 37-case suite at this candidate. A direct connector write of the expanded test file was blocked before mutation, so the 44-case supplemental harness is sandbox evidence only and is not represented as committed regression coverage. No existing repository tests were removed or weakened.
+
+The Windows workflow for pre-repair head `2ad3bab...`, run `35988421764` / #1040, completed successfully. Any hosted run on an older head is historical after this repair. A fresh exact-head hosted run and a fresh independent review are required before this PR leaves draft.
 
 ## Verification model
 
-The verifier does not require byte-identical glTF output. It decodes the embedded buffers/accessors, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, checks world-transform handedness, rejects GPU-instanced duplicates, compares material semantics, and compares canonical winding-preserving triangle/attribute signatures for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
+The verifier does not require byte-identical glTF output. It decodes embedded buffers/accessors, validates the fixed source and receipt identities, scans the complete node collection for disabled exporter payloads, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, checks world-transform handedness, compares material semantics, and compares canonical winding-preserving triangle/attribute signatures for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
 
-This bounded gate is intentionally stricter than a filename/count check but is still only a DCC source-workflow gate. It cannot establish Astral compatibility.
+The bounded output additionally rejects GPU instancing, punctual lights and node cameras, and requires optional animation/image/texture/camera collections to be absent or exact empty arrays. This gate is intentionally stricter than a filename/count check but is still only a DCC source-workflow gate. It cannot establish Astral compatibility.
 
 ## Not run / not claimed
 
