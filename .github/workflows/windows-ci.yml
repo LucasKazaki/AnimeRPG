@@ -64,6 +64,43 @@ jobs:
           from ctypes import wintypes
           from pathlib import Path
 
+          JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
+          JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS = 9
+          PROBE_MARKER = "ASTRAL_WINDOWS_JOB_OBJECT_PROBE_OK"
+
+          class IO_COUNTERS(ctypes.Structure):
+              _fields_ = [
+                  ("ReadOperationCount", ctypes.c_ulonglong),
+                  ("WriteOperationCount", ctypes.c_ulonglong),
+                  ("OtherOperationCount", ctypes.c_ulonglong),
+                  ("ReadTransferCount", ctypes.c_ulonglong),
+                  ("WriteTransferCount", ctypes.c_ulonglong),
+                  ("OtherTransferCount", ctypes.c_ulonglong),
+              ]
+
+          class JOBOBJECT_BASIC_LIMIT_INFORMATION(ctypes.Structure):
+              _fields_ = [
+                  ("PerProcessUserTimeLimit", ctypes.c_longlong),
+                  ("PerJobUserTimeLimit", ctypes.c_longlong),
+                  ("LimitFlags", wintypes.DWORD),
+                  ("MinimumWorkingSetSize", ctypes.c_size_t),
+                  ("MaximumWorkingSetSize", ctypes.c_size_t),
+                  ("ActiveProcessLimit", wintypes.DWORD),
+                  ("Affinity", ctypes.c_size_t),
+                  ("PriorityClass", wintypes.DWORD),
+                  ("SchedulingClass", wintypes.DWORD),
+              ]
+
+          class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
+              _fields_ = [
+                  ("BasicLimitInformation", JOBOBJECT_BASIC_LIMIT_INFORMATION),
+                  ("IoInfo", IO_COUNTERS),
+                  ("ProcessMemoryLimit", ctypes.c_size_t),
+                  ("JobMemoryLimit", ctypes.c_size_t),
+                  ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                  ("PeakJobMemoryUsed", ctypes.c_size_t),
+              ]
+
           script = Path("Scripts/invoke_r0_release_candidate.py").resolve()
           spec = importlib.util.spec_from_file_location("r0_runner_job_probe", script)
           if spec is None or spec.loader is None:
@@ -72,7 +109,58 @@ jobs:
           sys.modules[spec.name] = r0
           spec.loader.exec_module(r0)
 
-          probe_code = r'''
+          kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+          kernel32.GetCurrentProcess.argtypes = []
+          kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+          kernel32.IsProcessInJob.argtypes = [wintypes.HANDLE, wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)]
+          kernel32.IsProcessInJob.restype = wintypes.BOOL
+          kernel32.QueryInformationJobObject.argtypes = [
+              wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)
+          ]
+          kernel32.QueryInformationJobObject.restype = wintypes.BOOL
+          kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+          kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+          kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+          kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+          kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+          kernel32.CloseHandle.restype = wintypes.BOOL
+
+          current = kernel32.GetCurrentProcess()
+          outer_job = kernel32.CreateJobObjectW(None, None)
+          if not outer_job:
+              raise ctypes.WinError(ctypes.get_last_error())
+          try:
+              outer_limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
+              if not kernel32.QueryInformationJobObject(
+                  outer_job,
+                  JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS,
+                  ctypes.byref(outer_limits),
+                  ctypes.sizeof(outer_limits),
+                  None,
+              ):
+                  raise ctypes.WinError(ctypes.get_last_error())
+              if outer_limits.BasicLimitInformation.LimitFlags & JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE:
+                  raise RuntimeError("fresh outer Job Object unexpectedly has KILL_ON_JOB_CLOSE enabled")
+              if not kernel32.AssignProcessToJobObject(outer_job, current):
+                  raise ctypes.WinError(ctypes.get_last_error())
+              in_outer = wintypes.BOOL()
+              if not kernel32.IsProcessInJob(current, outer_job, ctypes.byref(in_outer)):
+                  raise ctypes.WinError(ctypes.get_last_error())
+              if not in_outer.value:
+                  raise RuntimeError("probe process was not assigned to the explicit outer Job Object")
+              immediate_outer_limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
+              if not kernel32.QueryInformationJobObject(
+                  None,
+                  JOB_OBJECT_EXTENDED_LIMIT_INFORMATION_CLASS,
+                  ctypes.byref(immediate_outer_limits),
+                  ctypes.sizeof(immediate_outer_limits),
+                  None,
+              ):
+                  raise ctypes.WinError(ctypes.get_last_error())
+              if immediate_outer_limits.BasicLimitInformation.LimitFlags & JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE:
+                  raise RuntimeError("explicit outer Job Object is not distinguishable from the R0 supervisor job")
+
+              probe_code = r'''
           import ctypes
           from ctypes import wintypes
 
@@ -151,39 +239,55 @@ jobs:
               kernel32.CloseHandle(nested)
           '''
 
-          with tempfile.TemporaryDirectory() as temp:
-              root = Path(temp)
-              source = root / "source"
-              worktree = root / "worktree"
-              source.mkdir()
-              worktree.mkdir()
-              args = argparse.Namespace(
-                  source_repository=source,
-                  worktree=worktree,
-                  build_root=root / "build",
-                  release_root=root / "release",
-                  evidence_root=root / "evidence",
-                  recovery_branch="probe/r0-job-object",
-                  base_ref="HEAD",
-                  skip_fetch=True,
-                  command_timeout_seconds=10.0,
-                  capture_timeout_seconds=10.0,
-              )
-              runner = r0.R0Runner(args)
-              runner.run_command(
-                  "windows-job-object-probe",
-                  [sys.executable, "-c", probe_code],
-                  cwd=worktree,
-                  timeout_seconds=10.0,
-              )
-              log = (args.evidence_root / "01-windows-job-object-probe.log").read_text(encoding="utf-8")
-              if "ASTRAL_WINDOWS_JOB_OBJECT_PROBE_OK" not in log:
-                  raise RuntimeError("Job Object probe marker is missing from retained command evidence")
-              if len(runner.records) != 1 or runner.records[0].exit_code != 0:
-                  raise RuntimeError("Job Object probe did not retain a successful command record")
-              if runner.records[0].timed_out or runner.records[0].interrupted or runner.records[0].spawn_error:
-                  raise RuntimeError("Job Object probe retained an unexpected failure state")
-              print("Hosted Windows Job Object containment contract passed.")
+              with tempfile.TemporaryDirectory() as temp:
+                  root = Path(temp)
+                  source = root / "source"
+                  worktree = root / "worktree"
+                  source.mkdir()
+                  worktree.mkdir()
+                  args = argparse.Namespace(
+                      source_repository=source,
+                      worktree=worktree,
+                      build_root=root / "build",
+                      release_root=root / "release",
+                      evidence_root=root / "evidence",
+                      recovery_branch="probe/r0-job-object",
+                      base_ref="HEAD",
+                      skip_fetch=True,
+                      command_timeout_seconds=10.0,
+                      capture_timeout_seconds=10.0,
+                  )
+                  runner = r0.R0Runner(args)
+                  runner.run_command(
+                      "windows-job-object-probe",
+                      [sys.executable, "-c", probe_code],
+                      cwd=worktree,
+                      timeout_seconds=10.0,
+                  )
+                  log = (args.evidence_root / "01-windows-job-object-probe.log").read_text(encoding="utf-8")
+                  header_end = log.find("\n\n")
+                  if header_end < 0:
+                      raise RuntimeError("Job Object probe evidence is missing the command/output separator")
+                  output_start = header_end + 2
+                  boundaries = []
+                  for boundary in ("\nsupervisor_control:\n", "\nfinished_at:"):
+                      position = log.find(boundary, output_start)
+                      if position >= 0:
+                          boundaries.append(position)
+                  if not boundaries:
+                      raise RuntimeError("Job Object probe evidence is missing completion metadata")
+                  streamed_output = log[output_start:min(boundaries)]
+                  if PROBE_MARKER not in log[:output_start]:
+                      raise RuntimeError("Job Object probe no longer exercises the command-header marker collision")
+                  if PROBE_MARKER not in streamed_output:
+                      raise RuntimeError("Job Object probe marker is missing from retained streamed command output")
+                  if len(runner.records) != 1 or runner.records[0].exit_code != 0:
+                      raise RuntimeError("Job Object probe did not retain a successful command record")
+                  if runner.records[0].timed_out or runner.records[0].interrupted or runner.records[0].spawn_error:
+                      raise RuntimeError("Job Object probe retained an unexpected failure state")
+                  print("Hosted Windows Job Object containment contract passed.")
+          finally:
+              kernel32.CloseHandle(outer_job)
           '@ | Set-Content -Path $probe -Encoding utf8
           python $probe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
