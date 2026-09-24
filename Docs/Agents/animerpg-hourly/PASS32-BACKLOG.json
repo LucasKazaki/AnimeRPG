@@ -49,32 +49,32 @@
     {
       "id": "GAME-157",
       "title": "Shadow Crypt-gated Rift Warden mastery trial",
-      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
     },
     {
       "id": "GAME-158",
       "title": "Deterministic three-phase boss attack pattern",
-      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
     },
     {
       "id": "GAME-159",
       "title": "Difficulty- and phase-specific timed defense",
-      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
     },
     {
       "id": "GAME-160",
       "title": "Posture break and one-shot punish opening",
-      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
     },
     {
       "id": "GAME-161",
       "title": "Progressive difficulty unlocks and per-difficulty mastery records",
-      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
     },
     {
       "id": "QOL-033",
       "title": "Learned-phase boss practice",
-      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
     }
   ],
   "review_repairs": [
@@ -85,18 +85,32 @@
     "cover all nine difficulty-by-phase timing windows at exact and just-outside boundaries",
     "prove per-difficulty records remain separate",
     "prove a worse replay on the same trial cannot replace a better record",
-    "prove learned-phase practice preserves every ranked record field and difficulty unlock bit"
+    "prove learned-phase practice preserves every ranked record field and difficulty unlock bit",
+    "treat capped damage as information-loss evidence so a later higher-actual-damage replay cannot win the clear-time tie-breaker"
   ],
-  "pre_documentation_verification": {
-    "source_test_head": "de919da6946a2f33345833304428b85218f398fb",
-    "windows_debug_release_run": 35960493908,
-    "windows_debug_release_run_number": 982,
-    "windows_debug_release_result": "success",
-    "release_manifest_run": 35960493883,
-    "release_manifest_run_number": 720,
-    "release_manifest_result": "success",
-    "independent_review": "fresh exact-source-head review requested; documentation completion intentionally requires a final-head rereview"
-  },
+  "historical_verification": [
+    {
+      "head": "de919da6946a2f33345833304428b85218f398fb",
+      "windows_debug_release_run": 35960493908,
+      "windows_debug_release_run_number": 982,
+      "windows_debug_release_result": "success",
+      "release_manifest_run": 35960493883,
+      "release_manifest_run_number": 720,
+      "release_manifest_result": "success",
+      "status": "superseded_by_later_review_repairs"
+    },
+    {
+      "head": "0d95c071aab5f860f0056808afd271abdeb07f6a",
+      "windows_debug_release_run": 35960888686,
+      "windows_debug_release_run_number": 985,
+      "windows_debug_release_result": "success",
+      "release_manifest_run": 35960888615,
+      "release_manifest_run_number": 723,
+      "release_manifest_result": "success",
+      "independent_review_result": "material_P2_damage_saturation_ordering_finding",
+      "status": "superseded_by_repair_73fefff6cbfb58ca43d73fd7bcbf5f2219e5adc1"
+    }
+  ],
   "counts": {
     "reference_features_researched": 5,
     "community_improvements_researched": 1,
@@ -108,5 +122,5 @@
     "independent_reviewed_clean_exact_final_head": 0,
     "merged": 0
   },
-  "next_action": "Finish the durable run/state records, then require hosted Windows Debug/Release, release-manifest integrity and fresh independent Codex review on the resulting exact documentation-complete head before expected-head merge."
+  "next_action": "Use the documentation-complete repaired head as the sole acceptance candidate; require hosted Windows Debug/Release, Release-manifest integrity and fresh independent Codex review on that exact head, then reread main/head/diff/threads and expected-head merge only if every gate remains clean."
 }
