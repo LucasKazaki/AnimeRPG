@@ -21,6 +21,7 @@ NODES = [
     ("Grove_Envelope_NegX", 2, [-56.388, -0.03, 0], [39.624, 0.06, 158.496]),
 ]
 MATERIALS = ["Lawn_Blockout", "Gravel_Path_Blockout", "Tree_Grove_Envelope"]
+REAL_ART006B_SHA = "6c51463332199c65bcfbde04ee8e5883e03a94aba710980eebfaa6945f2759b7"
 
 
 def pack_fixture_buffer() -> tuple[bytes, list[dict[str, object]], list[dict[str, object]]]:
@@ -58,6 +59,8 @@ def make_gltf() -> dict[str, object]:
     for i, mat in enumerate(MATERIALS):
         meshes.append({"name":f"FixtureMesh{i}","primitives":[{"attributes":{"POSITION":0,"NORMAL":1,"TANGENT":2,"TEXCOORD_0":3},"indices":4,"mode":4,"material":i}]})
     nodes = [{"name":name,"mesh":mesh,"translation":translation,"scale":scale} for name,mesh,translation,scale in NODES]
+    colors = [(0.18,0.36,0.12,1.0),(0.5,0.45,0.35,1.0),(0.08,0.2,0.08,1.0)]
+    roughness = [0.95,1.0,1.0]
     return {
         "asset":{"version":"2.0","generator":"ART-006D test fixture"},
         "scene":0,
@@ -66,7 +69,10 @@ def make_gltf() -> dict[str, object]:
         "buffers":[{"byteLength":len(payload),"uri":uri}],
         "bufferViews":views,
         "accessors":accessors,
-        "materials":[{"name":name,"pbrMetallicRoughness":{"baseColorFactor":[0.5,0.5,0.5,1.0],"metallicFactor":0.0,"roughnessFactor":1.0}} for name in MATERIALS],
+        "materials":[
+            {"name":name,"pbrMetallicRoughness":{"baseColorFactor":list(colors[i]),"metallicFactor":0.0,"roughnessFactor":roughness[i]},"doubleSided":False}
+            for i,name in enumerate(MATERIALS)
+        ],
         "meshes":meshes,
     }
 
@@ -81,13 +87,30 @@ def sha(path: Path) -> str:
 
 def prepare(root: Path) -> dict[str, Path]:
     paths = {name: root / filename for name, filename in {
-        "source":"source.gltf", "manifest":"expected-manifest.json", "roundtrip":"roundtrip.gltf", "blend":"roundtrip.blend", "receipt":"receipt.json"
+        "source":"mall_core_panel_blockout.gltf", "manifest":"expected-manifest.json", "roundtrip":"roundtrip.gltf", "blend":"roundtrip.blend", "receipt":"receipt.json"
     }.items()}
     gltf = make_gltf()
     write_json(paths["source"], gltf)
     write_json(paths["roundtrip"], copy.deepcopy(gltf))
     paths["blend"].write_bytes(b"BLENDER-v5.2.2-fixture\x00")
-    manifest = {"schema_version":1,"status":"source_validated_not_imported","gltf_file":"source.gltf","gltf_sha256":sha(paths["source"])}
+    verifier.EXPECTED_SOURCE_SHA = sha(paths["source"])
+    manifest = {
+        "schema_version":1,
+        "asset_id":"national-mall-core-panel-module-v1",
+        "status":"source_validated_not_imported",
+        "ledger_ref":"Content/Reference/NationalMall/reference-ledger.json",
+        "ledger_blob_sha1":"ba8ec205d2aecfa4b2ace15c13c71fb9932cb7f4",
+        "source_sha256":"5ec46c554172b0f83859ed6185df07bbd2d35cb89f13fe66d9ac10246d9005b1",
+        "gltf_file":"mall_core_panel_blockout.gltf",
+        "gltf_sha256":sha(paths["source"]),
+        "gltf_bytes":paths["source"].stat().st_size,
+        "unique_meshes":3,
+        "mesh_instances":7,
+        "materials":3,
+        "unit_box_vertices":24,
+        "unit_box_indices":36,
+        "dimensions_m":{"lawn_longitudinal":137.16},
+    }
     write_json(paths["manifest"], manifest)
     receipt = {
         "schema_version":1,
@@ -96,7 +119,7 @@ def prepare(root: Path) -> dict[str, Path]:
         "status":"dcc_roundtrip_executed_not_astral_imported",
         "run":{"kind":"native_blender_background","background_mode":True,"script_completed":True,"working_directory":root.as_posix()},
         "blender":{"version":"5.2.2","version_tuple":[5,2,2],"executable":"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe"},
-        "input":{"path":"source.gltf","sha256":sha(paths["source"]),"bytes":paths["source"].stat().st_size},
+        "input":{"path":paths["source"].name,"sha256":sha(paths["source"]),"bytes":paths["source"].stat().st_size},
         "output":{
             "gltf":{"path":"roundtrip.gltf","sha256":sha(paths["roundtrip"]),"bytes":paths["roundtrip"].stat().st_size},
             "blend":{"path":"roundtrip.blend","sha256":sha(paths["blend"]),"bytes":paths["blend"].stat().st_size},
@@ -112,6 +135,12 @@ def prepare(root: Path) -> dict[str, Path]:
     return paths
 
 
+def repin_input(paths: dict[str, Path], receipt: dict[str, object]) -> None:
+    inp = receipt["input"]  # type: ignore[index]
+    inp["sha256"] = sha(paths["source"])  # type: ignore[index]
+    inp["bytes"] = paths["source"].stat().st_size  # type: ignore[index]
+
+
 def repin_output(paths: dict[str, Path], receipt: dict[str, object]) -> None:
     out = receipt["output"]["gltf"]  # type: ignore[index]
     out["sha256"] = sha(paths["roundtrip"])  # type: ignore[index]
@@ -121,10 +150,10 @@ def repin_output(paths: dict[str, Path], receipt: dict[str, object]) -> None:
 def expect_fail(fn, contains: str) -> None:
     try:
         fn()
-    except verifier.VerificationError:
-        return
+    except verifier.VerificationError as exc:
+        assert contains in str(exc), f"expected {contains!r}, got {exc!r}"
     else:
-        raise AssertionError(f"expected VerificationError for {contains!r}")
+        raise AssertionError(f"expected VerificationError containing {contains!r}")
 
 
 def run_verify(paths: dict[str, Path]):
@@ -151,12 +180,50 @@ def mutate_output(paths, mutator):
     write_json(paths["receipt"], receipt)
 
 
+def mutate_self_consistent_source(paths):
+    src = json.loads(paths["source"].read_text())
+    src["asset"]["generator"] = "substituted-source"
+    write_json(paths["source"], src)
+    write_json(paths["roundtrip"], copy.deepcopy(src))
+    manifest = json.loads(paths["manifest"].read_text())
+    manifest["gltf_sha256"] = sha(paths["source"])
+    manifest["gltf_bytes"] = paths["source"].stat().st_size
+    write_json(paths["manifest"], manifest)
+    receipt = json.loads(paths["receipt"].read_text())
+    repin_input(paths, receipt)
+    repin_output(paths, receipt)
+    write_json(paths["receipt"], receipt)
+
+
+def mutate_index_subset(paths):
+    gltf = json.loads(paths["roundtrip"].read_text())
+    prefix = "data:application/octet-stream;base64,"
+    payload = bytearray(base64.b64decode(gltf["buffers"][0]["uri"][len(prefix):]))
+    acc = gltf["accessors"][4]
+    view = gltf["bufferViews"][acc["bufferView"]]
+    start = view.get("byteOffset", 0) + acc.get("byteOffset", 0)
+    subset = [0,1,2] * 12
+    payload[start:start + 72] = struct.pack("<" + "H" * 36, *subset)
+    gltf["buffers"][0]["uri"] = prefix + base64.b64encode(payload).decode("ascii")
+    write_json(paths["roundtrip"], gltf)
+    receipt = json.loads(paths["receipt"].read_text())
+    repin_output(paths, receipt)
+    write_json(paths["receipt"], receipt)
+
+
+def assert_pin():
+    assert REAL_ART006B_SHA == "6c51463332199c65bcfbde04ee8e5883e03a94aba710980eebfaa6945f2759b7"
+
+
 def cases():
     return [
         ("valid", test_valid, None),
-        ("manifest source hash", lambda p: expect_fail(lambda: run_verify(p), "source no longer matches ART-006B pin"), lambda p: write_json(p["manifest"], {"status":"source_validated_not_imported","gltf_sha256":"0"*64})),
+        ("production pin constant", lambda p: assert_pin(), None),
+        ("manifest source hash", lambda p: expect_fail(lambda: run_verify(p), "source no longer matches pinned ART-006B input"), lambda p: write_json(p["manifest"], {**json.loads(p["manifest"].read_text()), "gltf_sha256":"0"*64})),
+        ("self-consistent source substitution", lambda p: expect_fail(lambda: run_verify(p), "source no longer matches pinned ART-006B input"), mutate_self_consistent_source),
+        ("manifest identity", lambda p: expect_fail(lambda: run_verify(p), "ART-006B manifest identity drift: asset_id"), lambda p: write_json(p["manifest"], {**json.loads(p["manifest"].read_text()), "asset_id":"other-panel"})),
         ("blender version", lambda p: expect_fail(lambda: run_verify(p), "Blender evidence invalid"), lambda p: mutate_receipt(p, lambda r: r["blender"].__setitem__("version", "5.2.1"))),
-        ("version tuple bool", lambda p: expect_fail(lambda: run_verify(p), "version_tuple"), lambda p: mutate_receipt(p, lambda r: r["blender"].__setitem__("version_tuple", [5,2,True]))),
+        ("version tuple bool", lambda p: expect_fail(lambda: run_verify(p), "Blender evidence invalid"), lambda p: mutate_receipt(p, lambda r: r["blender"].__setitem__("version_tuple", [5,2,True]))),
         ("input hash", lambda p: expect_fail(lambda: run_verify(p), "receipt input hash mismatch"), lambda p: mutate_receipt(p, lambda r: r["input"].__setitem__("sha256", "0"*64))),
         ("output hash", lambda p: expect_fail(lambda: run_verify(p), "receipt output.gltf hash mismatch"), lambda p: mutate_receipt(p, lambda r: r["output"]["gltf"].__setitem__("sha256", "0"*64))),
         ("blend hash", lambda p: expect_fail(lambda: run_verify(p), "receipt output.blend hash mismatch"), lambda p: mutate_receipt(p, lambda r: r["output"]["blend"].__setitem__("sha256", "0"*64))),
@@ -164,17 +231,22 @@ def cases():
         ("object inventory", lambda p: expect_fail(lambda: run_verify(p), "import inventory invalid"), lambda p: mutate_receipt(p, lambda r: r["imported_scene"]["object_names"].pop())),
         ("settings drift", lambda p: expect_fail(lambda: run_verify(p), "export settings drift"), lambda p: mutate_receipt(p, lambda r: r["export_settings"].__setitem__("export_tangents", False))),
         ("unknown receipt field", lambda p: expect_fail(lambda: run_verify(p), "receipt root fields invalid"), lambda p: mutate_receipt(p, lambda r: r.__setitem__("unexpected", 1))),
-        ("missing node", lambda p: expect_fail(lambda: run_verify(p), "seven expected named"), lambda p: mutate_output(p, lambda g: (g["scenes"][0]["nodes"].pop(), g["nodes"].pop()))),
-        ("dimension drift", lambda p: expect_fail(lambda: run_verify(p), "transform/material drift"), lambda p: mutate_output(p, lambda g: g["nodes"][0]["scale"].__setitem__(0, 60.0))),
-        ("center drift", lambda p: expect_fail(lambda: run_verify(p), "transform/material drift"), lambda p: mutate_output(p, lambda g: g["nodes"][0]["translation"].__setitem__(0, 1.0))),
+        ("missing node", lambda p: expect_fail(lambda: run_verify(p), "expected seven named mesh instances"), lambda p: mutate_output(p, lambda g: (g["scenes"][0]["nodes"].pop(), g["nodes"].pop()))),
+        ("dimension drift", lambda p: expect_fail(lambda: run_verify(p), "transform/material binding drift"), lambda p: mutate_output(p, lambda g: g["nodes"][0]["scale"].__setitem__(0, 60.0))),
+        ("center drift", lambda p: expect_fail(lambda: run_verify(p), "transform/material binding drift"), lambda p: mutate_output(p, lambda g: g["nodes"][0]["translation"].__setitem__(0, 1.0))),
+        ("indexed subset bounds", lambda p: expect_fail(lambda: run_verify(p), "transform/material binding drift"), mutate_index_subset),
         ("missing tangent", lambda p: expect_fail(lambda: run_verify(p), "required attributes missing"), lambda p: mutate_output(p, lambda g: g["meshes"][0]["primitives"][0]["attributes"].pop("TANGENT"))),
-        ("material drift", lambda p: expect_fail(lambda: run_verify(p), "transform/material drift"), lambda p: mutate_output(p, lambda g: g["meshes"][0]["primitives"][0].__setitem__("material", 1))),
+        ("material binding drift", lambda p: expect_fail(lambda: run_verify(p), "transform/material binding drift"), lambda p: mutate_output(p, lambda g: g["meshes"][0]["primitives"][0].__setitem__("material", 1))),
+        ("base color drift", lambda p: expect_fail(lambda: run_verify(p), "Lawn_Blockout material property drift"), lambda p: mutate_output(p, lambda g: g["materials"][0]["pbrMetallicRoughness"].__setitem__("baseColorFactor", [0,0,0,1]))),
+        ("roughness drift", lambda p: expect_fail(lambda: run_verify(p), "Lawn_Blockout material property drift"), lambda p: mutate_output(p, lambda g: g["materials"][0]["pbrMetallicRoughness"].__setitem__("roughnessFactor", 0.0))),
+        ("sidedness drift", lambda p: expect_fail(lambda: run_verify(p), "Lawn_Blockout material property drift"), lambda p: mutate_output(p, lambda g: g["materials"][0].__setitem__("doubleSided", True))),
         ("external buffer", lambda p: expect_fail(lambda: run_verify(p), "must be embedded"), lambda p: mutate_output(p, lambda g: g["buffers"][0].__setitem__("uri", "mesh.bin"))),
         ("nontriangles", lambda p: expect_fail(lambda: run_verify(p), "requires indexed TRIANGLES"), lambda p: mutate_output(p, lambda g: g["meshes"][0]["primitives"][0].__setitem__("mode", 1))),
     ]
 
 
 def main() -> None:
+    assert verifier.EXPECTED_SOURCE_SHA == REAL_ART006B_SHA
     passed = 0
     for name, check, mutate in cases():
         with tempfile.TemporaryDirectory() as td:
