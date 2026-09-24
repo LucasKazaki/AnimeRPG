@@ -22,35 +22,41 @@ A third exact-head Codex review of `fb2867ae5f3151e27c7cfaa2b109379c705e9fc1` fo
 
 The exact-head review of `2ad3bab391088419349cc27125f10df555efee0a` then found three additional P2 issues. The subsequent repair rejected GPU instancing and punctual-light payloads on every node, including unreachable nodes, rejected node cameras, and required optional animation/image/texture/camera collections to be absent or actual empty arrays.
 
-The review that completed on `78c9acbc2dbbac312d0c9ca6cd4b0c82555b1b86` surfaced four remaining issues: one P1 regression in the committed GPU-instancing error-text expectation, plus P2 gaps for same-AABB world rotation, morph-target deformation, and extra `COLOR_0` rendering attributes. Verifier commit `738511005b5737b2693392d6fd64dec994e6a07a` and regression commit `6591b226e1760b83d022b43fa2aabef5b6c52397` repair them by:
+The review that completed on `78c9acbc2dbbac312d0c9ca6cd4b0c82555b1b86` surfaced four remaining issues: one P1 regression in the committed GPU-instancing error-text expectation, plus P2 gaps for same-AABB world rotation, morph-target deformation, and extra `COLOR_0` rendering attributes. Those were repaired by restoring a distinct GPU-instancing error path, comparing complete inherited 3x4 world transforms, rejecting primitive/mesh/node morph payloads across the bounded glTF, and requiring the exact four source rendering attributes.
 
-1. restoring a distinct `GPU instancing unsupported` failure path while keeping punctual-light failures separate;
-2. comparing the complete inherited 3x4 world transform within the fixed `1e-4` tolerance in addition to transform parity;
-3. rejecting primitive morph `targets`, mesh `weights`, and node `weights` across the complete bounded glTF;
-4. requiring the exact four rendering attributes `POSITION`, `NORMAL`, `TANGENT`, and `TEXCOORD_0`, so unverified vertex colors, skinning attributes, and other extras fail closed;
-5. adding three committed hidden regressions for 180-degree world rotation, morph deformation, and vertex-color injection, taking the additive hidden suite from seven to ten cases.
+A fresh review of `918ec775c73c1e6b6f91fe7fcdf2ba973be6fa80` found one P1 and three P2 issues. The current repair addresses all four:
 
-The four newest review threads remain a gate until the repair is replied to, resolved, and independently re-reviewed on the final exact head.
+1. the verifier checks center/dimensions/material binding before the stricter world-transform comparison, preserving the committed `transform/material binding drift` contract for the existing dimension and center regressions while still catching same-AABB orientation drift afterward;
+2. every mesh primitive in the bounded glTF, including unreachable meshes, must use indexed `TRIANGLES` and exactly `POSITION`, `NORMAL`, `TANGENT`, and `TEXCOORD_0`; missing attributes preserve the existing `required attributes missing` contract, and extras fail as `unexpected rendering attributes`;
+3. the hidden suite now exercises primitive `targets`, mesh `weights`, and node `weights` independently, including unreachable-content variants, rather than allowing one earlier rejection to mask another branch;
+4. the inherited-world-transform regression now wraps `Lawn` beneath a rotated parent instead of rotating the semantic mesh locally, so ancestor transform composition is directly covered.
 
 ## Author verification executed in sandbox
 
-Before publication, the repaired verifier was syntax-compiled and exercised with a focused in-memory fixture matching the committed test fixture's seven semantic nodes, three materials, embedded indexed triangle data and fixed receipt profile. The valid path returned `dcc_roundtrip_verified_not_astral_imported`; independent mutations for a 180-degree `Lawn` rotation, morph target with nonzero weight, `COLOR_0`, and `EXT_mesh_gpu_instancing` each failed with the intended repaired gate. This targeted probe is author evidence only and does not replace the repository suites or independent review.
-
-The committed verification commands remain:
+The repaired repository-source copies were executed in a clean sandbox with the same standard-library fixture used by the committed tests. Results:
 
 ```text
 python Scripts/test_blender_roundtrip_national_mall_panel.py
+PASS: 37/37 Blender round-trip verifier tests
+
 python Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
+PASS: 16/16 Blender hidden-payload verifier tests
+
 python -m py_compile Scripts/blender_roundtrip_national_mall_panel.py Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
+exit 0
 ```
 
-The original committed suite remains 37 cases. The hidden-payload suite now contains ten cases, for 47 focused committed cases total. A fresh exact-head hosted run is required after these repairs; prior workflow run `35991975091` / #1055 passed on `78c9ac...` but is historical for later heads.
+The two suites now provide 53 focused cases total. These are source/tooling tests only. They do not establish Blender execution or Astral runtime behavior.
 
 ## Verification model
 
 The verifier does not require byte-identical glTF output. It decodes embedded buffers/accessors, validates the fixed source and receipt identities, scans the complete node and mesh collections for disabled or unverified payloads, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, checks full inherited world transforms and handedness, compares material semantics, and compares canonical winding-preserving triangle/attribute signatures for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
 
 The bounded output rejects GPU instancing, punctual lights, node cameras, morph targets/weights and rendering attributes outside the four-source-attribute profile. Optional animation/image/texture/camera collections must be absent or exact empty arrays. This gate is intentionally stricter than a filename/count check but is still only a DCC source-workflow gate. It cannot establish Astral compatibility.
+
+## Hosted and independent gates
+
+A fresh exact-head Windows workflow and fresh independent review are required after the current repair commits. Earlier Windows workflow evidence applies only to earlier heads and is historical for the final repaired packet.
 
 ## Not run / not claimed
 
