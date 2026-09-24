@@ -249,6 +249,43 @@ public:
         if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return {};
         return shadowCryptMission_.ClaimFirstClearReward(*progression_);
     }
+
+    // Pass 37 mission-planning and records integration. Keep protagonist identity
+    // authority in this live owner so entry guidance never advertises an action
+    // that Begin/Replay would reject.
+    bool SetShadowCryptFocusMode(ShadowCryptMissionFocusMode mode) {
+        return shadowCryptMission_.SetFocusMode(mode);
+    }
+    ShadowCryptEntryReport ShadowCryptEntryStatus() const {
+        ShadowCryptEntryReport report = shadowCryptMission_.EntryReport(fieldGuide_);
+        if (report.readyToBegin && progression_ == nullptr) {
+            report.readyToBegin = false;
+            report.blocker = ShadowCryptEntryBlocker::ProtagonistUnavailable;
+        } else if (report.blocker == ShadowCryptEntryBlocker::CompletedRunRequiresReplay
+            && progression_ != shadowCryptProgressionOwner_) {
+            report.blocker = ShadowCryptEntryBlocker::ProtagonistUnavailable;
+        }
+        return report;
+    }
+    ShadowCryptEntryGuidance ShadowCryptEntryNextAction() const {
+        const ShadowCryptEntryReport report = ShadowCryptEntryStatus();
+        if (report.blocker == ShadowCryptEntryBlocker::ProtagonistUnavailable) {
+            return ShadowCryptEntryGuidance::BindProtagonist;
+        }
+        return shadowCryptMission_.EntryGuidance(fieldGuide_);
+    }
+    ShadowCryptMissionPreview ShadowCryptPreview() const {
+        return shadowCryptMission_.Preview();
+    }
+    ShadowCryptMissionResult ShadowCryptLatestResult() const {
+        return shadowCryptMission_.LatestResult();
+    }
+    std::size_t ShadowCryptCompletionRecordCount() const {
+        return shadowCryptMission_.CompletionRecordCount();
+    }
+    ShadowCryptMissionRecord ShadowCryptCompletionRecordFromNewest(std::size_t offset) const {
+        return shadowCryptMission_.CompletionRecordFromNewest(offset);
+    }
     const ShadowCryptMission& ShadowCrypt() const { return shadowCryptMission_; }
 
     // Pass 32 game-owned Rift Warden mastery trial. Entry is dependency-ready:
