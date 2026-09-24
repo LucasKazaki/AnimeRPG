@@ -24,7 +24,17 @@ SEMVER_RE = re.compile(
 ROOT_KEYS = {"uri", "mimeType", "validatorVersion", "validatedAt", "issues", "info"}
 ISSUE_KEYS = {"numErrors", "numWarnings", "numInfos", "numHints", "messages", "truncated"}
 MESSAGE_KEYS = {"code", "severity", "pointer", "offset", "message"}
-INFO_KEYS = {"version", "minVersion", "generator", "extensionsUsed", "extensionsRequired", "resources"}
+INFO_KEYS = {
+    "version", "minVersion", "generator", "extensionsUsed", "extensionsRequired", "resources",
+    "animationCount", "materialCount", "hasMorphTargets", "hasSkins", "hasTextures",
+    "hasDefaultScene", "drawCallCount", "totalVertexCount", "totalTriangleCount",
+    "maxUVs", "maxInfluences", "maxAttributes",
+}
+INFO_COUNT_FIELDS = {
+    "animationCount", "materialCount", "drawCallCount", "totalVertexCount",
+    "totalTriangleCount", "maxUVs", "maxInfluences", "maxAttributes",
+}
+INFO_BOOL_FIELDS = {"hasMorphTargets", "hasSkins", "hasTextures", "hasDefaultScene"}
 RESOURCE_KEYS = {"pointer", "storage", "mimeType", "byteLength", "uri", "image"}
 RESOURCE_STORAGE = {"data-uri", "buffer-view", "glb", "external"}
 
@@ -65,10 +75,17 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _uri_basename(uri: str) -> str:
+def _resolved_report_path(uri: str) -> Path:
     parsed = urlparse(uri)
-    path = parsed.path if parsed.scheme else uri
-    return Path(unquote(path.replace("\\", "/"))).name
+    if parsed.scheme not in ("", "file"):
+        _fail(f"report.uri uses unsupported scheme {parsed.scheme!r}")
+    if parsed.scheme == "file":
+        raw = unquote(parsed.path)
+        if parsed.netloc:
+            raw = f"//{parsed.netloc}{raw}"
+    else:
+        raw = unquote(uri)
+    return Path(raw).resolve(strict=False)
 
 
 def verify_report(
@@ -87,8 +104,13 @@ def verify_report(
 
     if "uri" not in root or type(root["uri"]) is not str:
         _fail("report.uri must be present and be a string")
-    if _uri_basename(root["uri"]) != asset_path.name:
-        _fail(f"report.uri does not identify {asset_path.name!r}")
+    report_asset_path = _resolved_report_path(root["uri"])
+    expected_asset_path = asset_path.resolve(strict=False)
+    if report_asset_path != expected_asset_path:
+        _fail(
+            "report.uri does not resolve to the exact asset path: "
+            f"report={report_asset_path}, expected={expected_asset_path}"
+        )
 
     if root.get("mimeType") != "model/gltf+json":
         _fail("mimeType must be model/gltf+json for this .gltf asset")
@@ -137,6 +159,22 @@ def verify_report(
     info = _expect_keys(root.get("info"), INFO_KEYS, {"version"}, "info")
     if info["version"] != "2.0":
         _fail(f"info.version must be '2.0', got {info['version']!r}")
+    for field in INFO_COUNT_FIELDS:
+        if field in info:
+            _strict_int(info[field], f"info.{field}")
+    for field in INFO_BOOL_FIELDS:
+        if field in info and type(info[field]) is not bool:
+            _fail(f"info.{field} must be a JSON boolean")
+    for field in ("extensionsUsed", "extensionsRequired"):
+        if field in info:
+            values = info[field]
+            if type(values) is not list or not values or any(type(v) is not str or not v for v in values):
+                _fail(f"info.{field} must be a non-empty array of strings")
+            if len(set(values)) != len(values):
+                _fail(f"info.{field} must contain unique strings")
+    for field in ("minVersion", "generator"):
+        if field in info and type(info[field]) is not str:
+            _fail(f"info.{field} must be a string")
 
     resources = info.get("resources", [])
     if type(resources) is not list:
