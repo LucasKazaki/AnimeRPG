@@ -203,6 +203,33 @@ class R0RunnerSafetyTests(unittest.TestCase):
                         with self.assertRaisesRegex(r0.RecoveryFailure, "positive finite"):
                             r0.R0Runner(args)
 
+    def test_main_reports_constructor_validation_failure_without_mutating_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--source-repository", str(root / "source"),
+                    "--worktree", str(root / "worktree"),
+                    "--build-root", str(root / "build"),
+                    "--release-root", str(root / "release"),
+                    "--evidence-root", str(root / "evidence"),
+                    "--command-timeout-seconds", "nan",
+                    "--skip-fetch",
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("R0 AUTOMATED GATE: BLOCKED", result.stdout)
+            self.assertIn("positive finite", result.stdout)
+            self.assertNotIn("Traceback", result.stdout)
+            for name in ("source", "worktree", "build", "release", "evidence"):
+                self.assertFalse((root / name).exists(), f"constructor failure mutated {name}")
+
     def _tree_sleep_command(self, sentinel: Path, ready: Path | None = None) -> list[str]:
         child_code = (
             "import pathlib,time; time.sleep(2.0); "
