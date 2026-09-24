@@ -42,6 +42,18 @@ def main() -> int:
             },
             "info": {
                 "version": "2.0",
+                "animationCount": 0,
+                "materialCount": 3,
+                "hasMorphTargets": False,
+                "hasSkins": False,
+                "hasTextures": False,
+                "hasDefaultScene": True,
+                "drawCallCount": 3,
+                "totalVertexCount": 24,
+                "totalTriangleCount": 12,
+                "maxUVs": 1,
+                "maxInfluences": 0,
+                "maxAttributes": 4,
                 "resources": [{"pointer": "/buffers/0", "storage": "data-uri", "byteLength": 4}],
             },
         }
@@ -54,11 +66,13 @@ def main() -> int:
         r = copy.deepcopy(valid); r["issues"]["numErrors"] = 1; r["issues"]["numInfos"] = 0; r["issues"]["messages"][0]["severity"] = 0; cases.append(("validator error", r, "reported 1 error"))
         r = copy.deepcopy(valid); r["issues"]["numWarnings"] = 1; r["issues"]["numInfos"] = 0; r["issues"]["messages"][0]["severity"] = 1; cases.append(("warning gate", r, "warning(s), limit is 0"))
         r = copy.deepcopy(valid); r["issues"]["truncated"] = True; cases.append(("truncated", r, "truncated"))
-        r = copy.deepcopy(valid); r["uri"] = "different.gltf"; cases.append(("wrong uri", r, "does not identify"))
+        r = copy.deepcopy(valid); r["uri"] = str(root / "other" / asset.name); cases.append(("wrong exact path", r, "does not resolve to the exact asset path"))
         r = copy.deepcopy(valid); r["validatorVersion"] = "not-semver"; cases.append(("bad version", r, "semver"))
         r = copy.deepcopy(valid); r["issues"]["numInfos"] = 0; cases.append(("count mismatch", r, "summary does not match"))
         r = copy.deepcopy(valid); r["issues"]["messages"][0]["severity"] = True; cases.append(("bool severity", r, "JSON integer"))
         r = copy.deepcopy(valid); r["info"]["version"] = "1.0"; cases.append(("wrong gltf version", r, "must be '2.0'"))
+        r = copy.deepcopy(valid); r["info"]["animationCount"] = True; cases.append(("bool info count", r, "JSON integer"))
+        r = copy.deepcopy(valid); r["info"]["hasSkins"] = 0; cases.append(("non-bool info flag", r, "JSON boolean"))
         r = copy.deepcopy(valid); r["info"]["resources"][0] = {"pointer": "/buffers/0", "storage": "external", "uri": "buf.bin"}; cases.append(("external resource", r, "is external"))
         r = copy.deepcopy(valid); del r["info"]["resources"][0]["storage"]; cases.append(("missing storage", r, "required to prove self-contained"))
         r = copy.deepcopy(valid); r["info"]["resources"][0]["storage"] = True; cases.append(("bool storage", r, "known Khronos storage string"))
@@ -80,7 +94,7 @@ def main() -> int:
         ])
         assert rc == 0
 
-    print("PASS: 18/18 Khronos glTF report adapter tests")
+    print("PASS: 20/20 Khronos glTF report adapter tests")
     return 0
 
 
