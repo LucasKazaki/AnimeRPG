@@ -1,6 +1,6 @@
 namespace {
 
-void UnlockShadowCryptProductionOwnerPass38(Astral::Scene::LandmarkInteraction& owner,
+void UnlockShadowCryptProductionOwnerPass39(Astral::Scene::LandmarkInteraction& owner,
     Astral::Scene::WorldBlockout& world, Astral::Scene::ShadowbladeActions& actions) {
     using namespace Astral::Scene;
     const Astral::Math::Vec3 positions[3]{
@@ -11,29 +11,29 @@ void UnlockShadowCryptProductionOwnerPass38(Astral::Scene::LandmarkInteraction& 
     for (const Astral::Math::Vec3& position : positions) {
         Expect(owner.TryInteract(position, world, actions).result
                 == LandmarkInteractionResult::Discovered,
-            "pass38 production setup discovers each National Mall landmark");
+            "pass39 production setup discovers each National Mall landmark");
     }
     Expect(owner.TryDialogueChoice(DialogueTopic::ShadowCrypt, DialogueChoice::Reassure).loreUnlocked
             && owner.TryDialogueChoice(DialogueTopic::ShadowCrypt,
                     DialogueChoice::ShareEvidence).clueUnlocked
             && owner.FieldGuide().OperationProgress(FieldOperation::ShadowCryptLead).Complete(),
-        "pass38 production setup creates both authoritative Shadow Crypt lead witnesses");
+        "pass39 production setup creates both authoritative Shadow Crypt lead witnesses");
 }
 
-void DefeatShadowCryptSkirmishTargetPass38(Astral::Scene::ShadowCryptSkirmish& skirmish,
+void DefeatShadowCryptSkirmishTargetPass39(Astral::Scene::ShadowCryptSkirmish& skirmish,
     std::size_t index) {
     using namespace Astral::Scene;
     int guard = 0;
     while (!skirmish.Enemy(index).defeated && guard++ < 32) {
         const ShadowCryptAttackReport report =
             skirmish.AttackTarget(index, ShadowCryptAttackStyle::Heavy);
-        Expect(report.accepted, "pass38 bounded defeat fixture keeps heavy attacks accepted");
+        Expect(report.accepted, "pass39 bounded defeat fixture keeps heavy attacks accepted");
     }
     Expect(skirmish.Enemy(index).defeated,
-        "pass38 bounded defeat fixture defeats the requested target");
+        "pass39 bounded defeat fixture defeats the requested target");
 }
 
-void DefeatProductionShadowCryptSkirmishPass38(Astral::Scene::LandmarkInteraction& owner) {
+void DefeatProductionShadowCryptSkirmishPass39(Astral::Scene::LandmarkInteraction& owner) {
     using namespace Astral::Scene;
     for (std::size_t index = 0; index < owner.ShadowCryptSkirmishState().EnemyCount(); ++index) {
         int guard = 0;
@@ -41,139 +41,221 @@ void DefeatProductionShadowCryptSkirmishPass38(Astral::Scene::LandmarkInteractio
             const ShadowCryptAttackReport report =
                 owner.AttackShadowCryptSkirmishTarget(index, ShadowCryptAttackStyle::Heavy);
             Expect(report.accepted,
-                "pass38 production defeat fixture keeps heavy attacks accepted");
+                "pass39 production defeat fixture keeps heavy attacks accepted");
         }
         Expect(owner.ShadowCryptSkirmishState().Enemy(index).defeated,
-            "pass38 production defeat fixture defeats every encounter target");
+            "pass39 production defeat fixture defeats every encounter target");
     }
 }
 
 void TestShadowCryptSkirmishPass38() {
     using namespace Astral::Scene;
 
-    // GAME-187 + GAME-188: three original roles are arranged into bounded,
-    // room-scaled formations instead of cloning comparator enemies.
+    // Retain pass-38 role/formation coverage and malformed-tier rejection.
     ShadowCryptSkirmish entry;
     Expect(!entry.Begin(static_cast<ShadowCryptSkirmishTier>(255))
             && entry.Begin(ShadowCryptSkirmishTier::EntrySeal)
             && entry.EnemyCount() == 2
             && entry.Enemy(0).role == ShadowCryptEnemyRole::RiftSkirmisher
             && entry.Enemy(1).role == ShadowCryptEnemyRole::GraveboundBulwark,
-        "pass38 Entry Seal exposes its two-role formation and rejects invalid tiers");
+        "pass39 retains Entry Seal formation and invalid-tier rejection");
 
     ShadowCryptSkirmish archive;
     Expect(archive.Begin(ShadowCryptSkirmishTier::ArchiveGallery)
             && archive.EnemyCount() == 2
             && archive.Enemy(0).role == ShadowCryptEnemyRole::VeilChanneler,
-        "pass38 Archive Gallery introduces the caster role");
+        "pass39 retains Archive Gallery caster formation");
 
     ShadowCryptSkirmish nave;
     Expect(nave.Begin(ShadowCryptSkirmishTier::RiftNave)
             && nave.EnemyCount() == ShadowCryptSkirmish::EnemyCapacity
             && nave.Enemy(0).maxHealth > archive.Enemy(0).maxHealth,
-        "pass38 Rift Nave escalates to all three roles with tougher bounded values");
+        "pass39 retains Rift Nave escalation");
 
-    // GAME-189 + GAME-190: semantic threat cues expose the intended response,
-    // exact timing boundary, and one-shot caster interrupt without depending on color.
+    // Retain pass-38 semantic telegraph, nonfinite timing, exact-boundary,
+    // interrupt, and one-shot counter contracts.
     const ShadowCryptThreatTelegraph telegraph = nave.CurrentThreat();
     Expect(telegraph.valid && telegraph.role == ShadowCryptEnemyRole::VeilChanneler
             && telegraph.cue == ShadowCryptThreatCue::Interrupt
             && telegraph.expected == ShadowCryptDefenseResponse::Interrupt
+            && telegraph.variant == ShadowCryptThreatVariant::VeilBind
             && telegraph.defensiveCounterAllowed,
-        "pass38 Veil Channeler publishes a semantic interrupt cue and counterability");
+        "pass39 retains initial Veil Channeler interrupt semantics");
     const int damageBeforeInvalid = nave.DamageTaken();
     const auto invalidTiming = nave.ResolveThreat(ShadowCryptDefenseResponse::Interrupt,
         std::numeric_limits<double>::infinity());
     Expect(!invalidTiming.accepted && nave.DamageTaken() == damageBeforeInvalid,
-        "pass38 nonfinite reaction timing fails closed without mutation");
+        "pass39 nonfinite reaction timing fails closed without mutation");
     const auto interrupted = nave.ResolveThreat(
         ShadowCryptDefenseResponse::Interrupt, telegraph.responseWindowSeconds);
-    Expect(interrupted.accepted && interrupted.successful && interrupted.interruptedChannel
-            && interrupted.openedCounter && interrupted.damageTaken == 0,
-        "pass38 exact-boundary interrupt succeeds and opens one earned counter");
+    Expect(interrupted.accepted && interrupted.successful && !interrupted.precision
+            && interrupted.interruptedChannel && interrupted.openedCounter
+            && interrupted.damageTaken == 0,
+        "pass39 exact-boundary interrupt remains successful and non-precision");
     const auto counter = nave.AttackTarget(0, ShadowCryptAttackStyle::Counter);
     const auto duplicateCounter = nave.AttackTarget(0, ShadowCryptAttackStyle::Counter);
     Expect(counter.accepted && counter.healthDamage == 36 && !duplicateCounter.accepted,
-        "pass38 caster counter opportunity is one-shot");
+        "pass39 ordinary earned counter remains one-shot with legacy damage");
 
-    // GAME-191: posture creates a bounded stagger window and the next strike
-    // consumes it rather than allowing a permanent stun lock.
+    // Retain pass-38 actual posture delta, bounded stagger consume/recovery,
+    // and lethal-stagger signal suppression.
     ShadowCryptSkirmish posture;
     Expect(posture.Begin(ShadowCryptSkirmishTier::RiftNave),
-        "pass38 posture fixture begins");
+        "pass39 posture fixture begins");
     ShadowCryptAttackReport heavy{};
     for (int i = 0; i < 4; ++i) {
         heavy = posture.AttackTarget(1, ShadowCryptAttackStyle::Heavy);
     }
     Expect(heavy.staggerOpened && heavy.postureDamage == 1
             && posture.Enemy(1).staggered && posture.Enemy(1).posture == 0,
-        "pass38 repeated heavy pressure reports only actual posture removed and opens stagger at zero");
+        "pass39 repeated pressure reports only actual posture removed");
     const auto punish = posture.AttackTarget(1, ShadowCryptAttackStyle::Light);
     Expect(punish.staggerConsumed && punish.healthDamage == 40 && punish.postureDamage == 0
             && !posture.Enemy(1).staggered
             && posture.Enemy(1).posture == posture.Enemy(1).maxPosture,
-        "pass38 one follow-up consumes stagger, reports no phantom posture damage, and restores posture");
+        "pass39 one punish consumes stagger and restores posture without phantom damage");
 
     ShadowCryptSkirmish lethalStagger;
     Expect(lethalStagger.Begin(ShadowCryptSkirmishTier::EntrySeal),
-        "pass38 lethal-stagger fixture begins");
+        "pass39 lethal-stagger fixture begins");
     Expect(lethalStagger.ResolveThreat(ShadowCryptDefenseResponse::Dodge, 0.10).openedCounter,
-        "pass38 lethal-stagger fixture earns the first skirmisher counter");
+        "pass39 lethal fixture earns first skirmisher counter");
     Expect(lethalStagger.AttackTarget(0, ShadowCryptAttackStyle::Counter).accepted
             && lethalStagger.AttackTarget(0, ShadowCryptAttackStyle::Light).accepted,
-        "pass38 lethal-stagger fixture reduces skirmisher health and posture");
+        "pass39 lethal fixture reduces skirmisher health and posture");
     Expect(lethalStagger.ResolveThreat(ShadowCryptDefenseResponse::Guard, 0.10).successful
             && lethalStagger.ResolveThreat(ShadowCryptDefenseResponse::Dodge, 0.10).openedCounter,
-        "pass38 lethal-stagger fixture cycles back to an earned finishing counter");
+        "pass39 repeated role pattern keeps semantic defense contract stable");
     const auto lethalCounter = lethalStagger.AttackTarget(0, ShadowCryptAttackStyle::Counter);
     Expect(lethalCounter.accepted && lethalCounter.defeated
-            && lethalCounter.postureDamage == 4 && !lethalCounter.staggerOpened
-            && !lethalStagger.Enemy(0).staggered,
-        "pass38 a lethal posture break suppresses an impossible stagger follow-up signal");
+            && !lethalCounter.staggerOpened && !lethalStagger.Enemy(0).staggered,
+        "pass39 lethal posture break suppresses impossible stagger follow-up");
 
-    // QOL-039: an explicit manual target lock stays sticky until that target is
-    // defeated, then the deterministic role/threat fallback resumes.
+    // Retain pass-38 sticky manual focus and deterministic fallback.
     ShadowCryptSkirmish targeting;
     Expect(targeting.Begin(ShadowCryptSkirmishTier::RiftNave),
-        "pass38 targeting fixture begins");
+        "pass39 targeting fixture begins");
     const auto recommended = targeting.RecommendedTarget();
     Expect(recommended.valid && recommended.enemyIndex == 0
             && recommended.role == ShadowCryptEnemyRole::VeilChanneler,
-        "pass38 live caster threat receives the deterministic default priority");
+        "pass39 live caster remains deterministic default priority");
     Expect(targeting.LockTarget(1) && targeting.SelectedTarget() == 1,
-        "pass38 player can override recommendation with a sticky manual target");
+        "pass39 player can override recommendation with sticky target");
     const auto resolvedOtherThreat = targeting.ResolveThreat(
         ShadowCryptDefenseResponse::Interrupt, 0.25);
     Expect(resolvedOtherThreat.accepted && targeting.SelectedTarget() == 1,
-        "pass38 resolving another enemy threat does not silently steal manual target focus");
-    DefeatShadowCryptSkirmishTargetPass38(targeting, 1);
+        "pass39 resolving another threat does not steal manual target");
+    DefeatShadowCryptSkirmishTargetPass39(targeting, 1);
     Expect(!targeting.HasTargetLock() && targeting.SelectedTarget() != 1,
-        "pass38 manual target invalidates only after the target is defeated");
+        "pass39 manual target invalidates after target defeat");
 
-    // Production integration: a room skirmish is admitted only through the live
-    // protagonist-owned Shadow Crypt mission. Failed defense records mission
-    // damage, and exactly one completed skirmish advances one objective step.
+    // GAME-192: every role now owns a deterministic two-variant attack pattern.
+    ShadowCryptSkirmish patterns;
+    Expect(patterns.Begin(ShadowCryptSkirmishTier::RiftNave)
+            && patterns.CurrentThreat().variant == ShadowCryptThreatVariant::VeilBind,
+        "GAME-192 Channeler begins on Veil Bind");
+    Expect(patterns.ResolveThreat(ShadowCryptDefenseResponse::Interrupt, 0.50).successful
+            && patterns.CurrentThreat().variant == ShadowCryptThreatVariant::GraveHammer,
+        "GAME-192 Bulwark begins on Grave Hammer");
+    Expect(patterns.ResolveThreat(ShadowCryptDefenseResponse::Guard, 0.40).successful
+            && patterns.CurrentThreat().variant == ShadowCryptThreatVariant::RiftLunge,
+        "GAME-192 Skirmisher begins on Rift Lunge");
+    Expect(patterns.ResolveThreat(ShadowCryptDefenseResponse::Dodge, 0.30).successful,
+        "GAME-192 first Skirmisher response advances its pattern");
+    const auto secondChannel = patterns.CurrentThreat();
+    Expect(secondChannel.variant == ShadowCryptThreatVariant::VeilBurst
+            && secondChannel.patternStep == 1
+            && secondChannel.expected == ShadowCryptDefenseResponse::Interrupt
+            && secondChannel.responseWindowSeconds < 0.70
+            && secondChannel.failureDamage > 24,
+        "GAME-192 Channeler alternates to a faster, harder Veil Burst");
+
+    // GAME-193: low-health enemies enter a bounded desperation state.
+    ShadowCryptSkirmish desperation;
+    Expect(desperation.Begin(ShadowCryptSkirmishTier::EntrySeal)
+            && desperation.AttackTarget(0, ShadowCryptAttackStyle::Heavy).accepted
+            && desperation.AttackTarget(0, ShadowCryptAttackStyle::Light).accepted,
+        "GAME-193 desperation fixture lowers a living Skirmisher below half health");
+    const auto desperateThreat = desperation.CurrentThreat();
+    Expect(desperateThreat.enraged
+            && desperateThreat.responseWindowSeconds < 0.42
+            && desperateThreat.responseWindowSeconds >= 0.20
+            && desperateThreat.failureDamage == 24
+            && desperateThreat.failureDamage <= 40,
+        "GAME-193 desperation tightens timing and raises damage within explicit caps");
+
+    // GAME-194 + GAME-195: very early correct defense is marked precision and
+    // upgrades only the one earned counter, while exact-boundary behavior above
+    // retains the legacy counter values.
+    ShadowCryptSkirmish precision;
+    Expect(precision.Begin(ShadowCryptSkirmishTier::RiftNave),
+        "GAME-194 precision fixture begins");
+    const auto precisionDefense = precision.ResolveThreat(
+        ShadowCryptDefenseResponse::Interrupt, 0.05);
+    Expect(precisionDefense.accepted && precisionDefense.successful
+            && precisionDefense.precision && precisionDefense.openedCounter,
+        "GAME-194 very early correct interrupt earns precision");
+    const auto precisionCounter = precision.AttackTarget(0, ShadowCryptAttackStyle::Counter);
+    Expect(precisionCounter.accepted && precisionCounter.healthDamage == 44
+            && precisionCounter.postureDamage == 30
+            && !precision.AttackTarget(0, ShadowCryptAttackStyle::Counter).accepted,
+        "GAME-195 precision counter gets one bounded health/posture bonus");
+
+    // GAME-196: successful brace against the Bulwark pushes posture without
+    // creating a counter the role does not advertise.
+    ShadowCryptSkirmish brace;
+    Expect(brace.Begin(ShadowCryptSkirmishTier::EntrySeal)
+            && brace.ResolveThreat(ShadowCryptDefenseResponse::Dodge, 0.20).successful,
+        "GAME-196 brace fixture advances to Gravebound Bulwark");
+    const auto braceDefense = brace.ResolveThreat(ShadowCryptDefenseResponse::Guard, 0.20);
+    Expect(braceDefense.accepted && braceDefense.successful && !braceDefense.openedCounter
+            && braceDefense.postureDamageApplied == 10 && !braceDefense.staggerOpened
+            && brace.Enemy(1).posture == 60,
+        "GAME-196 successful brace applies exactly ten actual posture pressure");
+
+    // QOL-040: a read-only semantic queue can expose the current and next two
+    // living attackers without depending on camera framing or color.
+    ShadowCryptSkirmish queue;
+    Expect(queue.Begin(ShadowCryptSkirmishTier::RiftNave),
+        "QOL-040 queue fixture begins");
+    const auto threatQueue = queue.ThreatQueue();
+    Expect(threatQueue.count == 3
+            && threatQueue.threats[0].enemyIndex == 0
+            && threatQueue.threats[0].cue == ShadowCryptThreatCue::Interrupt
+            && threatQueue.threats[1].enemyIndex == 1
+            && threatQueue.threats[1].cue == ShadowCryptThreatCue::Brace
+            && threatQueue.threats[2].enemyIndex == 2
+            && threatQueue.threats[2].cue == ShadowCryptThreatCue::Evade
+            && queue.CurrentThreat().enemyIndex == 0,
+        "QOL-040 threat queue exposes three semantic attackers without mutation");
+    Expect(queue.ThreatQueue(0).count == 0 && queue.ThreatQueue(1).count == 1,
+        "QOL-040 queue request is explicitly bounded");
+
+    // Production integration retained through the live LandmarkInteraction owner:
+    // admission, timeline lock, authoritative damage, objective completion, retry,
+    // and replay cleanup remain covered.
     WorldBlockout world;
     ShadowbladeActions actions;
     CharacterProgression progression;
     LandmarkInteraction owner;
-    UnlockShadowCryptProductionOwnerPass38(owner, world, actions);
+    UnlockShadowCryptProductionOwnerPass39(owner, world, actions);
     owner.SetCharacterProgression(&progression);
     Expect(owner.BeginShadowCrypt() && owner.ShadowCryptBriefing().active
             && owner.ShadowCryptBriefing().room == ShadowCryptRoom::EntrySeal,
-        "pass38 live production owner enters Shadow Crypt before room combat");
+        "pass39 production owner enters Shadow Crypt");
     Expect(owner.BeginShadowCryptSkirmish()
             && owner.ShadowCryptSkirmishState().Tier() == ShadowCryptSkirmishTier::EntrySeal,
-        "pass38 live production owner derives skirmish tier from authoritative mission room");
+        "pass39 production owner derives skirmish tier from authoritative room");
     Expect(!owner.AdvanceShadowCryptObjective() && !owner.SuspendShadowCrypt()
             && owner.ShadowCryptBriefing().objectiveProgress == 0,
-        "pass38 active room combat blocks direct objective advancement and checkpoint suspension");
+        "pass39 active combat blocks direct objective advancement and suspension");
+
     const auto failedDefense = owner.ResolveShadowCryptSkirmishThreat(
         ShadowCryptDefenseResponse::Guard, 0.10);
     Expect(failedDefense.accepted && !failedDefense.successful
             && failedDefense.damageTaken == 18
             && owner.ShadowCryptBriefing().damageTaken == 18,
-        "pass38 failed room defense is charged into authoritative mission damage exactly once");
+        "pass39 failed defense records authoritative mission damage once");
 
     int capGuard = 0;
     while (owner.ShadowCryptSkirmishState().DamageTaken() < 9999 && capGuard++ < 600) {
@@ -188,79 +270,79 @@ void TestShadowCryptSkirmishPass38() {
                 && owner.ShadowCryptSkirmishState().DamageTaken()
                     == skirmishBefore + expectedApplied
                 && owner.ShadowCryptBriefing().damageTaken == missionBefore + expectedApplied,
-            "pass38 capped defense damage reports only the applied delta and keeps mission damage synchronized");
+            "pass39 capped defense keeps skirmish and mission damage synchronized");
     }
     Expect(owner.ShadowCryptSkirmishState().DamageTaken() == 9999
             && owner.ShadowCryptBriefing().damageTaken == 9999,
-        "pass38 skirmish and mission damage remain equal at the skirmish tracking cap");
+        "pass39 skirmish and mission damage agree at skirmish cap");
 
     LandmarkInteraction missionCapOwner;
     WorldBlockout missionCapWorld;
     ShadowbladeActions missionCapActions;
     CharacterProgression missionCapProgression;
-    UnlockShadowCryptProductionOwnerPass38(missionCapOwner, missionCapWorld, missionCapActions);
+    UnlockShadowCryptProductionOwnerPass39(
+        missionCapOwner, missionCapWorld, missionCapActions);
     missionCapOwner.SetCharacterProgression(&missionCapProgression);
     Expect(missionCapOwner.BeginShadowCrypt()
             && missionCapOwner.RecordShadowCryptDamageTaken(999995) == 999995
             && missionCapOwner.BeginShadowCryptSkirmish(),
-        "pass38 mission-cap fixture reaches five points below the authoritative damage cap");
+        "pass39 mission-cap fixture reaches five below authoritative cap");
     const auto missionCapDefense = missionCapOwner.ResolveShadowCryptSkirmishThreat(
         ShadowCryptDefenseResponse::Guard, 0.10);
     Expect(missionCapDefense.accepted && !missionCapDefense.successful
             && missionCapDefense.damageTaken == 5
             && missionCapOwner.ShadowCryptBriefing().damageTaken == 1000000,
-        "pass38 production defense report exposes only damage accepted by the authoritative mission cap");
+        "pass39 defense report exposes only damage accepted by mission cap");
 
     const int progressBeforeClear = owner.ShadowCryptBriefing().objectiveProgress;
-    DefeatProductionShadowCryptSkirmishPass38(owner);
+    DefeatProductionShadowCryptSkirmishPass39(owner);
     Expect(owner.ShadowCryptSkirmishState().Complete()
             && owner.ShadowCryptBriefing().objectiveProgress == progressBeforeClear + 1,
-        "pass38 first room skirmish completion advances exactly one mission objective step");
+        "pass39 first room completion advances exactly one mission objective");
     const auto afterComplete = owner.AttackShadowCryptSkirmishTarget(
         0, ShadowCryptAttackStyle::Heavy);
     Expect(!afterComplete.accepted
             && owner.ShadowCryptBriefing().objectiveProgress == progressBeforeClear + 1,
-        "pass38 completed encounter cannot duplicate objective advancement");
+        "pass39 completed encounter cannot duplicate objective advancement");
 
     Expect(owner.ReportShadowCryptDefeat()
             && !owner.ShadowCryptSkirmishState().Active()
             && !owner.ShadowCryptSkirmishState().Complete()
             && owner.ShadowCryptSkirmishState().EnemyCount() == 0
             && owner.ShadowCryptBriefing().objectiveProgress == 0,
-        "pass38 defeat after completion clears stale inactive skirmish state and resets mission progress");
-    Expect(owner.BeginShadowCryptSkirmish(),
-        "pass38 clean retry can begin after completed-skirmish defeat cleanup");
-    Expect(owner.ReportShadowCryptDefeat()
+        "pass39 post-completion defeat clears stale skirmish state");
+    Expect(owner.BeginShadowCryptSkirmish()
+            && owner.ReportShadowCryptDefeat()
             && !owner.ShadowCryptSkirmishState().Active()
             && !owner.ShadowCryptSkirmishState().Complete()
             && owner.ShadowCryptBriefing().objectiveProgress == 0
             && owner.BeginShadowCryptSkirmish(),
-        "pass38 active defeat cancels room combat, resets mission progress, and permits another clean retry");
+        "pass39 active defeat resets room combat and permits clean retry");
 
     LandmarkInteraction replayOwner;
     WorldBlockout replayWorld;
     ShadowbladeActions replayActions;
     CharacterProgression replayProgression;
-    UnlockShadowCryptProductionOwnerPass38(replayOwner, replayWorld, replayActions);
+    UnlockShadowCryptProductionOwnerPass39(replayOwner, replayWorld, replayActions);
     replayOwner.SetCharacterProgression(&replayProgression);
     Expect(replayOwner.BeginShadowCrypt() && replayOwner.BeginShadowCryptSkirmish(),
-        "pass38 replay fixture begins a production Entry Seal skirmish");
-    DefeatProductionShadowCryptSkirmishPass38(replayOwner);
+        "pass39 replay fixture begins Entry Seal skirmish");
+    DefeatProductionShadowCryptSkirmishPass39(replayOwner);
     int replayGuard = 0;
     while (!replayOwner.ShadowCryptBriefing().complete && replayGuard++ < 16) {
         Expect(replayOwner.AdvanceShadowCryptObjective(),
-            "pass38 replay fixture advances the remaining accepted mission objectives");
+            "pass39 replay fixture advances remaining accepted objectives");
     }
     Expect(replayOwner.ShadowCryptBriefing().complete
             && replayOwner.ShadowCryptSkirmishState().Complete(),
-        "pass38 replay fixture preserves completed encounter evidence until replay is accepted");
+        "pass39 replay fixture retains completed encounter until replay");
     Expect(replayOwner.ReplayCompletedShadowCrypt()
             && replayOwner.ShadowCryptBriefing().active
             && replayOwner.ShadowCryptBriefing().room == ShadowCryptRoom::EntrySeal
             && !replayOwner.ShadowCryptSkirmishState().Active()
             && !replayOwner.ShadowCryptSkirmishState().Complete()
             && replayOwner.ShadowCryptSkirmishState().EnemyCount() == 0,
-        "pass38 successful mission replay clears stale skirmish state before the new Entry Seal run");
+        "pass39 replay clears stale skirmish state before new run");
 }
 
 } // namespace
