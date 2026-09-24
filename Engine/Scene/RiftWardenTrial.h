@@ -106,6 +106,7 @@ public:
     static constexpr int MaximumPosture = 100;
     static constexpr int MaximumPerfectDefenses = 16384;
     static constexpr int MaximumMissedOpenings = 4096;
+    static constexpr int MaximumDamageTaken = 9999;
     static constexpr double MaximumElapsedSeconds = 3600.0;
     static constexpr double StaggerResponseWindowSeconds = 2.0;
 
@@ -185,7 +186,7 @@ public:
         } else {
             report.resolution = RiftWardenResolution::Hit;
             report.playerDamage = IncomingDamage(difficulty_, phase_);
-            damageTaken_ = std::min(9999, damageTaken_ + report.playerDamage);
+            damageTaken_ = std::min(MaximumDamageTaken, damageTaken_ + report.playerDamage);
             posture_ = std::max(0, posture_ - 25);
             currentStreak_ = 0;
         }
@@ -399,6 +400,11 @@ private:
         if (candidate.damageTaken != current.damageTaken) {
             return candidate.damageTaken < current.damageTaken;
         }
+        // Saturated damage has the same information-loss problem: equal capped
+        // totals do not prove equal actual damage. Preserve the established
+        // record rather than allowing clear time to make an unknown-or-worse
+        // replay look better after both runs reach the cap.
+        if (candidate.damageTaken >= MaximumDamageTaken) return false;
         return candidate.clearSeconds < current.clearSeconds;
     }
 
