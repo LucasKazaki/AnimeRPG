@@ -194,8 +194,9 @@ public:
                 threat.role == ShadowCryptEnemyRole::VeilChanneler
                 && response == ShadowCryptDefenseResponse::Interrupt;
         } else {
-            report.damageTaken = threat.failureDamage;
-            damageTaken_ = std::min(MaxTrackedDamage, damageTaken_ + report.damageTaken);
+            const int damageBefore = damageTaken_;
+            damageTaken_ = std::min(MaxTrackedDamage, damageTaken_ + threat.failureDamage);
+            report.damageTaken = damageTaken_ - damageBefore;
             counterTarget_ = EnemyCapacity;
         }
         AdvanceThreatCursor();
