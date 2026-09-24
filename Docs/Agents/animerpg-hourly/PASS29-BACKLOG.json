@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "repository": "LucasKazaki/AnimeRPG",
+  "target_branch": "main",
+  "pass": "GAME-PASS29-FIELD-GUIDE-MAP-QOL-2026-09-24",
+  "baseline": "e38760070e0d021293e9f907834e61e6a6edca23",
+  "branch": "game/2026-09-24-field-guide-map-qol-pass29",
+  "pr": null,
+  "sources": [
+    {
+      "id": "GENSHIN-5.4-MAP",
+      "kind": "current-version-history-and-update-detail-mirror",
+      "published": "2025-02-12",
+      "accessed": "2026-09-24",
+      "urls": [
+        "https://genshin-impact.fandom.com/wiki/Version/5.4",
+        "https://traveler.gg/moonlight-amidst-dreams-version-5-4-update-details/"
+      ],
+      "used_for": [
+        "map destination selection",
+        "quest hints",
+        "consolidated reward hints",
+        "tracked custom-marker visibility"
+      ],
+      "caveat": "Secondary retention/mirror of developer update details; mechanics are design references only."
+    },
+    {
+      "id": "GENSHIN-5.6-MAP",
+      "kind": "current-version-history-and-update-detail-mirror",
+      "published": "2025-05-07",
+      "accessed": "2026-09-24",
+      "urls": [
+        "https://genshin-impact.fandom.com/wiki/Version/5.6",
+        "https://traveler.gg/paralogism-version-5-6-update-details/"
+      ],
+      "used_for": [
+        "category-scoped custom-pin management",
+        "relevant-only map sidebar information"
+      ],
+      "caveat": "Secondary retention/mirror of developer update details; no proprietary data or UI is copied."
+    },
+    {
+      "id": "GENSHIN-PLAYER-PIN-FILTER-20230920",
+      "kind": "original_player_discussion",
+      "published": "2023-09-20",
+      "accessed": "2026-09-24",
+      "url": "https://www.reddit.com/r/Genshin_Impact/comments/16nle96/",
+      "used_for": [
+        "QOL-030 route-pin category visibility filter"
+      ],
+      "sentiment": "Specific player request with corroborating replies, not consensus.",
+      "current_resolution": "partially_revalidated_unestablished_for_visibility_filter"
+    },
+    {
+      "id": "GENSHIN-PLAYER-QOL-RETROSPECTIVE-20260115",
+      "kind": "original_player_discussion",
+      "published": "2026-01-15",
+      "accessed": "2026-09-24",
+      "url": "https://www.reddit.com/r/Genshin_Impact/comments/1qd7l2l/",
+      "used_for": [
+        "historical corroboration of pin-filter interest"
+      ],
+      "sentiment": "Retrospective says many old requests were gradually added while still listing pin filtering among old requests; not proof of a current defect."
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-142",
+      "kind": "reference_feature",
+      "title": "Operation-aware next-step hint",
+      "gap": "Rift Investigation and Shadow Crypt Lead exposed counts but no bounded next-action semantics.",
+      "adaptation": "A non-mutating hint identifies the next Mall landmark or missing narrative evidence and explicitly reports completion.",
+      "allowed_paths": ["Engine/Scene/ExplorationFieldGuide.h", "Tests/ExplorationFieldGuidePass29Tests.inc"],
+      "acceptance": "Hint changes deterministically as authoritative visit/evidence state changes and never mutates guide state.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-143",
+      "kind": "reference_feature",
+      "title": "Next-incomplete operation tracking",
+      "gap": "Players/callers had to manually find the next unfinished operation after completing one.",
+      "adaptation": "Cyclic next-incomplete selection skips completed operations, wraps deterministically, and stops without mutation when all are complete.",
+      "allowed_paths": ["Engine/Scene/ExplorationFieldGuide.h", "Tests/ExplorationFieldGuidePass29Tests.inc"],
+      "acceptance": "Completed operations are skipped; all-complete state is idempotent.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-144",
+      "kind": "reference_feature",
+      "title": "Bounded multi-stop field route",
+      "gap": "Only one temporary landmark pin existed for a three-site field loop.",
+      "adaptation": "A fixed three-stop route preserves insertion order, rejects invalid/duplicate/visited/full additions, supports individual/batch removal, and prunes visited stops.",
+      "allowed_paths": ["Engine/Scene/ExplorationFieldGuide.h", "Tests/ExplorationFieldGuidePass29Tests.inc"],
+      "acceptance": "No allocation or unbounded growth; legacy single pin remains higher priority; discovery removes a matching route stop once.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-145",
+      "kind": "reference_feature",
+      "title": "Unread field-journal notices",
+      "gap": "Unlocked journal entries had no read/unread distinction.",
+      "adaptation": "New entries begin unread and explicit read-one/read-all acknowledgement is idempotent; repeated evidence cannot resurrect a notice.",
+      "allowed_paths": ["Engine/Scene/ExplorationFieldGuide.h", "Tests/ExplorationFieldGuidePass29Tests.inc"],
+      "acceptance": "Unread counts are exact and locked/invalid/already-read entries fail closed.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-146",
+      "kind": "reference_feature",
+      "title": "Consolidated field briefing",
+      "gap": "Callers had to query progress, target, hint, route and journal state separately.",
+      "adaptation": "A read-only briefing snapshot exposes the tracked operation, progress, hint, target, route count, journal counts and completed-operation count.",
+      "allowed_paths": ["Engine/Scene/ExplorationFieldGuide.h", "Tests/ExplorationFieldGuidePass29Tests.inc"],
+      "acceptance": "Snapshot equals authoritative values and does not mutate tracking or route state.",
+      "status": "implemented_pending_exact_head_gates"
+    },
+    {
+      "id": "QOL-030",
+      "kind": "community_improvement",
+      "title": "Route-pin category visibility filter",
+      "gap": "A multi-stop route would otherwise expose all pin categories at once with no clutter control.",
+      "adaptation": "Original Objective/Resource/Note route categories can be filtered for visibility without deleting hidden stops; All restores them.",
+      "allowed_paths": ["Engine/Scene/ExplorationFieldGuide.h", "Tests/ExplorationFieldGuidePass29Tests.inc"],
+      "acceptance": "Filtering changes only target visibility, invalid filters fail closed, and hidden route state remains intact.",
+      "status": "implemented_pending_exact_head_gates"
+    }
+  ],
+  "verification": {
+    "sandbox_header_domain": "passed_before_publication_on_matching implementation logic; exact repo integration still requires hosted gates",
+    "registered_target": "ThoughtCommandsTests via existing aggregation",
+    "windows_debug_release": "pending_exact_final_head",
+    "release_manifest": "pending_exact_final_head",
+    "native_interactive": "not_run_not_claimed_no_input_or_ui_wiring",
+    "independent_review": "pending_exact_final_head"
+  },
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "registered_regression_covered": 6,
+    "integrated_game_domain": 6,
+    "hosted_verified_exact_final_head": 0,
+    "native_playable_verified": 0,
+    "independently_reviewed_clean_exact_final_head": 0,
+    "merged": 0
+  },
+  "next_action": "Finish durable receipt/state, open one scoped PR, then require exact-head hosted Debug/Release, Release-manifest and independent Codex review before expected-head merge."
+}
