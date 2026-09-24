@@ -135,6 +135,9 @@ def semantics(g):
         for primitive in primitives:
             req(type(primitive) is dict,"primitive invalid")
             req("targets" not in primitive,"morph targets unsupported in ART-006D")
+            req(primitive.get("mode",4)==4 and jint(primitive.get("indices")),"mesh primitive requires indexed TRIANGLES")
+            attributes=primitive.get("attributes")
+            req(type(attributes) is dict and set(attributes)==ATTR,"unexpected rendering attributes")
     scene=sc[si];req(type(scene) is dict,"scene invalid");roots=scene.get("nodes");req(type(roots) is list,"scene roots invalid");bs=buffers(g);seen=set();out={}
     def walk(i,parent):
         req(jint(i) and 0<=i<len(ns) and i not in seen,"node graph invalid/cyclic");seen.add(i);n=ns[i];world=mul(parent,local(n));name=n.get("name");mi=n.get("mesh")
@@ -193,7 +196,7 @@ def verify(source:Path,manifest:Path,roundtrip:Path,blend:Path,receipt_path:Path
     for n in MATS:req(matclose(sm[n],om[n]),f"{n} material property drift")
     ss=semantics(src);os=semantics(out)
     for n in NAMES:
-        req(ss[n]["parity"]==os[n]["parity"],f"{n} transform parity drift");req(close(ss[n]["world"],os[n]["world"]),f"{n} world transform drift");req(close(ss[n]["center"],os[n]["center"]) and close(ss[n]["dimensions"],os[n]["dimensions"]) and ss[n]["materials"]==os[n]["materials"],f"{n} transform/material binding drift");req(ss[n]["topology"]==os[n]["topology"],f"{n} topology/attribute drift")
+        req(close(ss[n]["center"],os[n]["center"]) and close(ss[n]["dimensions"],os[n]["dimensions"]) and ss[n]["materials"]==os[n]["materials"],f"{n} transform/material binding drift");req(ss[n]["parity"]==os[n]["parity"],f"{n} transform parity drift");req(close(ss[n]["world"],os[n]["world"]),f"{n} world transform drift");req(ss[n]["topology"]==os[n]["topology"],f"{n} topology/attribute drift")
     return {"nodes":7,"source_sha256":sha(source),"roundtrip_sha256":sha(roundtrip),"blend_sha256":sha(blend),"blender":"5.2.2","tolerance_m":TOLERANCE,"status":"dcc_roundtrip_verified_not_astral_imported"}
 
 def main():
