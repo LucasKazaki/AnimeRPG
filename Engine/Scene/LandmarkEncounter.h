@@ -54,8 +54,9 @@ public:
         ShadowbladeActions& shadowbladeActions);
     void ConfigureChallenge(EncounterChallengeDifficulty difficulty,
         EncounterTacticalFocus focus,
-        EncounterScoringMode scoringMode = EncounterScoringMode::Balanced) {
-        challengeTracker_.Configure(difficulty, focus, scoringMode);
+        EncounterScoringMode scoringMode = EncounterScoringMode::Balanced,
+        EncounterTacticalBuff tacticalBuff = EncounterTacticalBuff::None) {
+        challengeTracker_.Configure(difficulty, focus, scoringMode, tacticalBuff);
     }
 
     bool ConfigureTraining(ShadowbladeTrainingFocus focus, DefensePracticePace pace,
