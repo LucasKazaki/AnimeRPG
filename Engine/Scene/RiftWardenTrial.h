@@ -544,8 +544,8 @@ private:
         if (!AttackValid(attack) || !PhaseValid(phase)) return;
         const std::size_t index = AttackIndex(attack);
         RiftWardenTrainingRecord& record = trainingRecords_[index];
-        if (record.attempts >= MaximumTrainingAttempts) return;
         record.lastSeenPhase = phase;
+        if (record.attempts >= MaximumTrainingAttempts) return;
         ++record.attempts;
         if (success) ++record.successes;
         if (success) {
