@@ -3,20 +3,20 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "cc491c87253ccaf8affc3b91055036a7af143e10",
+  "last_verified_main_at_pass_start": "a607cb671712e974fcc324cd1619b39ec84b9646",
   "last_merged_pass": {
-    "id": "GAME-PASS37-SHADOW-CRYPT-MISSION-PLANNING-2026-09-24",
-    "pr": 62,
-    "merge_sha": "cc491c87253ccaf8affc3b91055036a7af143e10",
+    "id": "GAME-PASS38-SHADOW-CRYPT-SKIRMISH-2026-09-24",
+    "pr": 63,
+    "merge_sha": "a607cb671712e974fcc324cd1619b39ec84b9646",
     "native_playable": false
   },
-  "working_branch": "game/pass38-shadow-crypt-skirmish",
-  "pass": "GAME-PASS38-SHADOW-CRYPT-SKIRMISH-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS38-SHADOW-CRYPT-SKIRMISH-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS38-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS38.md",
-  "pr": 63,
-  "final_head": "this_state_commit_pending_exact_head_gates_and_review",
+  "working_branch": "game/pass39-shadow-crypt-threat-depth",
+  "pass": "GAME-PASS39-SHADOW-CRYPT-THREAT-DEPTH-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS39-SHADOW-CRYPT-THREAT-DEPTH-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS39-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS39.md",
+  "pr": null,
+  "final_head": "candidate_state_freeze_pending_pr_and_exact_head_gates",
   "final_receipt_location": "implementation_PR_comment_after_exact_head_acceptance_and_merge",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -30,42 +30,31 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-187","title":"Distinct Shadow Crypt enemy roles","status":"implemented_pending_exact_final_head_acceptance"},
-    {"id":"GAME-188","title":"Room-scaled enemy formations","status":"implemented_pending_exact_final_head_acceptance"},
-    {"id":"GAME-189","title":"Semantic counterability telegraphs","status":"implemented_pending_exact_final_head_acceptance"},
-    {"id":"GAME-190","title":"Interruptible channel and earned counter","status":"implemented_pending_exact_final_head_acceptance"},
-    {"id":"GAME-191","title":"Posture break and bounded recovery","status":"implemented_pending_exact_final_head_acceptance"},
-    {"id":"QOL-039","title":"Sticky manual target focus","status":"implemented_pending_exact_final_head_acceptance"}
+    {"id":"GAME-192","title":"Deterministic two-variant enemy attack patterns","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-193","title":"Bounded low-health desperation pressure","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-194","title":"Precision-defense timing classification","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-195","title":"One-shot precision counter bonus","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"GAME-196","title":"Bulwark brace-to-posture counterplay","status":"implemented_pending_exact_head_acceptance"},
+    {"id":"QOL-040","title":"Read-only semantic multi-enemy threat queue","status":"implemented_pending_exact_head_acceptance"}
   ],
-  "review_repairs": {
-    "stale_room_timeline": "repaired_and_regression_covered",
-    "actual_posture_delta": "repaired_and_regression_covered",
-    "actual_capped_failure_damage_delta": "repaired_and_regression_covered",
-    "completed_skirmish_defeat_cleanup": "repaired_and_regression_covered",
-    "latest_implementation_commits": [
-      "7a9cf9d2caa35cc02d6cfb6be67b369a4e190b9b",
-      "3549f472f52a4d806453f0f291966a7f61e67d06",
-      "cae55b6093cb308f02b4def64cb7ca5979c05db5"
-    ]
-  },
   "verification": {
-    "sandbox_cpp17": "standalone ShadowCryptSkirmish logic compiled and ran with g++ -std=c++17 -Wall -Wextra -Werror -pedantic before PR; exit 0",
-    "registered_test_target": "ThoughtCommandsTests_with_ShadowCryptSkirmishPass38Tests_inc",
+    "sandbox_cpp17": "header-only pass39 smoke compiled with g++ -std=c++17 -Wall -Wextra -Werror -pedantic and ran successfully before PR publication",
+    "registered_test_target": "ThoughtCommandsTests_with_extended_ShadowCryptSkirmishPass38Tests_inc",
     "hosted_windows_ci": "pending_exact_final_head_after_state_freeze",
     "release_manifest": "pending_exact_final_head_after_state_freeze",
-    "native_windows_interactive": "not_run_not_claimed_no_input_UI_or_renderer_changes",
-    "independent_review": "pending_fresh_exact_final_head_rereview",
+    "native_windows_interactive": "not_run_not_claimed_no_input_UI_renderer_changes",
+    "independent_review": "pending_fresh_exact_final_head_review",
     "cross_process_persistence": "not_changed_or_claimed"
   },
   "coordination": {
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "new_ShadowCryptSkirmish_h_plus_narrow_LandmarkInteraction_h_owner_integration",
-    "test_registration": "existing_ThoughtCommandsTests_target_include_call_only_no_CMake_change"
+    "gameplay_paths": "ShadowCryptSkirmish_h_only_existing_LandmarkInteraction_owner_unchanged",
+    "test_registration": "existing_ThoughtCommandsTests_include_call_retained_no_CMake_change"
   },
   "research": {
-    "reference_context": "ZZZ 3.2 enemy roles, Defensive Assist counterability and stun semantics; Genshin Stygian escalating combat; ZZZ enemy-card Combat Training",
-    "community_request": "manual/sticky target focus request adapted without claiming a current comparator defect",
-    "current_resolution": "current Genshin target-lock resolution unverified; older ZZZ discussion explicitly notes an existing manual-lock option"
+    "reference_context": "current ZZZ 3.2 Dodge/Parry, Stun/follow-up, opponent-trait design plus Genshin Stygian escalating combat pressure",
+    "community_request": "semantic multi-enemy threat awareness adapted from recent ZZZ visual-clarity/camera complaints",
+    "current_resolution": "not established; player threads include lock-on/effect-setting counterarguments, so no current-comparator defect claim"
   },
-  "next_action": "Treat this state commit as the candidate freeze, require fresh exact-head Windows Debug/Release plus Release-manifest checks and a fresh Codex review, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
+  "next_action": "Open the scoped PR on the frozen candidate, require exact-head hosted Windows Debug/Release plus release-manifest checks and fresh Codex review, repair findings, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
 }
