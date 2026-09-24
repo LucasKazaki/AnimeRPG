@@ -83,9 +83,11 @@ struct ShadowCryptDefenseReport {
     bool openedCounter{};
     bool interruptedChannel{};
     bool staggerOpened{};
+    bool breachOpened{};
     int postureDamageApplied{};
     int damageTaken{};
     std::size_t enemyIndex{};
+    std::uint8_t shadowFlow{};
 };
 
 struct ShadowCryptAttackReport {
@@ -97,6 +99,9 @@ struct ShadowCryptAttackReport {
     bool staggerConsumed{};
     bool defeated{};
     bool encounterComplete{};
+    bool breachConsumed{};
+    bool weaknessExploited{};
+    bool flowBreakConsumed{};
 };
 
 struct ShadowCryptTargetRecommendation {
@@ -112,12 +117,22 @@ struct ShadowCryptThreatQueue {
     std::size_t count{};
 };
 
+struct ShadowCryptRoleIntel {
+    bool valid{};
+    std::size_t enemyIndex{};
+    ShadowCryptEnemyRole role{ShadowCryptEnemyRole::RiftSkirmisher};
+    ShadowCryptAttackStyle recommendedAttack{ShadowCryptAttackStyle::Heavy};
+    bool breachOpening{};
+    bool enraged{};
+};
+
 // Game-domain Shadow Crypt room combat. This models original enemy roles and
 // readable counterplay without taking renderer, input, animation, audio, or
 // generic engine ownership.
 class ShadowCryptSkirmish {
 public:
     static constexpr std::size_t EnemyCapacity = 3;
+    static constexpr std::uint8_t MaxShadowFlow = 3;
 
     bool Begin(ShadowCryptSkirmishTier tier) {
         if (active_ || !ValidTier(tier)) return false;
@@ -148,6 +163,14 @@ public:
         return true;
     }
 
+    bool Replay() {
+        if (active_ || !complete_ || !ValidTier(tier_)) return false;
+        const ShadowCryptSkirmishTier replayTier = tier_;
+        if (!Begin(replayTier)) return false;
+        replayMode_ = true;
+        return true;
+    }
+
     bool Cancel() {
         if (!active_) return false;
         Reset();
@@ -156,11 +179,27 @@ public:
 
     bool Active() const { return active_; }
     bool Complete() const { return complete_; }
+    bool ReplayMode() const { return replayMode_; }
     ShadowCryptSkirmishTier Tier() const { return tier_; }
     std::size_t EnemyCount() const { return enemyCount_; }
+    std::uint8_t ShadowFlow() const { return shadowFlow_; }
+    bool ShadowFlowReady() const { return shadowFlow_ == MaxShadowFlow; }
 
     ShadowCryptEnemyState Enemy(std::size_t index) const {
         return index < enemyCount_ ? enemies_[index] : ShadowCryptEnemyState{};
+    }
+
+    ShadowCryptRoleIntel EnemyIntel(std::size_t index) const {
+        ShadowCryptRoleIntel intel{};
+        if (index >= enemyCount_) return intel;
+        intel.valid = true;
+        intel.enemyIndex = index;
+        intel.role = enemies_[index].role;
+        intel.recommendedAttack = RecommendedAttack(enemies_[index].role);
+        intel.breachOpening = breachOpenings_[index] && !enemies_[index].defeated;
+        intel.enraged = enemies_[index].health > 0
+            && enemies_[index].health * 2 <= enemies_[index].maxHealth;
+        return intel;
     }
 
     ShadowCryptThreatTelegraph CurrentThreat() const {
@@ -203,6 +242,10 @@ public:
             report.interruptedChannel =
                 threat.role == ShadowCryptEnemyRole::VeilChanneler
                 && response == ShadowCryptDefenseResponse::Interrupt;
+            breachOpenings_[threat.enemyIndex] = true;
+            report.breachOpened = true;
+            shadowFlow_ = std::min<std::uint8_t>(MaxShadowFlow,
+                static_cast<std::uint8_t>(shadowFlow_ + 1));
             if (threat.role == ShadowCryptEnemyRole::GraveboundBulwark
                 && response == ShadowCryptDefenseResponse::Guard) {
                 auto& enemy = enemies_[threat.enemyIndex];
@@ -222,7 +265,10 @@ public:
             report.damageTaken = damageTaken_ - damageBefore;
             counterTarget_ = EnemyCapacity;
             precisionCounterTarget_ = EnemyCapacity;
+            breachOpenings_[threat.enemyIndex] = false;
+            shadowFlow_ = 0;
         }
+        report.shadowFlow = shadowFlow_;
         AdvanceThreatPattern(threat.enemyIndex);
         AdvanceThreatCursor();
         return report;
@@ -265,6 +311,22 @@ public:
             break;
         }
 
+        if (breachOpenings_[index]) {
+            report.breachConsumed = true;
+            breachOpenings_[index] = false;
+            if (style == RecommendedAttack(enemy.role)) {
+                report.weaknessExploited = true;
+                healthDamage += WeaknessHealthBonus;
+                postureDamage += WeaknessPostureBonus;
+            }
+        }
+        if (style == ShadowCryptAttackStyle::Heavy && ShadowFlowReady()) {
+            report.flowBreakConsumed = true;
+            shadowFlow_ = 0;
+            healthDamage += FlowBreakHealthBonus;
+            postureDamage += FlowBreakPostureBonus;
+        }
+
         if (enemy.staggered) {
             healthDamage += 20;
             enemy.staggered = false;
@@ -288,6 +350,7 @@ public:
             enemy.staggered = false;
             report.staggerOpened = false;
             report.defeated = true;
+            breachOpenings_[index] = false;
             if (lockedTarget_ == index) lockedTarget_ = EnemyCapacity;
             if (counterTarget_ == index) counterTarget_ = EnemyCapacity;
             if (precisionCounterTarget_ == index) precisionCounterTarget_ = EnemyCapacity;
@@ -352,6 +415,10 @@ private:
     static constexpr int BracePostureDamage = 10;
     static constexpr int PrecisionCounterHealthBonus = 8;
     static constexpr int PrecisionCounterPostureBonus = 6;
+    static constexpr int WeaknessHealthBonus = 10;
+    static constexpr int WeaknessPostureBonus = 8;
+    static constexpr int FlowBreakHealthBonus = 12;
+    static constexpr int FlowBreakPostureBonus = 10;
     static constexpr double PrecisionResponseFraction = 0.30;
 
     static constexpr bool ValidTier(ShadowCryptSkirmishTier tier) {
@@ -378,6 +445,15 @@ private:
         case ShadowCryptEnemyRole::Count: return 0;
         }
         return 0;
+    }
+    static constexpr ShadowCryptAttackStyle RecommendedAttack(ShadowCryptEnemyRole role) {
+        switch (role) {
+        case ShadowCryptEnemyRole::VeilChanneler: return ShadowCryptAttackStyle::Light;
+        case ShadowCryptEnemyRole::RiftSkirmisher: return ShadowCryptAttackStyle::Heavy;
+        case ShadowCryptEnemyRole::GraveboundBulwark: return ShadowCryptAttackStyle::Heavy;
+        case ShadowCryptEnemyRole::Count: return ShadowCryptAttackStyle::Heavy;
+        }
+        return ShadowCryptAttackStyle::Heavy;
     }
 
     ShadowCryptThreatTelegraph ThreatForIndex(std::size_t index) const {
@@ -457,12 +533,15 @@ private:
     void Reset() {
         enemies_ = {};
         patternSteps_ = {};
+        breachOpenings_ = {};
         enemyCount_ = 0;
         threatIndex_ = 0;
         lockedTarget_ = EnemyCapacity;
         counterTarget_ = EnemyCapacity;
         precisionCounterTarget_ = EnemyCapacity;
         damageTaken_ = 0;
+        shadowFlow_ = 0;
+        replayMode_ = false;
         complete_ = false;
         active_ = false;
     }
@@ -499,13 +578,16 @@ private:
 
     std::array<ShadowCryptEnemyState, EnemyCapacity> enemies_{};
     std::array<std::uint8_t, EnemyCapacity> patternSteps_{};
+    std::array<bool, EnemyCapacity> breachOpenings_{};
     std::size_t enemyCount_{};
     std::size_t threatIndex_{};
     std::size_t lockedTarget_{EnemyCapacity};
     std::size_t counterTarget_{EnemyCapacity};
     std::size_t precisionCounterTarget_{EnemyCapacity};
     int damageTaken_{};
+    std::uint8_t shadowFlow_{};
     ShadowCryptSkirmishTier tier_{ShadowCryptSkirmishTier::EntrySeal};
+    bool replayMode_{};
     bool active_{};
     bool complete_{};
 };
