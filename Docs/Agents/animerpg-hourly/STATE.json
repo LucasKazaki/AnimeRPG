@@ -17,7 +17,7 @@
   "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS32-BACKLOG.json",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS32.md",
   "pr": 54,
-  "final_head": "pending_after_durable_receipt_commit",
+  "final_head": "pending_after_saturation_repair_records",
   "final_receipt_location": "PR_54_comment_after_exact_head_acceptance_and_merge",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -31,26 +31,27 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-157","title":"Shadow Crypt-gated Rift Warden mastery trial","status":"candidate_verified_pending_final_documentation_head_gates"},
-    {"id":"GAME-158","title":"Deterministic three-phase boss attack pattern","status":"candidate_verified_pending_final_documentation_head_gates"},
-    {"id":"GAME-159","title":"Difficulty- and phase-specific timed defense","status":"candidate_verified_pending_final_documentation_head_gates"},
-    {"id":"GAME-160","title":"Posture break and one-shot punish opening","status":"candidate_verified_pending_final_documentation_head_gates"},
-    {"id":"GAME-161","title":"Progressive difficulty unlocks and per-difficulty mastery records","status":"candidate_verified_pending_final_documentation_head_gates"},
-    {"id":"QOL-033","title":"Learned-phase boss practice","status":"candidate_verified_pending_final_documentation_head_gates"}
+    {"id":"GAME-157","title":"Shadow Crypt-gated Rift Warden mastery trial","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-158","title":"Deterministic three-phase boss attack pattern","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-159","title":"Difficulty- and phase-specific timed defense","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-160","title":"Posture break and one-shot punish opening","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-161","title":"Progressive difficulty unlocks and per-difficulty mastery records","status":"pending_exact_final_head_acceptance"},
+    {"id":"QOL-033","title":"Learned-phase boss practice","status":"pending_exact_final_head_acceptance"}
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_RiftWardenTrialPass32Tests",
-    "source_test_head": "de919da6946a2f33345833304428b85218f398fb",
-    "hosted_windows_ci": "run_35960493908_number_982_success_on_de919da",
-    "release_manifest": "run_35960493883_number_720_success_on_de919da",
+    "latest_repaired_source_test_head": "73fefff6cbfb58ca43d73fd7bcbf5f2219e5adc1",
+    "historical_hosted_windows_ci": "run_35960888686_number_985_success_on_0d95c071_but_superseded_by_damage_saturation_repair",
+    "historical_release_manifest": "run_35960888615_number_723_success_on_0d95c071_but_superseded_by_damage_saturation_repair",
     "native_windows_interactive": "not_run_not_claimed_no_rendered_boss_ui_or_input_changes",
-    "independent_review": "final_documentation_complete_head_still_requires_fresh_Codex_review",
+    "independent_review": "exact_0d95c071_review_found_damage_saturation_P2; repaired_and_final_head_rereview_required",
     "integration": "LandmarkInteraction owns RiftWardenTrial and binds entry/action authority to completed Shadow Crypt plus one CharacterProgression identity",
     "persistent_cross_process_save": "trial_unlocks_records_and_practice_state_in_memory_only_not_claimed_cross_process"
   },
   "review_repairs": {
-    "resolved_material_threads": 9,
-    "latest_test_repairs": "all_9_timing_windows_exact_and_outside_boundaries; complete_record_separation; same_trial_monotonic_best; full_practice_record_and_unlock_isolation; invalid_enum_and_one_shot_punish_edges"
+    "resolved_material_threads": 10,
+    "latest_repair": "MaximumDamageTaken is an explicit information-loss sentinel; equal capped-damage records cannot use clear time to displace an established personal best; regression proves a faster replay with 100 additional post-cap hits is retained as worse/unknown rather than replacing the baseline",
+    "other_test_repairs": "all_9_timing_windows_exact_and_outside_boundaries; complete_record_separation; same_trial_monotonic_best; full_practice_record_and_unlock_isolation; missed_opening_saturation_ordering; invalid_enum_and_one_shot_punish_edges"
   },
   "coordination": {
     "open_non_game_prs_inspected": "52_55_49_45_33_28_26_23_13_left_unchanged",
@@ -62,5 +63,5 @@
     "community_request": "ZZZ_player_discussion_requesting_more_training_enemy_variety_and_boss_practice",
     "current_resolution": "current_official_ZZZ_Combat_Training_confirms_selectable_enemy_cards_but_arbitrary_boss_phase_practice_resolution_unestablished"
   },
-  "next_action": "Finish the bounded run receipt, then require exact-head hosted Windows Debug/Release and Release-manifest success plus fresh independent Codex review on that resulting head; reread main/head/diff/threads and merge with expected-head guard only if every gate is clean."
+  "next_action": "Finalize the durable receipt, then require exact-head hosted Windows Debug/Release and Release-manifest success plus fresh independent Codex review on the resulting head; reread main/head/diff/threads and merge with expected-head guard only if every gate is clean."
 }
