@@ -137,7 +137,8 @@ def semantics(g):
             req("targets" not in primitive,"morph targets unsupported in ART-006D")
             req(primitive.get("mode",4)==4 and jint(primitive.get("indices")),"mesh primitive requires indexed TRIANGLES")
             attributes=primitive.get("attributes")
-            req(type(attributes) is dict and set(attributes)==ATTR,"unexpected rendering attributes")
+            req(type(attributes) is dict and ATTR<=set(attributes),"required attributes missing")
+            req(set(attributes)==ATTR,"unexpected rendering attributes")
     scene=sc[si];req(type(scene) is dict,"scene invalid");roots=scene.get("nodes");req(type(roots) is list,"scene roots invalid");bs=buffers(g);seen=set();out={}
     def walk(i,parent):
         req(jint(i) and 0<=i<len(ns) and i not in seen,"node graph invalid/cyclic");seen.add(i);n=ns[i];world=mul(parent,local(n));name=n.get("name");mi=n.get("mesh")
