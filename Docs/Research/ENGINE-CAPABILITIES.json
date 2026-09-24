@@ -28,7 +28,7 @@
     {"id":"E08","title":"Physics and collision","status":"not_found","acceptance":"broad/narrow phase, queries, rigid bodies, collision layers, stable timesteps and 2D/3D stress","native_evidence":[],"independent_acceptance":false},
     {"id":"E09","title":"AI and navigation","status":"partial","acceptance":"behavior/state execution, pathfinding, cancellation/budgets and deterministic agent fixtures","native_evidence":[],"independent_acceptance":false},
     {"id":"E10","title":"Audio engine","status":"not_found","acceptance":"decode/stream/mix, spatialization, latency, underrun/device recovery and procedural-signal budgets","native_evidence":[],"independent_acceptance":false},
-    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_selection_resize_and_show_state_owner_pinned_hosted_green_final_review_pending_native_pending","acceptance":"scene/asset inspectors, selection/gizmos, undo/redo, save/reopen, editor/runtime boundaries, stable usable shell across admitted window states","native_evidence":[],"independent_acceptance":false},
+    {"id":"E11","title":"UI and editor tooling","status":"partial_editor_shell_owner_pinned_hosted_green_selection_deadline_repair_required_native_blocked","acceptance":"scene/asset inspectors, selection/gizmos, undo/redo, save/reopen, editor/runtime boundaries, stable usable shell across admitted window states","native_evidence":[],"independent_acceptance":false},
     {"id":"E12","title":"Genuine 2D support","status":"partial","acceptance":"sprites/batching/layers, tilemaps, 2D cameras/physics, text and image/runtime tests","native_evidence":[],"independent_acceptance":false},
     {"id":"E13","title":"Networking and multiplayer runtime","status":"not_found","acceptance":"offline schema first; later authorized transport, authority/replication, loss/reorder and disconnect recovery","native_evidence":[],"independent_acceptance":false},
     {"id":"E14","title":"Profiling and budgets","status":"partial","acceptance":"CPU/GPU timelines, p50/p95/p99 frame times, RAM/VRAM, allocations/stalls and reproducible manifests","native_evidence":[],"independent_acceptance":false},
@@ -59,45 +59,79 @@
     {
       "id": "E11-EDITOR-RUNTIME-SMOKE-2026-09-22",
       "kind": "editor-native-verification-slice",
-      "status": "selection_resize_and_show_state_owner_pinned_hosted_green_final_independent_review_pending_native_pending",
+      "status": "selection_deadline_side_effect_repair_required_before_native_handoff",
       "baseline_main_revision": "e2c0cbe3c7bbdea646888bf31f25cfeb394693e1",
       "latest_observed_main_revision": "6d22da88402db71843ecd5a35766c0c77e62dca6",
       "current_source_candidate": "57a7867aa4273def5d1dfbb73766883945881c7c",
       "runtime_smoke_blob": "290b4931b3a4083555f0a5ddcae4ee14cbaebe6a",
       "cmake_blob": "4fd471151acb4b5919ccef4a92f49da12bd8d1f1",
-      "latest_reviewed_findings": [
-        "SelectCubeAndNotify could mutate a recycled Outliner HWND or notify a recycled editor HWND because validation returned before LB_SETCURSEL and WM_COMMAND side effects",
-        "pull_request hosted evidence must record the actual tested synthetic merge/base separately from the raw source association",
-        "task and QA records must advance past already-completed receipt synchronization to the pending final-head review and native handoff"
-      ],
-      "repair": [
-        "retain exact CreateProcess primary thread ID, thread handle and process handle for asynchronous window and selection side effects",
-        "retain existing resize owner pin through SetWindowPos SWP_ASYNCWINDOWPOS and existing show-state owner pin through ShowWindowAsync",
-        "add PostSelectionMutationWhileOwnerPinned and route both LB_SETCURSEL and WM_COMMAND LBN_SELCHANGE through it",
-        "require exact editor and Outliner PID/TID ownership, direct parent/control-ID/class identity, visibility/enabled state and LBS_NOTIFY before each selection owner pin",
-        "suspend only the exact window-owning primary thread and require zero prior suspend count",
-        "capture CONTEXT_CONTROL as a post-suspend execution barrier before final identity revalidation",
-        "while the creator thread is stopped, recheck process/thread liveness plus exact editor and Outliner PID/TID/semantic identity",
-        "issue only asynchronous PostMessageW selection mutation or selection notification while pinned, then resume immediately before any poll or wait",
-        "bound the full selection-plus-Inspector synchronization phase to three seconds with bounded message waits and sleeps",
-        "retain resize/show-state phase deadlines, semantic/containment checks, exact maximize/restore placement, process-tree cleanup and safe final close"
-      ],
-      "latest_implementation_diff": {
-        "commit": "57a7867aa4273def5d1dfbb73766883945881c7c",
-        "parent": "a87ff45c236deb4fa5f9a734192e8dfad1beade4",
-        "file": "Tests/EditorRuntimeSmoke.cpp",
-        "changed_files": 1,
-        "additions": 133,
-        "deletions": 24
+      "current_evidence_commits": {
+        "task": "3768bee189ab92405be66d5338a042c8f197dbe1",
+        "qa": "478d7b5cc7777684ade161dacf4deb528dbf613b"
       },
-      "portable_fixtures": [
-        {"sha256":"b8c196a51b372982922165b5dc4d5044445d2279559ba3312505fec14a8f9dbb","scope":"source-logic show-state deadline/side-effect evidence only; not Win32 GUI evidence"},
-        {"sha256":"ab2d1952a2e30036e396b4652bcff0a3190fdf629c9c43606ed760eb7cbe4d15","scope":"source-logic exact restore-rectangle evidence only; not Win32 GUI evidence"},
-        {"sha256":"11cf52f815ceb3a83294c514fa4d2b478d54a3b27c0082651de7e99b71010de0","scope":"source-logic resize-deadline evidence only; not Win32 GUI evidence"},
-        {"sha256":"5155078196847989c416e6bcac146e264b5a02cdcb9fefe82824a89466db2193","scope":"source-logic adjacent resize ownership-gate evidence only; superseded by owner-pin repair; not Win32 GUI evidence"},
-        {"sha256":"a092dedb8ba74fb0df0e967d0d2465f7229532b6a73edabb0b8a3e1e83fa5432","gcc_warning_clean":true,"clang_asan_ubsan_leak_detection":true,"scope":"source-logic resize owner-pin state-machine evidence; not Win32 GUI evidence"},
-        {"sha256":"6110abf51993b7c2666bc95ef3089989fa448f84b0933c14b67984633c4f1ce1","gcc_warning_clean":true,"clang_asan_ubsan_leak_detection":true,"scope":"source-logic show-state owner-pin state-machine evidence; not Win32 GUI evidence"},
-        {"sha256":"0fac685ae3ab5d6f33b37be53f06167e007db7c654414d2460191fb3e66cc374","gcc_warning_clean":true,"clang_asan_ubsan_leak_detection":true,"scope":"source-logic selection owner-pin and bounded synchronization evidence; rejects recycled editor/Outliner ownership, identity/liveness/barrier/enqueue/resume/deadline failures; not Win32 GUI evidence"}
+      "source_hosted_evidence": {
+        "source_head": "57a7867aa4273def5d1dfbb73766883945881c7c",
+        "event": "pull_request",
+        "tested_synthetic_merge": "ec0dee8274e6b3fd1ffeb4fe5480c88590c96fbf",
+        "tested_base": "6d22da88402db71843ecd5a35766c0c77e62dca6",
+        "tested_merge_source_parent": "57a7867aa4273def5d1dfbb73766883945881c7c",
+        "windows_run": 35933677666,
+        "windows_job": 107425789093,
+        "windows_conclusion": "success",
+        "profiling_run": 35933677505,
+        "profiling_conclusion": "success",
+        "release_manifest_run": 35933677460,
+        "release_manifest_conclusion": "success",
+        "interactive_runtime_smoke_executed_by_hosted_suite": false
+      },
+      "prepass_evidence_head_hosted_evidence": {
+        "source_head": "4f1996e98a24c0478157c4ad1de9083ed35f0642",
+        "event": "pull_request",
+        "tested_synthetic_merge": "9e42ea5a12659d84e852ce8c1e5901bbd98adc9a",
+        "tested_base": "6d22da88402db71843ecd5a35766c0c77e62dca6",
+        "windows_run": 35934076273,
+        "windows_job": 107427047961,
+        "windows_conclusion": "success",
+        "windows_completed_at": "2026-09-23T23:34:22Z",
+        "profiling_run": 35934076239,
+        "profiling_conclusion": "success",
+        "release_manifest_run": 35934076556,
+        "release_manifest_conclusion": "success"
+      },
+      "fresh_independent_review": {
+        "reviewed_head": "4f1996e98a24c0478157c4ad1de9083ed35f0642",
+        "completed_at": "2026-09-23T23:38:32Z",
+        "result": "p2_evidence_control_finding_stale_next_action",
+        "thread": "PRRT_kwDOTo2Ig86lYKi9",
+        "comment": 4088355136,
+        "finding": "task and QA still requested evidence synchronization already completed by the current records",
+        "remediation": "task and QA advanced in evidence-only commits 3768bee189ab92405be66d5338a042c8f197dbe1 and 478d7b5cc7777684ade161dacf4deb528dbf613b",
+        "independent_acceptance": false,
+        "post_remediation_exact_head_review_required": true
+      },
+      "coordinator_static_finding": {
+        "status": "reproduced_source_repair_required",
+        "scope": "selection phase deadline can expire before asynchronous selection notification is enqueued",
+        "details": [
+          "SelectCubeAndNotify breaks on LB_GETCURSEL == 3 before checking the phase deadline",
+          "PostSelectionMutationWhileOwnerPinned does not receive or check the selection deadline immediately before PostMessageW",
+          "a Cube observation at the deadline or an in-time observation followed by slow owner pinning can enqueue WM_COMMAND/LBN_SELCHANGE after the claimed three-second phase",
+          "later validation remains deadline-bounded, so this finding is not a demonstrated false PASS"
+        ],
+        "portable_fixture": {
+          "sha256": "383f71febc58529fa9c7e2887936463eaf5ff67c663a2763a27d4d7a3b8c18b7",
+          "gcc_warning_clean": true,
+          "clang_asan_ubsan_leak_detection": true,
+          "scope": "source-logic deadline admission evidence only; not Win32 GUI evidence"
+        }
+      },
+      "previous_portable_fixtures_retained": [
+        {"sha256":"b8c196a51b372982922165b5dc4d5044445d2279559ba3312505fec14a8f9dbb","scope":"show-state deadline/side-effect source logic"},
+        {"sha256":"ab2d1952a2e30036e396b4652bcff0a3190fdf629c9c43606ed760eb7cbe4d15","scope":"exact restore-rectangle source logic"},
+        {"sha256":"11cf52f815ceb3a83294c514fa4d2b478d54a3b27c0082651de7e99b71010de0","scope":"resize-deadline source logic"},
+        {"sha256":"a092dedb8ba74fb0df0e967d0d2465f7229532b6a73edabb0b8a3e1e83fa5432","scope":"resize owner-pin source logic"},
+        {"sha256":"6110abf51993b7c2666bc95ef3089989fa448f84b0933c14b67984633c4f1ce1","scope":"show-state owner-pin source logic"},
+        {"sha256":"0fac685ae3ab5d6f33b37be53f06167e007db7c654414d2460191fb3e66cc374","scope":"selection owner-pin and bounded synchronization source logic"}
       ],
       "automated_state_matrix": [
         "startup_unmodified",
@@ -117,76 +151,17 @@
         "actual_maximized_desktop_with_screenshot_then_exact_outer_rectangle_restore",
         "420x260_or_closest_os_permitted_narrow_size"
       ],
-      "source_hosted_evidence": {
-        "source_head": "57a7867aa4273def5d1dfbb73766883945881c7c",
-        "event": "pull_request",
-        "tested_synthetic_merge": "ec0dee8274e6b3fd1ffeb4fe5480c88590c96fbf",
-        "tested_base": "6d22da88402db71843ecd5a35766c0c77e62dca6",
-        "tested_merge_source_parent": "57a7867aa4273def5d1dfbb73766883945881c7c",
-        "windows_run": 35933677666,
-        "windows_job": 107425789093,
-        "windows_conclusion": "success",
-        "windows_completed_at": "2026-09-23T23:29:35Z",
-        "profiling_run": 35933677505,
-        "profiling_conclusion": "success",
-        "release_manifest_run": 35933677460,
-        "release_manifest_conclusion": "success",
-        "interactive_runtime_smoke_executed_by_hosted_suite": false
-      },
-      "previous_review": {
-        "reviewed_head": "a87ff45c236deb4fa5f9a734192e8dfad1beade4",
-        "completed_at": "2026-09-23T23:13:44Z",
-        "result": "p2_findings_requiring_selection_owner_pin_hosted_merge_provenance_and_stale_next_action_repair",
-        "selection_source_thread": "PRRT_kwDOTo2Ig86lX2XO",
-        "selection_comment": 4088223052,
-        "provenance_thread": "PRRT_kwDOTo2Ig86lX2XS",
-        "provenance_comment": 4088223057,
-        "stale_action_thread": "PRRT_kwDOTo2Ig86lX2XW",
-        "stale_action_comment": 4088223061,
-        "superseded_for_current_source_acceptance": true
-      },
-      "current_source_independent_review": {
-        "status": "required_pending_after_evidence_sync"
-      },
-      "research": [
-        {"source":"Microsoft Learn PostMessageW","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postmessagew","accessed":"2026-09-23","applicability":"queues a message to the thread that created the specified window and returns without waiting, allowing the verification harness to release its short owner pin before completion polling"},
-        {"source":"Microsoft Learn LB_SETCURSEL","url":"https://learn.microsoft.com/en-us/windows/win32/controls/lb-setcursel","accessed":"2026-09-23","applicability":"single-selection listbox selection message; zero-based row, unused lParam and LB_ERR error contract used by the bounded Cube-selection phase"},
-        {"source":"Microsoft Learn GetThreadContext","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadcontext","accessed":"2026-09-23","applicability":"successful CONTEXT_CONTROL capture after suspension is used as the execution barrier before final identity validation"},
-        {"source":"Microsoft Learn SuspendThread","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-suspendthread","accessed":"2026-09-23","applicability":"short verification-only owner pin; no target-dependent wait while suspended because Microsoft warns it is debugger-oriented and unsafe as general synchronization"},
-        {"source":"Microsoft Learn ResumeThread","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-resumethread","accessed":"2026-09-23","applicability":"requires previous count one so the harness-owned suspension is removed before polling"},
-        {"source":"Epic Unreal Engine 5.8 Using Editor Viewports","url":"https://dev.epicgames.com/documentation/unreal-engine/using-editor-viewports-in-unreal-engine","accessed":"2026-09-23","applicability":"3D perspective, 2D orthographic, multi-layout and maximized/immersive workflows are editor comparison targets"},
-        {"source":"Unity 6.0 EditorWindow.maximized","url":"https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html","accessed":"2026-09-23","applicability":"maximized editor-window state is a comparison workflow property"}
-      ],
-      "licensing_constraints": "Public Epic, Unity and Microsoft documentation used for behavioral/API comparison only. No proprietary engine source copied and no dependency imported.",
-      "task": "Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
-      "task_receipt_commit": "c47aa11566a135764fc041c6ec0edabbb7d73de6",
-      "evidence": "Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md",
-      "qa_receipt_commit": "21ae5174c9dc578da120ffafc11bea5916ee9231",
-      "native_additional_regression": "launch AstralGame separately from the exact reviewed source/build and retain no-regression evidence",
       "native_evidence": [],
-      "fresh_final_receipt_review_required": true,
-      "fresh_final_receipt_review_clean": false,
-      "independent_acceptance": false
+      "independent_acceptance": false,
+      "next_action": "repair the selection phase deadline at the asynchronous side-effect boundary, rerun applicable portable and hosted checks, record the actual tested PR integration tree, synchronize evidence, obtain fresh independent review, and only then hand the exact clean-reviewed SHA to the registered Windows executor"
     }
   ],
-  "benchmark_proposals": {
-    "status": "not_approved_not_measured",
-    "resolutions": ["1920x1080", "2560x1440"],
-    "frame_budget_ms": 16.67,
-    "budget_statistic": "p95",
-    "ram_vram_limits": null,
-    "comparison_tolerances": null,
-    "required_soak_hours": 24
-  },
-  "progression_rules": [
-    "No completion from docs, stubs, test counts, or green compilation alone.",
-    "Research one dependency-ready gap, reproduce or specify a failure, then implement one bounded packet.",
-    "Keep native and independent acceptance gates; staged repairs are not auto-merged.",
-    "Record source SHA, commands, exits, versions, files, hashes, and deferred local checks.",
-    "For pull_request CI, distinguish source association from GitHub's synthetic integration merge and tested base when recording final integration evidence.",
-    "Pin the post-evidence receipt head in PR metadata/checkpoint rather than creating an infinite self-referential evidence commit chain.",
-    "Do not shrink an earlier admitted native acceptance matrix without explicit approved scope change.",
-    "No second local scheduler, local process control, R0 execution, publication, release, merge, dependency, or graphics-API change from this packet.",
-    "Do not remove unresolved capability rows or catalogue gaps to make parity easier."
+  "research": [
+    {"source":"Microsoft Learn PostMessageW","url":"https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postmessagew","accessed":"2026-09-23","applicability":"asynchronous enqueue returns before processing, so phase admission must gate the side effect itself"},
+    {"source":"Microsoft Learn GetTickCount64","url":"https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-gettickcount64","accessed":"2026-09-23","applicability":"monotonic elapsed-millisecond source used by E11 phase deadlines; boundary handling must be consistent"},
+    {"source":"Microsoft Learn GetThreadContext","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadcontext","accessed":"2026-09-23","applicability":"valid context requires the target not be running; retained execution barrier for owner-pinned enqueue"},
+    {"source":"Microsoft Learn SuspendThread","url":"https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-suspendthread","accessed":"2026-09-23","applicability":"debugger-oriented short verification-only owner pin; no target-dependent wait while suspended"},
+    {"source":"Epic Unreal Engine 5.8 Using Editor Viewports","url":"https://dev.epicgames.com/documentation/unreal-engine/using-editor-viewports-in-unreal-engine","accessed":"2026-09-23","applicability":"3D perspective, 2D orthographic, multi-layout, maximized and immersive editor comparison workflows"},
+    {"source":"Unity 6.0 EditorWindow.maximized","url":"https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html","accessed":"2026-09-23","applicability":"maximized editor-window workflow comparison property"}
   ]
 }
