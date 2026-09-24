@@ -81,6 +81,20 @@ def mutate_buffer(gltf,manifest,accessor_index,component_index,value,fmt,refresh
         refresh_accessor_bounds(g,accessor_index,data)
     save_gltf(gltf,g,manifest)
 
+def mutate_float_accessor(gltf,manifest,accessor_index,mutator):
+    g=json.loads(gltf.read_text())
+    prefix="data:application/octet-stream;base64,"
+    data=bytearray(base64.b64decode(g["buffers"][0]["uri"][len(prefix):]))
+    a=g["accessors"][accessor_index]; v=g["bufferViews"][a["bufferView"]]
+    widths={"VEC2":2,"VEC3":3,"VEC4":4}; width=widths[a["type"]]
+    if a["componentType"]!=5126: raise AssertionError("float accessor required")
+    count=a["count"]
+    values=list(struct.unpack_from("<"+"f"*(count*width),data,v["byteOffset"]))
+    mutator(values,width,count)
+    struct.pack_into("<"+"f"*len(values),data,v["byteOffset"],*values)
+    g["buffers"][0]["uri"]=prefix+base64.b64encode(bytes(data)).decode("ascii")
+    save_gltf(gltf,g,manifest)
+
 def verify(src,gltf,manifest,expected_manifest=EXPECTED_MANIFEST):
     VER.verify_source(src)
     VER.verify_manifest(manifest,src,gltf)
@@ -142,7 +156,6 @@ def test_manifest_bool_count_rejected():
         m=json.loads(manifest.read_text()); m["mesh_count"]=True; manifest.write_text(canon(m))
         expect_fail(lambda: VER.verify_manifest(manifest,src,gltf),"JSON integer")
     finally: td.cleanup()
-
 
 def test_checked_in_expected_manifest_pin_required():
     td,src,gltf,manifest=workspace()
@@ -214,7 +227,6 @@ def test_reversed_winding_rejected_after_repin():
 def test_sphere_radius_drift_rejected_after_repin():
     td,src,gltf,manifest=workspace()
     try:
-        # Sphere POSITION accessor 5; component 1 is first vertex Y.
         mutate_buffer(gltf,manifest,5,1,0.45,"f")
         expect_fail(lambda: verify_semantic(src,gltf,manifest),"sphere vertex")
     finally: td.cleanup()
@@ -222,7 +234,6 @@ def test_sphere_radius_drift_rejected_after_repin():
 def test_cylinder_cap_drift_rejected_after_repin():
     td,src,gltf,manifest=workspace()
     try:
-        # Cylinder POSITION accessor 10; vertex 34 is top center, component index 34*3+1.
         mutate_buffer(gltf,manifest,10,34*3+1,0.9,"f")
         expect_fail(lambda: verify_semantic(src,gltf,manifest),"cylinder cap")
     finally: td.cleanup()
@@ -247,7 +258,6 @@ def test_unknown_root_field_rejected_after_repin():
         g=json.loads(gltf.read_text()); g["extensionsUsed"]=[]; save_gltf(gltf,g,manifest)
         expect_fail(lambda: verify_semantic(src,gltf,manifest),"root keys")
     finally: td.cleanup()
-
 
 def test_material_bool_numeric_rejected_after_repin():
     td,src,gltf,manifest=workspace()
@@ -291,6 +301,35 @@ def test_source_reference_drift_rejected_both():
         source=json.loads(src.read_text()); source["reference_scope"]["observed_2026_09_24"][0]["official_url"]="https://example.invalid"; src.write_text(canon(source))
         expect_fail(lambda: GEN.load_source(src),"reference inventory")
         expect_fail(lambda: VER.verify_source(src),"reference inventory")
+    finally: td.cleanup()
+
+def test_semantically_wrong_cube_tangent_rejected_after_repin():
+    td,src,gltf,manifest=workspace()
+    try:
+        def change(values,width,count):
+            assert width==4 and count>=1
+            values[0:4]=[0.0,1.0,0.0,1.0]
+        mutate_float_accessor(gltf,manifest,2,change)
+        expect_fail(lambda: verify_semantic(src,gltf,manifest),"tangent/UV")
+    finally: td.cleanup()
+
+def test_cube_uv_policy_collapse_rejected_after_repin():
+    td,src,gltf,manifest=workspace()
+    try:
+        def change(values,width,count):
+            assert width==2 and count>=4
+            for i in range(4): values[i*2:i*2+2]=[0.5,0.5]
+        mutate_float_accessor(gltf,manifest,3,change)
+        expect_fail(lambda: verify_semantic(src,gltf,manifest),"UV policy")
+    finally: td.cleanup()
+
+def test_attribute_bool_binding_rejected_after_repin():
+    td,src,gltf,manifest=workspace()
+    try:
+        g=json.loads(gltf.read_text())
+        g["meshes"][0]["primitives"][0]["attributes"]["POSITION"]=False
+        save_gltf(gltf,g,manifest)
+        expect_fail(lambda: verify_semantic(src,gltf,manifest),"JSON integer")
     finally: td.cleanup()
 
 TESTS=[v for k,v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
