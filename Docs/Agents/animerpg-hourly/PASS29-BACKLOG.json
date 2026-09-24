@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "repository": "LucasKazaki/AnimeRPG",
+  "target_branch": "main",
+  "pass": "GAME-PASS29-FIELD-GUIDE-MAP-QOL-2026-09-24",
+  "baseline": "e38760070e0d021293e9f907834e61e6a6edca23",
+  "branch": "game/2026-09-24-field-guide-map-qol-pass29",
+  "pr": 50,
+  "sources": [
+    {
+      "id": "GENSHIN-OFFICIAL-INTERACTIVE-MAP-2.6",
+      "kind": "official_developer_gameplay_explanation",
+      "published": "2022-03-30",
+      "accessed": "2026-09-24",
+      "url": "https://www.hoyolab.com/article/4029408",
+      "used_for": ["quick location", "personal pin management", "filter list", "own/synced pin visibility"]
+    },
+    {
+      "id": "GENSHIN-OFFICIAL-LUNA-III-UPDATE",
+      "kind": "official_developer_release_notes",
+      "published": "2025-12-02",
+      "accessed": "2026-09-24",
+      "url": "https://www.hoyolab.com/article_pre/21389",
+      "used_for": ["simultaneous tracking of up to three nearby objective locations"]
+    },
+    {
+      "id": "GENSHIN-OFFICIAL-INTERACTIVE-MAP-GUIDE",
+      "kind": "official_platform_gameplay_guide",
+      "published": "2023",
+      "accessed": "2026-09-24",
+      "url": "https://www.hoyolab.com/article/17673509",
+      "used_for": ["pin sync and player-authored exploration routing"]
+    },
+    {
+      "id": "GENSHIN-PLAYER-PIN-FILTER-20230920",
+      "kind": "original_player_discussion",
+      "published": "2023-09-20",
+      "accessed": "2026-09-24",
+      "url": "https://www.reddit.com/r/Genshin_Impact/comments/16nle96/",
+      "used_for": ["QOL-030 route-pin visibility filter"],
+      "sentiment": "specific player request with corroborating replies; not consensus",
+      "current_resolution": "later pin-management improvements exist; equivalent narrower in-game visibility filter not established in inspected current sources"
+    },
+    {
+      "id": "GENSHIN-PLAYER-QOL-RETROSPECTIVE-20260115",
+      "kind": "original_player_discussion",
+      "published": "2026-01-15",
+      "accessed": "2026-09-24",
+      "url": "https://www.reddit.com/r/Genshin_Impact/comments/1qd7l2l/",
+      "used_for": ["historical corroboration of pin-filter interest"],
+      "sentiment": "retrospective notes many old QoL requests were gradually implemented while still listing pin filtering among the historical requests"
+    },
+    {
+      "id": "GENSHIN-PLAYER-PIN-FILTER-20201112",
+      "kind": "original_player_discussion",
+      "published": "2020-11-12",
+      "accessed": "2026-09-24",
+      "url": "https://www.reddit.com/r/Genshin_Impact/comments/jt1oi7/",
+      "used_for": ["independent historical corroboration for displaying only selected pin types"],
+      "sentiment": "older independent player suggestion; not current-state evidence"
+    }
+  ],
+  "reference_lessons": [
+    "actionable location and target guidance",
+    "deterministic objective selection",
+    "fixed-capacity multi-objective tracking",
+    "custom route-pin creation and management",
+    "consolidated and filterable navigation information"
+  ],
+  "allowed_production_paths": [
+    "Engine/Scene/ExplorationFieldGuide.h",
+    "Engine/Scene/LandmarkInteraction.h"
+  ],
+  "features": [
+    {
+      "id": "GAME-142",
+      "kind": "reference_feature",
+      "title": "Operation-aware next-step hint",
+      "adaptation": "non-mutating hints for the next Mall landmark or missing Rift/Shadow Crypt evidence",
+      "acceptance": "hint follows authoritative state and reports completion without mutation",
+      "status": "implemented_owner_integrated_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-143",
+      "kind": "reference_feature",
+      "title": "Next-incomplete operation tracking",
+      "adaptation": "cyclic selection skips completed operations and is exposed through LandmarkInteraction",
+      "acceptance": "deterministic wraparound, including final-enum to MallSurvey boundary, and all-complete no-op",
+      "status": "implemented_owner_integrated_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-144",
+      "kind": "reference_feature",
+      "title": "Bounded multi-stop field route",
+      "adaptation": "fixed three-stop route with validation, ordering, visit pruning, removal and nonempty batch clear, forwarded through LandmarkInteraction",
+      "acceptance": "bounded state, legacy pin precedence, exact pruning/removal/clear counts",
+      "status": "implemented_owner_integrated_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-145",
+      "kind": "reference_feature",
+      "title": "Unread field-journal notices",
+      "adaptation": "new entries begin unread; read-one/read-all acknowledgement is idempotent and owner-reachable",
+      "acceptance": "exact unread counts, locked/invalid/already-read entries fail closed, duplicate evidence does not resurrect notices",
+      "status": "implemented_owner_integrated_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-146",
+      "kind": "reference_feature",
+      "title": "Consolidated field briefing",
+      "adaptation": "read-only authoritative snapshot exposed through LandmarkInteraction::FieldBriefing",
+      "acceptance": "snapshot matches tracked operation, progress, hint, target, route and journal state without mutation",
+      "status": "implemented_owner_integrated_pending_exact_head_gates"
+    },
+    {
+      "id": "QOL-030",
+      "kind": "community_improvement",
+      "title": "Route-pin category visibility filter",
+      "adaptation": "Objective/Resource/Note visibility filter hides without deleting route state and is forwarded through LandmarkInteraction",
+      "acceptance": "invalid filters fail closed and restoring All reveals hidden route pins",
+      "status": "implemented_owner_integrated_pending_exact_head_gates"
+    }
+  ],
+  "review_history": {
+    "material_findings_repaired": 3,
+    "summary": [
+      "P2 production-owner reachability gap repaired with thin LandmarkInteraction forwarding and owner-path regression coverage",
+      "P2 missing final-enum wraparound coverage repaired with ShadowCryptLead-to-MallSurvey regression",
+      "P2 owner batch-clear coverage repaired by clearing a nonempty live-owner route and asserting exact removed count/state"
+    ]
+  },
+  "verification": {
+    "registered_target": "ThoughtCommandsTests via existing aggregation",
+    "initial_sandbox_header_domain": "passed before review repairs; not final exact-head evidence",
+    "windows_debug_release": "pending_exact_final_head_after_review_repairs",
+    "release_manifest": "pending_exact_final_head_after_review_repairs",
+    "native_interactive": "not_run_not_claimed_no_input_or_ui_wiring",
+    "independent_review": "fresh_exact_final_head_review_required_after_three_repaired_findings"
+  },
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "registered_regression_covered": 6,
+    "integrated_game_domain": 6,
+    "hosted_verified_exact_final_head": 0,
+    "native_playable_verified": 0,
+    "independently_reviewed_clean_exact_final_head": 0,
+    "merged": 0
+  },
+  "next_action": "Require exact-head hosted Windows Debug/Release, Release-manifest and fresh independent Codex review on PR 50; repair and rerun if needed, then expected-head merge if clean."
+}
