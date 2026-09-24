@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS35-RIFT-WARDEN-FOCUSED-PRACTICE-2026-09-24",
+  "baseline": "3fcc9a003799dc23dddf8c7cadac4c857f826428",
+  "target_branch": "main",
+  "working_branch": "game/pass35-rift-warden-focused-practice",
+  "accessed": "2026-09-24",
+  "sources": [
+    {
+      "id": "ZZZ-COMBAT-TRAINING-20260831",
+      "kind": "official_event_details",
+      "published": "2026-08-31",
+      "url": "https://zenless.hoyoverse.com/m/en-us/news/165921",
+      "use": "selectable Combat Simulation enemy cards"
+    },
+    {
+      "id": "GRANBLUE-PLAYSTATION-CURRENT",
+      "kind": "official_platform_accessibility",
+      "published": null,
+      "url": "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "use": "adjustable difficulty/assists, Control Reminders, Tutorial Reminders, Practice Mode, offline pausing"
+    },
+    {
+      "id": "GENSHIN-STYGIAN-20260302",
+      "kind": "official_event_details",
+      "published": "2026-03-02",
+      "url": "https://www.hoyolab.com/article/44016747",
+      "use": "revalidated existing Warden selectable difficulty, sequential unlock and timed multi-phase challenge context; not counted as new implementation"
+    },
+    {
+      "id": "ZZZ-BOSS-PRACTICE-20260214",
+      "kind": "original_player_discussion",
+      "published": "2026-02-14",
+      "url": "https://www.reddit.com/r/ZZZ_Discussion/comments/1r4l7xn/why_cant_we_put_bosses_in_the_training_training/",
+      "use": "boss training request for manual chains/stun windows"
+    },
+    {
+      "id": "ZZZ-BOSS-PRACTICE-20260302",
+      "kind": "original_player_discussion",
+      "published": "2026-03-02",
+      "url": "https://www.reddit.com/r/ZZZ_Official/comments/1rikhmx/how_do_you_guys_like_to_test_your_teams/",
+      "use": "more enemy variety and boss practice request"
+    },
+    {
+      "id": "ZZZ-BOSS-PRACTICE-20260801",
+      "kind": "original_player_discussion",
+      "published": "2026-08-01",
+      "url": "https://www.reddit.com/r/ZZZ_Discussion/comments/1vcwt03/i_wish_we_could_practice_against_bosses_in_free/",
+      "use": "practice boss parry windows and rotations"
+    },
+    {
+      "id": "ZZZ-WEEKLY-BOSS-PRACTICE-20260922",
+      "kind": "original_player_discussion",
+      "published": "2026-09-22",
+      "url": "https://www.reddit.com/r/ZZZ_Official/comments/1wnlvf6/weekly_question_discussion_megathread_september/",
+      "use": "current anecdotal report that VR training lacks bosses",
+      "sentiment": "corroborated player request, not consensus",
+      "current_resolution": "official 2026-08-31 Combat Training page confirms selectable enemy cards but does not establish universal boss availability"
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-172",
+      "title": "Focused learned boss-attack drill",
+      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_acceptance",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h", "Engine/Scene/LandmarkInteraction.h"]
+    },
+    {
+      "id": "GAME-173",
+      "title": "Guided Standard Expert practice pace",
+      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_acceptance",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h", "Engine/Scene/LandmarkInteraction.h"]
+    },
+    {
+      "id": "GAME-174",
+      "title": "Authoritative control reminder",
+      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_acceptance",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h"]
+    },
+    {
+      "id": "GAME-175",
+      "title": "Learned Warden attack guide",
+      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_acceptance",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h", "Engine/Scene/LandmarkInteraction.h"]
+    },
+    {
+      "id": "GAME-176",
+      "title": "Practice-only pause and resume",
+      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_acceptance",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h", "Engine/Scene/LandmarkInteraction.h"]
+    },
+    {
+      "id": "QOL-036",
+      "title": "Looping focused boss-move rehearsal",
+      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_acceptance",
+      "production_paths": ["Engine/Scene/RiftWardenTrial.h", "Engine/Scene/LandmarkInteraction.h"]
+    }
+  ],
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "registered_regression_covered": 6,
+    "game_domain_integrated": 6,
+    "native_player_playable_verified": 0,
+    "hosted_verified_exact_final_head": 0,
+    "independent_reviewed_clean_exact_final_head": 0,
+    "merged": 0
+  },
+  "next_action": "Run exact-head hosted Windows Debug/Release and Release-manifest checks plus independent Codex review; repair any material finding, rerun gates, reread main/head/diff/threads, then expected-head merge only if all required evidence is green."
+}

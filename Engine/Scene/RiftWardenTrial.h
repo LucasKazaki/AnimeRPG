@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 namespace Astral::Scene {
 
@@ -61,6 +62,12 @@ enum class RiftWardenMastery : std::uint8_t {
     Bronze,
     Silver,
     Gold,
+};
+
+enum class RiftWardenPracticePace : std::uint8_t {
+    Guided,
+    Standard,
+    Expert,
 };
 
 struct RiftWardenTelegraph {
@@ -122,10 +129,34 @@ struct RiftWardenCoachTip {
     double observedReactionSeconds{};
 };
 
+struct RiftWardenControlReminder {
+    bool available{};
+    RiftWardenAttack attack{RiftWardenAttack::RiftSlash};
+    RiftWardenResponse response{RiftWardenResponse::Dodge};
+    RiftWardenCue cue{RiftWardenCue::None};
+};
+
+struct RiftWardenAttackGuide {
+    bool available{};
+    RiftWardenAttack attack{RiftWardenAttack::RiftSlash};
+    RiftWardenResponse response{RiftWardenResponse::Dodge};
+    RiftWardenCue cue{RiftWardenCue::None};
+    RiftWardenPhase lastSeenPhase{RiftWardenPhase::Opening};
+    int attempts{};
+    int successes{};
+    double standardWindowSeconds{};
+    double practiceWindowSeconds{};
+};
+
 struct RiftWardenBriefing {
     bool active{};
     bool complete{};
     bool practice{};
+    bool practicePaused{};
+    bool focusedPractice{};
+    bool loopingFocusedPractice{};
+    RiftWardenPracticePace practicePace{RiftWardenPracticePace::Standard};
+    RiftWardenAttack focusedAttack{RiftWardenAttack::RiftSlash};
     RiftWardenDifficulty difficulty{RiftWardenDifficulty::Story};
     RiftWardenPhase phase{RiftWardenPhase::Opening};
     int bossHealth{};
@@ -142,6 +173,8 @@ struct RiftWardenBriefing {
     RiftWardenTelegraph telegraph{};
     RiftWardenPracticeRecommendation practiceRecommendation{};
     RiftWardenCoachTip coachTip{};
+    RiftWardenControlReminder controlReminder{};
+    RiftWardenAttackGuide attackGuide{};
 };
 
 // GAME-domain-only deterministic boss challenge. Rendering, input, animation,
@@ -156,6 +189,14 @@ public:
     static constexpr int MaximumTrainingAttempts = 4096;
     static constexpr double MaximumElapsedSeconds = 3600.0;
     static constexpr double StaggerResponseWindowSeconds = 2.0;
+    static constexpr double GuidedPracticeWindowMultiplier = 1.25;
+    static constexpr double ExpertPracticeWindowMultiplier = 0.80;
+    static constexpr std::uint32_t MaximumTelegraphSequence =
+        std::numeric_limits<std::uint32_t>::max();
+
+    static constexpr std::uint32_t NextTelegraphSequence(std::uint32_t sequence) {
+        return sequence < MaximumTelegraphSequence ? sequence + 1U : MaximumTelegraphSequence;
+    }
 
     bool Begin(bool shadowCryptComplete, RiftWardenDifficulty difficulty) {
         if (!shadowCryptComplete || active_ || !DifficultyValid(difficulty)
@@ -179,16 +220,70 @@ public:
         return true;
     }
 
+    // GAME-172 + QOL-036: once an attack has actually been encountered, practice
+    // may target exactly that learned boss move. A normal focused drill resolves
+    // after one accepted attempt; looping mode keeps the same move alive without
+    // advancing boss health or phase so a player can repeat the mechanic.
+    bool BeginFocusedPractice(bool shadowCryptComplete, RiftWardenDifficulty difficulty,
+        RiftWardenAttack attack, RiftWardenPracticePace pace = RiftWardenPracticePace::Standard,
+        bool looping = false) {
+        if (!shadowCryptComplete || active_ || !hasRankedClear_
+            || !DifficultyValid(difficulty) || !DifficultyUnlocked(difficulty)
+            || !AttackValid(attack) || !PracticePaceValid(pace) || !AttackLearned(attack)) {
+            return false;
+        }
+        const RiftWardenTrainingRecord learned = TrainingRecord(attack);
+        if (!PhaseValid(learned.lastSeenPhase)
+            || learned.lastSeenPhase == RiftWardenPhase::Defeated) {
+            return false;
+        }
+        ResetAttempt(difficulty, true, learned.lastSeenPhase);
+        focusedPractice_ = true;
+        focusedAttack_ = attack;
+        practicePace_ = pace;
+        loopingFocusedPractice_ = looping;
+        if (attack == RiftWardenAttack::StaggerOpening) {
+            posture_ = MaximumPosture;
+            staggerOpen_ = true;
+        }
+        return true;
+    }
+
+    bool SetPracticePace(RiftWardenPracticePace pace) {
+        if (!active_ || !practice_ || !PracticePaceValid(pace) || practicePace_ == pace) {
+            return false;
+        }
+        practicePace_ = pace;
+        return true;
+    }
+
+    bool SetPracticePaused(bool paused) {
+        if (!active_ || !practice_ || practicePaused_ == paused) return false;
+        practicePaused_ = paused;
+        return true;
+    }
+
+    bool SetLoopingFocusedPractice(bool looping) {
+        if (!active_ || !practice_ || !focusedPractice_
+            || loopingFocusedPractice_ == looping) {
+            return false;
+        }
+        loopingFocusedPractice_ = looping;
+        return true;
+    }
+
     bool AdvanceTime(double deltaSeconds) {
-        if (!active_ || !std::isfinite(deltaSeconds) || deltaSeconds < 0.0) return false;
+        if (!active_ || practicePaused_ || !std::isfinite(deltaSeconds) || deltaSeconds < 0.0) {
+            return false;
+        }
         elapsedSeconds_ = std::min(MaximumElapsedSeconds, elapsedSeconds_ + deltaSeconds);
         return true;
     }
 
     RiftWardenActionReport Resolve(RiftWardenResponse response, double reactionSeconds) {
         RiftWardenActionReport report{};
-        if (!active_ || !ResponseValid(response) || !std::isfinite(reactionSeconds)
-            || reactionSeconds < 0.0) {
+        if (!active_ || practicePaused_ || !ResponseValid(response)
+            || !std::isfinite(reactionSeconds) || reactionSeconds < 0.0) {
             return report;
         }
 
@@ -197,6 +292,55 @@ public:
         report.accepted = true;
         report.responseMatched = response == telegraph.recommendedResponse;
         report.timingMarginSeconds = telegraph.responseWindowSeconds - reactionSeconds;
+
+        if (focusedPractice_) {
+            const bool success = report.responseMatched && report.timingMarginSeconds >= 0.0;
+            if (telegraph.attack == RiftWardenAttack::StaggerOpening) {
+                if (success) {
+                    report.resolution = RiftWardenResolution::Punish;
+                    report.bossDamage = PunishDamage(difficulty_);
+                    punishes_ = std::min(MaximumTrainingAttempts, punishes_ + 1);
+                    currentStreak_ = std::min(MaximumTrainingAttempts, currentStreak_ + 1);
+                    bestStreak_ = std::max(bestStreak_, currentStreak_);
+                } else {
+                    report.resolution = RiftWardenResolution::MissedOpening;
+                    missedOpenings_ = std::min(MaximumMissedOpenings, missedOpenings_ + 1);
+                    currentStreak_ = 0;
+                    lastCoachTip_ = BuildCoachTip(
+                        telegraph, RiftWardenCoachReason::MissedPunish, reactionSeconds);
+                }
+            } else if (success) {
+                report.resolution = RiftWardenResolution::PerfectDefense;
+                perfectDefenses_ = std::min(MaximumPerfectDefenses, perfectDefenses_ + 1);
+                currentStreak_ = std::min(MaximumTrainingAttempts, currentStreak_ + 1);
+                bestStreak_ = std::max(bestStreak_, currentStreak_);
+            } else {
+                report.resolution = RiftWardenResolution::Hit;
+                report.playerDamage = IncomingDamage(difficulty_, phase_);
+                damageTaken_ = std::min(MaximumDamageTaken, damageTaken_ + report.playerDamage);
+                currentStreak_ = 0;
+                lastCoachTip_ = BuildCoachTip(telegraph,
+                    report.responseMatched ? RiftWardenCoachReason::LateResponse
+                                           : RiftWardenCoachReason::WrongResponse,
+                    reactionSeconds);
+            }
+
+            RecordTrainingAttempt(telegraph.attack, resolvedPhase, success);
+            attackCursor_ = NextTelegraphSequence(attackCursor_);
+            if (loopingFocusedPractice_) {
+                posture_ = telegraph.attack == RiftWardenAttack::StaggerOpening
+                    ? MaximumPosture
+                    : 0;
+                staggerOpen_ = telegraph.attack == RiftWardenAttack::StaggerOpening;
+            } else {
+                posture_ = 0;
+                staggerOpen_ = false;
+                active_ = false;
+                complete_ = true;
+            }
+            report.complete = complete_;
+            return report;
+        }
 
         if (staggerOpen_) {
             const bool success = report.responseMatched && report.timingMarginSeconds >= 0.0;
@@ -248,24 +392,71 @@ public:
                 reactionSeconds);
         }
         RecordTrainingAttempt(telegraph.attack, resolvedPhase, correct);
-        ++attackCursor_;
+        attackCursor_ = NextTelegraphSequence(attackCursor_);
         return report;
     }
 
     RiftWardenTelegraph CurrentTelegraph() const {
         RiftWardenTelegraph result{};
         result.sequence = attackCursor_;
+        if (focusedPractice_) {
+            result.attack = focusedAttack_;
+            result.recommendedResponse = RecommendedResponse(result.attack);
+            result.cue = CueFor(result.attack);
+            result.responseWindowSeconds = AdjustPracticeWindow(
+                BaseResponseWindow(result.attack, difficulty_, phase_));
+            return result;
+        }
         if (staggerOpen_) {
             result.attack = RiftWardenAttack::StaggerOpening;
             result.recommendedResponse = RiftWardenResponse::Strike;
             result.cue = RiftWardenCue::Punish;
-            result.responseWindowSeconds = StaggerResponseWindowSeconds;
+            result.responseWindowSeconds = AdjustPracticeWindow(StaggerResponseWindowSeconds);
             return result;
         }
         result.attack = PatternFor(phase_, attackCursor_);
         result.recommendedResponse = RecommendedResponse(result.attack);
         result.cue = CueFor(result.attack);
-        result.responseWindowSeconds = DefenseWindow(difficulty_, phase_);
+        result.responseWindowSeconds = AdjustPracticeWindow(
+            DefenseWindow(difficulty_, phase_));
+        return result;
+    }
+
+    RiftWardenControlReminder ControlReminder() const {
+        RiftWardenControlReminder result{};
+        if (!active_) return result;
+        const RiftWardenTelegraph telegraph = CurrentTelegraph();
+        result.available = true;
+        result.attack = telegraph.attack;
+        result.response = telegraph.recommendedResponse;
+        result.cue = telegraph.cue;
+        return result;
+    }
+
+    RiftWardenAttackGuide AttackGuide(RiftWardenAttack attack,
+        RiftWardenDifficulty difficulty) const {
+        RiftWardenAttackGuide result{};
+        if (!AttackValid(attack) || !DifficultyValid(difficulty)
+            || !DifficultyUnlocked(difficulty) || !AttackLearned(attack)) {
+            return result;
+        }
+        const RiftWardenTrainingRecord record = TrainingRecord(attack);
+        if (!PhaseValid(record.lastSeenPhase)
+            || record.lastSeenPhase == RiftWardenPhase::Defeated) {
+            return result;
+        }
+        result.available = true;
+        result.attack = attack;
+        result.response = RecommendedResponse(attack);
+        result.cue = CueFor(attack);
+        result.lastSeenPhase = record.lastSeenPhase;
+        result.attempts = record.attempts;
+        result.successes = record.successes;
+        result.standardWindowSeconds = BaseResponseWindow(
+            attack, difficulty, record.lastSeenPhase);
+        result.practiceWindowSeconds = active_ && practice_ && difficulty == difficulty_
+            ? AdjustPracticeWindow(result.standardWindowSeconds)
+            : result.standardWindowSeconds;
         return result;
     }
 
@@ -274,6 +465,11 @@ public:
         result.active = active_;
         result.complete = complete_;
         result.practice = practice_;
+        result.practicePaused = practicePaused_;
+        result.focusedPractice = focusedPractice_;
+        result.loopingFocusedPractice = loopingFocusedPractice_;
+        result.practicePace = practicePace_;
+        result.focusedAttack = focusedAttack_;
         result.difficulty = difficulty_;
         result.phase = phase_;
         result.bossHealth = bossHealth_;
@@ -290,6 +486,8 @@ public:
         result.telegraph = CurrentTelegraph();
         result.practiceRecommendation = PracticeRecommendation();
         result.coachTip = lastCoachTip_;
+        result.controlReminder = ControlReminder();
+        result.attackGuide = AttackGuide(result.telegraph.attack, difficulty_);
         return result;
     }
 
@@ -398,6 +596,16 @@ private:
         return false;
     }
 
+    static constexpr bool PracticePaceValid(RiftWardenPracticePace pace) {
+        switch (pace) {
+        case RiftWardenPracticePace::Guided:
+        case RiftWardenPracticePace::Standard:
+        case RiftWardenPracticePace::Expert:
+            return true;
+        }
+        return false;
+    }
+
     static constexpr std::size_t DifficultyIndex(RiftWardenDifficulty difficulty) {
         return static_cast<std::size_t>(difficulty);
     }
@@ -457,6 +665,26 @@ private:
         if (phase == RiftWardenPhase::Fracture) seconds -= 0.05;
         if (phase == RiftWardenPhase::Overload) seconds -= 0.10;
         return seconds;
+    }
+
+    static constexpr double BaseResponseWindow(RiftWardenAttack attack,
+        RiftWardenDifficulty difficulty, RiftWardenPhase phase) {
+        return attack == RiftWardenAttack::StaggerOpening
+            ? StaggerResponseWindowSeconds
+            : DefenseWindow(difficulty, phase);
+    }
+
+    double AdjustPracticeWindow(double seconds) const {
+        if (!practice_) return seconds;
+        switch (practicePace_) {
+        case RiftWardenPracticePace::Guided:
+            return seconds * GuidedPracticeWindowMultiplier;
+        case RiftWardenPracticePace::Expert:
+            return seconds * ExpertPracticeWindowMultiplier;
+        case RiftWardenPracticePace::Standard:
+        default:
+            return seconds;
+        }
     }
 
     static constexpr RiftWardenAttack PatternFor(RiftWardenPhase phase,
@@ -562,6 +790,11 @@ private:
         RiftWardenPhase startPhase) {
         difficulty_ = difficulty;
         practice_ = practice;
+        practicePaused_ = false;
+        focusedPractice_ = false;
+        loopingFocusedPractice_ = false;
+        practicePace_ = RiftWardenPracticePace::Standard;
+        focusedAttack_ = RiftWardenAttack::RiftSlash;
         active_ = true;
         complete_ = false;
         bossMaxHealth_ = BossHealthFor(difficulty);
@@ -634,6 +867,8 @@ private:
     RiftWardenCoachTip lastCoachTip_{};
     RiftWardenDifficulty difficulty_{RiftWardenDifficulty::Story};
     RiftWardenPhase phase_{RiftWardenPhase::Opening};
+    RiftWardenPracticePace practicePace_{RiftWardenPracticePace::Standard};
+    RiftWardenAttack focusedAttack_{RiftWardenAttack::RiftSlash};
     int bossHealth_{};
     int bossMaxHealth_{};
     int posture_{};
@@ -649,6 +884,9 @@ private:
     bool active_{};
     bool complete_{};
     bool practice_{};
+    bool practicePaused_{};
+    bool focusedPractice_{};
+    bool loopingFocusedPractice_{};
     bool hasRankedClear_{};
 };
 
