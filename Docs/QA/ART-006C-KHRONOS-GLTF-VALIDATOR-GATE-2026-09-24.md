@@ -19,7 +19,7 @@ Executed against the authored ART-006C files before publication:
 
 ```text
 python Scripts/test_khronos_gltf_validator_report.py
-# PASS: 15/15 Khronos glTF report adapter tests
+# PASS: 18/18 Khronos glTF report adapter tests
 
 python -m py_compile \
   Scripts/verify_khronos_gltf_validator_report.py \
@@ -27,7 +27,7 @@ python -m py_compile \
 # exit 0
 ```
 
-The regression suite covers a valid report plus fail-closed behavior for boolean-as-integer counts, validator errors, warnings above the default limit, truncated output, wrong target URI, malformed validator semver, summary/message count mismatch, boolean severity, wrong glTF version, external resources, unknown root fields, pointer-plus-offset ambiguity, wrong asset SHA-256, and the actual CLI adapter entry point.
+The regression suite covers a valid report plus fail-closed behavior for boolean-as-integer counts, validator errors, warnings above the default limit, truncated output, wrong target URI, malformed validator semver, summary/message count mismatch, boolean severity, wrong glTF version, external resources, missing/boolean/unknown resource storage, unknown root fields, pointer-plus-offset ambiguity, wrong asset SHA-256, and the actual CLI adapter entry point.
 
 ## Not run / not claimed
 
