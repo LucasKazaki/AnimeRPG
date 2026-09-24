@@ -51,8 +51,8 @@ void DefeatProductionShadowCryptSkirmishPass38(Astral::Scene::LandmarkInteractio
 void TestShadowCryptSkirmishPass38() {
     using namespace Astral::Scene;
 
-    // GAME-187: each authored dungeon tier gets an original, bounded formation
-    // instead of cloning the Rift Warden boss path or comparator enemy designs.
+    // GAME-187 + GAME-188: three original roles are arranged into bounded,
+    // room-scaled formations instead of cloning comparator enemies.
     ShadowCryptSkirmish entry;
     Expect(!entry.Begin(static_cast<ShadowCryptSkirmishTier>(255))
             && entry.Begin(ShadowCryptSkirmishTier::EntrySeal)
@@ -73,8 +73,8 @@ void TestShadowCryptSkirmishPass38() {
             && nave.Enemy(0).maxHealth > archive.Enemy(0).maxHealth,
         "pass38 Rift Nave escalates to all three roles with tougher bounded values");
 
-    // GAME-188 + GAME-189: semantic threat cues expose the intended response,
-    // exact timing boundary, and caster interrupt without depending on color.
+    // GAME-189 + GAME-190: semantic threat cues expose the intended response,
+    // exact timing boundary, and one-shot caster interrupt without depending on color.
     const ShadowCryptThreatTelegraph telegraph = nave.CurrentThreat();
     Expect(telegraph.valid && telegraph.role == ShadowCryptEnemyRole::VeilChanneler
             && telegraph.cue == ShadowCryptThreatCue::Interrupt
@@ -96,7 +96,7 @@ void TestShadowCryptSkirmishPass38() {
     Expect(counter.accepted && counter.healthDamage == 36 && !duplicateCounter.accepted,
         "pass38 caster counter opportunity is one-shot");
 
-    // GAME-190: posture creates a bounded stagger window and the next strike
+    // GAME-191: posture creates a bounded stagger window and the next strike
     // consumes it rather than allowing a permanent stun lock.
     ShadowCryptSkirmish posture;
     Expect(posture.Begin(ShadowCryptSkirmishTier::RiftNave),
@@ -105,17 +105,17 @@ void TestShadowCryptSkirmishPass38() {
     for (int i = 0; i < 4; ++i) {
         heavy = posture.AttackTarget(1, ShadowCryptAttackStyle::Heavy);
     }
-    Expect(heavy.staggerOpened && posture.Enemy(1).staggered
-            && posture.Enemy(1).posture == 0,
-        "pass38 repeated heavy pressure opens the Gravebound stagger exactly at zero posture");
+    Expect(heavy.staggerOpened && heavy.postureDamage == 1
+            && posture.Enemy(1).staggered && posture.Enemy(1).posture == 0,
+        "pass38 repeated heavy pressure reports only actual posture removed and opens stagger at zero");
     const auto punish = posture.AttackTarget(1, ShadowCryptAttackStyle::Light);
-    Expect(punish.staggerConsumed && punish.healthDamage == 40
+    Expect(punish.staggerConsumed && punish.healthDamage == 40 && punish.postureDamage == 0
             && !posture.Enemy(1).staggered
             && posture.Enemy(1).posture == posture.Enemy(1).maxPosture,
-        "pass38 one follow-up consumes stagger and restores bounded posture");
+        "pass38 one follow-up consumes stagger, reports no phantom posture damage, and restores posture");
 
-    // GAME-191 + QOL-039: tactical recommendation remains deterministic, while
-    // an explicit manual target lock stays sticky until that target is defeated.
+    // QOL-039: an explicit manual target lock stays sticky until that target is
+    // defeated, then the deterministic role/threat fallback resumes.
     ShadowCryptSkirmish targeting;
     Expect(targeting.Begin(ShadowCryptSkirmishTier::RiftNave),
         "pass38 targeting fixture begins");
@@ -148,6 +148,9 @@ void TestShadowCryptSkirmishPass38() {
     Expect(owner.BeginShadowCryptSkirmish()
             && owner.ShadowCryptSkirmishState().Tier() == ShadowCryptSkirmishTier::EntrySeal,
         "pass38 live production owner derives skirmish tier from authoritative mission room");
+    Expect(!owner.AdvanceShadowCryptObjective() && !owner.SuspendShadowCrypt()
+            && owner.ShadowCryptBriefing().objectiveProgress == 0,
+        "pass38 active room combat blocks direct objective advancement and checkpoint suspension");
     const auto failedDefense = owner.ResolveShadowCryptSkirmishThreat(
         ShadowCryptDefenseResponse::Guard, 0.10);
     Expect(failedDefense.accepted && !failedDefense.successful
@@ -166,6 +169,11 @@ void TestShadowCryptSkirmishPass38() {
         "pass38 completed encounter cannot duplicate objective advancement");
     Expect(owner.BeginShadowCryptSkirmish(),
         "pass38 same room can start its next required skirmish after the prior one completes");
+    Expect(owner.ReportShadowCryptDefeat()
+            && !owner.ShadowCryptSkirmishState().Active()
+            && owner.ShadowCryptBriefing().objectiveProgress == 0
+            && owner.BeginShadowCryptSkirmish(),
+        "pass38 defeat cancels the detached room encounter, resets mission progress, and permits a clean retry");
 }
 
 } // namespace
