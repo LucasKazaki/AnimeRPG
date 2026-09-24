@@ -98,16 +98,18 @@ void TestRiftWardenTrialPass32() {
     Expect(missed.resolution == RiftWardenResolution::MissedOpening
             && progressionTrial.Briefing().bossHealth == healthBeforeMissedOpening
             && progressionTrial.Briefing().posture == 0
+            && progressionTrial.Briefing().missedOpenings == 1
             && !progressionTrial.Briefing().staggerOpen,
-        "pass32 missed stagger opening deals no boss damage and resets the one-shot posture window");
+        "pass32 missed stagger opening is recorded, deals no boss damage, and resets the one-shot posture window");
 
     ClearRiftWardenDirect(progressionTrial);
     const RiftWardenRecord storyRecord = progressionTrial.BestRecord(
         RiftWardenDifficulty::Story);
     Expect(storyRecord.valid && storyRecord.mastery != RiftWardenMastery::Unranked
+            && storyRecord.missedOpenings == 1
             && progressionTrial.DifficultyUnlocked(RiftWardenDifficulty::Standard)
             && !progressionTrial.DifficultyUnlocked(RiftWardenDifficulty::Expert),
-        "pass32 Story clear stores a ranked record and unlocks Standard but not Expert");
+        "pass32 Story clear stores missed-opening evidence and unlocks Standard but not Expert");
 
     Expect(progressionTrial.Begin(true, RiftWardenDifficulty::Standard),
         "pass32 ranked Story completion admits Standard difficulty");
@@ -117,6 +119,39 @@ void TestRiftWardenTrialPass32() {
     Expect(standardRecord.valid
             && progressionTrial.DifficultyUnlocked(RiftWardenDifficulty::Expert),
         "pass32 Standard clear stores a separate record and unlocks Expert");
+
+    // Review repair: deliberately skipping stagger openings cannot farm a better
+    // score/mastery by accumulating otherwise-perfect defense cycles.
+    RiftWardenTrial cleanScoreTrial;
+    Expect(cleanScoreTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass32 anti-farming clean baseline begins");
+    ClearRiftWardenDirect(cleanScoreTrial);
+    const RiftWardenRecord cleanScoreRecord = cleanScoreTrial.BestRecord(
+        RiftWardenDifficulty::Story);
+    Expect(cleanScoreRecord.valid && cleanScoreRecord.missedOpenings == 0
+            && cleanScoreRecord.mastery == RiftWardenMastery::Gold,
+        "pass32 clean Story execution establishes a Gold no-miss score baseline");
+
+    RiftWardenTrial missedScoreTrial;
+    Expect(missedScoreTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass32 anti-farming missed-opening run begins");
+    for (int cycle = 0; cycle < 3; ++cycle) {
+        while (!missedScoreTrial.Briefing().staggerOpen) {
+            const RiftWardenTelegraph farmTelegraph = missedScoreTrial.CurrentTelegraph();
+            Expect(missedScoreTrial.Resolve(farmTelegraph.recommendedResponse, 0.10).accepted,
+                "pass32 anti-farming setup earns a legitimate stagger opening");
+        }
+        Expect(missedScoreTrial.Resolve(RiftWardenResponse::Guard, 0.10).resolution
+                == RiftWardenResolution::MissedOpening,
+            "pass32 anti-farming setup intentionally skips the stagger opening");
+    }
+    ClearRiftWardenDirect(missedScoreTrial);
+    const RiftWardenRecord missedScoreRecord = missedScoreTrial.BestRecord(
+        RiftWardenDifficulty::Story);
+    Expect(missedScoreRecord.valid && missedScoreRecord.missedOpenings == 3
+            && missedScoreRecord.mastery == RiftWardenMastery::Bronze
+            && missedScoreRecord.score < cleanScoreRecord.score,
+        "pass32 skipped stagger openings lower mastery/score instead of farming a better ranked record");
 
     // QOL-033: community-requested boss practice can start at a chosen learned
     // phase after a ranked clear. It preserves the ranked personal best and does
@@ -163,11 +198,17 @@ void TestRiftWardenTrialPass32() {
         "pass32 setup begins the authoritative Shadow Crypt expedition");
     AdvanceShadowCryptPass27ToRiftNave(owner);
     FinishShadowCryptPass27FromRiftNave(owner);
-    Expect(owner.ShadowCryptBriefing().complete
-            && owner.BeginRiftWardenTrial(RiftWardenDifficulty::Story),
-        "pass32 completed Shadow Crypt unlocks the production-owned Rift Warden trial");
+    Expect(owner.ShadowCryptBriefing().complete,
+        "pass32 setup completes authoritative Shadow Crypt before Warden entry checks");
 
     CharacterProgression unrelated;
+    owner.SetCharacterProgression(&unrelated);
+    Expect(!owner.BeginRiftWardenTrial(RiftWardenDifficulty::Story),
+        "pass32 a different protagonist cannot inherit another owner's completed Shadow Crypt Warden unlock");
+    owner.SetCharacterProgression(&progression);
+    Expect(owner.BeginRiftWardenTrial(RiftWardenDifficulty::Story),
+        "pass32 completed Shadow Crypt unlocks the Warden trial for the same persistent protagonist owner");
+
     owner.SetCharacterProgression(&unrelated);
     const RiftWardenBriefing beforeOwnerSwap = owner.RiftWardenTrialBriefing();
     Expect(!owner.ResolveRiftWardenAction(
