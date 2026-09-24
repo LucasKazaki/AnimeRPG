@@ -3,6 +3,7 @@
 #include "Engine/Scene/CharacterProgression.h"
 #include "Engine/Scene/ExplorationFieldGuide.h"
 #include "Engine/Scene/LandmarkDialogue.h"
+#include "Engine/Scene/LandmarkDialogueContinuity.h"
 #include "Engine/Scene/ManaReactorMission.h"
 #include "Engine/Scene/ShadowCryptMission.h"
 #include "Engine/Scene/ShadowbladeActions.h"
@@ -62,11 +63,13 @@ public:
         bool allowAdvanceScreening = false) {
         const DialogueBeat beat = dialogue_.Choose(
             topic, choice, DialogueContext(allowAdvanceScreening));
+        dialogueContinuity_.RecordBeat(dialogue_, beat);
         SyncFieldGuideNarrative();
         return beat;
     }
     DialogueOutcome CommitDialogueOutcome() {
         const DialogueOutcome outcome = dialogue_.CommitOutcome();
+        dialogueContinuity_.RecordCommittedOutcome(dialogue_, outcome);
         SyncFieldGuideNarrative();
         return outcome;
     }
@@ -81,6 +84,31 @@ public:
     }
     static constexpr bool DialogueQuickAdvanceSafe(const DialogueBeat& beat) {
         return LandmarkDialogue::QuickAdvanceSafe(beat);
+    }
+    DialogueRelationshipTier DialogueRelationship() const {
+        return dialogueContinuity_.RelationshipTier(dialogue_);
+    }
+    DialogueCheckpoint DialogueCheckpointFor(DialogueTopic topic) const {
+        return dialogueContinuity_.Checkpoint(topic);
+    }
+    DialogueRevisit RevisitDialogueCheckpoint(DialogueTopic topic) const {
+        return dialogueContinuity_.Revisit(topic);
+    }
+    DialogueEndingArchive DialogueEndings() const {
+        return dialogueContinuity_.EndingArchive();
+    }
+    bool DialogueStoryEpisodeUnlocked(DialogueStoryEpisode episode) const {
+        return dialogueContinuity_.StoryEpisodeUnlocked(episode);
+    }
+    bool CaptureDialogueInterruption() { return dialogueContinuity_.CaptureInterruption(); }
+    InterruptedDialogueBeat InterruptedDialogue() const {
+        return dialogueContinuity_.InterruptedBeat();
+    }
+    bool AcknowledgeInterruptedDialogue() {
+        return dialogueContinuity_.AcknowledgeInterruptedBeat();
+    }
+    const LandmarkDialogueContinuity& DialogueContinuity() const {
+        return dialogueContinuity_;
     }
     const LandmarkDialogue& Dialogue() const { return dialogue_; }
 
@@ -232,6 +260,7 @@ private:
     CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
     CharacterProgression* shadowCryptProgressionOwner_{}; // Identity only; never dereferenced directly.
     LandmarkDialogue dialogue_{};
+    LandmarkDialogueContinuity dialogueContinuity_{};
     ExplorationFieldGuide fieldGuide_{};
     ManaReactorMission manaReactorMission_{};
     ShadowCryptMission shadowCryptMission_{};
