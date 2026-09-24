@@ -16,8 +16,8 @@
   "task_packet": "Tasks/GAME-PASS30-DIALOGUE-CONTINUITY-2026-09-24.md",
   "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS30-BACKLOG.json",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS30.md",
-  "pr": null,
-  "final_head": "record_after_operating_records_and_exact_head_gates",
+  "pr": 51,
+  "final_head": "pending_exact_head_gates_and_review",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -56,5 +56,5 @@
     "community_request": "corroborated_ZZZ_dialogue_retrigger_and_interruption_reports",
     "current_resolution": "specific_retrigger_interruption_fix_not_established_in_inspected_later_official_material"
   },
-  "next_action": "Create the scoped PR, capture its exact head, require hosted Windows Debug/Release and Release-manifest gates plus fresh independent review, repair/rerun if necessary, then reread main/head/diff/threads before expected-head merge if clean."
+  "next_action": "Treat the post-receipt PR 51 head as candidate, require hosted Windows Debug/Release and Release-manifest gates plus fresh independent review, repair and rerun if necessary, then reread main/head/diff/threads before expected-head merge if clean."
 }
