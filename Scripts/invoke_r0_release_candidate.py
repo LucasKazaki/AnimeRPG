@@ -211,6 +211,43 @@ class R0Runner:
     def _wait_process(self, process: subprocess.Popen[str], timeout: float) -> int:
         return process.wait(timeout=timeout)
 
+    @staticmethod
+    def _timeout_output(error: subprocess.TimeoutExpired) -> str:
+        output = error.output
+        if output is None:
+            return ""
+        if isinstance(output, bytes):
+            return output.decode(errors="replace")
+        return output
+
+    def _drain_after_timeout(self, process: subprocess.Popen[str]) -> str:
+        """Finish pipe handling without ever falling back to an unbounded communicate()."""
+        partial = ""
+        for attempt in range(2):
+            try:
+                output, _ = process.communicate(timeout=TERMINATION_GRACE_SECONDS)
+                return output or partial
+            except subprocess.TimeoutExpired as exc:
+                observed = self._timeout_output(exc)
+                if observed:
+                    partial = observed
+                if attempt == 0:
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
+                    continue
+                raise RecoveryFailure(
+                    "Timed-out command cleanup exceeded the bounded pipe-drain budget "
+                    f"({2 * TERMINATION_GRACE_SECONDS:g}s)."
+                    + (f" Partial output:\n{partial}" if partial else "")
+                ) from exc
+            except OSError as exc:
+                raise RecoveryFailure(
+                    f"Timed-out command cleanup failed while draining pipes: {exc}"
+                ) from exc
+        raise RecoveryFailure("Timed-out command cleanup reached an unreachable state.")
+
     def capture(
         self,
         command: Sequence[str | Path],
@@ -221,6 +258,8 @@ class R0Runner:
     ) -> subprocess.CompletedProcess[str]:
         normalized = [str(part) for part in command]
         timeout = self.capture_timeout if timeout_seconds is None else float(timeout_seconds)
+        if timeout <= 0:
+            raise RecoveryFailure("Capture command has a non-positive timeout.")
         process = subprocess.Popen(
             normalized,
             cwd=str(cwd or self.source),
@@ -234,7 +273,13 @@ class R0Runner:
             output, _ = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
             self._terminate_process_tree(process)
-            output, _ = process.communicate()
+            try:
+                output = self._drain_after_timeout(process)
+            except RecoveryFailure as cleanup_error:
+                raise RecoveryFailure(
+                    f"Command timed out after {timeout:g}s and cleanup remained incomplete: "
+                    f"{' '.join(normalized)}\n{cleanup_error}"
+                ) from exc
             raise RecoveryFailure(
                 f"Command timed out after {timeout:g}s: {' '.join(normalized)}\n{output or ''}"
             ) from exc
