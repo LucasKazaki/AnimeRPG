@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""Verify a Khronos glTF-Validator JSON report against a specific source asset.
+
+This is an evidence adapter, not a replacement for Khronos glTF-Validator.
+It intentionally fails closed on malformed/truncated reports, validator errors,
+unexpected warnings, asset/hash mismatches, or external resources.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+SEMVER_RE = re.compile(
+    r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+    r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
+    r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+)
+ROOT_KEYS = {"uri", "mimeType", "validatorVersion", "validatedAt", "issues", "info"}
+ISSUE_KEYS = {"numErrors", "numWarnings", "numInfos", "numHints", "messages", "truncated"}
+MESSAGE_KEYS = {"code", "severity", "pointer", "offset", "message"}
+INFO_KEYS = {"version", "minVersion", "generator", "extensionsUsed", "extensionsRequired", "resources"}
+RESOURCE_KEYS = {"pointer", "storage", "mimeType", "byteLength", "uri", "image"}
+
+
+class VerificationError(ValueError):
+    pass
+
+
+def _fail(message: str) -> None:
+    raise VerificationError(message)
+
+
+def _strict_int(value: object, label: str, *, minimum: int = 0) -> int:
+    if type(value) is not int:
+        _fail(f"{label} must be a JSON integer, got {type(value).__name__}")
+    if value < minimum:
+        _fail(f"{label} must be >= {minimum}, got {value}")
+    return value
+
+
+def _expect_keys(obj: object, allowed: set[str], required: set[str], label: str) -> dict:
+    if type(obj) is not dict:
+        _fail(f"{label} must be an object")
+    unknown = set(obj) - allowed
+    missing = required - set(obj)
+    if unknown:
+        _fail(f"{label} contains unknown fields: {sorted(unknown)}")
+    if missing:
+        _fail(f"{label} is missing required fields: {sorted(missing)}")
+    return obj
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _uri_basename(uri: str) -> str:
+    parsed = urlparse(uri)
+    path = parsed.path if parsed.scheme else uri
+    return Path(unquote(path.replace("\\", "/"))).name
+
+
+def verify_report(
+    report: dict,
+    *,
+    asset_path: Path,
+    expected_sha256: str,
+    max_warnings: int = 0,
+    require_self_contained: bool = True,
+) -> dict:
+    root = _expect_keys(report, ROOT_KEYS, {"validatorVersion", "issues"}, "report")
+
+    version = root["validatorVersion"]
+    if type(version) is not str or not SEMVER_RE.fullmatch(version):
+        _fail("validatorVersion must be a semver string")
+
+    if "uri" not in root or type(root["uri"]) is not str:
+        _fail("report.uri must be present and be a string")
+    if _uri_basename(root["uri"]) != asset_path.name:
+        _fail(f"report.uri does not identify {asset_path.name!r}")
+
+    if root.get("mimeType") != "model/gltf+json":
+        _fail("mimeType must be model/gltf+json for this .gltf asset")
+
+    issues = _expect_keys(root["issues"], ISSUE_KEYS, ISSUE_KEYS, "issues")
+    counts = {
+        0: _strict_int(issues["numErrors"], "issues.numErrors"),
+        1: _strict_int(issues["numWarnings"], "issues.numWarnings"),
+        2: _strict_int(issues["numInfos"], "issues.numInfos"),
+        3: _strict_int(issues["numHints"], "issues.numHints"),
+    }
+    if type(issues["truncated"]) is not bool:
+        _fail("issues.truncated must be a JSON boolean")
+    if issues["truncated"]:
+        _fail("validator report is truncated")
+    if type(issues["messages"]) is not list:
+        _fail("issues.messages must be an array")
+
+    observed = {0: 0, 1: 0, 2: 0, 3: 0}
+    for index, raw in enumerate(issues["messages"]):
+        message = _expect_keys(raw, MESSAGE_KEYS, {"code", "severity", "message"}, f"issues.messages[{index}]")
+        if type(message["code"]) is not str or not message["code"]:
+            _fail(f"issues.messages[{index}].code must be a non-empty string")
+        severity = _strict_int(message["severity"], f"issues.messages[{index}].severity")
+        if severity not in observed:
+            _fail(f"issues.messages[{index}].severity must be in 0..3")
+        if type(message["message"]) is not str or not message["message"]:
+            _fail(f"issues.messages[{index}].message must be a non-empty string")
+        has_pointer = "pointer" in message
+        has_offset = "offset" in message
+        if has_pointer == has_offset:
+            _fail(f"issues.messages[{index}] must contain exactly one of pointer or offset")
+        if has_pointer and type(message["pointer"]) is not str:
+            _fail(f"issues.messages[{index}].pointer must be a string")
+        if has_offset:
+            _strict_int(message["offset"], f"issues.messages[{index}].offset")
+        observed[severity] += 1
+
+    if observed != counts:
+        _fail(f"issue summary does not match messages: summary={counts}, messages={observed}")
+    if counts[0] != 0:
+        _fail(f"Khronos validator reported {counts[0]} error(s)")
+    if counts[1] > max_warnings:
+        _fail(f"Khronos validator reported {counts[1]} warning(s), limit is {max_warnings}")
+
+    info = _expect_keys(root.get("info"), INFO_KEYS, {"version"}, "info")
+    if info["version"] != "2.0":
+        _fail(f"info.version must be '2.0', got {info['version']!r}")
+
+    resources = info.get("resources", [])
+    if type(resources) is not list:
+        _fail("info.resources must be an array when present")
+    for index, raw in enumerate(resources):
+        resource = _expect_keys(raw, RESOURCE_KEYS, {"pointer"}, f"info.resources[{index}]")
+        if type(resource["pointer"]) is not str:
+            _fail(f"info.resources[{index}].pointer must be a string")
+        if "byteLength" in resource:
+            _strict_int(resource["byteLength"], f"info.resources[{index}].byteLength", minimum=1)
+        if require_self_contained and resource.get("storage") == "external":
+            _fail(f"info.resources[{index}] is external; ART-006B must remain self-contained")
+
+    if not asset_path.is_file():
+        _fail(f"asset does not exist: {asset_path}")
+    actual_sha = _sha256(asset_path)
+    normalized_expected = expected_sha256.lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", normalized_expected):
+        _fail("expected_sha256 must be 64 lowercase/uppercase hex characters")
+    if actual_sha != normalized_expected:
+        _fail(f"asset SHA-256 mismatch: expected {normalized_expected}, got {actual_sha}")
+
+    return {
+        "asset": asset_path.name,
+        "asset_sha256": actual_sha,
+        "validator_version": version,
+        "errors": counts[0],
+        "warnings": counts[1],
+        "infos": counts[2],
+        "hints": counts[3],
+        "self_contained": require_self_contained,
+        "status": "khronos_report_accepted_source_only",
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--asset", type=Path, required=True)
+    parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--expected-sha256", required=True)
+    parser.add_argument("--max-warnings", type=int, default=0)
+    parser.add_argument("--allow-external-resources", action="store_true")
+    args = parser.parse_args(argv)
+
+    if args.max_warnings < 0:
+        parser.error("--max-warnings must be >= 0")
+
+    try:
+        report = json.loads(args.report.read_text(encoding="utf-8"))
+        receipt = verify_report(
+            report,
+            asset_path=args.asset,
+            expected_sha256=args.expected_sha256,
+            max_warnings=args.max_warnings,
+            require_self_contained=not args.allow_external_resources,
+        )
+    except (OSError, json.JSONDecodeError, VerificationError) as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
+        return 1
+
+    print("PASS: " + json.dumps(receipt, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
