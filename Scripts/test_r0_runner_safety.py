@@ -341,14 +341,20 @@ class R0RunnerSafetyTests(unittest.TestCase):
             args.source_repository.mkdir()
             args.worktree.mkdir()
             runner = r0.R0Runner(args)
-            setup_prefix = "__ASTRAL_R0_SUPERVISOR_SETUP_ERROR__="
+            setup_prefix = r0.SUPERVISOR_SETUP_ERROR_PREFIX
+            sentinel = root / "requested-command-ran.txt"
             supervisor_code = (
                 "import sys; "
                 f"print({setup_prefix!r} + 'synthetic job setup failure', "
                 "file=sys.stderr, flush=True); "
                 "raise SystemExit(126)"
             )
-            requested = [sys.executable, "-c", "print('MUST_NOT_RUN')"]
+            requested_code = (
+                "from pathlib import Path; "
+                f"Path({str(sentinel)!r}).write_text('ran', encoding='utf-8'); "
+                "print('MUST_NOT_RUN', flush=True)"
+            )
+            requested = [sys.executable, "-c", requested_code]
             with mock.patch.object(r0, "CAPTURE_SUPERVISOR_CODE", supervisor_code):
                 with self.assertRaisesRegex(r0.RecoveryFailure, "could not start"):
                     runner.run_command(
@@ -361,7 +367,10 @@ class R0RunnerSafetyTests(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn(setup_prefix + "synthetic job setup failure", log)
-            self.assertNotIn("MUST_NOT_RUN", log)
+            self.assertIn("MUST_NOT_RUN", log, "the requested command must remain in provenance")
+            command_output = log.split("\n\n", 1)[1].split("\nsupervisor_control:\n", 1)[0]
+            self.assertNotIn("MUST_NOT_RUN", command_output)
+            self.assertFalse(sentinel.exists(), "requested command executed after supervisor setup failed")
             self.assertIn("exit_code: None", log)
             self.assertIn("timed_out: false", log)
             self.assertIn("interrupted: false", log)
