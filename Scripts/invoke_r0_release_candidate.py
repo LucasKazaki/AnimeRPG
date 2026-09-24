@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import shutil
 import signal
@@ -28,6 +29,106 @@ DEFAULT_BRANCH = "agent/r0-loop-recovery-2026-08-11"
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 1800.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 120.0
 TERMINATION_GRACE_SECONDS = 10.0
+SUPERVISOR_SPAWN_ERROR_PREFIX = "__ASTRAL_R0_SUPERVISOR_SPAWN_ERROR__="
+SUPERVISOR_SETUP_ERROR_PREFIX = "__ASTRAL_R0_SUPERVISOR_SETUP_ERROR__="
+CAPTURE_SUPERVISOR_CODE = r"""import os, signal, subprocess, sys
+if os.name == "nt":
+    import ctypes
+    from ctypes import wintypes
+
+    class IO_COUNTERS(ctypes.Structure):
+        _fields_ = [
+            ("ReadOperationCount", ctypes.c_ulonglong),
+            ("WriteOperationCount", ctypes.c_ulonglong),
+            ("OtherOperationCount", ctypes.c_ulonglong),
+            ("ReadTransferCount", ctypes.c_ulonglong),
+            ("WriteTransferCount", ctypes.c_ulonglong),
+            ("OtherTransferCount", ctypes.c_ulonglong),
+        ]
+
+    class JOBOBJECT_BASIC_LIMIT_INFORMATION(ctypes.Structure):
+        _fields_ = [
+            ("PerProcessUserTimeLimit", ctypes.c_longlong),
+            ("PerJobUserTimeLimit", ctypes.c_longlong),
+            ("LimitFlags", wintypes.DWORD),
+            ("MinimumWorkingSetSize", ctypes.c_size_t),
+            ("MaximumWorkingSetSize", ctypes.c_size_t),
+            ("ActiveProcessLimit", wintypes.DWORD),
+            ("Affinity", ctypes.c_size_t),
+            ("PriorityClass", wintypes.DWORD),
+            ("SchedulingClass", wintypes.DWORD),
+        ]
+
+    class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
+        _fields_ = [
+            ("BasicLimitInformation", JOBOBJECT_BASIC_LIMIT_INFORMATION),
+            ("IoInfo", IO_COUNTERS),
+            ("ProcessMemoryLimit", ctypes.c_size_t),
+            ("JobMemoryLimit", ctypes.c_size_t),
+            ("PeakProcessMemoryUsed", ctypes.c_size_t),
+            ("PeakJobMemoryUsed", ctypes.c_size_t),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+    kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel32.SetInformationJobObject.argtypes = [
+        wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD
+    ]
+    kernel32.SetInformationJobObject.restype = wintypes.BOOL
+    kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+    kernel32.GetCurrentProcess.argtypes = []
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+
+    try:
+        job = kernel32.CreateJobObjectW(None, None)
+        if not job:
+            raise ctypes.WinError(ctypes.get_last_error())
+        limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
+        limits.BasicLimitInformation.LimitFlags = 0x00002000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not kernel32.SetInformationJobObject(
+            job, 9, ctypes.byref(limits), ctypes.sizeof(limits)
+        ):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if not kernel32.AssignProcessToJobObject(job, kernel32.GetCurrentProcess()):
+            raise ctypes.WinError(ctypes.get_last_error())
+    except OSError as exc:
+        print(
+            "__ASTRAL_R0_SUPERVISOR_SETUP_ERROR__=" + f"{type(exc).__name__}: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise SystemExit(126)
+
+try:
+    process = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+except (OSError, ValueError) as exc:
+    print(
+        "__ASTRAL_R0_SUPERVISOR_SPAWN_ERROR__=" + f"{type(exc).__name__}: {exc}",
+        file=sys.stderr,
+        flush=True,
+    )
+    raise SystemExit(127)
+assert process.stdout is not None
+while True:
+    chunk = os.read(process.stdout.fileno(), 65536)
+    if not chunk:
+        break
+    sys.stdout.buffer.write(chunk)
+    sys.stdout.buffer.flush()
+returncode = process.wait()
+if os.name != "nt" and returncode < 0:
+    signal_number = -returncode
+    try:
+        signal.signal(signal_number, signal.SIG_DFL)
+    except (OSError, ValueError):
+        pass
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal_number})
+    os.kill(os.getpid(), signal_number)
+    os._exit(128 + signal_number)
+raise SystemExit(returncode)
+"""
 ALLOWED_CHANGES = {
     "Docs/Agents/LOOP_HEARTBEAT.json",
     "Docs/Agents/LOOP_STATUS_2026-08-11.md",
@@ -54,6 +155,7 @@ class CommandRecord:
     exit_code: int | None
     timed_out: bool
     interrupted: bool
+    spawn_error: str | None
     timeout_seconds: float
     log: str
 
@@ -146,8 +248,13 @@ class R0Runner:
         self.capture_timeout = float(
             getattr(args, "capture_timeout_seconds", DEFAULT_CAPTURE_TIMEOUT_SECONDS)
         )
-        if self.command_timeout <= 0 or self.capture_timeout <= 0:
-            raise RecoveryFailure("Command deadlines must be positive numbers of seconds.")
+        if (
+            not math.isfinite(self.command_timeout)
+            or not math.isfinite(self.capture_timeout)
+            or self.command_timeout <= 0
+            or self.capture_timeout <= 0
+        ):
+            raise RecoveryFailure("Command deadlines must be positive finite numbers of seconds.")
         self.heartbeat: Path | None = None
         self.records: list[CommandRecord] = []
         self.last_command: list[str] | None = None
@@ -179,7 +286,9 @@ class R0Runner:
             return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
         return {"start_new_session": True}
 
-    def _terminate_process_tree(self, process: subprocess.Popen[str]) -> None:
+    def _terminate_process_tree(
+        self, process: subprocess.Popen[str], *, wait_for_parent: bool = True
+    ) -> None:
         if process.poll() is not None:
             return
         if os.name == "nt":
@@ -203,13 +312,51 @@ class R0Runner:
                 process.kill()
             except OSError:
                 pass
-        try:
-            process.wait(timeout=TERMINATION_GRACE_SECONDS)
-        except (subprocess.TimeoutExpired, OSError):
-            pass
+        if wait_for_parent:
+            try:
+                process.wait(timeout=TERMINATION_GRACE_SECONDS)
+            except (subprocess.TimeoutExpired, OSError):
+                pass
 
     def _wait_process(self, process: subprocess.Popen[str], timeout: float) -> int:
         return process.wait(timeout=timeout)
+
+    @staticmethod
+    def _timeout_output(error: subprocess.TimeoutExpired) -> str:
+        output = error.output
+        if output is None:
+            return ""
+        if isinstance(output, bytes):
+            return output.decode(errors="replace")
+        return output
+
+    def _drain_after_timeout(self, process: subprocess.Popen[str]) -> str:
+        """Finish pipe handling without ever falling back to an unbounded communicate()."""
+        partial = ""
+        for attempt in range(2):
+            try:
+                output, _ = process.communicate(timeout=TERMINATION_GRACE_SECONDS)
+                return output or partial
+            except subprocess.TimeoutExpired as exc:
+                observed = self._timeout_output(exc)
+                if observed:
+                    partial = observed
+                if attempt == 0:
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
+                    continue
+                raise RecoveryFailure(
+                    "Timed-out command cleanup exceeded the bounded pipe-drain budget "
+                    f"({2 * TERMINATION_GRACE_SECONDS:g}s)."
+                    + (f" Partial output:\n{partial}" if partial else "")
+                ) from exc
+            except OSError as exc:
+                raise RecoveryFailure(
+                    f"Timed-out command cleanup failed while draining pipes: {exc}"
+                ) from exc
+        raise RecoveryFailure("Timed-out command cleanup reached an unreachable state.")
 
     def capture(
         self,
@@ -221,20 +368,29 @@ class R0Runner:
     ) -> subprocess.CompletedProcess[str]:
         normalized = [str(part) for part in command]
         timeout = self.capture_timeout if timeout_seconds is None else float(timeout_seconds)
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise RecoveryFailure("Capture command has a non-positive timeout or a non-finite timeout.")
+        supervised = [sys.executable, "-c", CAPTURE_SUPERVISOR_CODE, *normalized]
         process = subprocess.Popen(
-            normalized,
+            supervised,
             cwd=str(cwd or self.source),
             text=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             errors="replace",
             **self._popen_isolation(),
         )
         try:
-            output, _ = process.communicate(timeout=timeout)
+            output, supervisor_control = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
-            self._terminate_process_tree(process)
-            output, _ = process.communicate()
+            self._terminate_process_tree(process, wait_for_parent=False)
+            try:
+                output = self._drain_after_timeout(process)
+            except RecoveryFailure as cleanup_error:
+                raise RecoveryFailure(
+                    f"Command timed out after {timeout:g}s and cleanup remained incomplete: "
+                    f"{' '.join(normalized)}\n{cleanup_error}"
+                ) from exc
             raise RecoveryFailure(
                 f"Command timed out after {timeout:g}s: {' '.join(normalized)}\n{output or ''}"
             ) from exc
@@ -245,6 +401,22 @@ class R0Runner:
             except (OSError, subprocess.SubprocessError):
                 pass
             raise
+        setup_error: str | None = None
+        spawn_error: str | None = None
+        for line in (supervisor_control or "").splitlines():
+            if line.startswith(SUPERVISOR_SETUP_ERROR_PREFIX):
+                setup_error = line[len(SUPERVISOR_SETUP_ERROR_PREFIX) :].strip()
+            elif line.startswith(SUPERVISOR_SPAWN_ERROR_PREFIX):
+                spawn_error = line[len(SUPERVISOR_SPAWN_ERROR_PREFIX) :].strip()
+        if process.returncode == 126 and setup_error:
+            raise RecoveryFailure(
+                "Command could not start because supervisor setup failed: "
+                f"{setup_error}: {' '.join(normalized)}"
+            )
+        if process.returncode == 127 and spawn_error:
+            raise RecoveryFailure(
+                f"Command could not start: {spawn_error}: {' '.join(normalized)}"
+            )
         result = subprocess.CompletedProcess(normalized, process.returncode, output, None)
         if check and result.returncode != 0:
             raise RecoveryFailure(
@@ -310,8 +482,9 @@ class R0Runner:
         normalized = [str(part) for part in command]
         working_directory = cwd or self.worktree
         timeout = self.command_timeout if timeout_seconds is None else float(timeout_seconds)
-        if timeout <= 0:
-            raise RecoveryFailure(f"{label} has a non-positive timeout.")
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise RecoveryFailure(f"{label} has a non-positive timeout or a non-finite timeout.")
+        supervised = [sys.executable, "-c", CAPTURE_SUPERVISOR_CODE, *normalized]
         index = len(self.records) + 1
         log_path = self.evidence_root / f"{index:02d}-{label}.log"
         self.last_command = normalized
@@ -328,6 +501,10 @@ class R0Runner:
         exit_code: int | None = None
         timed_out = False
         interrupted = False
+        spawn_error: str | None = None
+        supervisor_spawn_error: str | None = None
+        supervisor_setup_error: str | None = None
+        supervisor_control: list[str] = []
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("w", encoding="utf-8", newline="\n") as log:
             log.write(f"label: {label}\n")
@@ -336,17 +513,47 @@ class R0Runner:
             log.write(f"working_directory: {working_directory}\n")
             log.write("command: " + subprocess.list2cmdline(normalized) + "\n\n")
             log.flush()
-            process = subprocess.Popen(
-                normalized,
-                cwd=str(working_directory),
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                errors="replace",
-                bufsize=1,
-                **self._popen_isolation(),
-            )
+            try:
+                process = subprocess.Popen(
+                    supervised,
+                    cwd=str(working_directory),
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    errors="replace",
+                    bufsize=1,
+                    **self._popen_isolation(),
+                )
+            except (OSError, ValueError) as exc:
+                spawn_error = f"{type(exc).__name__}: {exc}"
+                finished = iso_now()
+                log.write(f"spawn_error: {spawn_error}\n")
+                log.write(f"finished_at: {finished}\n")
+                log.write("exit_code: None\n")
+                log.write("timed_out: false\n")
+                log.write("interrupted: false\n")
+                log.flush()
+                self.records.append(
+                    CommandRecord(
+                        index=index,
+                        label=label,
+                        command=normalized,
+                        cwd=str(working_directory),
+                        started_at=started,
+                        finished_at=finished,
+                        exit_code=None,
+                        timed_out=False,
+                        interrupted=False,
+                        spawn_error=spawn_error,
+                        timeout_seconds=timeout,
+                        log=str(log_path),
+                    )
+                )
+                raise RecoveryFailure(
+                    f"{label} could not start: {spawn_error}. Inspect {log_path}."
+                ) from exc
             assert process.stdout is not None
+            assert process.stderr is not None
 
             def copy_output() -> None:
                 try:
@@ -357,8 +564,30 @@ class R0Runner:
                 except (OSError, ValueError):
                     return
 
+            def copy_supervisor_control() -> None:
+                nonlocal supervisor_spawn_error, supervisor_setup_error
+                try:
+                    for line in process.stderr:
+                        supervisor_control.append(line)
+                        if line.startswith(SUPERVISOR_SPAWN_ERROR_PREFIX):
+                            supervisor_spawn_error = line[
+                                len(SUPERVISOR_SPAWN_ERROR_PREFIX) :
+                            ].strip()
+                        elif line.startswith(SUPERVISOR_SETUP_ERROR_PREFIX):
+                            supervisor_setup_error = line[
+                                len(SUPERVISOR_SETUP_ERROR_PREFIX) :
+                            ].strip()
+                except (OSError, ValueError):
+                    return
+
             reader = threading.Thread(target=copy_output, name=f"r0-log-{label}", daemon=True)
+            control_reader = threading.Thread(
+                target=copy_supervisor_control,
+                name=f"r0-control-{label}",
+                daemon=True,
+            )
             reader.start()
+            control_reader.start()
             try:
                 exit_code = self._wait_process(process, timeout)
             except subprocess.TimeoutExpired:
@@ -372,15 +601,32 @@ class R0Runner:
                 raise
             finally:
                 reader.join(timeout=TERMINATION_GRACE_SECONDS)
+                control_reader.join(timeout=TERMINATION_GRACE_SECONDS)
                 try:
                     process.stdout.close()
                 except OSError:
                     pass
+                try:
+                    process.stderr.close()
+                except OSError:
+                    pass
                 finished = iso_now()
+                if supervisor_control:
+                    log.write("\nsupervisor_control:\n")
+                    log.writelines(supervisor_control)
+                if not timed_out and not interrupted and exit_code == 126 and supervisor_setup_error:
+                    spawn_error = f"supervisor setup failed: {supervisor_setup_error}"
+                    recorded_exit_code: int | None = None
+                elif not timed_out and not interrupted and exit_code == 127 and supervisor_spawn_error:
+                    spawn_error = supervisor_spawn_error
+                    recorded_exit_code = None
+                else:
+                    recorded_exit_code = exit_code
                 log.write(f"\nfinished_at: {finished}\n")
-                log.write(f"exit_code: {exit_code}\n")
+                log.write(f"exit_code: {recorded_exit_code}\n")
                 log.write(f"timed_out: {str(timed_out).lower()}\n")
                 log.write(f"interrupted: {str(interrupted).lower()}\n")
+                log.write(f"spawn_error: {spawn_error or 'none'}\n")
                 log.flush()
                 self.records.append(
                     CommandRecord(
@@ -390,15 +636,18 @@ class R0Runner:
                         cwd=str(working_directory),
                         started_at=started,
                         finished_at=finished,
-                        exit_code=exit_code,
+                        exit_code=recorded_exit_code,
                         timed_out=timed_out,
                         interrupted=interrupted,
+                        spawn_error=spawn_error,
                         timeout_seconds=timeout,
                         log=str(log_path),
                     )
                 )
         if timed_out:
             raise RecoveryFailure(f"{label} timed out after {timeout:g}s. Inspect {log_path}.")
+        if spawn_error is not None:
+            raise RecoveryFailure(f"{label} could not start: {spawn_error}. Inspect {log_path}.")
         if exit_code != 0:
             raise RecoveryFailure(f"{label} failed with exit code {exit_code}. Inspect {log_path}.")
 
@@ -834,29 +1083,32 @@ See RECOVERY-2026-08-11.md, R0-COMMAND-EVIDENCE.json, the evidence directory, an
 
 
 def main() -> int:
-    runner = R0Runner(parse_args())
+    runner: R0Runner | None = None
     try:
+        runner = R0Runner(parse_args())
         runner.execute()
         return 0
-    except Exception as exc:
-        try:
-            runner.set_heartbeat(
-                "blocked",
-                current_command=runner.last_command,
-                last_result=(
-                    "R0 stopped at the first deterministic failure. "
-                    f"Latest log: {runner.last_log}"
-                ),
-                blocker=str(exc),
-                next_action=(
-                    "Inspect the named log and preserve the current checkpoint. Change one material condition before retrying. "
-                    "If tracked evidence exists, use a new clean worktree/output set rather than overwriting or discarding it."
-                ),
-            )
-        except Exception as heartbeat_error:
-            print(f"WARNING: heartbeat update failed: {heartbeat_error}", file=sys.stderr)
-        print(f"R0 AUTOMATED GATE: BLOCKED\n{exc}", file=sys.stderr)
-        return 1
+    except (Exception, KeyboardInterrupt) as exc:
+        blocker = "KeyboardInterrupt" if isinstance(exc, KeyboardInterrupt) else str(exc)
+        if runner is not None:
+            try:
+                runner.set_heartbeat(
+                    "blocked",
+                    current_command=runner.last_command,
+                    last_result=(
+                        "R0 stopped at the first deterministic failure or operator interruption. "
+                        f"Latest log: {runner.last_log}"
+                    ),
+                    blocker=blocker,
+                    next_action=(
+                        "Inspect the named log and preserve the current checkpoint. Change one material condition before retrying. "
+                        "If tracked evidence exists, use a new clean worktree/output set rather than overwriting or discarding it."
+                    ),
+                )
+            except Exception as heartbeat_error:
+                print(f"WARNING: heartbeat update failed: {heartbeat_error}", file=sys.stderr)
+        print(f"R0 AUTOMATED GATE: BLOCKED\n{blocker}", file=sys.stderr)
+        return 130 if isinstance(exc, KeyboardInterrupt) else 1
 
 
 if __name__ == "__main__":

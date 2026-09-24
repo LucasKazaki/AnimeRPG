@@ -193,6 +193,65 @@ class R0RunnerSafetyTests(unittest.TestCase):
                     runner.establish_worktree()
             self.assertEqual((args.worktree / "tracked.txt").read_text(encoding="utf-8"), "evidence changed\n")
 
+    def test_rejects_non_finite_configured_deadlines(self) -> None:
+        for field in ("command_timeout_seconds", "capture_timeout_seconds"):
+            for value in (float("nan"), float("inf")):
+                with self.subTest(field=field, value=value):
+                    with tempfile.TemporaryDirectory() as temp:
+                        args = make_args(Path(temp))
+                        setattr(args, field, value)
+                        with self.assertRaisesRegex(r0.RecoveryFailure, "positive finite"):
+                            r0.R0Runner(args)
+
+    def test_main_reports_constructor_validation_failure_without_mutating_outputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--source-repository", str(root / "source"),
+                    "--worktree", str(root / "worktree"),
+                    "--build-root", str(root / "build"),
+                    "--release-root", str(root / "release"),
+                    "--evidence-root", str(root / "evidence"),
+                    "--command-timeout-seconds", "nan",
+                    "--skip-fetch",
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("R0 AUTOMATED GATE: BLOCKED", result.stdout)
+            self.assertIn("positive finite", result.stdout)
+            self.assertNotIn("Traceback", result.stdout)
+            for name in ("source", "worktree", "build", "release", "evidence"):
+                self.assertFalse((root / name).exists(), f"constructor failure mutated {name}")
+
+    def test_main_records_keyboard_interrupt_as_blocked_checkpoint(self) -> None:
+        fake_runner = mock.Mock()
+        fake_runner.last_command = ["fixture"]
+        fake_runner.last_log = Path("fixture.log")
+        fake_runner.execute.side_effect = KeyboardInterrupt()
+        with mock.patch.object(r0, "parse_args", return_value=argparse.Namespace()), mock.patch.object(
+            r0, "R0Runner", return_value=fake_runner
+        ):
+            self.assertEqual(r0.main(), 130)
+        fake_runner.set_heartbeat.assert_called_once()
+        heartbeat_args, heartbeat_kwargs = fake_runner.set_heartbeat.call_args
+        self.assertEqual(heartbeat_args, ("blocked",))
+        self.assertEqual(heartbeat_kwargs["current_command"], ["fixture"])
+        self.assertEqual(heartbeat_kwargs["blocker"], "KeyboardInterrupt")
+        self.assertIn("operator interruption", heartbeat_kwargs["last_result"])
+
+    def test_main_does_not_swallow_argparse_system_exit(self) -> None:
+        with mock.patch.object(r0, "parse_args", side_effect=SystemExit(2)):
+            with self.assertRaises(SystemExit) as failure:
+                r0.main()
+        self.assertEqual(failure.exception.code, 2)
+
     def _tree_sleep_command(self, sentinel: Path, ready: Path | None = None) -> list[str]:
         child_code = (
             "import pathlib,time; time.sleep(2.0); "
@@ -208,6 +267,18 @@ class R0RunnerSafetyTests(unittest.TestCase):
             f"subprocess.Popen([sys.executable, '-c', {child_code!r}]); "
             + ready_code
             + "print('partial-output-marker', flush=True); time.sleep(30)"
+        )
+        return [sys.executable, "-c", parent_code]
+
+    def _exited_parent_with_live_stdout_descendant_command(self, sentinel: Path) -> list[str]:
+        child_code = (
+            "import pathlib,time; time.sleep(2.0); "
+            f"pathlib.Path({str(sentinel)!r}).write_text('escaped', encoding='utf-8')"
+        )
+        parent_code = (
+            "import os,subprocess,sys; "
+            f"subprocess.Popen([sys.executable, '-c', {child_code!r}]); "
+            "print('exited-parent-output-marker', flush=True); os._exit(0)"
         )
         return [sys.executable, "-c", parent_code]
 
@@ -231,6 +302,191 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertFalse(sentinel.exists(), "a descendant survived the timeout cleanup")
             self.assertTrue(runner.records[0].timed_out)
 
+    def test_run_command_timeout_kills_descendant_after_direct_parent_exits(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            sentinel = root / "run-command-exited-parent-escaped.txt"
+            with self.assertRaisesRegex(r0.RecoveryFailure, "timed out"):
+                runner.run_command(
+                    "exited-parent-timeout-fixture",
+                    self._exited_parent_with_live_stdout_descendant_command(sentinel),
+                    cwd=args.worktree,
+                    timeout_seconds=0.8,
+                )
+            log = (args.evidence_root / "01-exited-parent-timeout-fixture.log").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("exited-parent-output-marker", log)
+            self.assertIn("timed_out: true", log)
+            time.sleep(2.2)
+            self.assertFalse(
+                sentinel.exists(),
+                "a run_command descendant escaped after its direct parent exited",
+            )
+            self.assertTrue(runner.records[0].timed_out)
+
+    def test_run_command_spawn_failure_is_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            missing = root / "missing-r0-executable"
+            with self.assertRaisesRegex(r0.RecoveryFailure, "could not start"):
+                runner.run_command(
+                    "spawn-failure-fixture", [missing],
+                    cwd=args.worktree, timeout_seconds=0.5,
+                )
+            log = (args.evidence_root / "01-spawn-failure-fixture.log").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("spawn_error:", log)
+            self.assertIn("supervisor_control:", log)
+            self.assertIn("exit_code: None", log)
+            self.assertIn("timed_out: false", log)
+            self.assertIn("interrupted: false", log)
+            self.assertEqual(len(runner.records), 1)
+            self.assertIsNone(runner.records[0].exit_code)
+            self.assertFalse(runner.records[0].timed_out)
+            self.assertFalse(runner.records[0].interrupted)
+            self.assertIsNotNone(runner.records[0].spawn_error)
+
+    def test_run_command_supervisor_setup_failure_is_pre_start_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            setup_prefix = r0.SUPERVISOR_SETUP_ERROR_PREFIX
+            sentinel = root / "requested-command-ran.txt"
+            supervisor_code = (
+                "import sys; "
+                f"print({setup_prefix!r} + 'synthetic job setup failure', "
+                "file=sys.stderr, flush=True); "
+                "raise SystemExit(126)"
+            )
+            requested_code = (
+                "from pathlib import Path; "
+                f"Path({str(sentinel)!r}).write_text('ran', encoding='utf-8'); "
+                "print('MUST_NOT_RUN', flush=True)"
+            )
+            requested = [sys.executable, "-c", requested_code]
+            with mock.patch.object(r0, "CAPTURE_SUPERVISOR_CODE", supervisor_code):
+                with self.assertRaisesRegex(r0.RecoveryFailure, "could not start"):
+                    runner.run_command(
+                        "supervisor-setup-failure-fixture",
+                        requested,
+                        cwd=args.worktree,
+                        timeout_seconds=1.0,
+                    )
+            log = (args.evidence_root / "01-supervisor-setup-failure-fixture.log").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(setup_prefix + "synthetic job setup failure", log)
+            self.assertIn("MUST_NOT_RUN", log, "the requested command must remain in provenance")
+            command_output = log.split("\n\n", 1)[1].split("\nsupervisor_control:\n", 1)[0]
+            self.assertNotIn("MUST_NOT_RUN", command_output)
+            self.assertFalse(sentinel.exists(), "requested command executed after supervisor setup failed")
+            self.assertIn("exit_code: None", log)
+            self.assertIn("timed_out: false", log)
+            self.assertIn("interrupted: false", log)
+            self.assertEqual(len(runner.records), 1)
+            self.assertIsNone(runner.records[0].exit_code)
+            self.assertIsNotNone(runner.records[0].spawn_error)
+
+    def test_run_command_output_cannot_spoof_supervisor_spawn_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            spoof = r0.SUPERVISOR_SPAWN_ERROR_PREFIX + "spoofed command output"
+            command = [
+                sys.executable,
+                "-c",
+                f"import sys; print({spoof!r}, flush=True); sys.exit(127)",
+            ]
+            with self.assertRaisesRegex(r0.RecoveryFailure, "failed with exit code 127"):
+                runner.run_command(
+                    "spawn-marker-spoof-fixture",
+                    command,
+                    cwd=args.worktree,
+                    timeout_seconds=1.0,
+                )
+            log = (args.evidence_root / "01-spawn-marker-spoof-fixture.log").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(spoof, log)
+            self.assertIn("exit_code: 127", log)
+            self.assertIn("spawn_error: none", log)
+            self.assertEqual(len(runner.records), 1)
+            self.assertEqual(runner.records[0].exit_code, 127)
+            self.assertIsNone(runner.records[0].spawn_error)
+
+    def test_capture_supervisor_setup_failure_is_pre_start_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            setup_prefix = r0.SUPERVISOR_SETUP_ERROR_PREFIX
+            sentinel = root / "capture-requested-command-ran.txt"
+            supervisor_code = (
+                "import sys; "
+                f"print({setup_prefix!r} + 'synthetic capture setup failure', "
+                "file=sys.stderr, flush=True); "
+                "raise SystemExit(126)"
+            )
+            requested = [
+                sys.executable,
+                "-c",
+                (
+                    "from pathlib import Path; "
+                    f"Path({str(sentinel)!r}).write_text('ran', encoding='utf-8')"
+                ),
+            ]
+            with mock.patch.object(r0, "CAPTURE_SUPERVISOR_CODE", supervisor_code):
+                with self.assertRaisesRegex(r0.RecoveryFailure, "supervisor setup failed"):
+                    runner.capture(requested, check=False, timeout_seconds=1.0)
+            self.assertFalse(sentinel.exists(), "capture requested command ran after setup failure")
+
+            spoof = setup_prefix + "spoofed requested-command output"
+            ordinary = runner.capture(
+                [
+                    sys.executable,
+                    "-c",
+                    f"import sys; print({spoof!r}, flush=True); sys.exit(126)",
+                ],
+                check=False,
+                timeout_seconds=1.0,
+            )
+            self.assertEqual(ordinary.returncode, 126)
+            self.assertIn(spoof, ordinary.stdout)
+
+    def test_run_command_rejects_non_finite_override_before_spawn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            for value in (float("nan"), float("inf")):
+                with self.subTest(value=value), mock.patch.object(r0.subprocess, "Popen") as popen:
+                    with self.assertRaisesRegex(r0.RecoveryFailure, "non-finite timeout"):
+                        runner.run_command(
+                            "invalid-timeout-fixture", ["fixture"],
+                            cwd=args.worktree, timeout_seconds=value,
+                        )
+                    popen.assert_not_called()
+            self.assertFalse(args.evidence_root.exists())
+
     def test_capture_timeout_kills_descendant(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -242,6 +498,105 @@ class R0RunnerSafetyTests(unittest.TestCase):
                 runner.capture(self._tree_sleep_command(sentinel), timeout_seconds=0.4)
             time.sleep(2.4)
             self.assertFalse(sentinel.exists(), "a capture descendant survived timeout cleanup")
+
+    def test_capture_timeout_kills_descendant_after_direct_parent_exits(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            sentinel = root / "capture-exited-parent-escaped.txt"
+            with self.assertRaisesRegex(r0.RecoveryFailure, "Command timed out") as failure:
+                runner.capture(
+                    self._exited_parent_with_live_stdout_descendant_command(sentinel),
+                    timeout_seconds=0.8,
+                )
+            self.assertIn("exited-parent-output-marker", str(failure.exception))
+            time.sleep(2.2)
+            self.assertFalse(
+                sentinel.exists(),
+                "a descendant escaped after its direct parent exited but kept capture stdout open",
+            )
+
+    def test_capture_timeout_cleanup_drain_remains_bounded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            process = mock.Mock()
+            process.returncode = -9
+            process.communicate.side_effect = [
+                subprocess.TimeoutExpired(["fixture"], 0.1, output="initial-partial\n"),
+                subprocess.TimeoutExpired(
+                    ["fixture"], r0.TERMINATION_GRACE_SECONDS, output="cleanup-partial\n"
+                ),
+                ("final-output\n", None),
+            ]
+            with mock.patch.object(r0.subprocess, "Popen", return_value=process), mock.patch.object(
+                runner, "_terminate_process_tree"
+            ) as terminate:
+                with self.assertRaisesRegex(r0.RecoveryFailure, "Command timed out after 0.1s"):
+                    runner.capture(["fixture"], timeout_seconds=0.1)
+            terminate.assert_called_once_with(process, wait_for_parent=False)
+            self.assertEqual(
+                [call.kwargs.get("timeout") for call in process.communicate.call_args_list],
+                [0.1, r0.TERMINATION_GRACE_SECONDS, r0.TERMINATION_GRACE_SECONDS],
+            )
+            process.kill.assert_called_once_with()
+
+    def test_capture_timeout_cleanup_exhaustion_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            process = mock.Mock()
+            process.returncode = None
+            process.communicate.side_effect = [
+                subprocess.TimeoutExpired(["fixture"], 0.1, output="initial-partial\n"),
+                subprocess.TimeoutExpired(
+                    ["fixture"], r0.TERMINATION_GRACE_SECONDS, output="cleanup-partial\n"
+                ),
+                subprocess.TimeoutExpired(
+                    ["fixture"], r0.TERMINATION_GRACE_SECONDS, output="final-partial\n"
+                ),
+            ]
+            with mock.patch.object(r0.subprocess, "Popen", return_value=process), mock.patch.object(
+                runner, "_terminate_process_tree"
+            ) as terminate:
+                with self.assertRaisesRegex(
+                    r0.RecoveryFailure, "cleanup remained incomplete"
+                ) as failure:
+                    runner.capture(["fixture"], timeout_seconds=0.1)
+            terminate.assert_called_once_with(process, wait_for_parent=False)
+            self.assertIn("bounded pipe-drain budget", str(failure.exception))
+            self.assertIn("final-partial", str(failure.exception))
+            self.assertEqual(len(process.communicate.call_args_list), 3)
+            process.kill.assert_called_once_with()
+
+    def test_capture_rejects_non_positive_override_before_spawn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            with mock.patch.object(r0.subprocess, "Popen") as popen:
+                with self.assertRaisesRegex(r0.RecoveryFailure, "non-positive timeout"):
+                    runner.capture(["fixture"], timeout_seconds=0)
+                popen.assert_not_called()
+
+    def test_capture_rejects_non_finite_override_before_spawn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            for value in (float("nan"), float("inf")):
+                with self.subTest(value=value), mock.patch.object(r0.subprocess, "Popen") as popen:
+                    with self.assertRaisesRegex(r0.RecoveryFailure, "non-finite timeout"):
+                        runner.capture(["fixture"], timeout_seconds=value)
+                    popen.assert_not_called()
 
     def test_interrupted_run_command_cleans_owned_tree_and_records_interrupt(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -276,6 +631,30 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertFalse(sentinel.exists(), "a descendant survived interrupted-run cleanup")
             self.assertTrue(runner.records[0].interrupted)
 
+    def test_windows_ci_verifies_pr_head_and_merge_ref(self) -> None:
+        workflow = SCRIPT.parents[1] / ".github" / "workflows" / "windows-ci.yml"
+        content = workflow.read_text(encoding="utf-8")
+        self.assertIn(
+            '\"head\",\"merge\"',
+            content,
+            "pull_request Windows CI must exercise both the exact PR head and GitHub merge ref",
+        )
+        self.assertIn(
+            "matrix.revision == 'head'",
+            content,
+            "Windows CI checkout must select the exact PR head only for the head matrix leg",
+        )
+        self.assertIn(
+            "github.event.pull_request.head.sha",
+            content,
+            "Windows CI must retain explicit exact-head provenance",
+        )
+        self.assertIn(
+            "github.sha",
+            content,
+            "Windows CI must retain pull_request merge-ref provenance via GITHUB_SHA",
+        )
+
     def test_generated_docs_use_current_run_time_not_hardcoded_build_date(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -291,6 +670,63 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertIn(runner.run_started_at, milestone)
             self.assertIn(runner.run_started_at, package)
             self.assertNotIn("Build date: August 11, 2026", package)
+
+
+@unittest.skipIf(os.name == "nt", "POSIX signal return codes only")
+class R0RunnerPosixSignalTests(unittest.TestCase):
+    def test_capture_preserves_posix_signal_termination_status(self) -> None:
+        import signal as signal_module
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            signal_number = int(signal_module.SIGKILL)
+            command = [
+                sys.executable,
+                "-c",
+                f"import os,signal; os.kill(os.getpid(), {signal_number})",
+            ]
+
+            unchecked = runner.capture(command, check=False)
+            self.assertEqual(unchecked.returncode, -signal_number)
+            with self.assertRaisesRegex(
+                r0.RecoveryFailure, rf"Command failed \(-{signal_number}\)"
+            ):
+                runner.capture(command)
+
+            ordinary = runner.capture(
+                [sys.executable, "-c", "import sys; sys.exit(7)"], check=False
+            )
+            self.assertEqual(ordinary.returncode, 7)
+
+    def test_capture_unblocks_relayed_posix_signal(self) -> None:
+        import signal as signal_module
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            signal_number = int(signal_module.SIGTERM)
+            previous_mask = signal_module.pthread_sigmask(
+                signal_module.SIG_BLOCK, {signal_module.SIGTERM}
+            )
+            try:
+                command = [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import os,signal; "
+                        f"signal.pthread_sigmask(signal.SIG_UNBLOCK, {{{signal_number}}}); "
+                        f"os.kill(os.getpid(), {signal_number})"
+                    ),
+                ]
+                unchecked = runner.capture(command, check=False)
+                self.assertEqual(unchecked.returncode, -signal_number)
+            finally:
+                signal_module.pthread_sigmask(signal_module.SIG_SETMASK, previous_mask)
 
 
 if __name__ == "__main__":
