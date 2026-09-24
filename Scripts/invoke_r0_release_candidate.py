@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import shutil
 import signal
@@ -146,8 +147,13 @@ class R0Runner:
         self.capture_timeout = float(
             getattr(args, "capture_timeout_seconds", DEFAULT_CAPTURE_TIMEOUT_SECONDS)
         )
-        if self.command_timeout <= 0 or self.capture_timeout <= 0:
-            raise RecoveryFailure("Command deadlines must be positive numbers of seconds.")
+        if (
+            not math.isfinite(self.command_timeout)
+            or not math.isfinite(self.capture_timeout)
+            or self.command_timeout <= 0
+            or self.capture_timeout <= 0
+        ):
+            raise RecoveryFailure("Command deadlines must be positive finite numbers of seconds.")
         self.heartbeat: Path | None = None
         self.records: list[CommandRecord] = []
         self.last_command: list[str] | None = None
@@ -261,8 +267,8 @@ class R0Runner:
     ) -> subprocess.CompletedProcess[str]:
         normalized = [str(part) for part in command]
         timeout = self.capture_timeout if timeout_seconds is None else float(timeout_seconds)
-        if timeout <= 0:
-            raise RecoveryFailure("Capture command has a non-positive timeout.")
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise RecoveryFailure("Capture command has a non-positive timeout or a non-finite timeout.")
         process = subprocess.Popen(
             normalized,
             cwd=str(cwd or self.source),
@@ -358,8 +364,8 @@ class R0Runner:
         normalized = [str(part) for part in command]
         working_directory = cwd or self.worktree
         timeout = self.command_timeout if timeout_seconds is None else float(timeout_seconds)
-        if timeout <= 0:
-            raise RecoveryFailure(f"{label} has a non-positive timeout.")
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise RecoveryFailure(f"{label} has a non-positive timeout or a non-finite timeout.")
         index = len(self.records) + 1
         log_path = self.evidence_root / f"{index:02d}-{label}.log"
         self.last_command = normalized
