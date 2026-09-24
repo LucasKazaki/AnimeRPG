@@ -230,6 +230,28 @@ class R0RunnerSafetyTests(unittest.TestCase):
             for name in ("source", "worktree", "build", "release", "evidence"):
                 self.assertFalse((root / name).exists(), f"constructor failure mutated {name}")
 
+    def test_main_records_keyboard_interrupt_as_blocked_checkpoint(self) -> None:
+        fake_runner = mock.Mock()
+        fake_runner.last_command = ["fixture"]
+        fake_runner.last_log = Path("fixture.log")
+        fake_runner.execute.side_effect = KeyboardInterrupt()
+        with mock.patch.object(r0, "parse_args", return_value=argparse.Namespace()), mock.patch.object(
+            r0, "R0Runner", return_value=fake_runner
+        ):
+            self.assertEqual(r0.main(), 130)
+        fake_runner.set_heartbeat.assert_called_once()
+        heartbeat_args, heartbeat_kwargs = fake_runner.set_heartbeat.call_args
+        self.assertEqual(heartbeat_args, ("blocked",))
+        self.assertEqual(heartbeat_kwargs["current_command"], ["fixture"])
+        self.assertEqual(heartbeat_kwargs["blocker"], "KeyboardInterrupt")
+        self.assertIn("operator interruption", heartbeat_kwargs["last_result"])
+
+    def test_main_does_not_swallow_argparse_system_exit(self) -> None:
+        with mock.patch.object(r0, "parse_args", side_effect=SystemExit(2)):
+            with self.assertRaises(SystemExit) as failure:
+                r0.main()
+        self.assertEqual(failure.exception.code, 2)
+
     def _tree_sleep_command(self, sentinel: Path, ready: Path | None = None) -> list[str]:
         child_code = (
             "import pathlib,time; time.sleep(2.0); "
