@@ -353,12 +353,14 @@ private:
 
     void StoreBestRecord(const MallResonanceRecord& candidate) {
         MallResonanceRecord& best = bestRecords_[DifficultyIndex(candidate.difficulty)];
+        const int candidateRank = RankValue(candidate.rank);
+        const int bestRank = RankValue(best.rank);
         const bool better = !best.valid
-            || candidate.score > best.score
-            || (candidate.score == best.score && RankValue(candidate.rank) > RankValue(best.rank))
-            || (candidate.score == best.score && candidate.rank == best.rank
+            || candidateRank > bestRank
+            || (candidateRank == bestRank && candidate.score > best.score)
+            || (candidateRank == bestRank && candidate.score == best.score
                 && candidate.moves < best.moves)
-            || (candidate.score == best.score && candidate.rank == best.rank
+            || (candidateRank == bestRank && candidate.score == best.score
                 && candidate.moves == best.moves
                 && candidate.elapsedSeconds < best.elapsedSeconds);
         if (better) best = candidate;
