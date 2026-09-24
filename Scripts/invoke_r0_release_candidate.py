@@ -97,6 +97,7 @@ try:
 except (OSError, ValueError) as exc:
     print(
         "__ASTRAL_R0_SUPERVISOR_SPAWN_ERROR__=" + f"{type(exc).__name__}: {exc}",
+        file=sys.stderr,
         flush=True,
     )
     raise SystemExit(127)
@@ -477,6 +478,7 @@ class R0Runner:
         interrupted = False
         spawn_error: str | None = None
         supervisor_spawn_error: str | None = None
+        supervisor_control: list[str] = []
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("w", encoding="utf-8", newline="\n") as log:
             log.write(f"label: {label}\n")
@@ -491,7 +493,7 @@ class R0Runner:
                     cwd=str(working_directory),
                     text=True,
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
+                    stderr=subprocess.PIPE,
                     errors="replace",
                     bufsize=1,
                     **self._popen_isolation(),
@@ -525,21 +527,37 @@ class R0Runner:
                     f"{label} could not start: {spawn_error}. Inspect {log_path}."
                 ) from exc
             assert process.stdout is not None
+            assert process.stderr is not None
 
             def copy_output() -> None:
-                nonlocal supervisor_spawn_error
                 try:
                     for line in process.stdout:
-                        if line.startswith(SUPERVISOR_SPAWN_ERROR_PREFIX):
-                            supervisor_spawn_error = line[len(SUPERVISOR_SPAWN_ERROR_PREFIX) :].strip()
                         print(line, end="")
                         log.write(line)
                         log.flush()
                 except (OSError, ValueError):
                     return
 
+            def copy_supervisor_control() -> None:
+                nonlocal supervisor_spawn_error
+                try:
+                    for line in process.stderr:
+                        supervisor_control.append(line)
+                        if line.startswith(SUPERVISOR_SPAWN_ERROR_PREFIX):
+                            supervisor_spawn_error = line[
+                                len(SUPERVISOR_SPAWN_ERROR_PREFIX) :
+                            ].strip()
+                except (OSError, ValueError):
+                    return
+
             reader = threading.Thread(target=copy_output, name=f"r0-log-{label}", daemon=True)
+            control_reader = threading.Thread(
+                target=copy_supervisor_control,
+                name=f"r0-control-{label}",
+                daemon=True,
+            )
             reader.start()
+            control_reader.start()
             try:
                 exit_code = self._wait_process(process, timeout)
             except subprocess.TimeoutExpired:
@@ -553,11 +571,19 @@ class R0Runner:
                 raise
             finally:
                 reader.join(timeout=TERMINATION_GRACE_SECONDS)
+                control_reader.join(timeout=TERMINATION_GRACE_SECONDS)
                 try:
                     process.stdout.close()
                 except OSError:
                     pass
+                try:
+                    process.stderr.close()
+                except OSError:
+                    pass
                 finished = iso_now()
+                if supervisor_control:
+                    log.write("\nsupervisor_control:\n")
+                    log.writelines(supervisor_control)
                 if not timed_out and not interrupted and exit_code == 127 and supervisor_spawn_error:
                     spawn_error = supervisor_spawn_error
                     recorded_exit_code: int | None = None
