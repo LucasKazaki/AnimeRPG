@@ -260,9 +260,10 @@ class R0RunnerSafetyTests(unittest.TestCase):
             ]
             with mock.patch.object(r0.subprocess, "Popen", return_value=process), mock.patch.object(
                 runner, "_terminate_process_tree"
-            ):
+            ) as terminate:
                 with self.assertRaisesRegex(r0.RecoveryFailure, "Command timed out after 0.1s"):
                     runner.capture(["fixture"], timeout_seconds=0.1)
+            terminate.assert_called_once_with(process, wait_for_parent=False)
             self.assertEqual(
                 [call.kwargs.get("timeout") for call in process.communicate.call_args_list],
                 [0.1, r0.TERMINATION_GRACE_SECONDS, r0.TERMINATION_GRACE_SECONDS],
@@ -288,11 +289,12 @@ class R0RunnerSafetyTests(unittest.TestCase):
             ]
             with mock.patch.object(r0.subprocess, "Popen", return_value=process), mock.patch.object(
                 runner, "_terminate_process_tree"
-            ):
+            ) as terminate:
                 with self.assertRaisesRegex(
                     r0.RecoveryFailure, "cleanup remained incomplete"
                 ) as failure:
                     runner.capture(["fixture"], timeout_seconds=0.1)
+            terminate.assert_called_once_with(process, wait_for_parent=False)
             self.assertIn("bounded pipe-drain budget", str(failure.exception))
             self.assertIn("final-partial", str(failure.exception))
             self.assertEqual(len(process.communicate.call_args_list), 3)
