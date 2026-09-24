@@ -103,7 +103,8 @@
     "P2: Authoritative ShadowbladeLoadout::ApplyPreset records recall on every successful apply, including the established direct mutable-loadout path, with direct-path regression coverage.",
     "P2: The retained run receipt now lists and describes ShadowbladeLoadout.h and its metadata/bookkeeping changes.",
     "P2: GAME-141, QOL-029, and durable coordination path inventories now include ShadowbladeLoadout.h.",
-    "P2: Backlog, STATE, and run receipt now consistently retain the complete two-P1/eight-P2 independent-review repair history."
+    "P2: Backlog, STATE, and run receipt now consistently retain the complete review-repair history.",
+    "P2: The task and receipt now retain literal hosted configure/build/test/scope commands, observed success-to-exit-zero semantics, and the explicit no-native-runtime evidence boundary."
   ],
   "known_failed_gate": {
     "head": "6957ff8d913e0a70c18df7deb0bc13b572bc304c",
@@ -129,5 +130,13 @@
     "release_manifest_result": "success",
     "reason_not_final": "fresh independent review found stale durable path inventories and review-history records; repaired by later documentation-only commits"
   },
-  "next_action": "Use the final durable-record repair commit as the exact candidate, require green Windows Debug/Release and release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
+  "superseded_green_gate_before_command_receipt_repair": {
+    "head": "06b5f57e880737ab286e421244d75234139968bc",
+    "windows_run": 35934957614,
+    "windows_result": "success",
+    "release_manifest_run": 35934957584,
+    "release_manifest_result": "success",
+    "reason_not_final": "fresh independent review found that literal gate commands and exit semantics were not retained in the durable task/receipt; repaired by later documentation-only commits"
+  },
+  "next_action": "Use the complete command-evidence repair commit as the exact candidate, require green Windows Debug/Release and release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
 }
