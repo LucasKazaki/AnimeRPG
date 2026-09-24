@@ -631,6 +631,30 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertFalse(sentinel.exists(), "a descendant survived interrupted-run cleanup")
             self.assertTrue(runner.records[0].interrupted)
 
+    def test_windows_ci_verifies_pr_head_and_merge_ref(self) -> None:
+        workflow = SCRIPT.parents[1] / ".github" / "workflows" / "windows-ci.yml"
+        content = workflow.read_text(encoding="utf-8")
+        self.assertIn(
+            '\"head\",\"merge\"',
+            content,
+            "pull_request Windows CI must exercise both the exact PR head and GitHub merge ref",
+        )
+        self.assertIn(
+            "matrix.revision == 'head'",
+            content,
+            "Windows CI checkout must select the exact PR head only for the head matrix leg",
+        )
+        self.assertIn(
+            "github.event.pull_request.head.sha",
+            content,
+            "Windows CI must retain explicit exact-head provenance",
+        )
+        self.assertIn(
+            "github.sha",
+            content,
+            "Windows CI must retain pull_request merge-ref provenance via GITHUB_SHA",
+        )
+
     def test_generated_docs_use_current_run_time_not_hardcoded_build_date(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
