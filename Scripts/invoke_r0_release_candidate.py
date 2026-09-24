@@ -29,6 +29,7 @@ DEFAULT_BRANCH = "agent/r0-loop-recovery-2026-08-11"
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 1800.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 120.0
 TERMINATION_GRACE_SECONDS = 10.0
+SUPERVISOR_SPAWN_ERROR_PREFIX = "__ASTRAL_R0_SUPERVISOR_SPAWN_ERROR__="
 CAPTURE_SUPERVISOR_CODE = r"""import os, signal, subprocess, sys
 if os.name == "nt":
     import ctypes
@@ -91,7 +92,14 @@ if os.name == "nt":
     if not kernel32.AssignProcessToJobObject(job, kernel32.GetCurrentProcess()):
         raise ctypes.WinError(ctypes.get_last_error())
 
-process = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+try:
+    process = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+except (OSError, ValueError) as exc:
+    print(
+        "__ASTRAL_R0_SUPERVISOR_SPAWN_ERROR__=" + f"{type(exc).__name__}: {exc}",
+        flush=True,
+    )
+    raise SystemExit(127)
 assert process.stdout is not None
 while True:
     chunk = os.read(process.stdout.fileno(), 65536)
@@ -450,6 +458,7 @@ class R0Runner:
         timeout = self.command_timeout if timeout_seconds is None else float(timeout_seconds)
         if not math.isfinite(timeout) or timeout <= 0:
             raise RecoveryFailure(f"{label} has a non-positive timeout or a non-finite timeout.")
+        supervised = [sys.executable, "-c", CAPTURE_SUPERVISOR_CODE, *normalized]
         index = len(self.records) + 1
         log_path = self.evidence_root / f"{index:02d}-{label}.log"
         self.last_command = normalized
@@ -467,6 +476,7 @@ class R0Runner:
         timed_out = False
         interrupted = False
         spawn_error: str | None = None
+        supervisor_spawn_error: str | None = None
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("w", encoding="utf-8", newline="\n") as log:
             log.write(f"label: {label}\n")
@@ -477,7 +487,7 @@ class R0Runner:
             log.flush()
             try:
                 process = subprocess.Popen(
-                    normalized,
+                    supervised,
                     cwd=str(working_directory),
                     text=True,
                     stdout=subprocess.PIPE,
@@ -517,8 +527,11 @@ class R0Runner:
             assert process.stdout is not None
 
             def copy_output() -> None:
+                nonlocal supervisor_spawn_error
                 try:
                     for line in process.stdout:
+                        if line.startswith(SUPERVISOR_SPAWN_ERROR_PREFIX):
+                            supervisor_spawn_error = line[len(SUPERVISOR_SPAWN_ERROR_PREFIX) :].strip()
                         print(line, end="")
                         log.write(line)
                         log.flush()
@@ -545,11 +558,16 @@ class R0Runner:
                 except OSError:
                     pass
                 finished = iso_now()
+                if not timed_out and not interrupted and exit_code == 127 and supervisor_spawn_error:
+                    spawn_error = supervisor_spawn_error
+                    recorded_exit_code: int | None = None
+                else:
+                    recorded_exit_code = exit_code
                 log.write(f"\nfinished_at: {finished}\n")
-                log.write(f"exit_code: {exit_code}\n")
+                log.write(f"exit_code: {recorded_exit_code}\n")
                 log.write(f"timed_out: {str(timed_out).lower()}\n")
                 log.write(f"interrupted: {str(interrupted).lower()}\n")
-                log.write("spawn_error: none\n")
+                log.write(f"spawn_error: {spawn_error or 'none'}\n")
                 log.flush()
                 self.records.append(
                     CommandRecord(
@@ -559,16 +577,18 @@ class R0Runner:
                         cwd=str(working_directory),
                         started_at=started,
                         finished_at=finished,
-                        exit_code=exit_code,
+                        exit_code=recorded_exit_code,
                         timed_out=timed_out,
                         interrupted=interrupted,
-                        spawn_error=None,
+                        spawn_error=spawn_error,
                         timeout_seconds=timeout,
                         log=str(log_path),
                     )
                 )
         if timed_out:
             raise RecoveryFailure(f"{label} timed out after {timeout:g}s. Inspect {log_path}.")
+        if spawn_error is not None:
+            raise RecoveryFailure(f"{label} could not start: {spawn_error}. Inspect {log_path}.")
         if exit_code != 0:
             raise RecoveryFailure(f"{label} failed with exit code {exit_code}. Inspect {log_path}.")
 
