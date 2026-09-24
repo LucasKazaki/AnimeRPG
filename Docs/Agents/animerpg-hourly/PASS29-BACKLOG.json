@@ -86,15 +86,15 @@
       "kind": "reference_feature",
       "title": "Next-incomplete operation tracking",
       "adaptation": "cyclic selection skips completed operations and is exposed through LandmarkInteraction",
-      "acceptance": "deterministic wraparound and all-complete no-op",
+      "acceptance": "deterministic wraparound, including final-enum to MallSurvey boundary, and all-complete no-op",
       "status": "implemented_owner_integrated_pending_exact_head_gates"
     },
     {
       "id": "GAME-144",
       "kind": "reference_feature",
       "title": "Bounded multi-stop field route",
-      "adaptation": "fixed three-stop route with validation, ordering, visit pruning, removal and clear, forwarded through LandmarkInteraction",
-      "acceptance": "bounded state, legacy pin precedence, exact pruning/removal",
+      "adaptation": "fixed three-stop route with validation, ordering, visit pruning, removal and nonempty batch clear, forwarded through LandmarkInteraction",
+      "acceptance": "bounded state, legacy pin precedence, exact pruning/removal/clear counts",
       "status": "implemented_owner_integrated_pending_exact_head_gates"
     },
     {
@@ -123,16 +123,20 @@
     }
   ],
   "review_history": {
-    "material_findings_repaired": 1,
-    "summary": ["P2 production-owner reachability gap repaired with thin LandmarkInteraction forwarding and owner-path regression coverage"]
+    "material_findings_repaired": 3,
+    "summary": [
+      "P2 production-owner reachability gap repaired with thin LandmarkInteraction forwarding and owner-path regression coverage",
+      "P2 missing final-enum wraparound coverage repaired with ShadowCryptLead-to-MallSurvey regression",
+      "P2 owner batch-clear coverage repaired by clearing a nonempty live-owner route and asserting exact removed count/state"
+    ]
   },
   "verification": {
     "registered_target": "ThoughtCommandsTests via existing aggregation",
-    "initial_sandbox_header_domain": "passed before review repair; not final exact-head evidence",
-    "windows_debug_release": "pending_exact_final_head_after_owner_repair",
-    "release_manifest": "pending_exact_final_head_after_owner_repair",
+    "initial_sandbox_header_domain": "passed before review repairs; not final exact-head evidence",
+    "windows_debug_release": "pending_exact_final_head_after_review_repairs",
+    "release_manifest": "pending_exact_final_head_after_review_repairs",
     "native_interactive": "not_run_not_claimed_no_input_or_ui_wiring",
-    "independent_review": "fresh_exact_final_head_review_required_after_owner_repair"
+    "independent_review": "fresh_exact_final_head_review_required_after_three_repaired_findings"
   },
   "counts": {
     "reference_features_researched": 5,
