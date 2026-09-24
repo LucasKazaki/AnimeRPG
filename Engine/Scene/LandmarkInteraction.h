@@ -87,8 +87,27 @@ public:
     bool TrackFieldOperation(FieldOperation operation) {
         return fieldGuide_.TrackOperation(operation);
     }
+    bool TrackNextIncompleteFieldOperation() {
+        return fieldGuide_.TrackNextIncompleteOperation();
+    }
     bool PinFieldTarget(LandmarkKind landmark) { return fieldGuide_.PinTarget(landmark); }
     void ClearPinnedFieldTarget() { fieldGuide_.ClearPinnedTarget(); }
+    bool AddFieldRouteTarget(LandmarkKind landmark,
+        FieldPinCategory category = FieldPinCategory::Objective) {
+        return fieldGuide_.AddRouteTarget(landmark, category);
+    }
+    bool RemoveFieldRouteTarget(LandmarkKind landmark) {
+        return fieldGuide_.RemoveRouteTarget(landmark);
+    }
+    std::size_t ClearFieldRouteTargets() { return fieldGuide_.ClearRouteTargets(); }
+    bool SetFieldRouteFilter(FieldPinFilter filter) {
+        return fieldGuide_.SetRouteFilter(filter);
+    }
+    bool MarkFieldJournalRead(FieldJournalEntry entry) {
+        return fieldGuide_.MarkJournalRead(entry);
+    }
+    std::size_t MarkAllFieldJournalRead() { return fieldGuide_.MarkAllJournalRead(); }
+    FieldGuideBriefing FieldBriefing() const { return fieldGuide_.Briefing(); }
     const ExplorationFieldGuide& FieldGuide() const { return fieldGuide_; }
 
     bool BeginManaReactor(ManaReactorMode mode = ManaReactorMode::Expedition,
