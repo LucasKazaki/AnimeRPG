@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS40-SHADOW-CRYPT-MASTERY-REPLAY-2026-09-24",
+  "baseline": "43051845a6f663cdd2942ce4d321f2c9583e1dcb",
+  "target": "main",
+  "branch": "game/pass40-shadow-crypt-flow-replay",
+  "accessed": "2026-09-24",
+  "sources": [
+    {
+      "id": "ZZZ-APPSTORE-20260924",
+      "kind": "developer_description",
+      "url": "https://apps.apple.com/us/app/zenless-zone-zero/id1606356401",
+      "version_context": "3.2.0, listed Sep 8, 2026",
+      "notes": "Current listing describes Dodge/Parry, Stun/follow-up combat, and opponent traits/weaknesses."
+    },
+    {
+      "id": "WUWA-APPSTORE-20260924",
+      "kind": "developer_description",
+      "url": "https://apps.apple.com/us/app/wuthering-waves/id6475033368",
+      "version_context": "current page accessed 2026-09-24",
+      "notes": "Current listing describes Extreme Evasion, Dodge Counter, Echo Skill, and QTE mechanisms."
+    },
+    {
+      "id": "GRANBLUE-PS-20260924",
+      "kind": "official_platform_overview",
+      "url": "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "version_context": "current PlayStation page accessed 2026-09-24",
+      "notes": "Documents distinct weapons/skills/combat styles plus Link Attacks and Chain Bursts."
+    },
+    {
+      "id": "ZZZ-PLAYER-REPLAY-20260918",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZZZ_Official/comments/1wjfjm3/a_very_nitpick_about_endgame_mode/",
+      "published": "2026-09-18",
+      "accessed": "2026-09-24",
+      "notes": "Requests direct post-boss Shiyu replay; replies support score-chasing value and note another mode already has direct retry. Anecdotal, not consensus."
+    },
+    {
+      "id": "ZZZ-PLAYER-RETRY-20240803",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZenlessZoneZero/comments/1ej6nzi/you_should_know_retrying_individual_battles_in/",
+      "published": "2024-08-03",
+      "accessed": "2026-09-24",
+      "notes": "Historical corroboration that fast battle restart is useful; not proof of a current unresolved defect."
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-197",
+      "title": "Role weakness intel",
+      "sources": ["ZZZ-APPSTORE-20260924"],
+      "adaptation": "Expose deterministic recommended attack style for each original Shadow Crypt enemy role.",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "bounded read-only intel, invalid index fails closed"
+    },
+    {
+      "id": "GAME-198",
+      "title": "Defense-created breach opening",
+      "sources": ["WUWA-APPSTORE-20260924"],
+      "adaptation": "Correct semantic defense opens one source-specific offensive opportunity.",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "source-specific, consumed once by next accepted attack on that enemy"
+    },
+    {
+      "id": "GAME-199",
+      "title": "Role-matched breach exploit",
+      "sources": ["ZZZ-APPSTORE-20260924", "GRANBLUE-PS-20260924"],
+      "adaptation": "Recommended style on an earned breach adds bounded health/posture payoff.",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "+10 health/+8 nominal posture only on matching style, no repeat farming"
+    },
+    {
+      "id": "GAME-200",
+      "title": "Bounded Shadow Flow reads",
+      "sources": ["ZZZ-APPSTORE-20260924", "WUWA-APPSTORE-20260924"],
+      "adaptation": "Three-step single-protagonist flow meter rewards consecutive correct semantic reads.",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "caps at 3, accepted failure resets, invalid timing does not mutate"
+    },
+    {
+      "id": "GAME-201",
+      "title": "Earned Flow Break heavy finisher",
+      "sources": ["GRANBLUE-PS-20260924", "ZZZ-APPSTORE-20260924"],
+      "adaptation": "Full Shadow Flow empowers exactly one accepted Heavy attack without party switching.",
+      "status": "implemented_pending_exact_head_gates",
+      "acceptance": "+12 health/+10 nominal posture, one-shot consumption"
+    },
+    {
+      "id": "QOL-041",
+      "title": "Immediate completed-room replay primitive",
+      "sources": ["ZZZ-PLAYER-REPLAY-20260918", "ZZZ-PLAYER-RETRY-20240803"],
+      "adaptation": "Completed Shadow Crypt skirmish can restart the same tier with fresh transient state.",
+      "status": "implemented_backend_pending_exact_head_gates",
+      "acceptance": "completion-only, same tier, fresh state, active replay rejects; production menu/input wiring explicitly not claimed"
+    }
+  ],
+  "allowed_paths": [
+    "Engine/Scene/ShadowCryptSkirmish.h",
+    "Tests/ShadowCryptSkirmishPass40Tests.inc",
+    "Tests/ThoughtCommandsTests.cpp",
+    "Tasks/GAME-PASS40-SHADOW-CRYPT-MASTERY-REPLAY-2026-09-24.md",
+    "Docs/Agents/animerpg-hourly/PASS40-BACKLOG.json",
+    "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS40.md",
+    "Docs/Agents/animerpg-hourly/STATE.json"
+  ],
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "explicit_regression_coverage": 6,
+    "production_owner_reachable": 5,
+    "backend_only": 1,
+    "exact_head_hosted_verified": 0,
+    "native_player_playable_verified": 0,
+    "independent_reviewed_clean": 0,
+    "merged": 0
+  },
+  "next_action": "Freeze the candidate head, run exact-head hosted Windows and release-manifest gates, request fresh Codex review, repair any findings, then guarded-merge only if main/head/checks/review remain clean."
+}
