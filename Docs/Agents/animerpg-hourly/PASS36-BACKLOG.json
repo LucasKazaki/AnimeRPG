@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS36-ENCOUNTER-SPECIAL-OFFENSIVE-2026-09-24",
+  "baseline": "1db755a0f06a936198a8a329d83ee2fd6a1052d3",
+  "target_branch": "main",
+  "working_branch": "game/pass36-encounter-special-offensive",
+  "accessed": "2026-09-24",
+  "features": [
+    {
+      "id": "GAME-177",
+      "title": "Special Offensive encounter scoring profile",
+      "reference": "https://zenless.hoyoverse.com/en-us/news/166073",
+      "gap": "Existing encounter scoring has Balanced and TechniqueFirst modes only.",
+      "adaptation": "Opt-in score-attack evaluation inside the existing EncounterChallengeTracker.",
+      "acceptance": "Legacy modes remain unchanged and SpecialOffensive uses existing encounter ownership."
+    },
+    {
+      "id": "GAME-178",
+      "title": "Active mixed-technique combo scoring",
+      "reference": "https://zenless.hoyoverse.com/en-us/news/166073",
+      "gap": "CombatSandbox tracks an authoritative technique chain but encounter scoring did not expose it.",
+      "adaptation": "Bounded score-only bonus from the existing active mixed-technique chain, maximum four.",
+      "acceptance": "Expired or pre-activation chain state cannot inflate the accepted encounter score."
+    },
+    {
+      "id": "GAME-179",
+      "title": "Selectable tactical score protocols",
+      "reference": "https://zenless.hoyoverse.com/en-us/news/166073",
+      "gap": "Tactical focus chooses a side-goal event but no separate score protocol exists.",
+      "adaptation": "Original ShadowTempo, RiftPressure and BalancedFlow score-only protocols.",
+      "acceptance": "Protocols never alter health, damage, enemy state, rewards or persistent progression."
+    },
+    {
+      "id": "GAME-180",
+      "title": "Explicit score breakdown and time coefficient",
+      "reference": "https://zenless.hoyoverse.com/en-us/news/166073",
+      "gap": "Challenge result exposed an aggregate total rather than individual score axes.",
+      "adaptation": "Expose damage, technique, combo, protocol bonus, time coefficient, pre-difficulty and final score.",
+      "acceptance": "Breakdown is deterministic, activation-local and uses bounded arithmetic."
+    },
+    {
+      "id": "GAME-181",
+      "title": "Per-difficulty personal best retention",
+      "reference": "https://zenless.hoyoverse.com/en-us/news/166073",
+      "gap": "Tracker retains first-clear reward state but not a score-chase record.",
+      "adaptation": "Retain only a strictly higher positive SpecialOffensive score per difficulty across retries.",
+      "acceptance": "Worse replays cannot lower or duplicate the retained best."
+    },
+    {
+      "id": "QOL-037",
+      "title": "Read-only weakest-axis score coach",
+      "community_reference": "https://www.resetera.com/threads/zenless-zone-zero-ot2-bangboo-for-your-buck.1208418/page-467",
+      "community_date": "2026-01-08",
+      "current_resolution": "Current 2026-09-14 official Shadow Chase rules explicitly name more score components, so older criticism is treated as a historical player preference rather than proof of a current ZZZ defect.",
+      "gap": "Astral challenge totals do not explain which execution axis most limited a run.",
+      "adaptation": "Report Damage, Technique, Combo, Time or None from accepted score evidence without mutating gameplay.",
+      "acceptance": "Coach output is deterministic and read-only."
+    }
+  ],
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "target_increments": 6
+  }
+}
