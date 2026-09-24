@@ -2,7 +2,7 @@
 
 Date: 2026-09-24  
 Loop: `astral-art-hourly-20260922`  
-Status: **source tooling repaired and sandbox-verified; native Blender execution not run**
+Status: **source tooling repaired; native Blender execution not run**
 
 ## Scope reviewed
 
@@ -20,40 +20,37 @@ A second exact-head Codex review of `64ffc277811b8cb8f95578b862384f0593f5841f` f
 
 A third exact-head Codex review of `fb2867ae5f3151e27c7cfaa2b109379c705e9fc1` found two P2 issues. Head `2ad3bab391088419349cc27125f10df555efee0a` repaired reflected-transform parity and root/reachable-node GPU-instancing acceptance.
 
-The exact-head review of `2ad3bab391088419349cc27125f10df555efee0a` then found three additional P2 issues. Verifier repair commit `732537429dd555972098dd66d8fc926e81c58a77` addresses all three:
+The exact-head review of `2ad3bab391088419349cc27125f10df555efee0a` then found three additional P2 issues. The subsequent repair rejected GPU instancing and punctual-light payloads on every node, including unreachable nodes, rejected node cameras, and required optional animation/image/texture/camera collections to be absent or actual empty arrays.
 
-1. `EXT_mesh_gpu_instancing` is rejected in declarations, root payloads and every node extension container, including unreachable nodes.
-2. `KHR_lights_punctual` is rejected in declarations, root payloads and every node extension container because the fixed exporter profile has `export_lights=false`; node `camera` payloads are likewise rejected for `export_cameras=false`.
-3. Optional `animations`, `images`, `textures`, and `cameras` collections may be absent or actual empty JSON arrays only. Falsy non-array substitutions fail closed.
+The review that completed on `78c9acbc2dbbac312d0c9ca6cd4b0c82555b1b86` surfaced four remaining issues: one P1 regression in the committed GPU-instancing error-text expectation, plus P2 gaps for same-AABB world rotation, morph-target deformation, and extra `COLOR_0` rendering attributes. Verifier commit `738511005b5737b2693392d6fd64dec994e6a07a` and regression commit `6591b226e1760b83d022b43fa2aabef5b6c52397` repair them by:
 
-All three review threads were answered and resolved after the verifier repair.
+1. restoring a distinct `GPU instancing unsupported` failure path while keeping punctual-light failures separate;
+2. comparing the complete inherited 3x4 world transform within the fixed `1e-4` tolerance in addition to transform parity;
+3. rejecting primitive morph `targets`, mesh `weights`, and node `weights` across the complete bounded glTF;
+4. requiring the exact four rendering attributes `POSITION`, `NORMAL`, `TANGENT`, and `TEXCOORD_0`, so unverified vertex colors, skinning attributes, and other extras fail closed;
+5. adding three committed hidden regressions for 180-degree world rotation, morph deformation, and vertex-color injection, taking the additive hidden suite from seven to ten cases.
+
+The four newest review threads remain a gate until the repair is replied to, resolved, and independently re-reviewed on the final exact head.
 
 ## Author verification executed in sandbox
 
-The repaired verifier was exercised with the prior semantic/evidence coverage plus seven focused hidden-payload/type cases:
+Before publication, the repaired verifier was syntax-compiled and exercised with a focused in-memory fixture matching the committed test fixture's seven semantic nodes, three materials, embedded indexed triangle data and fixed receipt profile. The valid path returned `dcc_roundtrip_verified_not_astral_imported`; independent mutations for a 180-degree `Lawn` rotation, morph target with nonzero weight, `COLOR_0`, and `EXT_mesh_gpu_instancing` each failed with the intended repaired gate. This targeted probe is author evidence only and does not replace the repository suites or independent review.
+
+The committed verification commands remain:
 
 ```text
-python test_blender_roundtrip_national_mall_panel.py
-# PASS: 44/44 Blender round-trip verifier tests
-
-python test_blender_roundtrip_national_mall_panel_hidden_payloads.py
-# PASS: 7/7 Blender hidden-payload verifier tests
-
-python -m py_compile verify_blender_roundtrip_national_mall_panel.py test_blender_roundtrip_national_mall_panel.py test_blender_roundtrip_national_mall_panel_hidden_payloads.py
-# exit 0
+python Scripts/test_blender_roundtrip_national_mall_panel.py
+python Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
+python -m py_compile Scripts/blender_roundtrip_national_mall_panel.py Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
 ```
 
-The first 44-case run used a temporary expanded local copy of the existing suite while the verifier repair was being developed. The repository now preserves the original committed 37-case suite unchanged and adds `Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py` as a separate seven-case committed regression suite. Together the committed suites cover 44 cases without rewriting or weakening the earlier 37 cases.
-
-The seven added cases cover unreachable-node GPU instancing, punctual-light payloads, node cameras, and wrong-type `animations` / `images` / `textures` / `cameras` collections.
-
-The Windows workflow for pre-repair head `2ad3bab...`, run `35988421764` / #1040, completed successfully. Any hosted run on an older head is historical after this repair. A fresh exact-head hosted run and a fresh independent review are required before this PR leaves draft.
+The original committed suite remains 37 cases. The hidden-payload suite now contains ten cases, for 47 focused committed cases total. A fresh exact-head hosted run is required after these repairs; prior workflow run `35991975091` / #1055 passed on `78c9ac...` but is historical for later heads.
 
 ## Verification model
 
-The verifier does not require byte-identical glTF output. It decodes embedded buffers/accessors, validates the fixed source and receipt identities, scans the complete node collection for disabled exporter payloads, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, checks world-transform handedness, compares material semantics, and compares canonical winding-preserving triangle/attribute signatures for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
+The verifier does not require byte-identical glTF output. It decodes embedded buffers/accessors, validates the fixed source and receipt identities, scans the complete node and mesh collections for disabled or unverified payloads, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, checks full inherited world transforms and handedness, compares material semantics, and compares canonical winding-preserving triangle/attribute signatures for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
 
-The bounded output additionally rejects GPU instancing, punctual lights and node cameras, and requires optional animation/image/texture/camera collections to be absent or exact empty arrays. This gate is intentionally stricter than a filename/count check but is still only a DCC source-workflow gate. It cannot establish Astral compatibility.
+The bounded output rejects GPU instancing, punctual lights, node cameras, morph targets/weights and rendering attributes outside the four-source-attribute profile. Optional animation/image/texture/camera collections must be absent or exact empty arrays. This gate is intentionally stricter than a filename/count check but is still only a DCC source-workflow gate. It cannot establish Astral compatibility.
 
 ## Not run / not claimed
 
@@ -68,4 +65,4 @@ The bounded output additionally rejects GPU instancing, punctual lights and node
 
 ## Next acceptance
 
-First require a fresh exact-head hosted check and independent source review of this repaired packet. Then use the registered local execution path to prove Blender 5.2.2 availability, run the exact background command into a fresh evidence directory, preserve shell-level command/version/exit/hash evidence, and run this verifier plus the ART-006C Khronos evidence gate. Only real native outputs may advance the asset to `dcc_roundtrip_verified_not_astral_imported`.
+Require a fresh exact-head hosted check and independent source review of this repaired packet. Then use the registered local execution path to prove Blender 5.2.2 availability, run the exact background command into a fresh evidence directory, preserve shell-level command/version/exit/hash evidence, and run this verifier plus the ART-006C Khronos evidence gate. Only real native outputs may advance the asset to `dcc_roundtrip_verified_not_astral_imported`.
