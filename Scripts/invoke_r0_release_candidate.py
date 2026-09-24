@@ -29,6 +29,17 @@ DEFAULT_BRANCH = "agent/r0-loop-recovery-2026-08-11"
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 1800.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 120.0
 TERMINATION_GRACE_SECONDS = 10.0
+CAPTURE_SUPERVISOR_CODE = """import os, subprocess, sys
+process = subprocess.Popen(sys.argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+assert process.stdout is not None
+while True:
+    chunk = os.read(process.stdout.fileno(), 65536)
+    if not chunk:
+        break
+    sys.stdout.buffer.write(chunk)
+    sys.stdout.buffer.flush()
+raise SystemExit(process.wait())
+"""
 ALLOWED_CHANGES = {
     "Docs/Agents/LOOP_HEARTBEAT.json",
     "Docs/Agents/LOOP_STATUS_2026-08-11.md",
@@ -270,8 +281,9 @@ class R0Runner:
         timeout = self.capture_timeout if timeout_seconds is None else float(timeout_seconds)
         if not math.isfinite(timeout) or timeout <= 0:
             raise RecoveryFailure("Capture command has a non-positive timeout or a non-finite timeout.")
+        supervised = [sys.executable, "-c", CAPTURE_SUPERVISOR_CODE, *normalized]
         process = subprocess.Popen(
-            normalized,
+            supervised,
             cwd=str(cwd or self.source),
             text=True,
             stdout=subprocess.PIPE,
