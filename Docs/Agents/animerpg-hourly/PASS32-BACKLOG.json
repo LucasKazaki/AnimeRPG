@@ -42,51 +42,71 @@
       "url": "https://www.reddit.com/r/ZZZ_Official/comments/1rikhmx/how_do_you_guys_like_to_test_your_teams/",
       "use": "request for more training enemy variety and boss practice",
       "sentiment": "corroborated preference inside one discussion, with replies also using existing Free Training or live challenges; not consensus",
-      "current_resolution": "unestablished by inspected 2026-08-31 official Combat Training material"
+      "current_resolution": "unestablished by inspected current official Combat Training material"
     }
   ],
   "features": [
     {
       "id": "GAME-157",
       "title": "Shadow Crypt-gated Rift Warden mastery trial",
-      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
     },
     {
       "id": "GAME-158",
       "title": "Deterministic three-phase boss attack pattern",
-      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
     },
     {
       "id": "GAME-159",
       "title": "Difficulty- and phase-specific timed defense",
-      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
     },
     {
       "id": "GAME-160",
       "title": "Posture break and one-shot punish opening",
-      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
     },
     {
       "id": "GAME-161",
       "title": "Progressive difficulty unlocks and per-difficulty mastery records",
-      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
     },
     {
       "id": "QOL-033",
       "title": "Learned-phase boss practice",
-      "status": "implemented_owner_integrated_registered_regression_pending_exact_head_gates"
+      "status": "implemented_owner_integrated_registered_regression_candidate_verified_pending_final_documentation_head_gates"
     }
   ],
+  "review_repairs": [
+    "bind Warden entry to the protagonist that completed Shadow Crypt",
+    "penalize and bound missed stagger openings so score cannot be farmed or overflow",
+    "preserve best-record ordering when missed-opening evidence saturates",
+    "reject positive infinity, negative and NaN reaction timing without mutation",
+    "cover all nine difficulty-by-phase timing windows at exact and just-outside boundaries",
+    "prove per-difficulty records remain separate",
+    "prove a worse replay on the same trial cannot replace a better record",
+    "prove learned-phase practice preserves every ranked record field and difficulty unlock bit"
+  ],
+  "pre_documentation_verification": {
+    "source_test_head": "de919da6946a2f33345833304428b85218f398fb",
+    "windows_debug_release_run": 35960493908,
+    "windows_debug_release_run_number": 982,
+    "windows_debug_release_result": "success",
+    "release_manifest_run": 35960493883,
+    "release_manifest_run_number": 720,
+    "release_manifest_result": "success",
+    "independent_review": "fresh exact-source-head review requested; documentation completion intentionally requires a final-head rereview"
+  },
   "counts": {
     "reference_features_researched": 5,
     "community_improvements_researched": 1,
     "implemented": 6,
     "registered_regression_covered": 6,
     "game_domain_integrated": 6,
-    "hosted_verified_exact_head": 0,
+    "hosted_verified_exact_final_head": 0,
     "native_playable_verified": 0,
-    "independent_reviewed_clean": 0,
+    "independent_reviewed_clean_exact_final_head": 0,
     "merged": 0
   },
-  "next_action": "Finish pass records, open the scoped PR, then require exact-head Windows Debug/Release, release-manifest and fresh independent review before expected-head merge."
+  "next_action": "Finish the durable run/state records, then require hosted Windows Debug/Release, release-manifest integrity and fresh independent Codex review on the resulting exact documentation-complete head before expected-head merge."
 }
