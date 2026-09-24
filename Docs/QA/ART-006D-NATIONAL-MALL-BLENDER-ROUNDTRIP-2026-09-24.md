@@ -30,19 +30,22 @@ All three review threads were answered and resolved after the verifier repair.
 
 ## Author verification executed in sandbox
 
-The repaired verifier was exercised with a supplemental local harness containing the prior semantic/evidence cases plus seven focused hidden-payload/type cases:
+The repaired verifier was exercised with the prior semantic/evidence coverage plus seven focused hidden-payload/type cases:
 
 ```text
 python test_blender_roundtrip_national_mall_panel.py
 # PASS: 44/44 Blender round-trip verifier tests
 
-python -m py_compile verify_blender_roundtrip_national_mall_panel.py test_blender_roundtrip_national_mall_panel.py
+python test_blender_roundtrip_national_mall_panel_hidden_payloads.py
+# PASS: 7/7 Blender hidden-payload verifier tests
+
+python -m py_compile verify_blender_roundtrip_national_mall_panel.py test_blender_roundtrip_national_mall_panel.py test_blender_roundtrip_national_mall_panel_hidden_payloads.py
 # exit 0
 ```
 
-The seven supplemental cases cover unreachable-node GPU instancing, punctual-light payloads, node cameras, and wrong-type `animations` / `images` / `textures` / `cameras` collections.
+The first 44-case run used a temporary expanded local copy of the existing suite while the verifier repair was being developed. The repository now preserves the original committed 37-case suite unchanged and adds `Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py` as a separate seven-case committed regression suite. Together the committed suites cover 44 cases without rewriting or weakening the earlier 37 cases.
 
-The repository's persisted `Scripts/test_blender_roundtrip_national_mall_panel.py` is still the prior 37-case suite at this candidate. A direct connector write of the expanded test file was blocked before mutation, so the 44-case supplemental harness is sandbox evidence only and is not represented as committed regression coverage. No existing repository tests were removed or weakened.
+The seven added cases cover unreachable-node GPU instancing, punctual-light payloads, node cameras, and wrong-type `animations` / `images` / `textures` / `cameras` collections.
 
 The Windows workflow for pre-repair head `2ad3bab...`, run `35988421764` / #1040, completed successfully. Any hosted run on an older head is historical after this repair. A fresh exact-head hosted run and a fresh independent review are required before this PR leaves draft.
 
