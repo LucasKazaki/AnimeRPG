@@ -45,7 +45,7 @@ def accessor(g:dict[str,Any],bs:list[bytes],ai:int)->list[tuple[float|int,...]]:
     code,cs=CF[ct];k=NC[ty];packed=cs*k;stride=v.get("byteStride",packed);req(jint(stride) and stride>=packed and stride%cs==0,f"accessor {ai} stride invalid")
     start=vo+ao;end=start+(stride*(n-1)+packed if n else 0);req(end<=vo+vl and end<=len(bs[bi]),f"accessor {ai} escapes buffer");fmt="<"+code*k;out=[]
     for j in range(n):
-        q=struct.unpack_from(fmt,bs[bi],start+j*stride);req(ct!=5126 or all(math.isfinite(float(x)) for x in q),f"accessor {ai} nonfinite");out.append(q)
+        qv=struct.unpack_from(fmt,bs[bi],start+j*stride);req(ct!=5126 or all(math.isfinite(float(x)) for x in qv),f"accessor {ai} nonfinite");out.append(qv)
     return out
 def acontract(g,ai,ct,ty,label):
     ac=g.get("accessors");req(type(ac) is list and jint(ai) and 0<=ai<len(ac),f"{label} accessor invalid");a=ac[ai];req(type(a) is dict and a.get("componentType")==ct and a.get("type")==ty,f"{label} accessor format invalid")
@@ -57,6 +57,10 @@ def local(n):
     t=n.get("translation",[0,0,0]);s=n.get("scale",[1,1,1]);q=n.get("rotation",[0,0,0,1]);req(all(type(x) is list for x in (t,s,q)) and len(t)==3 and len(s)==3 and len(q)==4 and all(num(x) for x in t+s+q),"node TRS invalid")
     x,y,z,w=map(float,q);l=math.sqrt(x*x+y*y+z*z+w*w);req(l>0,"zero quaternion");x,y,z,w=[v/l for v in (x,y,z,w)]
     R=[[1-2*(y*y+z*z),2*(x*y-z*w),2*(x*z+y*w),0],[2*(x*y+z*w),1-2*(x*x+z*z),2*(y*z-x*w),0],[2*(x*z-y*w),2*(y*z+x*w),1-2*(x*x+y*y),0],[0,0,0,1]];S=ident();T=ident();S[0][0],S[1][1],S[2][2]=map(float,s);T[0][3],T[1][3],T[2][3]=map(float,t);return mul(T,mul(R,S))
+def det3(m):
+    return m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])-m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])+m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0])
+def parity(m):
+    d=det3(m);req(math.isfinite(d) and abs(d)>1e-12,"mesh world transform singular");return 1 if d>0 else -1
 def pt(m,p):
     v=[float(p[0]),float(p[1]),float(p[2]),1.];return tuple(sum(m[r][k]*v[k] for k in range(4)) for r in range(3))
 def materials(g):
@@ -72,9 +76,10 @@ def corner(pos,nor,tan,uv,i):return (q(pos[i][:3]),q(nor[i][:3]),q(tan[i][:4]),q
 def tri(c):
     req(len(c)==3,"triangle corner count invalid");return min(tuple(c),tuple(c[1:]+c[:1]),tuple(c[2:]+c[:2]))
 def semantics(g):
-    ns=g.get("nodes");meshes=g.get("meshes");ms=g.get("materials",[]);sc=g.get("scenes");si=g.get("scene",0);req(type(ns) is list and type(meshes) is list and type(sc) is list and jint(si) and 0<=si<len(sc),"scene graph invalid");roots=sc[si].get("nodes");req(type(roots) is list,"scene roots invalid");bs=buffers(g);seen=set();out={}
+    used=g.get("extensionsUsed",[]);required=g.get("extensionsRequired",[]);req(type(used) is list and all(type(x) is str for x in used) and type(required) is list and all(type(x) is str for x in required),"glTF extensions declarations invalid");req("EXT_mesh_gpu_instancing" not in used and "EXT_mesh_gpu_instancing" not in required,"GPU instancing unsupported in ART-006D")
+    ns=g.get("nodes");meshes=g.get("meshes");ms=g.get("materials",[]);sc=g.get("scenes");si=g.get("scene",0);req(type(ns) is list and type(meshes) is list and type(sc) is list and jint(si) and 0<=si<len(sc),"scene graph invalid");scene=sc[si];req(type(scene) is dict,"scene invalid");roots=scene.get("nodes");req(type(roots) is list,"scene roots invalid");bs=buffers(g);seen=set();out={}
     def walk(i,parent):
-        req(jint(i) and 0<=i<len(ns) and i not in seen,"node graph invalid/cyclic");seen.add(i);n=ns[i];req(type(n) is dict,"node invalid");world=mul(parent,local(n));name=n.get("name");mi=n.get("mesh")
+        req(jint(i) and 0<=i<len(ns) and i not in seen,"node graph invalid/cyclic");seen.add(i);n=ns[i];req(type(n) is dict,"node invalid");ext=n.get("extensions",{});req(type(ext) is dict,"node extensions invalid");req("EXT_mesh_gpu_instancing" not in ext,"GPU instancing unsupported in ART-006D");world=mul(parent,local(n));name=n.get("name");mi=n.get("mesh")
         if mi is not None:
             req(type(name) is str and name in NAMES,f"unexpected mesh instance {name!r}");req(name not in out,f"duplicate mesh instance {name}");req(jint(mi) and 0<=mi<len(meshes),f"{name} mesh invalid");mesh=meshes[mi];req(type(mesh) is dict,f"{name} mesh invalid");ps=mesh.get("primitives");req(type(ps) is list and ps,f"{name} primitives missing");mins=[math.inf]*3;maxs=[-math.inf]*3;bound=set();top=[]
             for p in ps:
@@ -88,7 +93,7 @@ def semantics(g):
                     wv=pt(world,pos[ii]);
                     for a in range(3):mins[a]=min(mins[a],wv[a]);maxs[a]=max(maxs[a],wv[a])
                 for j in range(0,len(idx),3):top.append((mn,tri([corner(pos,nor,tan,uv,idx[j+k]) for k in range(3)])))
-            out[name]={"center":tuple((mins[a]+maxs[a])/2 for a in range(3)),"dimensions":tuple(maxs[a]-mins[a] for a in range(3)),"materials":bound,"topology":tuple(sorted(top))}
+            out[name]={"center":tuple((mins[a]+maxs[a])/2 for a in range(3)),"dimensions":tuple(maxs[a]-mins[a] for a in range(3)),"materials":bound,"topology":tuple(sorted(top)),"parity":parity(world)}
         elif name in NAMES:raise VerificationError(f"{name} expected mesh instance missing mesh")
         ch=n.get("children",[]);req(type(ch) is list,"children invalid")
         for c in ch:walk(c,world)
@@ -112,12 +117,12 @@ def verify(source:Path,manifest:Path,roundtrip:Path,blend:Path,receipt_path:Path
     b=rec.get("blender");req(type(b) is dict and set(b)=={"version","version_tuple","executable"} and b["version"]=="5.2.2" and type(b["version_tuple"]) is list and b["version_tuple"]==[5,2,2] and all(jint(x) for x in b["version_tuple"]) and type(b["executable"]) is str and b["executable"],"Blender evidence invalid")
     strict_resource(rec.get("input"),source,"input");o=rec.get("output");req(type(o) is dict and set(o)=={"gltf","blend"},"receipt output invalid");strict_resource(o["gltf"],roundtrip,"output.gltf");strict_resource(o["blend"],blend,"output.blend")
     im=rec.get("imported_scene");req(type(im) is dict and set(im)=={"mesh_object_count","object_names","material_names"} and jint(im.get("mesh_object_count")) and im["mesh_object_count"]==7,"import inventory invalid");exact_names(im.get("object_names"),NAMES);exact_names(im.get("material_names"),MATS);exact_export(rec.get("export_settings"))
-    req(type(out.get("asset")) is dict and out["asset"].get("version")=="2.0" and not out.get("animations") and not out.get("images") and not out.get("textures"),"round-trip glTF scope invalid")
+    req(type(out.get("asset")) is dict and out["asset"].get("version")=="2.0" and not out.get("animations") and not out.get("images") and not out.get("textures") and not out.get("cameras"),"round-trip glTF scope invalid")
     sm=materials(src);om=materials(out);req(set(sm)==MATS and set(om)==MATS,"material inventory drift")
     for n in MATS:req(matclose(sm[n],om[n]),f"{n} material property drift")
     ss=semantics(src);os=semantics(out)
     for n in NAMES:
-        req(close(ss[n]["center"],os[n]["center"]) and close(ss[n]["dimensions"],os[n]["dimensions"]) and ss[n]["materials"]==os[n]["materials"],f"{n} transform/material binding drift");req(ss[n]["topology"]==os[n]["topology"],f"{n} topology/attribute drift")
+        req(ss[n]["parity"]==os[n]["parity"],f"{n} transform parity drift");req(close(ss[n]["center"],os[n]["center"]) and close(ss[n]["dimensions"],os[n]["dimensions"]) and ss[n]["materials"]==os[n]["materials"],f"{n} transform/material binding drift");req(ss[n]["topology"]==os[n]["topology"],f"{n} topology/attribute drift")
     return {"nodes":7,"source_sha256":sha(source),"roundtrip_sha256":sha(roundtrip),"blend_sha256":sha(blend),"blender":"5.2.2","tolerance_m":TOLERANCE,"status":"dcc_roundtrip_verified_not_astral_imported"}
 def main():
     p=argparse.ArgumentParser();p.add_argument("--source",required=True,type=Path);p.add_argument("--manifest",required=True,type=Path);p.add_argument("--roundtrip",required=True,type=Path);p.add_argument("--blend",required=True,type=Path);p.add_argument("--receipt",required=True,type=Path);a=p.parse_args()
