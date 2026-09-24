@@ -45,14 +45,14 @@
     "known_failed_windows_result": "Debug_build_failed_before_tests_after_owner_API_repair; registered tests still called now-private stateful methods; repaired_on_later_head",
     "known_release_manifest_run": 35930449015,
     "known_release_manifest_result": "success_on_6957ff8_but_not_final_acceptance",
-    "superseded_green_head": "0b9e6d88bb70070475b052e426b7b25d8f148ff4",
-    "superseded_green_windows_run": 35934146994,
-    "superseded_green_release_manifest_run": 35934146841,
-    "superseded_green_reason": "fresh independent review found stale durable path inventories and review-history records; later documentation-only repairs moved the head",
-    "hosted_windows_ci": "pending_exact_final_head_after_durable_record_repairs",
-    "release_manifest": "pending_exact_final_head_after_durable_record_repairs",
-    "native_windows_interactive": "not_run_not_claimed",
-    "independent_review": "two_P1_and_eight_P2_material_findings_repaired_threads_resolved_fresh_exact_final_head_review_pending",
+    "superseded_green_head": "06b5f57e880737ab286e421244d75234139968bc",
+    "superseded_green_windows_run": 35934957614,
+    "superseded_green_release_manifest_run": 35934957584,
+    "superseded_green_reason": "fresh independent review found that literal hosted gate commands and exit semantics were not retained in the durable task/receipt; documentation repair moved the head",
+    "hosted_windows_ci": "pending_exact_final_head_after_command_evidence_repair",
+    "release_manifest": "pending_exact_final_head_after_command_evidence_repair",
+    "native_windows_interactive": "not_applicable_to_backend_only_pass_not_run_not_claimed",
+    "independent_review": "two_P1_and_nine_P2_material_findings_repaired; prior_threads_resolved_and_command_evidence_thread_repaired_pending_resolution; fresh_exact_final_head_review_pending",
     "integration": "ShadowbladeActions exposes a const ShadowbladeLoadoutWorkbench beside authoritative ShadowbladeLoadout; preset labels and last-applied metadata live with ShadowbladeLoadout; successful direct or owner-wrapped preset apply shares authoritative recall bookkeeping; transient reset preserves the loadout; native input/UI not wired",
     "persistent_cross_process_save": "workbench_session_metadata_not_persisted_not_claimed"
   },
@@ -62,8 +62,8 @@
     "gameplay_paths": "ShadowbladeLoadoutWorkbench_h_plus_ShadowbladeLoadout_h_plus_ShadowbladeActions_h_plus_narrow_existing_ShadowbladeActions_cpp_reset_helper_plus_registered_game_tests_only"
   },
   "review_history": {
-    "material_findings_repaired": 10,
-    "severity_breakdown": "2_P1_8_P2",
+    "material_findings_repaired": 11,
+    "severity_breakdown": "2_P1_9_P2",
     "summary": [
       "CurrentSlot family-synergy leakage repaired.",
       "Missing bounded task/receipt records repaired.",
@@ -74,8 +74,9 @@
       "Direct preset-apply recall bypass repaired.",
       "Run-receipt ShadowbladeLoadout.h omission repaired.",
       "Backlog and STATE ShadowbladeLoadout.h inventory omissions repaired.",
-      "Durable independent-review history reconciled across retained records."
+      "Durable independent-review history reconciled across retained records.",
+      "Literal hosted configure/build/test/scope commands and observed exit semantics retained; no native runtime command applies to this backend-only pass."
     ]
   },
-  "next_action": "Use the final durable-record repair commit as the exact candidate, require green Windows Debug/Release and Release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
+  "next_action": "Use the complete command-evidence repair commit as the exact candidate, require green Windows Debug/Release and Release-manifest workflows plus fresh independent review on that same SHA, then re-read main/head/diff/threads and expected-head merge if clean."
 }
