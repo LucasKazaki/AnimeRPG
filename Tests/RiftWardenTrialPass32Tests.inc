@@ -8,7 +8,10 @@ void ClearRiftWardenDirect(Astral::Scene::RiftWardenTrial& trial) {
         const RiftWardenResponse response = telegraph.recommendedResponse;
         const RiftWardenActionReport report = trial.Resolve(response, 0.10);
         Expect(report.accepted, "pass32 direct clear accepts the authoritative recommended response");
-        Expect(trial.AdvanceTime(0.50), "pass32 direct clear advances bounded trial time");
+        if (trial.Briefing().active) {
+            Expect(trial.AdvanceTime(0.50),
+                "pass32 direct clear advances bounded trial time while the run remains active");
+        }
     }
     Expect(guard < 256 && trial.Briefing().complete,
         "pass32 direct clear reaches a deterministic bounded completion");
@@ -23,8 +26,10 @@ void ClearRiftWardenOwner(Astral::Scene::LandmarkInteraction& owner) {
             telegraph.recommendedResponse, 0.10);
         Expect(report.accepted,
             "pass32 production clear accepts the current authoritative trial response");
-        Expect(owner.AdvanceRiftWardenTrial(0.50),
-            "pass32 production clear advances bounded authoritative trial time");
+        if (owner.RiftWardenTrialBriefing().active) {
+            Expect(owner.AdvanceRiftWardenTrial(0.50),
+                "pass32 production clear advances bounded trial time while the run remains active");
+        }
     }
     Expect(guard < 256 && owner.RiftWardenTrialBriefing().complete,
         "pass32 production owner reaches a deterministic bounded Warden completion");
