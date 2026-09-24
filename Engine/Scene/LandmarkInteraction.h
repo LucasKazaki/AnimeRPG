@@ -248,7 +248,10 @@ public:
     bool ResumeShadowCrypt() { return shadowCryptMission_.ResumeSuspendedRun(); }
     bool ReplayCompletedShadowCrypt() {
         if (progression_ != shadowCryptProgressionOwner_) return false;
-        return shadowCryptMission_.ReplayCompletedRun(fieldGuide_);
+        if (!shadowCryptMission_.ReplayCompletedRun(fieldGuide_)) return false;
+        shadowCryptSkirmish_ = ShadowCryptSkirmish{};
+        shadowCryptSkirmishObjectiveAdvanced_ = false;
+        return true;
     }
     ShadowCryptMissionBriefing ShadowCryptBriefing() const {
         return shadowCryptMission_.Briefing();
@@ -325,10 +328,10 @@ public:
             || !shadowCryptSkirmish_.Active() || !shadowCryptMission_.Briefing().active) {
             return {};
         }
-        const ShadowCryptDefenseReport report =
+        ShadowCryptDefenseReport report =
             shadowCryptSkirmish_.ResolveThreat(response, reactionSeconds);
         if (report.accepted && report.damageTaken > 0) {
-            shadowCryptMission_.RecordDamageTaken(report.damageTaken);
+            report.damageTaken = shadowCryptMission_.RecordDamageTaken(report.damageTaken);
         }
         return report;
     }
