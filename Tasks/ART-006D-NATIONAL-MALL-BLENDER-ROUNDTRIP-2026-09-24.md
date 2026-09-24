@@ -16,6 +16,7 @@ This task does **not** install Blender, run Company Runtime, change Astral engin
 - `Scripts/blender_roundtrip_national_mall_panel.py`
 - `Scripts/verify_blender_roundtrip_national_mall_panel.py`
 - `Scripts/test_blender_roundtrip_national_mall_panel.py`
+- `Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py`
 - `Tasks/ART-006D-NATIONAL-MALL-BLENDER-ROUNDTRIP-2026-09-24.md`
 - `Docs/QA/ART-006D-NATIONAL-MALL-BLENDER-ROUNDTRIP-2026-09-24.md`
 
@@ -92,11 +93,14 @@ These do not execute Blender:
 
 ```text
 python Scripts/test_blender_roundtrip_national_mall_panel.py
-python -m py_compile Scripts/blender_roundtrip_national_mall_panel.py Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py
+python Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
+python -m py_compile Scripts/blender_roundtrip_national_mall_panel.py Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
 ```
+
+The two focused suites are additive: the original 37-case suite remains intact, and the hidden-payload suite adds seven regressions for the fourth review repairs.
 
 ## Stop condition
 
-This bounded packet stops when the scripts/profile/task/QA changes are published, the focused standard-library regression suite and Python compilation pass, hosted repository checks are observed, and independent exact-head source review is completed under the existing art-worker gate.
+This bounded packet stops when the scripts/profile/task/QA changes are published, both focused standard-library regression suites and Python compilation pass, hosted repository checks are observed, and independent exact-head source review is completed under the existing art-worker gate.
 
 Native Blender execution is a separate future gate. A clean source packet must not be labeled `dcc_roundtrip_executed_not_astral_imported` until real Blender 5.2.2 outputs and shell receipts exist.
