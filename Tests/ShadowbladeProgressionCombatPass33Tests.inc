@@ -335,6 +335,63 @@ void TestShadowbladeProgressionCombatPass33() {
             && punishTip.expectedResponse == RiftWardenResponse::Strike,
         "pass34 missed punish is retained as attack-specific practice and coaching evidence");
 
+    RiftWardenTrial saturatedGuidanceTrial;
+    Expect(saturatedGuidanceTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass34 saturation fixture begins a ranked Story Warden trial");
+    int saturationSteps = 0;
+    while (saturatedGuidanceTrial.TrainingRecord(RiftWardenAttack::RiftSlash).attempts
+               < RiftWardenTrial::MaximumTrainingAttempts
+           && saturationSteps < 25000) {
+        const RiftWardenTelegraph telegraph = saturatedGuidanceTrial.CurrentTelegraph();
+        const RiftWardenResponse response =
+            telegraph.attack == RiftWardenAttack::StaggerOpening
+                ? RiftWardenResponse::Guard
+                : telegraph.recommendedResponse;
+        Expect(saturatedGuidanceTrial.Resolve(response, 0.10).accepted,
+            "pass34 saturation fixture accepts each bounded training sample");
+        ++saturationSteps;
+    }
+    const RiftWardenTrainingRecord saturatedOpening =
+        saturatedGuidanceTrial.TrainingRecord(RiftWardenAttack::RiftSlash);
+    Expect(saturatedOpening.attempts == RiftWardenTrial::MaximumTrainingAttempts
+            && saturatedOpening.successes <= saturatedOpening.attempts
+            && saturatedOpening.lastSeenPhase == RiftWardenPhase::Opening,
+        "pass34 training counters saturate without corrupting success ratios");
+
+    int phaseAdvanceSteps = 0;
+    while (saturatedGuidanceTrial.Briefing().phase == RiftWardenPhase::Opening
+           && phaseAdvanceSteps < 32) {
+        const RiftWardenTelegraph telegraph = saturatedGuidanceTrial.CurrentTelegraph();
+        Expect(saturatedGuidanceTrial.Resolve(telegraph.recommendedResponse, 0.10).accepted,
+            "pass34 saturation fixture advances to a later phase through valid play");
+        ++phaseAdvanceSteps;
+    }
+    Expect(saturatedGuidanceTrial.Briefing().phase == RiftWardenPhase::Fracture,
+        "pass34 saturation fixture reaches Fracture after bounded successful punishes");
+    int seekRiftSlashSteps = 0;
+    while (saturatedGuidanceTrial.CurrentTelegraph().attack != RiftWardenAttack::RiftSlash
+           && seekRiftSlashSteps < 8) {
+        const RiftWardenTelegraph telegraph = saturatedGuidanceTrial.CurrentTelegraph();
+        const RiftWardenResponse response =
+            telegraph.attack == RiftWardenAttack::StaggerOpening
+                ? RiftWardenResponse::Guard
+                : telegraph.recommendedResponse;
+        Expect(saturatedGuidanceTrial.Resolve(response, 0.10).accepted,
+            "pass34 saturation fixture seeks a Fracture Rift Slash without leaving the phase");
+        ++seekRiftSlashSteps;
+    }
+    const RiftWardenTelegraph saturatedRiftSlash = saturatedGuidanceTrial.CurrentTelegraph();
+    Expect(saturatedRiftSlash.attack == RiftWardenAttack::RiftSlash,
+        "pass34 saturation fixture deterministically reaches Rift Slash in Fracture");
+    Expect(saturatedGuidanceTrial.Resolve(saturatedRiftSlash.recommendedResponse, 0.10).accepted,
+        "pass34 saturated Rift Slash remains an accepted encounter sample");
+    const RiftWardenTrainingRecord saturatedFracture =
+        saturatedGuidanceTrial.TrainingRecord(RiftWardenAttack::RiftSlash);
+    Expect(saturatedFracture.attempts == RiftWardenTrial::MaximumTrainingAttempts
+            && saturatedFracture.successes == saturatedOpening.successes
+            && saturatedFracture.lastSeenPhase == RiftWardenPhase::Fracture,
+        "pass34 saturated counters stay frozen while last-seen phase tracks later encounters");
+
     const RiftWardenBriefing guidanceBriefing = guidanceTrial.Briefing();
     Expect(guidanceBriefing.practiceRecommendation.available
             && guidanceBriefing.coachTip.available
