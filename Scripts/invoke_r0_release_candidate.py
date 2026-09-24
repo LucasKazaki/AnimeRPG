@@ -29,7 +29,7 @@ DEFAULT_BRANCH = "agent/r0-loop-recovery-2026-08-11"
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 1800.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 120.0
 TERMINATION_GRACE_SECONDS = 10.0
-CAPTURE_SUPERVISOR_CODE = r"""import os, subprocess, sys
+CAPTURE_SUPERVISOR_CODE = r"""import os, signal, subprocess, sys
 if os.name == "nt":
     import ctypes
     from ctypes import wintypes
@@ -99,7 +99,16 @@ while True:
         break
     sys.stdout.buffer.write(chunk)
     sys.stdout.buffer.flush()
-raise SystemExit(process.wait())
+returncode = process.wait()
+if os.name != "nt" and returncode < 0:
+    signal_number = -returncode
+    try:
+        signal.signal(signal_number, signal.SIG_DFL)
+    except (OSError, ValueError):
+        pass
+    os.kill(os.getpid(), signal_number)
+    os._exit(128 + signal_number)
+raise SystemExit(returncode)
 """
 ALLOWED_CHANGES = {
     "Docs/Agents/LOOP_HEARTBEAT.json",
