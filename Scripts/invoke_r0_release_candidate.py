@@ -179,7 +179,9 @@ class R0Runner:
             return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
         return {"start_new_session": True}
 
-    def _terminate_process_tree(self, process: subprocess.Popen[str]) -> None:
+    def _terminate_process_tree(
+        self, process: subprocess.Popen[str], *, wait_for_parent: bool = True
+    ) -> None:
         if process.poll() is not None:
             return
         if os.name == "nt":
@@ -203,10 +205,11 @@ class R0Runner:
                 process.kill()
             except OSError:
                 pass
-        try:
-            process.wait(timeout=TERMINATION_GRACE_SECONDS)
-        except (subprocess.TimeoutExpired, OSError):
-            pass
+        if wait_for_parent:
+            try:
+                process.wait(timeout=TERMINATION_GRACE_SECONDS)
+            except (subprocess.TimeoutExpired, OSError):
+                pass
 
     def _wait_process(self, process: subprocess.Popen[str], timeout: float) -> int:
         return process.wait(timeout=timeout)
@@ -272,7 +275,7 @@ class R0Runner:
         try:
             output, _ = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
-            self._terminate_process_tree(process)
+            self._terminate_process_tree(process, wait_for_parent=False)
             try:
                 output = self._drain_after_timeout(process)
             except RecoveryFailure as cleanup_error:
