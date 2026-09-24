@@ -126,6 +126,12 @@ public:
         return true;
     }
 
+    bool Cancel() {
+        if (!active_) return false;
+        Reset();
+        return true;
+    }
+
     bool Active() const { return active_; }
     bool Complete() const { return complete_; }
     ShadowCryptSkirmishTier Tier() const { return tier_; }
@@ -234,7 +240,9 @@ public:
             enemy.posture = enemy.maxPosture;
             report.staggerConsumed = true;
         } else {
+            const int postureBefore = enemy.posture;
             enemy.posture = std::max(0, enemy.posture - postureDamage);
+            report.postureDamage = postureBefore - enemy.posture;
             if (enemy.posture == 0) {
                 enemy.staggered = true;
                 report.staggerOpened = true;
@@ -244,7 +252,6 @@ public:
         const int beforeHealth = enemy.health;
         enemy.health = std::max(0, enemy.health - healthDamage);
         report.healthDamage = beforeHealth - enemy.health;
-        report.postureDamage = postureDamage;
         if (enemy.health == 0) {
             enemy.defeated = true;
             enemy.staggered = false;
