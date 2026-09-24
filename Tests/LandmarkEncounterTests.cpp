@@ -239,6 +239,141 @@ void TestConfiguredChallengeRewardsPersistAcrossRetryAndRespectCap() {
         "challenge-disabled activation preserves existing technique-chain behavior");
 }
 
+void TestSpecialOffensiveScorecardAndCoach() {
+    using namespace Astral::Scene;
+
+    EncounterChallengeTracker scorecard;
+    scorecard.Configure(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Balanced,
+        EncounterScoringMode::SpecialOffensive,
+        EncounterTacticalBuff::ShadowTempo);
+    const EncounterChallengeResult first = scorecard.Resolve({
+        0, 1, 1, 0, true, EncounterTimeGrade::Gold, 100, 60, 3});
+    Expect(first.score == 230 && first.breakdown.damageScore == 100
+            && first.breakdown.techniqueScore == 60,
+        "Special Offensive reports damage and technique score as separate bounded components");
+    Expect(first.breakdown.activeTechniqueChain == 3
+            && first.breakdown.techniqueComboBonus == 12,
+        "active mixed-technique chain contributes an explicit bounded combo bonus");
+    Expect(first.breakdown.tacticalBuff == EncounterTacticalBuff::ShadowTempo
+            && first.breakdown.tacticalBuffBonus == 12,
+        "selected Shadow Tempo protocol rewards maintaining an active technique chain");
+    Expect(first.breakdown.timeCoefficientPercent
+            == EncounterChallengeTracker::GoldTimeCoefficientPercent
+            && first.breakdown.scoreBeforeDifficulty == 230,
+        "Gold clear applies the explicit time coefficient after score components are combined");
+    Expect(first.newPersonalBest && first.previousBestScore == 0
+            && scorecard.BestSpecialOffensiveScore(EncounterChallengeDifficulty::Standard) == 230,
+        "first positive Special Offensive result establishes a per-difficulty personal best");
+    Expect(first.coachFocus == EncounterScoreCoachFocus::Combo,
+        "score coach identifies the remaining combo-depth opportunity on an otherwise balanced clear");
+
+    const EncounterChallengeResult worse = scorecard.Resolve({
+        0, 1, 0, 0, true, EncounterTimeGrade::Gold, 80, 40, 2});
+    Expect(worse.score == 165 && !worse.newPersonalBest
+            && worse.previousBestScore == 230
+            && scorecard.BestSpecialOffensiveScore(EncounterChallengeDifficulty::Standard) == 230,
+        "lower replay score cannot replace the retained personal best");
+
+    scorecard.Configure(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Balanced,
+        EncounterScoringMode::SpecialOffensive,
+        EncounterTacticalBuff::BalancedFlow);
+    const EncounterChallengeResult improved = scorecard.Resolve({
+        0, 1, 1, 1, true, EncounterTimeGrade::Gold, 100, 100, 4});
+    Expect(improved.breakdown.techniqueComboBonus == 30
+            && improved.breakdown.tacticalBuffBonus == 25
+            && improved.score == 318,
+        "Balanced Flow and a capped four-step technique chain compose deterministically");
+    Expect(improved.newPersonalBest && improved.previousBestScore == 230
+            && improved.coachFocus == EncounterScoreCoachFocus::None,
+        "well-balanced Gold execution can replace the prior best without fabricating a coaching deficit");
+
+    EncounterChallengeTracker slow;
+    slow.Configure(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Balanced,
+        EncounterScoringMode::SpecialOffensive,
+        EncounterTacticalBuff::RiftPressure);
+    const EncounterChallengeResult bronze = slow.Resolve({
+        0, 1, 0, 0, true, EncounterTimeGrade::Bronze, 100, 50, 2});
+    Expect(bronze.breakdown.tacticalBuffBonus == 0
+            && bronze.breakdown.timeCoefficientPercent
+                == EncounterChallengeTracker::BronzeTimeCoefficientPercent
+            && bronze.score == 116
+            && bronze.coachFocus == EncounterScoreCoachFocus::Time,
+        "Bronze run loses Rift Pressure speed bonus and receives an exact time-focused coaching cue");
+
+    EncounterChallengeTracker invalid;
+    invalid.Configure(static_cast<EncounterChallengeDifficulty>(999),
+        EncounterTacticalFocus::Balanced,
+        EncounterScoringMode::SpecialOffensive,
+        EncounterTacticalBuff::ShadowTempo);
+    Expect(!invalid.Enabled(),
+        "invalid challenge configuration fails closed instead of entering a scoring run");
+
+    EncounterChallengeTracker bounded;
+    bounded.Configure(EncounterChallengeDifficulty::Apex,
+        EncounterTacticalFocus::Balanced,
+        EncounterScoringMode::SpecialOffensive,
+        EncounterTacticalBuff::BalancedFlow);
+    const EncounterChallengeResult negative = bounded.Resolve({
+        0, 0, 0, 0, false, EncounterTimeGrade::Gold, -5, -10,
+        std::numeric_limits<int>::max()});
+    Expect(negative.score == 0 && negative.breakdown.damageScore == 0
+            && negative.breakdown.techniqueScore == 0
+            && negative.breakdown.activeTechniqueChain
+                == EncounterChallengeTracker::MaximumTechniqueCombo
+            && !negative.newPersonalBest
+            && negative.coachFocus == EncounterScoreCoachFocus::Damage,
+        "negative score inputs clamp to zero and extreme combo evidence saturates without overflow");
+
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    LandmarkEncounter encounter;
+    combat.SetTrainingEnemyProfile(TrainingEnemyProfile::Bulwark);
+    encounter.ConfigureChallenge(EncounterChallengeDifficulty::Standard,
+        EncounterTacticalFocus::Balanced,
+        EncounterScoringMode::SpecialOffensive,
+        EncounterTacticalBuff::ShadowTempo);
+    Expect(encounter.TryActivate(Discovery(LandmarkKind::LincolnMemorial), combat).result
+            == LandmarkEncounterResult::Activated,
+        "Special Offensive scoring uses the existing production landmark encounter activation");
+    combat.ApplyManaAffinity(ManaAffinity::Solar);
+    combat.ApplyManaAffinity(ManaAffinity::Umbral);
+    combat.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f});
+    combat.AdvanceTime(1.0f);
+    Expect(combat.TryAttack(AttackType::Heavy, {0.0f, 0.0f, 0.0f}).staggerTriggered
+            && combat.TechniqueChain() == 2,
+        "production encounter builds a two-step activation-local technique chain");
+    combat.ApplyDamage(combat.Dummy().health);
+    Expect(encounter.Update(combat, actions),
+        "production Special Offensive encounter resolves after the same authoritative target defeat");
+    const EncounterChallengeResult integrated = encounter.LastReport().challenge;
+    Expect(integrated.breakdown.damageScore == 180
+            && integrated.breakdown.techniqueScore == 50
+            && integrated.breakdown.activeTechniqueChain == 2
+            && integrated.breakdown.techniqueComboBonus == 5
+            && integrated.breakdown.tacticalBuffBonus == 10
+            && integrated.score == 306,
+        "LandmarkEncounter feeds activation-local damage, technique, chain, buff, and time evidence into the scorecard");
+    Expect(integrated.newPersonalBest
+            && encounter.ChallengeTracker().BestSpecialOffensiveScore(
+                EncounterChallengeDifficulty::Standard) == 306,
+        "production owner retains the accepted Special Offensive personal best");
+
+    Expect(encounter.Retry(combat, actions).result == LandmarkEncounterResult::Retried,
+        "existing immediate encounter replay preserves the configured scorecard");
+    combat.ApplyDamage(combat.Dummy().health);
+    Expect(encounter.Update(combat, actions),
+        "replayed encounter can resolve without rebuilding challenge configuration");
+    const EncounterChallengeResult replay = encounter.LastReport().challenge;
+    Expect(replay.breakdown.damageScore == 180 && replay.breakdown.techniqueScore == 0
+            && replay.score == 225 && !replay.newPersonalBest
+            && replay.previousBestScore == 306
+            && replay.coachFocus == EncounterScoreCoachFocus::Technique,
+        "replay preserves the best score and explains that a damage-only clear needs technique execution");
+}
+
 void TestManaReactionStateAndReset() {
     using namespace Astral::Scene;
     CombatSandbox combat;
@@ -631,6 +766,7 @@ int main() {
     TestActivationRequiresDesignatedDiscoveryAndLiveTarget();
     TestCompletionRewardsOnceThroughExistingCap();
     TestConfiguredChallengeRewardsPersistAcrossRetryAndRespectCap();
+    TestSpecialOffensiveScorecardAndCoach();
     TestManaReactionStateAndReset();
     TestComboFinisherAndAccessibleAssistPreset();
     TestObjectiveCompletionRewardIsOneShot();
