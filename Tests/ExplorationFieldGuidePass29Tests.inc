@@ -135,6 +135,17 @@ void TestExplorationFieldGuidePass29() {
             && capacity.RouteTarget(1).landmark == LandmarkKind::WashingtonMonument,
         "pass29 individual route removal compacts order and is idempotent");
 
+    ExplorationFieldGuide wraparound;
+    wraparound.SyncNarrativeEvidence({true, true, true, true});
+    Expect(wraparound.TrackOperation(FieldOperation::ShadowCryptLead)
+            && wraparound.OperationProgress(FieldOperation::RiftInvestigation).Complete()
+            && wraparound.OperationProgress(FieldOperation::ShadowCryptLead).Complete()
+            && !wraparound.OperationProgress(FieldOperation::MallSurvey).Complete(),
+        "pass29 wraparound setup leaves only Mall Survey incomplete while tracking the final operation");
+    Expect(wraparound.TrackNextIncompleteOperation()
+            && wraparound.TrackedOperation() == FieldOperation::MallSurvey,
+        "pass29 next-incomplete tracking wraps from Shadow Crypt Lead back to Mall Survey");
+
     ExplorationFieldGuide complete;
     Expect(complete.RecordLandmark(LandmarkKind::LincolnMemorial)
             && complete.RecordLandmark(LandmarkKind::ReflectingPool)
@@ -171,6 +182,12 @@ void TestExplorationFieldGuidePass29() {
             && !owner.RemoveFieldRouteTarget(LandmarkKind::WashingtonMonument)
             && owner.FieldBriefing().routeStops == 1,
         "pass29 production owner removal is exact and idempotent");
+    Expect(owner.ClearFieldRouteTargets() == 1
+            && owner.FieldBriefing().routeStops == 0
+            && owner.ClearFieldRouteTargets() == 0,
+        "pass29 production owner clears a nonempty route exactly once");
+    Expect(owner.AddFieldRouteTarget(LandmarkKind::ReflectingPool, FieldPinCategory::Resource),
+        "pass29 production route can be reseeded for live visit-pruning coverage");
     Expect(owner.TrackFieldOperation(FieldOperation::RiftInvestigation)
             && owner.TrackNextIncompleteFieldOperation()
             && owner.FieldBriefing().trackedOperation == FieldOperation::ShadowCryptLead,
@@ -195,5 +212,5 @@ void TestExplorationFieldGuidePass29() {
         "pass29 production owner read-all acknowledges exactly the newly discovered note once");
     Expect(owner.ClearFieldRouteTargets() == 0
             && owner.FieldBriefing().routeStops == 0,
-        "pass29 live route auto-pruning and batch clear stay consistent after visiting the remaining stop");
+        "pass29 live route auto-pruning leaves no route state for a later clear");
 }
