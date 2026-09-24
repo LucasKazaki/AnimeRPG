@@ -193,6 +193,16 @@ class R0RunnerSafetyTests(unittest.TestCase):
                     runner.establish_worktree()
             self.assertEqual((args.worktree / "tracked.txt").read_text(encoding="utf-8"), "evidence changed\n")
 
+    def test_rejects_non_finite_configured_deadlines(self) -> None:
+        for field in ("command_timeout_seconds", "capture_timeout_seconds"):
+            for value in (float("nan"), float("inf")):
+                with self.subTest(field=field, value=value):
+                    with tempfile.TemporaryDirectory() as temp:
+                        args = make_args(Path(temp))
+                        setattr(args, field, value)
+                        with self.assertRaisesRegex(r0.RecoveryFailure, "positive finite"):
+                            r0.R0Runner(args)
+
     def _tree_sleep_command(self, sentinel: Path, ready: Path | None = None) -> list[str]:
         child_code = (
             "import pathlib,time; time.sleep(2.0); "
@@ -230,6 +240,23 @@ class R0RunnerSafetyTests(unittest.TestCase):
             time.sleep(2.4)
             self.assertFalse(sentinel.exists(), "a descendant survived the timeout cleanup")
             self.assertTrue(runner.records[0].timed_out)
+
+    def test_run_command_rejects_non_finite_override_before_spawn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            for value in (float("nan"), float("inf")):
+                with self.subTest(value=value), mock.patch.object(r0.subprocess, "Popen") as popen:
+                    with self.assertRaisesRegex(r0.RecoveryFailure, "non-finite timeout"):
+                        runner.run_command(
+                            "invalid-timeout-fixture", ["fixture"],
+                            cwd=args.worktree, timeout_seconds=value,
+                        )
+                    popen.assert_not_called()
+            self.assertFalse(args.evidence_root.exists())
 
     def test_capture_timeout_kills_descendant(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -310,6 +337,18 @@ class R0RunnerSafetyTests(unittest.TestCase):
                 with self.assertRaisesRegex(r0.RecoveryFailure, "non-positive timeout"):
                     runner.capture(["fixture"], timeout_seconds=0)
                 popen.assert_not_called()
+
+    def test_capture_rejects_non_finite_override_before_spawn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            for value in (float("nan"), float("inf")):
+                with self.subTest(value=value), mock.patch.object(r0.subprocess, "Popen") as popen:
+                    with self.assertRaisesRegex(r0.RecoveryFailure, "non-finite timeout"):
+                        runner.capture(["fixture"], timeout_seconds=value)
+                    popen.assert_not_called()
 
     def test_interrupted_run_command_cleans_owned_tree_and_records_interrupt(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
