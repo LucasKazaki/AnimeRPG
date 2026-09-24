@@ -35,7 +35,7 @@ The verifier owns this ART-006B hash independently. A caller-supplied manifest c
 1. A Blender-native background driver pinned to Blender 5.2.2.
 2. One editable `.blend`, one embedded glTF and one strict JSON receipt when the driver is actually executed natively.
 3. A standard-library verifier that compares DCC output with ART-006B scene semantics rather than byte equality.
-4. Focused positive/negative regressions for evidence tampering, source substitution, receipt type confusion, scene inventory, complete inherited world transforms, topology/winding, exact rendering attributes across reachable and unreachable mesh primitives, morph-target rejection, materials, disabled-export payloads, GPU-instancing rejection and buffer/profile violations.
+4. Focused positive/negative regressions for evidence tampering, source substitution, receipt type confusion, scene inventory, complete inherited world transforms, topology/winding, exact rendering attributes and accessor payload contracts across reachable and unreachable mesh primitives, morph-target rejection, materials, disabled-export payloads, GPU-instancing rejection and buffer/profile violations.
 5. A versioned art-facing Blender/glTF profile based on current official Blender documentation.
 
 ## Round-trip semantic gate
@@ -47,12 +47,11 @@ For the bounded output it requires:
 - exactly the seven expected active-scene mesh-bearing semantic instances, with no extra or duplicate mesh instances;
 - indexed `TRIANGLES` only for every mesh primitive in the bounded glTF, including unreachable meshes;
 - an exact primitive rendering-attribute set of float `POSITION`, `NORMAL`, `TANGENT` and `TEXCOORD_0` on every mesh primitive in the bounded glTF, with no unverified `COLOR_0`, skinning, or other extra rendering attributes, including unreachable meshes;
-- unsigned-integer scalar index accessors;
-- nonzero `POSITION` count and identical `NORMAL`, `TANGENT` and `TEXCOORD_0` counts;
+- valid in-range float attribute accessors, valid buffer views/payload bounds, identical nonzero attribute counts, and unsigned-integer scalar index accessors with nonempty triangle-multiple index payloads whose indices stay within the decoded vertex range, for every mesh primitive including unreachable meshes;
 - world-space center/dimensions derived from referenced vertices and matching the ART-006B source within the verifier-owned, non-overridable `1e-4` metre tolerance;
 - the complete inherited 3x4 world transform for each semantic instance matching the ART-006B source within `1e-4`, in addition to matching transform orientation parity, so rotations, reflections, translations, scale and shear cannot preserve the AABB while changing rendered orientation;
 - semantic material bindings and base-color, metallic, roughness, emissive, alpha and sidedness preservation;
-- canonical triangle signatures that preserve winding and include referenced position/normal/tangent/UV payloads, so connectivity, culling orientation, shading basis or UV drift fails closed;
+- winding-preserving triangle/corner comparison that keeps triangle topology strict but compares position/normal/tangent/UV components pairwise with the full `1e-4` tolerance, rather than independently quantizing values into buckets;
 - no primitive morph `targets`, mesh `weights`, or node `weights` anywhere in the bounded glTF, including unreachable content;
 - exact JSON array/string types for imported names and exact types/values for every fixed export setting;
 - no `EXT_mesh_gpu_instancing` declaration, root payload or node payload anywhere in the glTF, including unreachable nodes;
@@ -99,7 +98,7 @@ python Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
 python -m py_compile Scripts/blender_roundtrip_national_mall_panel.py Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
 ```
 
-The two focused suites are additive: the original 37-case suite remains intact, and the hidden-payload suite now contains 16 regressions, for 53 focused cases total. The latest repairs preserve the original dimension/center error contract, exercise inherited parent transforms, test primitive targets, mesh weights and node weights independently in reachable and unreachable content, and prove that unreachable mesh primitives cannot carry unverified rendering attributes.
+The two focused suites are additive: the original 37-case suite remains intact, and the hidden-payload suite now contains 23 regressions, for 60 focused cases total. The newest repairs validate accessor format/count/buffer/index contracts on unreachable primitives and prove that an attribute drift of `0.00006` is accepted under the documented `1e-4` pairwise tolerance instead of being rejected by quantization bucket boundaries.
 
 ## Stop condition
 
