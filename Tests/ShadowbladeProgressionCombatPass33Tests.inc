@@ -114,11 +114,13 @@ void TestShadowbladeProgressionCombatPass33() {
     Expect(defenseActions.BeginIncomingAttack({1.0f, 20, 20, true}),
         "pass33 queues deterministic perfect-dodge threat");
     defenseActions.AdvanceTime(0.90f);
+    Expect(Near(defenseActions.Resource(), 88.5f),
+        "pass33 defense fixture accounts for deterministic resource regeneration");
     const ProgressionDefenseReport perfectDodge =
         defenseActions.TryProgressionDefend(DefenseInput::Dodge, defenseProgression);
     Expect(perfectDodge.defense.result == DefenseResult::PerfectDodge
             && Near(perfectDodge.resourceRestored, 8.0f)
-            && Near(defenseActions.Resource(), 83.0f),
+            && Near(defenseActions.Resource(), 96.5f),
         "pass33 defense mastery rewards precise defense with bounded resource recovery");
 
     CharacterProgression briefingProgression;
@@ -159,6 +161,20 @@ void TestShadowbladeProgressionCombatPass33() {
             && Near(briefing.staggerFollowUpEffectiveCost, 28.0f)
             && Near(briefing.perfectDefenseResourceRestore, 2.0f),
         "pass33 build briefing exposes exact bounded deltas without mutating combat");
+
+    int briefingLevelsGained = 0;
+    briefingProgression.GrantExperience(100000, briefingLevelsGained);
+    Expect(briefingActions.Loadout().AcquireWeapon(ShadowbladeWeapon::RiftsteelSabre)
+            && briefingActions.Loadout().TryEquipWeapon(
+                ShadowbladeWeapon::RiftsteelSabre, briefingProgression)
+                == LoadoutActionResult::Success,
+        "pass33 briefing fixture equips Riftsteel through existing ownership and level gates");
+    const ProgressionCombatBriefing riftsteelBriefing =
+        briefingActions.CurrentProgressionCombatBriefing(briefingProgression);
+    Expect(Near(riftsteelBriefing.fatalStrikeEffectiveCost, 48.0f)
+            && Near(riftsteelBriefing.defenseCounterEffectiveCost, 26.0f)
+            && Near(riftsteelBriefing.staggerFollowUpEffectiveCost, 23.0f),
+        "pass33 briefing includes Riftsteel only in authoritative follow-up costs");
 
     const float briefingResource = briefingActions.Resource();
     const int briefingHealth = briefingActions.PlayerHealth();
