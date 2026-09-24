@@ -100,6 +100,23 @@ def t_geometry_corruption():
         _dump(g,o); _repin(s,g,m)
         _expect_fail(lambda: ver.verify(s,g,m))
 
+def t_tangent_handedness_drift_repin():
+    td,s,g,m=_fixture()
+    with td:
+        o=json.loads(g.read_text())
+        uri=o["buffers"][0]["uri"]; prefix="data:application/octet-stream;base64,"
+        import base64, struct
+        b=bytearray(base64.b64decode(uri[len(prefix):])); struct.pack_into("<f",b,576+(20*4+3)*4,-1.0)
+        o["buffers"][0]["uri"]=prefix+base64.b64encode(bytes(b)).decode()
+        _dump(g,o); _repin(s,g,m)
+        _expect_fail(lambda: ver.verify(s,g,m))
+
+def t_tangent_accessor_contract_drift():
+    td,s,g,m=_fixture()
+    with td:
+        o=json.loads(g.read_text()); o["accessors"][2]["min"][3]=-1; _dump(g,o); _repin(s,g,m)
+        _expect_fail(lambda: ver.verify(s,g,m))
+
 def t_manifest_runtime_status():
     td,s,g,m=_fixture()
     with td:
@@ -128,8 +145,9 @@ def t_generator_check_detects_stale():
 TESTS=[
     t_valid,t_source_bool_schema,t_source_false_runtime_status,t_source_conversion_drift,
     t_ledger_blob_drift,t_root_extra_field,t_external_buffer_uri,t_node_scale_drift,
-    t_node_mesh_swap,t_material_drift,t_geometry_corruption,t_manifest_runtime_status,
-    t_manifest_unknown_field,t_manifest_dimension_drift,t_generator_check_detects_stale,
+    t_node_mesh_swap,t_material_drift,t_geometry_corruption,t_tangent_handedness_drift_repin,
+    t_tangent_accessor_contract_drift,t_manifest_runtime_status,t_manifest_unknown_field,
+    t_manifest_dimension_drift,t_generator_check_detects_stale,
 ]
 if __name__=="__main__":
     for i,t in enumerate(TESTS,1):
