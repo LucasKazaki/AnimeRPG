@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstddef>
+#include <limits>
 
 namespace Astral::Scene {
 
@@ -52,7 +53,12 @@ public:
         static_cast<std::size_t>(DialogueStoryEpisode::Count);
 
     constexpr bool RecordBeat(const LandmarkDialogue& dialogue, const DialogueBeat& beat) {
-        if (beat.response == DialogueResponse::Invalid) return false;
+        const std::size_t topicIndex = TopicIndex(beat.topic);
+        if (beat.response == DialogueResponse::Invalid
+            || topicIndex >= LandmarkDialogue::TopicCount
+            || sequence_ == std::numeric_limits<std::size_t>::max()) {
+            return false;
+        }
 
         ++sequence_;
         latestBeat_ = beat;
@@ -60,10 +66,7 @@ public:
         hasLatestBeat_ = true;
 
         if (IsCheckpointBeat(beat)) {
-            const std::size_t index = TopicIndex(beat.topic);
-            if (index < LandmarkDialogue::TopicCount) {
-                checkpoints_[index] = {true, beat.topic, beat, sequence_};
-            }
+            checkpoints_[topicIndex] = {true, beat.topic, beat, sequence_};
         }
 
         SyncEpisodes(dialogue);
@@ -119,7 +122,10 @@ public:
     }
 
     constexpr bool CaptureInterruption() {
-        if (interruptionPending_ || !hasLatestBeat_) return false;
+        if (interruptionPending_ || !hasLatestBeat_
+            || latestSequence_ <= acknowledgedSequence_) {
+            return false;
+        }
         interruptionPending_ = true;
         interruptedBeat_ = latestBeat_;
         interruptedSequence_ = latestSequence_;
@@ -133,6 +139,7 @@ public:
 
     constexpr bool AcknowledgeInterruptedBeat() {
         if (!interruptionPending_) return false;
+        acknowledgedSequence_ = interruptedSequence_;
         interruptionPending_ = false;
         interruptedBeat_ = {};
         interruptedSequence_ = 0;
@@ -178,6 +185,7 @@ private:
     std::size_t sequence_{};
     DialogueBeat latestBeat_{};
     std::size_t latestSequence_{};
+    std::size_t acknowledgedSequence_{};
     bool hasLatestBeat_{};
     bool aidCiviliansEnding_{};
     bool pursueRiftEnding_{};
@@ -214,7 +222,20 @@ constexpr bool LandmarkDialogueContinuityContract() {
     if (continuity.CaptureInterruption()) return false;
     if (!continuity.AcknowledgeInterruptedBeat()
         || continuity.AcknowledgeInterruptedBeat()
-        || continuity.InterruptedBeat().pending) return false;
+        || continuity.InterruptedBeat().pending
+        || continuity.CaptureInterruption()) return false;
+
+    const DialogueBeat nextBeat = dialogue.Choose(
+        DialogueTopic::CivilianSafety, DialogueChoice::AskDirectly);
+    if (!continuity.RecordBeat(dialogue, nextBeat)
+        || !continuity.CaptureInterruption()
+        || continuity.InterruptedBeat().sequence != 2
+        || !continuity.AcknowledgeInterruptedBeat()) return false;
+
+    DialogueBeat invalidTopic = direct;
+    invalidTopic.topic = static_cast<DialogueTopic>(999);
+    if (continuity.RecordBeat(dialogue, invalidTopic)
+        || continuity.Sequence() != 2) return false;
 
     LandmarkDialogue confidant;
     LandmarkDialogueContinuity confidantContinuity;
