@@ -248,6 +248,18 @@ class R0RunnerSafetyTests(unittest.TestCase):
         )
         return [sys.executable, "-c", parent_code]
 
+    def _exited_parent_with_live_stdout_descendant_command(self, sentinel: Path) -> list[str]:
+        child_code = (
+            "import pathlib,time; time.sleep(2.0); "
+            f"pathlib.Path({str(sentinel)!r}).write_text('escaped', encoding='utf-8')"
+        )
+        parent_code = (
+            "import os,subprocess,sys; "
+            f"subprocess.Popen([sys.executable, '-c', {child_code!r}]); "
+            "print('exited-parent-output-marker', flush=True); os._exit(0)"
+        )
+        return [sys.executable, "-c", parent_code]
+
     def test_run_command_timeout_retains_partial_log_and_kills_descendant(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -322,6 +334,25 @@ class R0RunnerSafetyTests(unittest.TestCase):
                 runner.capture(self._tree_sleep_command(sentinel), timeout_seconds=0.4)
             time.sleep(2.4)
             self.assertFalse(sentinel.exists(), "a capture descendant survived timeout cleanup")
+
+    def test_capture_timeout_kills_descendant_after_direct_parent_exits(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            sentinel = root / "capture-exited-parent-escaped.txt"
+            with self.assertRaisesRegex(r0.RecoveryFailure, "Command timed out") as failure:
+                runner.capture(
+                    self._exited_parent_with_live_stdout_descendant_command(sentinel),
+                    timeout_seconds=0.8,
+                )
+            self.assertIn("exited-parent-output-marker", str(failure.exception))
+            time.sleep(2.2)
+            self.assertFalse(
+                sentinel.exists(),
+                "a descendant escaped after its direct parent exited but kept capture stdout open",
+            )
 
     def test_capture_timeout_cleanup_drain_remains_bounded(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
