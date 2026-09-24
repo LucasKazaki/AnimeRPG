@@ -1,10 +1,35 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import copy
 import tempfile
 from pathlib import Path
 
 import test_blender_roundtrip_national_mall_panel as base
+
+
+def wrap_lawn_under_rotated_parent(paths):
+    def change(gltf):
+        roots = gltf["scenes"][0]["nodes"]
+        roots.remove(0)
+        parent_index = len(gltf["nodes"])
+        gltf["nodes"].append(
+            {
+                "name": "InheritedRotationParent",
+                "rotation": [0, 1, 0, 0],
+                "children": [0],
+            }
+        )
+        roots.append(parent_index)
+    base.mutate_output(paths, change)
+
+
+def append_unreachable_mesh(paths, mutator):
+    def change(gltf):
+        mesh = copy.deepcopy(gltf["meshes"][0])
+        mutator(mesh)
+        gltf["meshes"].append(mesh)
+    base.mutate_output(paths, change)
 
 
 def cases():
@@ -83,31 +108,77 @@ def cases():
             ),
         ),
         (
-            "world rotation drift",
+            "inherited parent world rotation drift",
             fail("world transform drift"),
-            lambda paths: base.mutate_output(
-                paths, lambda gltf: gltf["nodes"][0].__setitem__("rotation", [0, 1, 0, 0])
-            ),
+            wrap_lawn_under_rotated_parent,
         ),
         (
-            "morph target deformation",
+            "primitive morph target reachable",
             fail("morph targets unsupported"),
             lambda paths: base.mutate_output(
                 paths,
-                lambda gltf: (
-                    gltf["meshes"][0]["primitives"][0].__setitem__(
-                        "targets", [{"POSITION": 0}]
-                    ),
-                    gltf["meshes"][0].__setitem__("weights", [1.0]),
+                lambda gltf: gltf["meshes"][0]["primitives"][0].__setitem__(
+                    "targets", [{"POSITION": 0}]
                 ),
             ),
         ),
         (
-            "vertex color attribute",
+            "mesh weights reachable",
+            fail("morph targets unsupported"),
+            lambda paths: base.mutate_output(
+                paths, lambda gltf: gltf["meshes"][0].__setitem__("weights", [1.0])
+            ),
+        ),
+        (
+            "node weights reachable",
+            fail("morph targets unsupported"),
+            lambda paths: base.mutate_output(
+                paths, lambda gltf: gltf["nodes"][0].__setitem__("weights", [1.0])
+            ),
+        ),
+        (
+            "primitive morph target unreachable",
+            fail("morph targets unsupported"),
+            lambda paths: append_unreachable_mesh(
+                paths,
+                lambda mesh: mesh["primitives"][0].__setitem__(
+                    "targets", [{"POSITION": 0}]
+                ),
+            ),
+        ),
+        (
+            "mesh weights unreachable",
+            fail("morph targets unsupported"),
+            lambda paths: append_unreachable_mesh(
+                paths, lambda mesh: mesh.__setitem__("weights", [1.0])
+            ),
+        ),
+        (
+            "node weights unreachable",
+            fail("morph targets unsupported"),
+            lambda paths: base.mutate_output(
+                paths,
+                lambda gltf: gltf["nodes"].append(
+                    {"name": "UnreachableWeights", "weights": [1.0]}
+                ),
+            ),
+        ),
+        (
+            "vertex color attribute reachable",
             fail("unexpected rendering attributes"),
             lambda paths: base.mutate_output(
                 paths,
                 lambda gltf: gltf["meshes"][0]["primitives"][0]["attributes"].__setitem__(
+                    "COLOR_0", 0
+                ),
+            ),
+        ),
+        (
+            "vertex color attribute unreachable mesh",
+            fail("unexpected rendering attributes"),
+            lambda paths: append_unreachable_mesh(
+                paths,
+                lambda mesh: mesh["primitives"][0]["attributes"].__setitem__(
                     "COLOR_0", 0
                 ),
             ),
