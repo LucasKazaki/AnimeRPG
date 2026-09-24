@@ -8,10 +8,11 @@ Access date: 2026-09-24
 
 ## Scope and ownership
 
-Deepen the already-merged Shadow Crypt game-domain mission without changing Astral Engine infrastructure. `ShadowCryptMission` is an existing game-owned production module held by `LandmarkInteraction`; this packet does not change renderer, platform, editor, importer, animation, audio, physics, CMake, workflows, dependencies, networking, R0, release/deployment, or another worker's PR.
+Deepen the already-merged Shadow Crypt game-domain mission without changing Astral Engine infrastructure. `ShadowCryptMission` is an existing game-owned production module held by `LandmarkInteraction`; the live owner is changed only with thin Shadow Crypt planning wrappers required to make the new game behavior reachable. This packet does not change renderer, platform, editor, importer, animation, audio, physics, CMake, workflows, dependencies, networking, R0, release/deployment, or another worker's PR.
 
 Allowed paths:
 - `Engine/Scene/ShadowCryptMission.h`
+- `Engine/Scene/LandmarkInteraction.h`, Shadow Crypt planning wrappers only
 - `Tests/ShadowCryptMissionPlanningPass37Tests.inc`
 - registration-only include/call additions in `Tests/ThoughtCommandsTests.cpp`
 - this task and `Docs/Agents/animerpg-hourly/` pass-37 records
@@ -28,18 +29,18 @@ Community reference for `QOL-038`: Genshin Impact Reddit discussion `Domain QoL 
 
 ### GAME-182, Focused Shadow Crypt guidance
 Gap: Standard mission guidance currently prioritizes the optional Cooling Cache in Rift Nave before the main stabilization objective.  
-Adaptation: reversible `Standard` and `Focused` guidance. Focused mode points at the main Rift-node objective while leaving the optional cache fully available.  
+Adaptation: reversible `Standard` and `Focused` guidance. Focused mode points at the main Rift-node objective while leaving the optional cache fully available. The live `LandmarkInteraction` owner exposes the mode change.  
 Acceptance: changing guidance cannot delete cache state, auto-complete objectives, alter rewards, or accept invalid focus values.
 
 ### GAME-183, explicit entry prerequisite report
 Gap: initial entry currently fails as a boolean with no game-domain explanation of the authoritative blocker.  
-Adaptation: a read-only report exposes Shadow Crypt lead progress and distinguishes incomplete lead, active run, pending checkpoint, completed-run replay, and ready initial entry.  
-Acceptance: reports reflect real mission/field state and never create a second timeline.
+Adaptation: a read-only report exposes Shadow Crypt lead progress and distinguishes incomplete lead, missing protagonist ownership, active run, pending checkpoint, completed-run replay, and ready initial entry. The live owner adds the protagonist gate before declaring entry ready.  
+Acceptance: reports match `BeginShadowCrypt`/replay authority and never create a second timeline.
 
 ### GAME-184, prerequisite-specific next action
-Gap: callers would otherwise need to duplicate mission and field-guide state interpretation.  
-Adaptation: derive `FindCryptSigil`, `AskAboutShadowCrypt`, `EnterShadowCrypt`, `ContinueRun`, `ResumeCheckpoint`, or `ReplayCompletedRun` from authoritative state.  
-Acceptance: guidance must not mutate the player's currently tracked field operation.
+Gap: callers would otherwise need to duplicate mission, field-guide, and protagonist-authority interpretation.  
+Adaptation: derive `BindProtagonist`, `FindCryptSigil`, `AskAboutShadowCrypt`, `EnterShadowCrypt`, `ContinueRun`, `ResumeCheckpoint`, or `ReplayCompletedRun` from authoritative state.  
+Acceptance: guidance must not mutate the player's currently tracked field operation and must not advertise an action the live owner would immediately reject for missing protagonist authority.
 
 ### GAME-185, latest-clear versus personal-best result
 Gap: the mission stores a best record but does not expose a clear-result comparison.  
@@ -54,11 +55,13 @@ Acceptance: exactly one record is added per accepted clear, the archive never ex
 ### QOL-038, pre-entry Shadow Crypt encounter intel
 Gap: before beginning a run, the mission has no compact read-only description of its authored room/objective structure.  
 Adaptation: preview the four room objective requirements, optional Cooling Cache availability point, and Rift Warden finale before commitment, without inventing enemy statistics.  
-Acceptance: preview works before a run and cannot mutate mission or field state.
+Acceptance: preview works through the live owner before `BeginShadowCrypt` and cannot mutate mission or field state.
 
 ## Verification requirements
 
-Registered regression coverage must exercise all six increments through the existing `ThoughtCommandsTests` aggregate without changing shared CMake. Required cases include incomplete/complete lead state, no mutation of tracked field operation, active/checkpoint/completed entry blockers, focus-mode state preservation and invalid enum rejection, first/worse replay comparisons, history capacity/ordering, and pre-entry preview availability.
+Registered regression coverage must exercise all six increments through the existing `ThoughtCommandsTests` aggregate without changing shared CMake. Required cases include incomplete/complete lead state, production missing-protagonist rejection, no mutation of tracked field operation, active/checkpoint/completed entry blockers, live-owner focus selection, focus-mode state preservation and invalid enum rejection, first/worse replay comparisons, history capacity/ordering, and pre-entry preview availability.
+
+Initial independent review on commit `49113d2` found two P2 integration gaps: Focused mode was not reachable through the production owner, and entry readiness ignored the live owner's required `CharacterProgression`. Both are in-scope game-owner repairs and require fresh exact-head CI and rereview after landing.
 
 After the scoped PR is opened, require exact-head hosted Windows Debug/Release tests and release-manifest integrity. Require fresh independent Codex review on the exact accepted head. Repair material findings and rerun stale gates. Native interactive/player-playable verification is not claimable because there is no new UI/input path in this packet.
 
