@@ -39,6 +39,20 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact pull request head checkout
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          $actual = (git rev-parse HEAD).Trim()
+          $expected = "${{ github.event.pull_request.head.sha }}"
+          if ($actual -ne $expected) {
+            Write-Error "Expected exact pull request head $expected, got $actual."
+            exit 1
+          }
+          Write-Host "Exact pull request head verified: $actual"
 
       - name: Set external build root
         shell: pwsh
