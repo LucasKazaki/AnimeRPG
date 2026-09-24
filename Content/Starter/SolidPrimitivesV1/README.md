@@ -9,7 +9,7 @@ This packet adds four original, inspectable glTF 2.0 starter primitives for Astr
 - 1 m diameter x 2 m height cylinder, 70 vertices / 192 indices
 - 1 m x 1 m plane, 4 vertices / 6 indices
 
-All four carry `POSITION`, `NORMAL`, `TANGENT`, and `TEXCOORD_0`, use indexed `TRIANGLES`, and share one neutral nonmetal material. The file is self-contained with an embedded binary buffer. Units are metres. The source contract uses the art pipeline convention `+Y` up, `+Z` forward, `-X` right in a right-handed coordinate system.
+All four carry `POSITION`, `NORMAL`, `TANGENT`, and `TEXCOORD_0`, use indexed `TRIANGLES`, and share one neutral nonmetal material. The generated file is self-contained with an embedded binary buffer. Units are metres. The source contract uses the art pipeline convention `+Y` up, `+Z` forward, `-X` right in a right-handed coordinate system.
 
 ## Why these four first
 
@@ -25,27 +25,35 @@ No Epic or Unity meshes, textures, code, or content are copied.
 ## Files
 
 - `source-contract.json`: closed source/provenance/budget contract
-- `starter_solid_primitives_v1.gltf`: deterministic self-contained source asset
-- `expected-manifest.json`: exact source/glTF hashes and aggregate counts
+- generated `starter_solid_primitives_v1.gltf`: deterministic self-contained source asset produced into a fresh output directory
+- `expected-manifest.json`: checked-in exact pin for the generated source/glTF hashes and aggregate counts
 - `Scripts/generate_starter_solid_primitives.py`: deterministic generator
 - `Scripts/verify_starter_solid_primitives.py`: independent semantic verifier
 - `Scripts/test_starter_solid_primitives.py`: focused positive/negative regressions
 
 ## Verification
 
+Generate into a fresh output directory, then compare the fresh manifest to the checked-in pin:
+
 ```text
 python Scripts/generate_starter_solid_primitives.py \
   --source Content/Starter/SolidPrimitivesV1/source-contract.json \
-  --gltf Content/Starter/SolidPrimitivesV1/starter_solid_primitives_v1.gltf \
-  --manifest Content/Starter/SolidPrimitivesV1/expected-manifest.json \
+  --gltf <fresh-dir>/starter_solid_primitives_v1.gltf \
+  --manifest <fresh-dir>/manifest.json
+
+python Scripts/generate_starter_solid_primitives.py \
+  --source Content/Starter/SolidPrimitivesV1/source-contract.json \
+  --gltf <fresh-dir>/starter_solid_primitives_v1.gltf \
+  --manifest <fresh-dir>/manifest.json \
   --check
 
 python Scripts/verify_starter_solid_primitives.py \
   --source Content/Starter/SolidPrimitivesV1/source-contract.json \
-  --gltf Content/Starter/SolidPrimitivesV1/starter_solid_primitives_v1.gltf \
-  --manifest Content/Starter/SolidPrimitivesV1/expected-manifest.json
+  --gltf <fresh-dir>/starter_solid_primitives_v1.gltf \
+  --manifest <fresh-dir>/manifest.json \
+  --expected-manifest Content/Starter/SolidPrimitivesV1/expected-manifest.json
 
 python Scripts/test_starter_solid_primitives.py
 ```
 
-These commands establish only the source contract. They do not establish Blender round-trip behavior, Khronos validator acceptance, Astral import/rendering, collision, editor registration, tutorial installation, runtime performance, or visual-art approval.
+The generated glTF is intentionally not checked into the repository; its exact bytes are pinned by `expected-manifest.json`. These commands establish only the source contract. They do not establish Blender round-trip behavior, Khronos validator acceptance, Astral import/rendering, collision, editor registration, tutorial installation, runtime performance, or visual-art approval.
