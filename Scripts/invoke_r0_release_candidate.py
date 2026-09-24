@@ -55,6 +55,7 @@ class CommandRecord:
     exit_code: int | None
     timed_out: bool
     interrupted: bool
+    spawn_error: str | None
     timeout_seconds: float
     log: str
 
@@ -382,6 +383,7 @@ class R0Runner:
         exit_code: int | None = None
         timed_out = False
         interrupted = False
+        spawn_error: str | None = None
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("w", encoding="utf-8", newline="\n") as log:
             log.write(f"label: {label}\n")
@@ -390,16 +392,45 @@ class R0Runner:
             log.write(f"working_directory: {working_directory}\n")
             log.write("command: " + subprocess.list2cmdline(normalized) + "\n\n")
             log.flush()
-            process = subprocess.Popen(
-                normalized,
-                cwd=str(working_directory),
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                errors="replace",
-                bufsize=1,
-                **self._popen_isolation(),
-            )
+            try:
+                process = subprocess.Popen(
+                    normalized,
+                    cwd=str(working_directory),
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    errors="replace",
+                    bufsize=1,
+                    **self._popen_isolation(),
+                )
+            except (OSError, ValueError) as exc:
+                spawn_error = f"{type(exc).__name__}: {exc}"
+                finished = iso_now()
+                log.write(f"spawn_error: {spawn_error}\n")
+                log.write(f"finished_at: {finished}\n")
+                log.write("exit_code: None\n")
+                log.write("timed_out: false\n")
+                log.write("interrupted: false\n")
+                log.flush()
+                self.records.append(
+                    CommandRecord(
+                        index=index,
+                        label=label,
+                        command=normalized,
+                        cwd=str(working_directory),
+                        started_at=started,
+                        finished_at=finished,
+                        exit_code=None,
+                        timed_out=False,
+                        interrupted=False,
+                        spawn_error=spawn_error,
+                        timeout_seconds=timeout,
+                        log=str(log_path),
+                    )
+                )
+                raise RecoveryFailure(
+                    f"{label} could not start: {spawn_error}. Inspect {log_path}."
+                ) from exc
             assert process.stdout is not None
 
             def copy_output() -> None:
@@ -435,6 +466,7 @@ class R0Runner:
                 log.write(f"exit_code: {exit_code}\n")
                 log.write(f"timed_out: {str(timed_out).lower()}\n")
                 log.write(f"interrupted: {str(interrupted).lower()}\n")
+                log.write("spawn_error: none\n")
                 log.flush()
                 self.records.append(
                     CommandRecord(
@@ -447,6 +479,7 @@ class R0Runner:
                         exit_code=exit_code,
                         timed_out=timed_out,
                         interrupted=interrupted,
+                        spawn_error=None,
                         timeout_seconds=timeout,
                         log=str(log_path),
                     )
