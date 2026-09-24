@@ -66,6 +66,9 @@ def read_json(path):
         fail(f"{path} root must be object")
     return data
 
+def canonical_json_bytes(obj):
+    return (json.dumps(obj,indent=2,separators=(",",": "),ensure_ascii=False)+"\n").encode("utf-8")
+
 def verify_source(source_path):
     s=read_json(source_path)
     required={"schema_version","asset_id","loop_id","status","purpose","coordinate_system","material","primitives","scene_layout","reference_scope"}
@@ -130,7 +133,7 @@ def verify_manifest(manifest_path,source_path,gltf_path):
     if m["asset_id"]!=ASSET_ID or m["status"]!=STATUS or m["runtime_state"]!=STATUS or m["generator_id"]!=GENERATOR_ID:
         fail("manifest identity/status invalid")
     if m["source_file"]!="source-contract.json" or m["gltf_file"]!="starter_solid_primitives_v1.gltf": fail("manifest filenames invalid")
-    sb=Path(source_path).read_bytes(); gb=Path(gltf_path).read_bytes()
+    sb=canonical_json_bytes(read_json(source_path)); gb=Path(gltf_path).read_bytes()
     if m["source_sha256"]!=hashlib.sha256(sb).hexdigest(): fail("manifest source hash mismatch")
     if m["gltf_sha256"]!=hashlib.sha256(gb).hexdigest(): fail("manifest glTF hash mismatch")
     if strict_int(m["gltf_bytes"],"manifest.gltf_bytes",1)!=len(gb): fail("manifest glTF size mismatch")

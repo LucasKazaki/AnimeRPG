@@ -417,7 +417,8 @@ def build_outputs(source_path: Path):
     source = load_source(source_path)
     gltf = build_gltf(source)
     gltf_bytes = _canonical_bytes(gltf)
-    source_bytes = source_path.read_bytes()
+    # Hash the parsed canonical JSON, not checkout bytes, so LF/CRLF working trees share one source identity.
+    source_bytes = _canonical_bytes(source)
     manifest = {
         "schema_version": 1,
         "asset_id": source["asset_id"],

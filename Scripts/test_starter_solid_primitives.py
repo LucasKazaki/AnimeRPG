@@ -346,6 +346,19 @@ def test_opposing_cube_tangent_cancellation_rejected_after_repin():
         expect_fail(lambda: verify_semantic(src,gltf,manifest),"tangent/UV")
     finally: td.cleanup()
 
+def test_crlf_source_line_endings_preserve_manifest_pin():
+    td=tempfile.TemporaryDirectory()
+    try:
+        root=Path(td.name)
+        src=root/"source-contract.json"
+        normalized=SOURCE.read_text(encoding="utf-8").replace("\r\n","\n").replace("\r","\n")
+        src.write_bytes(normalized.replace("\n","\r\n").encode("utf-8"))
+        gltf=root/"starter_solid_primitives_v1.gltf"; manifest=root/"expected-manifest.json"
+        GEN.write_or_check(src,gltf,manifest,False)
+        result=verify(src,gltf,manifest)
+        assert result=={"meshes":4,"materials":1,"vertices":249,"indices":906}
+    finally: td.cleanup()
+
 TESTS=[v for k,v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
 
 if __name__=="__main__":
