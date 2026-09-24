@@ -33,7 +33,7 @@ The first independent review on candidate `3a8b174a4cba0e07bf368cd6369b937e8d608
 2. checks the declared per-shape UV mapping policies directly, including cube/plane corners, sphere seam and latitude/longitude parameterization, and cylinder side/cap mappings;
 3. applies strict JSON-integer validation to every attribute accessor binding so `false` cannot alias integer accessor `0` in Python equality semantics.
 
-The regression suite adds one negative test for each first-review finding, increasing focused coverage from 27 to 30 cases. A follow-up independent review then found that two opposing bad vertex tangents could cancel in the triangle-average tangent check. The verifier now checks every supplied vertex tangent directly against the independently derived triangle `dP/du` direction before retaining the average tangent/bitangent check as supplemental consistency evidence. The `0.975` per-vertex dot threshold is intentionally above the 16-segment sphere/cylinder chord case observed analytically (`cos(11.25 degrees) ~= 0.980785`) while decisively rejecting the reported approximately +/-80 degree cancellation case (`cos(80 degrees) ~= 0.173648`).
+The regression suite adds one negative test for each first-review finding, increasing focused coverage from 27 to 30 cases. A follow-up independent review then found that two opposing bad vertex tangents could cancel in the triangle-average tangent check. The verifier now checks every supplied vertex tangent directly against the independently derived triangle `dP/du` direction before retaining the average tangent/bitangent check as supplemental consistency evidence. The `0.975` per-vertex dot threshold is intentionally above the 16-segment sphere/cylinder chord case observed analytically (`cos(11.25 degrees) ~= 0.980785`) while decisively rejecting the reported approximately +/-80 degree cancellation case (`cos(80 degrees) ~= 0.173648`). This pass adds an explicit 31st regression that mutates cube tangent vertices 0 and 2 to opposing approximately +/-80 degree directions. That exact cancellation construction must now fail semantically even if asset bytes and the manifest are repinned together.
 
 ## Sandbox execution
 
@@ -51,7 +51,7 @@ The 30 focused tests include deterministic/stale-output behavior, overwrite refu
 
 ## Gate state
 
-The current verifier-only repair still requires the packet's exact generator/check/verifier/regression/compile commands on the exact branch head plus a fresh independent review. The repository-wide hosted Windows lane is useful compatibility evidence but does not currently execute this ART-009 focused Python suite, so a green hosted lane alone is not ART-009 source acceptance.
+The current verifier-plus-regression repair still requires the packet's exact generator/check/verifier/regression/compile commands on the exact branch head plus a fresh independent review. The focused suite inventory is now 31 cases, but no 31/31 execution result is claimed until those exact commands run on this head. The repository-wide hosted Windows lane is useful compatibility evidence but does not currently execute this ART-009 focused Python suite, so a green hosted lane alone is not ART-009 source acceptance.
 
 ## Evidence boundary
 

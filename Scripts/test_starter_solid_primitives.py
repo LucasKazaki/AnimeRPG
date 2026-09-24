@@ -332,6 +332,20 @@ def test_attribute_bool_binding_rejected_after_repin():
         expect_fail(lambda: verify_semantic(src,gltf,manifest),"JSON integer")
     finally: td.cleanup()
 
+
+def test_opposing_cube_tangent_cancellation_rejected_after_repin():
+    td,src,gltf,manifest=workspace()
+    try:
+        def change(values,width,count):
+            assert width==4 and count>=3
+            c=0.17364817766693041
+            s=0.984807753012208
+            values[0:4]=[c,s,0.0,1.0]
+            values[8:12]=[c,-s,0.0,1.0]
+        mutate_float_accessor(gltf,manifest,2,change)
+        expect_fail(lambda: verify_semantic(src,gltf,manifest),"tangent/UV")
+    finally: td.cleanup()
+
 TESTS=[v for k,v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
 
 if __name__=="__main__":
