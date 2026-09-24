@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS32-RIFT-WARDEN-TRIAL-2026-09-24",
+  "baseline": "1a575690df46ba5cff7e00b01a15f4256a844113",
+  "target_branch": "main",
+  "working_branch": "game/2026-09-24-rift-warden-trial-pass32",
+  "accessed": "2026-09-24",
+  "sources": [
+    {
+      "id": "GENSHIN-STYGIAN-20260302",
+      "kind": "official_event_details",
+      "published": "2026-03-02",
+      "url": "https://www.hoyolab.com/article/44016747",
+      "use": "selectable escalating difficulty, three timed phases, sequential higher-tier unlock"
+    },
+    {
+      "id": "ZZZ-COMBAT-TRAINING-20260831",
+      "kind": "official_event_details",
+      "published": "2026-08-31",
+      "url": "https://zenless.hoyoverse.com/m/en-us/news/165921",
+      "use": "story-gated selectable enemy-card combat training"
+    },
+    {
+      "id": "ZZZ-APPSTORE-CURRENT",
+      "kind": "developer_description",
+      "published": null,
+      "url": "https://apps.apple.com/us/app/zenless-zone-zero/id1606356401",
+      "use": "dodge/parry, stun, follow-up combat interaction lesson"
+    },
+    {
+      "id": "GRANBLUE-PLAYSTATION-CURRENT",
+      "kind": "official_platform_overview",
+      "published": null,
+      "url": "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "use": "adjustable difficulty and consequence-free practice"
+    },
+    {
+      "id": "ZZZ-PLAYER-PRACTICE-20260302",
+      "kind": "original_player_discussion",
+      "published": "2026-03-02",
+      "url": "https://www.reddit.com/r/ZZZ_Official/comments/1rikhmx/how_do_you_guys_like_to_test_your_teams/",
+      "use": "request for more training enemy variety and boss practice",
+      "sentiment": "corroborated preference inside one discussion, with replies also using existing Free Training or live challenges; not consensus",
+      "current_resolution": "unestablished by inspected current official Combat Training material"
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-157",
+      "title": "Shadow Crypt-gated Rift Warden mastery trial",
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
+    },
+    {
+      "id": "GAME-158",
+      "title": "Deterministic three-phase boss attack pattern",
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
+    },
+    {
+      "id": "GAME-159",
+      "title": "Difficulty- and phase-specific timed defense",
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
+    },
+    {
+      "id": "GAME-160",
+      "title": "Posture break and one-shot punish opening",
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
+    },
+    {
+      "id": "GAME-161",
+      "title": "Progressive difficulty unlocks and per-difficulty mastery records",
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
+    },
+    {
+      "id": "QOL-033",
+      "title": "Learned-phase boss practice",
+      "status": "implemented_owner_integrated_registered_regression_pending_final_head_acceptance"
+    }
+  ],
+  "review_repairs": [
+    "bind Warden entry to the protagonist that completed Shadow Crypt",
+    "penalize and bound missed stagger openings so score cannot be farmed or overflow",
+    "preserve best-record ordering when missed-opening evidence saturates",
+    "reject positive infinity, negative and NaN reaction timing without mutation",
+    "cover all nine difficulty-by-phase timing windows at exact and just-outside boundaries",
+    "prove per-difficulty records remain separate",
+    "prove a worse replay on the same trial cannot replace a better record",
+    "prove learned-phase practice preserves every ranked record field and difficulty unlock bit",
+    "treat capped damage as information-loss evidence so a later higher-actual-damage replay cannot win the clear-time tie-breaker"
+  ],
+  "historical_verification": [
+    {
+      "head": "de919da6946a2f33345833304428b85218f398fb",
+      "windows_debug_release_run": 35960493908,
+      "windows_debug_release_run_number": 982,
+      "windows_debug_release_result": "success",
+      "release_manifest_run": 35960493883,
+      "release_manifest_run_number": 720,
+      "release_manifest_result": "success",
+      "status": "superseded_by_later_review_repairs"
+    },
+    {
+      "head": "0d95c071aab5f860f0056808afd271abdeb07f6a",
+      "windows_debug_release_run": 35960888686,
+      "windows_debug_release_run_number": 985,
+      "windows_debug_release_result": "success",
+      "release_manifest_run": 35960888615,
+      "release_manifest_run_number": 723,
+      "release_manifest_result": "success",
+      "independent_review_result": "material_P2_damage_saturation_ordering_finding",
+      "status": "superseded_by_repair_73fefff6cbfb58ca43d73fd7bcbf5f2219e5adc1"
+    }
+  ],
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "registered_regression_covered": 6,
+    "game_domain_integrated": 6,
+    "hosted_verified_exact_final_head": 0,
+    "native_playable_verified": 0,
+    "independent_reviewed_clean_exact_final_head": 0,
+    "merged": 0
+  },
+  "next_action": "Use the documentation-complete repaired head as the sole acceptance candidate; require hosted Windows Debug/Release, Release-manifest integrity and fresh independent Codex review on that exact head, then reread main/head/diff/threads and expected-head merge only if every gate remains clean."
+}

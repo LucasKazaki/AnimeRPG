@@ -3,22 +3,22 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "a32a729591bdf4dddf32494d08959c3e6f90d69e",
+  "last_verified_main_at_pass_start": "1a575690df46ba5cff7e00b01a15f4256a844113",
   "last_merged_pass": {
-    "id": "GAME-PASS30-DIALOGUE-CONTINUITY-2026-09-24",
-    "pr": 51,
-    "merge_sha": "a32a729591bdf4dddf32494d08959c3e6f90d69e",
-    "head_sha": "7b9d658f2388c57b1e657eacab785c65c5e5037f",
+    "id": "GAME-PASS31-MALL-RESONANCE-PUZZLE-2026-09-24",
+    "pr": 53,
+    "merge_sha": "1a575690df46ba5cff7e00b01a15f4256a844113",
+    "head_sha": "ee97dc38efb398747bb4a1109e5529bc4d876242",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-24-mall-resonance-puzzle-pass31",
-  "pass": "GAME-PASS31-MALL-RESONANCE-PUZZLE-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS31-MALL-RESONANCE-PUZZLE-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS31-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS31.md",
-  "pr": 53,
-  "final_head": "pending_exact_head_gates_review_and_merge",
-  "final_receipt_location": "PR_53_comment_after_exact_head_acceptance_and_merge",
+  "working_branch": "game/2026-09-24-rift-warden-trial-pass32",
+  "pass": "GAME-PASS32-RIFT-WARDEN-TRIAL-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS32-RIFT-WARDEN-TRIAL-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS32-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS32.md",
+  "pr": 54,
+  "final_head": "pending_after_saturation_repair_records",
+  "final_receipt_location": "PR_54_comment_after_exact_head_acceptance_and_merge",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -31,31 +31,37 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-152","title":"Objective-gated three-anchor resonance puzzle","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-153","title":"Selectable bounded puzzle difficulty","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-154","title":"Optional class-neutral guidance assist","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-155","title":"Per-difficulty mastery record","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-156","title":"Repeatable clear with owner-bound first-clear reward","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"QOL-032","title":"Explicit in-game active-puzzle reset","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"}
+    {"id":"GAME-157","title":"Shadow Crypt-gated Rift Warden mastery trial","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-158","title":"Deterministic three-phase boss attack pattern","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-159","title":"Difficulty- and phase-specific timed defense","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-160","title":"Posture break and one-shot punish opening","status":"pending_exact_final_head_acceptance"},
+    {"id":"GAME-161","title":"Progressive difficulty unlocks and per-difficulty mastery records","status":"pending_exact_final_head_acceptance"},
+    {"id":"QOL-033","title":"Learned-phase boss practice","status":"pending_exact_final_head_acceptance"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_MallResonancePuzzlePass31Tests",
-    "hosted_windows_ci": "pending_exact_final_head_after_state_and_receipt_commit",
-    "release_manifest": "pending_exact_final_head_after_state_and_receipt_commit",
-    "native_windows_interactive": "not_run_not_claimed_no_rendered_puzzle_ui_or_input_changes",
-    "independent_review": "pending_exact_final_head_after_state_and_receipt_commit",
-    "integration": "LandmarkInteraction owns MallResonancePuzzle and binds entry/reward authority to completed National Mall objective plus one CharacterProgression owner",
-    "persistent_cross_process_save": "puzzle_state_and_records_in_memory_only_not_claimed_cross_process"
+    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_RiftWardenTrialPass32Tests",
+    "latest_repaired_source_test_head": "73fefff6cbfb58ca43d73fd7bcbf5f2219e5adc1",
+    "historical_hosted_windows_ci": "run_35960888686_number_985_success_on_0d95c071_but_superseded_by_damage_saturation_repair",
+    "historical_release_manifest": "run_35960888615_number_723_success_on_0d95c071_but_superseded_by_damage_saturation_repair",
+    "native_windows_interactive": "not_run_not_claimed_no_rendered_boss_ui_or_input_changes",
+    "independent_review": "exact_0d95c071_review_found_damage_saturation_P2; repaired_and_final_head_rereview_required",
+    "integration": "LandmarkInteraction owns RiftWardenTrial and binds entry/action authority to completed Shadow Crypt plus one CharacterProgression identity",
+    "persistent_cross_process_save": "trial_unlocks_records_and_practice_state_in_memory_only_not_claimed_cross_process"
+  },
+  "review_repairs": {
+    "resolved_material_threads": 10,
+    "latest_repair": "MaximumDamageTaken is an explicit information-loss sentinel; equal capped-damage records cannot use clear time to displace an established personal best; regression proves a faster replay with 100 additional post-cap hits is retained as worse/unknown rather than replacing the baseline",
+    "other_test_repairs": "all_9_timing_windows_exact_and_outside_boundaries; complete_record_separation; same_trial_monotonic_best; full_practice_record_and_unlock_isolation; missed_opening_saturation_ordering; invalid_enum_and_one_shot_punish_edges"
   },
   "coordination": {
-    "open_non_game_prs_inspected": "52_49_45_33_28_26_23_13_left_unchanged",
+    "open_non_game_prs_inspected": "52_55_49_45_33_28_26_23_13_left_unchanged",
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "new_MallResonancePuzzle_h_plus_thin_LandmarkInteraction_h_integration_plus_registered_game_tests_and_pass31_records"
+    "gameplay_paths": "new_RiftWardenTrial_h_plus_thin_LandmarkInteraction_h_integration_plus_registered_game_tests_and_pass32_records"
   },
   "research": {
-    "reference_context": "current_Genshin_7_1_challenge_parameters_and_best_scores_ZZZ_Combat_Training_WuWa_exploration_tool_Granblue_difficulty_assists",
-    "community_request": "recent_corroborated_Genshin_stuck_puzzle_reports_requesting_explicit_in_game_reset_instead_of_relog_or_teleport",
-    "current_resolution": "specific_comparator_puzzle_reset_issue_resolution_unestablished_in_inspected_official_7_1_material"
+    "reference_context": "Genshin_Stygian_three_phase_sequential_difficulty_ZZZ_Combat_Training_and_dodge_parry_stun_Granblue_practice_difficulty",
+    "community_request": "ZZZ_player_discussion_requesting_more_training_enemy_variety_and_boss_practice",
+    "current_resolution": "current_official_ZZZ_Combat_Training_confirms_selectable_enemy_cards_but_arbitrary_boss_phase_practice_resolution_unestablished"
   },
-  "next_action": "Treat the documentation-complete branch head as candidate, require fresh hosted Windows Debug/Release and Release-manifest success plus fresh independent Codex review, then reread main/head/diff/threads and expected-head merge only if all gates remain clean."
+  "next_action": "Finalize the durable receipt, then require exact-head hosted Windows Debug/Release and Release-manifest success plus fresh independent Codex review on the resulting head; reread main/head/diff/threads and merge with expected-head guard only if every gate is clean."
 }

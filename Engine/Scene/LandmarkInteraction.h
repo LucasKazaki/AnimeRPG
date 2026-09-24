@@ -6,6 +6,7 @@
 #include "Engine/Scene/LandmarkDialogueContinuity.h"
 #include "Engine/Scene/MallResonancePuzzle.h"
 #include "Engine/Scene/ManaReactorMission.h"
+#include "Engine/Scene/RiftWardenTrial.h"
 #include "Engine/Scene/ShadowCryptMission.h"
 #include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/WorldBlockout.h"
@@ -250,6 +251,48 @@ public:
     }
     const ShadowCryptMission& ShadowCrypt() const { return shadowCryptMission_; }
 
+    // Pass 32 game-owned Rift Warden mastery trial. Entry is dependency-ready:
+    // it consumes the already-authoritative completed Shadow Crypt state and a
+    // persistent protagonist owner, without changing engine/runtime facilities.
+    bool BeginRiftWardenTrial(RiftWardenDifficulty difficulty) {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptMission_.Briefing().complete
+            || (riftWardenProgressionOwner_ != nullptr
+                && riftWardenProgressionOwner_ != progression_)) {
+            return false;
+        }
+        if (!riftWardenTrial_.Begin(true, difficulty)) return false;
+        riftWardenProgressionOwner_ = progression_;
+        return true;
+    }
+    bool BeginRiftWardenPractice(RiftWardenDifficulty difficulty,
+        RiftWardenPhase phase) {
+        if (progression_ == nullptr || progression_ != riftWardenProgressionOwner_
+            || !shadowCryptMission_.Briefing().complete) {
+            return false;
+        }
+        return riftWardenTrial_.BeginPractice(true, difficulty, phase);
+    }
+    RiftWardenActionReport ResolveRiftWardenAction(RiftWardenResponse response,
+        double reactionSeconds) {
+        if (progression_ == nullptr || progression_ != riftWardenProgressionOwner_) return {};
+        return riftWardenTrial_.Resolve(response, reactionSeconds);
+    }
+    bool AdvanceRiftWardenTrial(double deltaSeconds) {
+        if (progression_ == nullptr || progression_ != riftWardenProgressionOwner_) return false;
+        return riftWardenTrial_.AdvanceTime(deltaSeconds);
+    }
+    RiftWardenBriefing RiftWardenTrialBriefing() const {
+        return riftWardenTrial_.Briefing();
+    }
+    RiftWardenRecord RiftWardenBestRecord(RiftWardenDifficulty difficulty) const {
+        return riftWardenTrial_.BestRecord(difficulty);
+    }
+    bool RiftWardenDifficultyUnlocked(RiftWardenDifficulty difficulty) const {
+        return riftWardenTrial_.DifficultyUnlocked(difficulty);
+    }
+    const RiftWardenTrial& RiftWarden() const { return riftWardenTrial_; }
+
     bool SetObjectiveActivationMode(LandmarkObjectiveActivationMode mode);
     bool StartObjective();
     LandmarkObjectiveActivationMode ObjectiveActivationMode() const {
@@ -310,12 +353,14 @@ private:
     CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
     CharacterProgression* shadowCryptProgressionOwner_{}; // Identity only; never dereferenced directly.
     CharacterProgression* mallResonanceProgressionOwner_{}; // Identity only; puzzle reward authority.
+    CharacterProgression* riftWardenProgressionOwner_{}; // Identity only; trial action authority.
     LandmarkDialogue dialogue_{};
     LandmarkDialogueContinuity dialogueContinuity_{};
     ExplorationFieldGuide fieldGuide_{};
     MallResonancePuzzle mallResonancePuzzle_{};
     ManaReactorMission manaReactorMission_{};
     ShadowCryptMission shadowCryptMission_{};
+    RiftWardenTrial riftWardenTrial_{};
     LandmarkInteractionReport lastReport_{};
 };
 

@@ -6,6 +6,7 @@
 #include "Engine/Scene/MallResonancePuzzle.h"
 #include "Engine/Scene/ManaReactorExpedition.h"
 #include "Engine/Scene/ManaReactorMission.h"
+#include "Engine/Scene/RiftWardenTrial.h"
 #include "Engine/Scene/ShadowCryptExpedition.h"
 #include "Engine/Scene/ShadowCryptMission.h"
 #include "Engine/Scene/ShadowbladeLoadout.h"
@@ -212,6 +213,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "ExplorationFieldGuidePass29Tests.inc"
 #include "LandmarkDialogueContinuityPass30Tests.inc"
 #include "MallResonancePuzzlePass31Tests.inc"
+#include "RiftWardenTrialPass32Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -241,6 +243,7 @@ int main() {
     TestExplorationFieldGuidePass29();
     TestLandmarkDialogueContinuityPass30();
     TestMallResonancePuzzlePass31();
+    TestRiftWardenTrialPass32();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;
