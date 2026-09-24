@@ -35,7 +35,7 @@ The verifier owns this ART-006B hash independently. A caller-supplied manifest c
 1. A Blender-native background driver pinned to Blender 5.2.2.
 2. One editable `.blend`, one embedded glTF and one strict JSON receipt when the driver is actually executed natively.
 3. A standard-library verifier that compares DCC output with ART-006B scene semantics rather than byte equality.
-4. Focused positive/negative regressions for evidence tampering, source substitution, receipt type confusion, scene inventory, transforms and transform parity, topology/winding, vertex attributes, materials, disabled-export payloads, GPU-instancing rejection and buffer/profile violations.
+4. Focused positive/negative regressions for evidence tampering, source substitution, receipt type confusion, scene inventory, complete inherited world transforms, topology/winding, exact rendering attributes, morph-target rejection, materials, disabled-export payloads, GPU-instancing rejection and buffer/profile violations.
 5. A versioned art-facing Blender/glTF profile based on current official Blender documentation.
 
 ## Round-trip semantic gate
@@ -46,12 +46,14 @@ For the bounded output it requires:
 
 - exactly the seven expected active-scene mesh-bearing semantic instances, with no extra or duplicate mesh instances;
 - indexed `TRIANGLES` only;
-- float `POSITION`, `NORMAL`, `TANGENT` and `TEXCOORD_0` accessors plus an unsigned-integer scalar index accessor;
+- an exact primitive rendering-attribute set of float `POSITION`, `NORMAL`, `TANGENT` and `TEXCOORD_0`, with no unverified `COLOR_0`, skinning, or other extra rendering attributes;
+- unsigned-integer scalar index accessors;
 - nonzero `POSITION` count and identical `NORMAL`, `TANGENT` and `TEXCOORD_0` counts;
 - world-space center/dimensions derived from referenced vertices and matching the ART-006B source within the verifier-owned, non-overridable `1e-4` metre tolerance;
-- matching world-transform orientation parity for each semantic instance, so a reflected transform cannot preserve the AABB while reversing world-space winding;
+- the complete inherited 3x4 world transform for each semantic instance matching the ART-006B source within `1e-4`, in addition to matching transform orientation parity, so rotations, reflections, translations, scale and shear cannot preserve the AABB while changing rendered orientation;
 - semantic material bindings and base-color, metallic, roughness, emissive, alpha and sidedness preservation;
 - canonical triangle signatures that preserve winding and include referenced position/normal/tangent/UV payloads, so connectivity, culling orientation, shading basis or UV drift fails closed;
+- no primitive morph `targets`, mesh `weights`, or node `weights` anywhere in the bounded glTF, including unreachable content;
 - exact JSON array/string types for imported names and exact types/values for every fixed export setting;
 - no `EXT_mesh_gpu_instancing` declaration, root payload or node payload anywhere in the glTF, including unreachable nodes;
 - no `KHR_lights_punctual` declaration, root payload or node payload because the fixed profile has `export_lights=false`;
@@ -97,7 +99,7 @@ python Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
 python -m py_compile Scripts/blender_roundtrip_national_mall_panel.py Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel_hidden_payloads.py
 ```
 
-The two focused suites are additive: the original 37-case suite remains intact, and the hidden-payload suite adds seven regressions for the fourth review repairs.
+The two focused suites are additive: the original 37-case suite remains intact, and the hidden-payload suite now adds ten regressions. The three newest cases cover a same-AABB 180-degree rotation, morph-target deformation, and a `COLOR_0` vertex-color attribute. Together the committed suites cover 47 focused cases without weakening prior coverage.
 
 ## Stop condition
 
