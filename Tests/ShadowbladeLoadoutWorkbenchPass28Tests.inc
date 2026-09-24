@@ -1,6 +1,11 @@
 void TestShadowbladeLoadoutWorkbenchPass28() {
     using namespace Astral::Scene;
 
+    static_assert(std::is_same_v<
+            decltype(std::declval<ShadowbladeActions&>().LoadoutWorkbench()),
+            const ShadowbladeLoadoutWorkbench&>,
+        "pass28 workbench exposure must remain const-only on mutable action owners");
+
     CharacterProgression progression;
     ShadowbladeActions actions;
     ShadowbladeLoadout& loadout = actions.Loadout();
