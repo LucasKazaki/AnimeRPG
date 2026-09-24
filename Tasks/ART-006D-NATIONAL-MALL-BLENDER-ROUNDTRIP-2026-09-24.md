@@ -27,13 +27,29 @@ Do not edit engine, renderer, gameplay, build, workflow, dependency or another w
 - `Content/Reference/NationalMall/Blockout/expected-manifest.json`
 - ART-006B expected source SHA-256 `6c51463332199c65bcfbde04ee8e5883e03a94aba710980eebfaa6945f2759b7`
 
+The verifier owns this ART-006B hash independently. A caller-supplied manifest cannot redefine the accepted source. The manifest must also retain the expected ART-006B asset identity, filename and source-contract counts.
+
 ## Deliverables
 
 1. A Blender-native background driver pinned to Blender 5.2.2.
 2. The driver saves one editable `.blend`, exports one embedded glTF and writes a strict JSON receipt.
 3. A standard-library verifier that compares the DCC output with ART-006B's source semantics rather than byte equality.
-4. Focused regressions for evidence tampering, version/type confusion, missing assets, transform drift, material drift, missing tangents, external buffers and non-triangle output.
+4. Focused regressions for evidence tampering, version/type confusion, substituted source+manifest pairs, missing assets, transform drift, indexed-geometry drift, material binding/property drift, missing tangents, external buffers and non-triangle output.
 5. A versioned art-facing round-trip profile based on current official Blender documentation.
+
+## Round-trip semantic gate
+
+The post-DCC comparison intentionally permits accessor and buffer repacking, but it does not infer equivalence from names or raw POSITION bounds alone.
+
+For each of the seven semantic instances the verifier:
+
+- requires indexed `TRIANGLES`;
+- requires float `POSITION`, `NORMAL`, `TANGENT` and `TEXCOORD_0` accessors plus an unsigned integer scalar index accessor;
+- computes world-space bounds from **indexed vertices only**, so unused source extrema cannot hide a re-indexed geometry change;
+- compares world center/dimensions within `1e-4` metre;
+- preserves semantic material bindings;
+- compares base-color, metallic, roughness, emissive, alpha mode/cutoff and sidedness semantics by material name;
+- rejects unexpected material extensions in this bounded blockout profile.
 
 ## Native execution command
 
