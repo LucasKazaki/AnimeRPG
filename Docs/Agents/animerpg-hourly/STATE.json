@@ -16,7 +16,7 @@
   "task_packet": "Tasks/GAME-PASS29-FIELD-GUIDE-MAP-QOL-2026-09-24.md",
   "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS29-BACKLOG.json",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS29.md",
-  "pr": null,
+  "pr": 50,
   "final_head": "record_in_PR_gate_comment_after_exact_head_checks_and_review",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -61,5 +61,5 @@
     "material_findings_repaired_this_pass": 0,
     "summary": []
   },
-  "next_action": "Open one scoped PR from the pass29 branch, require exact-head Windows Debug/Release and Release-manifest workflows plus fresh independent Codex review, repair and rerun if needed, then re-read main/head/diff/threads and expected-head merge if clean."
+  "next_action": "Require exact-head Windows Debug/Release and Release-manifest workflows plus fresh independent Codex review on PR 50; repair and rerun if needed, then re-read main/head/diff/threads and expected-head merge if clean."
 }
