@@ -8,6 +8,7 @@
 #include "Engine/Scene/ManaReactorMission.h"
 #include "Engine/Scene/RiftWardenTrial.h"
 #include "Engine/Scene/ShadowCryptMission.h"
+#include "Engine/Scene/ShadowCryptSkirmish.h"
 #include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/WorldBlockout.h"
 
@@ -288,6 +289,73 @@ public:
     }
     const ShadowCryptMission& ShadowCrypt() const { return shadowCryptMission_; }
 
+    // Pass 38 room-level enemy combat. Keep skirmish authority attached to the
+    // same protagonist and mission timeline; a completed skirmish advances one
+    // objective step exactly once and failed defense contributes mission damage.
+    bool BeginShadowCryptSkirmish() {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return false;
+        const ShadowCryptMissionBriefing briefing = shadowCryptMission_.Briefing();
+        if (!briefing.active || briefing.complete || briefing.suspended) return false;
+        ShadowCryptSkirmishTier tier{};
+        switch (briefing.room) {
+        case ShadowCryptRoom::EntrySeal:
+            tier = ShadowCryptSkirmishTier::EntrySeal;
+            break;
+        case ShadowCryptRoom::ArchiveGallery:
+            tier = ShadowCryptSkirmishTier::ArchiveGallery;
+            break;
+        case ShadowCryptRoom::RiftNave:
+            tier = ShadowCryptSkirmishTier::RiftNave;
+            break;
+        case ShadowCryptRoom::WardenSanctum:
+        case ShadowCryptRoom::Complete:
+            return false;
+        }
+        if (!shadowCryptSkirmish_.Begin(tier)) return false;
+        shadowCryptSkirmishObjectiveAdvanced_ = false;
+        return true;
+    }
+    ShadowCryptDefenseReport ResolveShadowCryptSkirmishThreat(
+        ShadowCryptDefenseResponse response, double reactionSeconds) {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return {};
+        const ShadowCryptDefenseReport report =
+            shadowCryptSkirmish_.ResolveThreat(response, reactionSeconds);
+        if (report.accepted && report.damageTaken > 0) {
+            shadowCryptMission_.RecordDamageTaken(report.damageTaken);
+        }
+        return report;
+    }
+    ShadowCryptAttackReport AttackShadowCryptSkirmishTarget(
+        std::size_t index, ShadowCryptAttackStyle style) {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return {};
+        ShadowCryptAttackReport report = shadowCryptSkirmish_.AttackTarget(index, style);
+        if (report.encounterComplete && !shadowCryptSkirmishObjectiveAdvanced_
+            && shadowCryptMission_.RecordObjectiveStep()) {
+            shadowCryptSkirmishObjectiveAdvanced_ = true;
+        }
+        return report;
+    }
+    bool LockShadowCryptSkirmishTarget(std::size_t index) {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return false;
+        return shadowCryptSkirmish_.LockTarget(index);
+    }
+    bool ClearShadowCryptSkirmishTargetLock() {
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return false;
+        return shadowCryptSkirmish_.ClearTargetLock();
+    }
+    std::size_t ShadowCryptSkirmishSelectedTarget() const {
+        return shadowCryptSkirmish_.SelectedTarget();
+    }
+    ShadowCryptTargetRecommendation ShadowCryptSkirmishRecommendedTarget() const {
+        return shadowCryptSkirmish_.RecommendedTarget();
+    }
+    ShadowCryptThreatTelegraph ShadowCryptSkirmishThreat() const {
+        return shadowCryptSkirmish_.CurrentThreat();
+    }
+    const ShadowCryptSkirmish& ShadowCryptSkirmishState() const {
+        return shadowCryptSkirmish_;
+    }
+
     // Pass 32 game-owned Rift Warden mastery trial. Entry is dependency-ready:
     // it consumes the already-authoritative completed Shadow Crypt state and a
     // persistent protagonist owner, without changing engine/runtime facilities.
@@ -424,6 +492,8 @@ private:
     MallResonancePuzzle mallResonancePuzzle_{};
     ManaReactorMission manaReactorMission_{};
     ShadowCryptMission shadowCryptMission_{};
+    ShadowCryptSkirmish shadowCryptSkirmish_{};
+    bool shadowCryptSkirmishObjectiveAdvanced_{};
     RiftWardenTrial riftWardenTrial_{};
     LandmarkInteractionReport lastReport_{};
 };
