@@ -214,6 +214,7 @@ void TestPhysicalAndCommandGuardComposition() {
 #include "LandmarkDialogueContinuityPass30Tests.inc"
 #include "MallResonancePuzzlePass31Tests.inc"
 #include "RiftWardenTrialPass32Tests.inc"
+#include "ShadowbladeProgressionCombatPass33Tests.inc"
 
 int main() {
     TestNormalizationAndGrammar();
@@ -244,6 +245,7 @@ int main() {
     TestLandmarkDialogueContinuityPass30();
     TestMallResonancePuzzlePass31();
     TestRiftWardenTrialPass32();
+    TestShadowbladeProgressionCombatPass33();
     if (failures != 0) return 1;
     std::cout << "Thought command tests passed\n";
     return 0;

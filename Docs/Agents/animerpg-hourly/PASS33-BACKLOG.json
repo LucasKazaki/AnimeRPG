@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "owner": "animerpg-game-hourly",
+  "pass": "GAME-PASS33-SHADOWBLADE-PROGRESSION-COMBAT-2026-09-24",
+  "baseline_main": "23a0fd258b170864893cf953b25ddf2c7e99491a",
+  "branch": "game/pass33-shadowblade-progression-combat",
+  "target_branch": "main",
+  "sources": [
+    {
+      "id": "GENSHIN-PS-CURRENT-20260924",
+      "kind": "official_platform_overview",
+      "url": "https://www.playstation.com/en-us/games/genshin-impact/",
+      "accessed": "2026-09-24",
+      "version_context": "PlayStation page currently presents Genshin Impact Version 7.0 and describes distinct character abilities/combat styles"
+    },
+    {
+      "id": "ZZZ-APPSTORE-CURRENT-20260924",
+      "kind": "developer_description",
+      "url": "https://apps.apple.com/us/app/zenless-zone-zero/id1606356401",
+      "accessed": "2026-09-24",
+      "version_context": "App Store currently lists Version 3.2 dated 2026-09-08; developer text describes Basic/Special attacks, Dodge/Parry, Stun/Chain Attack and exploiting opponent traits"
+    },
+    {
+      "id": "GRANBLUE-PS-CURRENT-20260924",
+      "kind": "official_platform_overview",
+      "url": "https://www.playstation.com/en-us/games/granblue-fantasy-relink/",
+      "accessed": "2026-09-24",
+      "version_context": "Current PlayStation page describes unique weapons/skills/combat styles plus adjustable difficulty, reminders and Practice Mode"
+    },
+    {
+      "id": "ZZZ-PLAYER-BUILDS-20260804",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZZZ_Official/comments/1vf2z4k/builds/",
+      "published": "2026-08-04",
+      "accessed": "2026-09-24",
+      "context": "Player asks for build explanation and says builds get confusing sometimes; anecdote, not consensus"
+    },
+    {
+      "id": "ZZZ-PLAYER-BUILDS-20260824",
+      "kind": "original_player_discussion",
+      "url": "https://www.reddit.com/r/ZZZ_Official/comments/1vx3xoy/so_hey_long_time_players_when_yall_do_the_builds/",
+      "published": "2026-08-24",
+      "accessed": "2026-09-24",
+      "context": "Returning player asks whether to make builds or use suggestions; replies mention learning mechanics/kits/synergies and that the game already provides suggestions/readiness grade"
+    }
+  ],
+  "features": [
+    {
+      "id": "GAME-162",
+      "kind": "reference_feature",
+      "title": "Equipped Shadowblade specialization authority",
+      "sources": ["GENSHIN-PS-CURRENT-20260924", "ZZZ-APPSTORE-CURRENT-20260924"],
+      "gap": "CoreTalent progression existed but no production combat path consumed equipped CoreTalent state.",
+      "adaptation": "Only equipped core talents contribute live action specialization; merely upgraded but unequipped talents remain inactive.",
+      "production_paths": ["Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Unequipped upgraded talent yields zero combat delta; equipped talent tier is read from authoritative CharacterProgression.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-163",
+      "kind": "reference_feature",
+      "title": "ShadowStep dash efficiency",
+      "sources": ["ZZZ-APPSTORE-CURRENT-20260924", "GENSHIN-PS-CURRENT-20260924"],
+      "gap": "ShadowStep did not affect the existing dash despite being a persistent core talent.",
+      "adaptation": "Each equipped ShadowStep tier refunds two resource after a successful existing dash, while Dash skill ranks above one refund one more each; cooldown/distance remain unchanged.",
+      "production_paths": ["Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Tier1 plus Dash rank5 makes a successful dash net 19 resource instead of 25, without refund on rejection and without exceeding MaximumResource.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-164",
+      "kind": "reference_feature",
+      "title": "EclipseEdge perfect-defense counter economy",
+      "sources": ["ZZZ-APPSTORE-CURRENT-20260924"],
+      "gap": "Perfect defense already earned a counter but EclipseEdge did not specialize that opening.",
+      "adaptation": "EclipseEdge refunds two resource per equipped tier only when the existing Fatal Strike consumed an earned defense-counter opening, plus FatalStrike mastery refund.",
+      "production_paths": ["Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Tier1 plus FatalStrike rank5 changes the existing 35-resource counter to a net 29; ordinary Fatal Strike does not receive the EclipseEdge component.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-165",
+      "kind": "reference_feature",
+      "title": "BreakerFocus stagger follow-up economy",
+      "sources": ["ZZZ-APPSTORE-CURRENT-20260924"],
+      "gap": "Stagger already opened a one-shot follow-up but BreakerFocus did not specialize it.",
+      "adaptation": "BreakerFocus refunds two resource per equipped tier only when Fatal Strike consumed the authoritative stagger opening, plus FatalStrike mastery refund.",
+      "production_paths": ["Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Tier1 plus FatalStrike rank5 changes the existing 30-resource stagger follow-up to net 24 while preserving one-shot stagger consumption.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "GAME-166",
+      "kind": "reference_feature",
+      "title": "Action-family skill ranks affect live combat economy",
+      "sources": ["GRANBLUE-PS-CURRENT-20260924", "GENSHIN-PS-CURRENT-20260924"],
+      "gap": "Dash/FatalStrike/Defense practice ranks were persistent progression but did not alter the production action path.",
+      "adaptation": "Bonus ranks provide small bounded action-family refunds; Defense bonus ranks restore two resource each only on PerfectGuard/PerfectDodge.",
+      "production_paths": ["Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Rank5 Defense restores eight resource on precise defense and zero on non-perfect outcomes; RestoreResource keeps the result capped at 100.",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    },
+    {
+      "id": "QOL-034",
+      "kind": "community_improvement",
+      "title": "Exact progression combat impact briefing",
+      "sources": ["ZZZ-PLAYER-BUILDS-20260804", "ZZZ-PLAYER-BUILDS-20260824"],
+      "gap": "Players could inspect progression ranks but not the exact live resource effects those choices would have after this integration.",
+      "adaptation": "Expose a read-only briefing with equipped talent tiers, action ranks, exact refunds/restores and effective resource costs.",
+      "production_paths": ["Engine/Scene/ShadowbladeActions.h"],
+      "acceptance": "Briefing is deterministic/read-only and matches the live action calculations; no claim that current ZZZ lacks suggestions/readiness tooling.",
+      "sentiment": "corroborating anecdotes, not consensus; current exact-delta resolution unestablished",
+      "status": "implemented_registered_regression_pending_exact_head_gates"
+    }
+  ],
+  "counts": {
+    "reference_features_researched": 5,
+    "community_improvements_researched": 1,
+    "implemented": 6,
+    "explicit_regression_coverage": 6,
+    "integrated_game_domain": 6,
+    "hosted_verified_exact_head": 0,
+    "native_playable_verified": 0,
+    "independently_reviewed_clean": 0,
+    "merged": 0
+  }
+}
