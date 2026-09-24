@@ -29,59 +29,63 @@ No shared build file or engine-owned path is admitted.
 
 Access date for web research: 2026-09-24.
 
-Primary/near-primary comparator context:
+Primary comparator sources:
 
-- Genshin Impact Version 5.4 map update details, as retained by the Genshin version changelog and HoYoverse update mirrors: map selections can select a destination, quest hints surface actionable quest state, reward hints are consolidated, and tracked custom markers stay visible through map zoom changes. Version 5.4 released 2025-02-12. Source: https://genshin-impact.fandom.com/wiki/Version/5.4 ; update-detail mirror: https://traveler.gg/moonlight-amidst-dreams-version-5-4-update-details/
-- Genshin Impact Version 5.6 map update details: custom-pin management gained category-scoped quantity selection, and map sidebars were reduced to currently relevant information. Version 5.6 released 2025-05-07. Source: https://genshin-impact.fandom.com/wiki/Version/5.6 ; update-detail mirror: https://traveler.gg/paralogism-version-5-6-update-details/
-- The project adapts the interaction lessons only. It does not copy Genshin map content, names, UI art, code, monetization, or world structure.
+- HoYoverse's official Genshin Impact post, `"Teyvat Interactive Map" Version 2.6 Update`, published 2022-03-30, documents quick area location, adding/editing personal pins, a filter list, viewing the player's own pins, synced in-game pins, and viewing pin distributions. Source: https://www.hoyolab.com/article/4029408
+- HoYoverse's official Genshin Impact Version `Luna III` update details, published 2025-12-02, documents the Adventurer Handbook tracking up to three nearby objective locations simultaneously. This is later official evidence that multi-target tracking remains part of Genshin's current-era navigation design. Source: https://www.hoyolab.com/article_pre/21389
+- HoYoverse's official `Teyvat Interactive Map Usage Guide`, retained on HoYoLAB, explains syncing in-game pins with the Interactive Map and recommends pinning discoveries to improve exploration efficiency. Source: https://www.hoyolab.com/article/17673509
+- Secondary Version 5.4/5.6 changelog mirrors were inspected only to revalidate later map-QoL evolution such as category-scoped custom-pin management and relevant-only map sidebars. They are corroborating context, not the primary authority for implementation.
+- The project adapts interaction lessons only. It does not copy Genshin map content, names, UI art, code, monetization, or world structure.
+
+Five distinct comparator lessons used by this packet are: actionable location/target guidance, custom route-pin creation/management, category/filter-based map decluttering, simultaneous multi-objective tracking, and consolidated relevant navigation information.
 
 Community improvement source:
 
 - Original Genshin player discussion, 2023-09-20, requested more pin icons/colors and the ability to turn pins on/off; a highly upvoted reply also asked for symbol-scoped deletion. Source: https://www.reddit.com/r/Genshin_Impact/comments/16nle96/
 - A January 15, 2026 retrospective community post still lists `Pin filter` among older requested QoL while noting that many old requests had gradually been added. Source: https://www.reddit.com/r/Genshin_Impact/comments/1qd7l2l/
-- Later official-version evidence shows category-scoped batch pin selection/deletion arrived by Version 5.6, but the inspected current sources do not establish an equivalent in-game per-category visibility filter. Therefore QOL-030 is recorded as a historical/specific player preference whose full current resolution is unestablished, not as proof that current Genshin lacks the feature.
+- Later official/retained version evidence shows category-scoped batch pin management exists, but the inspected current sources do not establish an equivalent in-game per-category visibility filter for the narrower historical request. Therefore QOL-030 is recorded as a specific player preference whose full current resolution is unestablished, not as proof that current Genshin lacks the feature.
 
 ## Five comparator features plus one community increment
 
 ### GAME-142: operation-aware next-step hint
 
-**Reference lesson:** map quest hints should surface the next relevant action without forcing progression.
-**Gap:** only the Mall survey can currently produce a meaningful next target; Rift Investigation and Shadow Crypt Lead expose counts but no next-step semantics.
+**Reference lesson:** map/location guidance should surface the next relevant action without forcing progression.
+**Repository gap:** only the Mall survey can currently produce a meaningful next target; Rift Investigation and Shadow Crypt Lead expose counts but no next-step semantics.
 **Adaptation:** `CurrentHint()` reports one bounded next action for the tracked operation: next unvisited Mall landmark, Rift Residue, Cooling Anomaly, Crypt Sigil, Shadow Crypt lore, or operation complete.
 **Acceptance:** hints advance deterministically as authoritative evidence arrives, never mutate state, and invalid operations still fail closed.
 
 ### GAME-143: deterministic next-incomplete operation tracking
 
-**Reference lesson:** selecting a relevant map entry should focus the player on actionable content rather than make them manually rediscover it.
-**Gap:** after finishing one operation the player must explicitly know which remaining operation is incomplete.
+**Reference lesson:** selecting/tracking relevant map objectives should focus the player on actionable content rather than require manual rediscovery.
+**Repository gap:** after finishing one operation the player must explicitly know which remaining operation is incomplete.
 **Adaptation:** `TrackNextIncompleteOperation()` advances cyclically from the current operation to the next incomplete one and refuses mutation once all operations are complete.
 **Acceptance:** completed operations are skipped, wraparound is deterministic, and all-complete state is idempotent.
 
 ### GAME-144: bounded multi-stop field route
 
-**Reference lesson:** tracked custom markers and map target management support intentional exploration routes.
-**Gap:** Astral supports only one temporary pin even though the National Mall field loop has three bounded sites.
+**Reference lesson:** Genshin's official current-era navigation can track multiple nearby objectives, while its official Interactive Map supports personal pins and synced pin distributions.
+**Repository gap:** Astral supports only one temporary pin even though the National Mall field loop has three bounded sites.
 **Adaptation:** add a fixed-capacity three-stop route with explicit insertion order, duplicate/visited/invalid rejection, individual removal, batch clear, and automatic pruning when a site is discovered. Legacy single-pin precedence remains unchanged.
 **Acceptance:** no allocation/unbounded growth, route order is stable, discovering a stop removes it exactly once, and single-pin behavior from pass 14 remains green.
 
 ### GAME-145: unread field-journal notices
 
-**Reference lesson:** consolidated map/reward hints make new information visible without requiring the player to inspect every category repeatedly.
-**Gap:** journal entries are only locked/unlocked, so the game cannot distinguish newly discovered notes from already-read notes.
+**Reference lesson:** relevant navigation/information surfaces should make newly actionable information visible without requiring the player to inspect every category repeatedly.
+**Repository gap:** journal entries are only locked/unlocked, so the game cannot distinguish newly discovered notes from already-read notes.
 **Adaptation:** newly unlocked entries begin unread; read-one and read-all acknowledgement are explicit and idempotent; duplicate evidence never re-notifies an already-read entry.
 **Acceptance:** unread counts are exact, invalid/locked/read entries cannot be acknowledged again, and repeated evidence does not resurrect notices.
 
 ### GAME-146: consolidated field briefing
 
-**Reference lesson:** relevant map sidebars should expose the currently useful subset instead of forcing menu hopping.
-**Gap:** callers must query operation progress, hint/target, route count, journal state, and completed-operation count separately.
+**Reference lesson:** map/navigation interfaces should consolidate the relevant tracked state rather than force menu hopping.
+**Repository gap:** callers must query operation progress, hint/target, route count, journal state, and completed-operation count separately.
 **Adaptation:** `Briefing()` returns a read-only snapshot of those authoritative values with no duplicated progression authority.
 **Acceptance:** snapshot matches the underlying guide state before/after route/evidence changes and is non-mutating.
 
 ### QOL-030: player route visibility filter
 
-**Community lesson:** players have repeatedly asked for pin filtering / pin visibility control to reduce map clutter.
-**Gap:** a multi-stop route would otherwise display/select every route category at once.
+**Community lesson:** players have specifically requested pin filtering / visibility control to reduce map clutter. HoYoverse's official Interactive Map independently demonstrates the utility of a filter list, but this increment is scoped to Astral's own in-game route state.
+**Repository gap:** a multi-stop route would otherwise display/select every route category at once.
 **Adaptation:** each route stop has one of three original Astral categories (`Objective`, `Resource`, `Note`); an `All`/category visibility filter changes which route pin becomes the current visible target without deleting hidden stops. Invalid filters fail closed.
 **Acceptance:** filtering changes target visibility only, preserves insertion/state, hidden stops remain removable/discoverable, and restoring `All` reveals them again.
 
@@ -92,11 +96,11 @@ Community improvement source:
 3. Add pass-29 boundary tests for invalid enums, route duplicates/capacity, visit pruning, category filtering, read acknowledgement idempotency, operation wraparound/all-complete behavior, and non-mutating briefing values.
 4. Run the existing hosted Windows Debug/Release lane and Release-manifest lane on the exact final candidate.
 5. Obtain a fresh Codex independent review of the exact final candidate. Repair every material finding, resolve threads, and rerun affected exact-head gates before merge.
-6. Immediately before merge, re-read `main`, PR head, changed paths, checks, full review state, and merge with expected head only.
+6. Re-read `main`, PR head, changed paths, checks and full review state immediately before an expected-head merge.
 
 ### Exact reproducible hosted commands
 
-The existing `.github/workflows/windows-ci.yml` runs these core commands on `windows-2022` with an external `$env:BUILD_ROOT`:
+The existing `.github/workflows/windows-ci.yml` runs these literal core commands on `windows-2022` with an external `$env:BUILD_ROOT`:
 
 ```powershell
 cmake -S . -B "$env:BUILD_ROOT" -G "Visual Studio 17 2022" -A x64
@@ -111,9 +115,9 @@ git diff --check
 git status --porcelain --untracked-files=no
 ```
 
-The same workflow also runs the existing R0-parser safety, PE dependency, Windows prerequisite/runtime/compatibility/bootstrap, and Release test-safety scripts. Every required non-skipped step must conclude `success` (exit code 0).
+The same workflow also executes the repository's R0-parser safety, PE dependency, Windows-prerequisite/runtime/compatibility/bootstrap, and Release test-safety contract scripts before and around those build/test commands. A workflow run is accepted only when every required step concludes `success`; a nonzero command exits the step/job.
 
-The existing `.github/workflows/release-manifest-validation.yml` runs its existing contract/package commands, including:
+The existing `.github/workflows/release-manifest-validation.yml` additionally runs these literal contract/package commands on the same source head, with workflow-owned temporary build/package paths:
 
 ```powershell
 python Scripts/test_release_manifest.py
@@ -139,4 +143,8 @@ g++ -std=c++17 -Wall -Wextra -Werror -I<scratch-root> <pass29-test>.cpp -o <scra
 <scratch-binary>
 ```
 
-No native interactive runtime command is applicable to acceptance because this packet does not add Win32/controller/menu wiring. Hosted CTest excludes `RuntimeSmoke`; native playable verification therefore remains separate and must not be claimed from this packet.
+No native interactive runtime command is applicable to pass-29 acceptance because this packet adds no Win32/controller/menu wiring. Hosted CTest intentionally excludes `RuntimeSmoke`. Therefore native playable verification remains `0`, and no runtime exit code is claimed.
+
+## Evidence boundary
+
+These APIs are integrated through the existing `LandmarkInteraction`-owned `ExplorationFieldGuide` production game-domain path, but there is still no Win32/controller/menu map or field-guide UI for these new interactions. Hosted deterministic tests are not a native interactive playtest. No GPU/rendering, animation, art/audio, cross-process field-guide persistence, or performance claim is made by this packet.
