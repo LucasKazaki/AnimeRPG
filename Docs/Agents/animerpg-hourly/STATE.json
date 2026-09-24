@@ -15,9 +15,9 @@
   "task_packet": "Tasks/GAME-PASS39-SHADOW-CRYPT-THREAT-DEPTH-2026-09-24.md",
   "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS39-BACKLOG.json",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS39.md",
-  "pr": null,
-  "final_head": "candidate_state_freeze_pending_pr_and_exact_head_gates",
-  "final_receipt_location": "implementation_PR_comment_after_exact_head_acceptance_and_merge",
+  "pr": 64,
+  "final_head": "this_state_commit_is_the_candidate_for_exact_head_gates",
+  "final_receipt_location": "PR_64_comment_after_exact_head_acceptance_and_merge",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -56,5 +56,5 @@
     "community_request": "semantic multi-enemy threat awareness adapted from recent ZZZ visual-clarity/camera complaints",
     "current_resolution": "not established; player threads include lock-on/effect-setting counterarguments, so no current-comparator defect claim"
   },
-  "next_action": "Open the scoped PR on the frozen candidate, require exact-head hosted Windows Debug/Release plus release-manifest checks and fresh Codex review, repair findings, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
+  "next_action": "Require exact-head hosted Windows Debug/Release plus release-manifest checks and fresh Codex review for PR 64, repair findings, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
 }
