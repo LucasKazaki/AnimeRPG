@@ -153,13 +153,21 @@ void TestRiftWardenTrialPass32() {
             && missedScoreRecord.score < cleanScoreRecord.score,
         "pass32 skipped stagger openings lower mastery/score instead of farming a better ranked record");
 
-    // Exact-head review repair: pathological repeated misses saturate instead of
-    // overflowing the signed score penalty and turning a worse Bronze run into
-    // a huge positive personal best.
+    // Exact-head review repairs: pathological repeated misses saturate before the
+    // signed score penalty can overflow, and a later run beyond the saturation
+    // sentinel cannot masquerade as an equal-miss run and win damage/time ties.
     RiftWardenTrial saturatedScoreTrial;
     Expect(saturatedScoreTrial.Begin(true, RiftWardenDifficulty::Story),
         "pass32 overflow regression begins a bounded Story trial");
-    for (int cycle = 0; cycle < RiftWardenTrial::MaximumMissedOpenings + 5; ++cycle) {
+    const RiftWardenTelegraph firstSaturatedTelegraph = saturatedScoreTrial.CurrentTelegraph();
+    const RiftWardenResponse wrongFirstResponse = firstSaturatedTelegraph.recommendedResponse
+            == RiftWardenResponse::Dodge
+        ? RiftWardenResponse::Guard
+        : RiftWardenResponse::Dodge;
+    Expect(saturatedScoreTrial.Resolve(wrongFirstResponse, 0.10).resolution
+            == RiftWardenResolution::Hit,
+        "pass32 saturation baseline intentionally records one authoritative hit");
+    for (int cycle = 0; cycle < RiftWardenTrial::MaximumMissedOpenings; ++cycle) {
         while (!saturatedScoreTrial.Briefing().staggerOpen) {
             const RiftWardenTelegraph farmTelegraph = saturatedScoreTrial.CurrentTelegraph();
             Expect(saturatedScoreTrial.Resolve(farmTelegraph.recommendedResponse, 0.10).accepted,
@@ -173,13 +181,35 @@ void TestRiftWardenTrialPass32() {
             == RiftWardenTrial::MaximumMissedOpenings,
         "pass32 missed-opening evidence saturates at the explicit safe bound");
     ClearRiftWardenDirect(saturatedScoreTrial);
-    const RiftWardenRecord saturatedScoreRecord = saturatedScoreTrial.BestRecord(
+    const RiftWardenRecord firstSaturatedRecord = saturatedScoreTrial.BestRecord(
         RiftWardenDifficulty::Story);
-    Expect(saturatedScoreRecord.valid
-            && saturatedScoreRecord.missedOpenings == RiftWardenTrial::MaximumMissedOpenings
-            && saturatedScoreRecord.mastery == RiftWardenMastery::Bronze
-            && saturatedScoreRecord.score == 0,
-        "pass32 saturated missed-opening penalty remains bounded at a zero Bronze score");
+    Expect(firstSaturatedRecord.valid
+            && firstSaturatedRecord.missedOpenings == RiftWardenTrial::MaximumMissedOpenings
+            && firstSaturatedRecord.damageTaken > 0
+            && firstSaturatedRecord.mastery == RiftWardenMastery::Bronze
+            && firstSaturatedRecord.score == 0,
+        "pass32 saturated baseline remains a bounded zero-score Bronze record");
+
+    Expect(saturatedScoreTrial.Begin(true, RiftWardenDifficulty::Story),
+        "pass32 saturation ordering regression starts a later Story replay");
+    for (int cycle = 0; cycle < RiftWardenTrial::MaximumMissedOpenings + 5; ++cycle) {
+        while (!saturatedScoreTrial.Briefing().staggerOpen) {
+            const RiftWardenTelegraph farmTelegraph = saturatedScoreTrial.CurrentTelegraph();
+            Expect(saturatedScoreTrial.Resolve(farmTelegraph.recommendedResponse, 0.10).accepted,
+                "pass32 saturation ordering replay earns the next stagger opening");
+        }
+        Expect(saturatedScoreTrial.Resolve(RiftWardenResponse::Guard, 0.10).resolution
+                == RiftWardenResolution::MissedOpening,
+            "pass32 saturation ordering replay intentionally misses beyond the cap");
+    }
+    ClearRiftWardenDirect(saturatedScoreTrial);
+    const RiftWardenRecord retainedSaturatedRecord = saturatedScoreTrial.BestRecord(
+        RiftWardenDifficulty::Story);
+    Expect(retainedSaturatedRecord.valid
+            && retainedSaturatedRecord.missedOpenings == firstSaturatedRecord.missedOpenings
+            && retainedSaturatedRecord.damageTaken == firstSaturatedRecord.damageTaken
+            && retainedSaturatedRecord.score == firstSaturatedRecord.score,
+        "pass32 later unknown-or-worse saturated replay cannot replace the established personal best through damage/time ties");
 
     // QOL-033: community-requested boss practice can start at a chosen learned
     // phase after a ranked clear. It preserves the ranked personal best and does
