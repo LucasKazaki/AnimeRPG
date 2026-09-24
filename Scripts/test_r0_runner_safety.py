@@ -513,6 +513,33 @@ class R0RunnerPosixSignalTests(unittest.TestCase):
             )
             self.assertEqual(ordinary.returncode, 7)
 
+    def test_capture_unblocks_relayed_posix_signal(self) -> None:
+        import signal as signal_module
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            signal_number = int(signal_module.SIGTERM)
+            previous_mask = signal_module.pthread_sigmask(
+                signal_module.SIG_BLOCK, {signal_module.SIGTERM}
+            )
+            try:
+                command = [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import os,signal; "
+                        f"signal.pthread_sigmask(signal.SIG_UNBLOCK, {{{signal_number}}}); "
+                        f"os.kill(os.getpid(), {signal_number})"
+                    ),
+                ]
+                unchecked = runner.capture(command, check=False)
+                self.assertEqual(unchecked.returncode, -signal_number)
+            finally:
+                signal_module.pthread_sigmask(signal_module.SIG_SETMASK, previous_mask)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
