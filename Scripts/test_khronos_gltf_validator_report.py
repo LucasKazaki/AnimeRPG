@@ -74,6 +74,8 @@ def main() -> int:
         r = copy.deepcopy(valid); r["info"]["animationCount"] = True; cases.append(("bool info count", r, "JSON integer"))
         r = copy.deepcopy(valid); r["info"]["hasSkins"] = 0; cases.append(("non-bool info flag", r, "JSON boolean"))
         r = copy.deepcopy(valid); r["info"]["resources"][0] = {"pointer": "/buffers/0", "storage": "external", "uri": "buf.bin"}; cases.append(("external resource", r, "is external"))
+        r = copy.deepcopy(valid); del r["info"]["resources"]; cases.append(("missing resources", r, "present and non-empty"))
+        r = copy.deepcopy(valid); r["info"]["resources"] = []; cases.append(("empty resources", r, "present and non-empty"))
         r = copy.deepcopy(valid); del r["info"]["resources"][0]["storage"]; cases.append(("missing storage", r, "required to prove self-contained"))
         r = copy.deepcopy(valid); r["info"]["resources"][0]["storage"] = True; cases.append(("bool storage", r, "known Khronos storage string"))
         r = copy.deepcopy(valid); r["info"]["resources"][0]["storage"] = "mystery"; cases.append(("unknown storage", r, "known Khronos storage string"))
@@ -94,7 +96,7 @@ def main() -> int:
         ])
         assert rc == 0
 
-    print("PASS: 20/20 Khronos glTF report adapter tests")
+    print("PASS: 22/22 Khronos glTF report adapter tests")
     return 0
 
 
