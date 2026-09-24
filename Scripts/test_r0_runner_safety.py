@@ -484,5 +484,35 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertNotIn("Build date: August 11, 2026", package)
 
 
+@unittest.skipIf(os.name == "nt", "POSIX signal return codes only")
+class R0RunnerPosixSignalTests(unittest.TestCase):
+    def test_capture_preserves_posix_signal_termination_status(self) -> None:
+        import signal as signal_module
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            runner = r0.R0Runner(args)
+            signal_number = int(signal_module.SIGKILL)
+            command = [
+                sys.executable,
+                "-c",
+                f"import os,signal; os.kill(os.getpid(), {signal_number})",
+            ]
+
+            unchecked = runner.capture(command, check=False)
+            self.assertEqual(unchecked.returncode, -signal_number)
+            with self.assertRaisesRegex(
+                r0.RecoveryFailure, rf"Command failed \(-{signal_number}\)"
+            ):
+                runner.capture(command)
+
+            ordinary = runner.capture(
+                [sys.executable, "-c", "import sys; sys.exit(7)"], check=False
+            )
+            self.assertEqual(ordinary.returncode, 7)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
