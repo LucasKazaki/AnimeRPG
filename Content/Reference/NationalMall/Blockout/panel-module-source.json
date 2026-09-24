@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "asset_id": "national-mall-core-panel-module-v1",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "source_validated_not_imported",
+  "ledger_ref": "Content/Reference/NationalMall/reference-ledger.json",
+  "ledger_blob_sha1": "ba8ec205d2aecfa4b2ace15c13c71fb9932cb7f4",
+  "ledger_entry_id": "mall-core-axis",
+  "source_units_policy": "retain_source_values_and_convert_to_metres_at_authoring_boundary",
+  "coordinate_system": {
+    "handedness": "right",
+    "up": "+Y",
+    "forward": "+Z",
+    "right": "-X",
+    "linear_unit": "metre",
+    "axis_note": "asset-local +Z is the panel longitudinal axis; no survey east/west placement is claimed"
+  },
+  "source_measurements": [
+    {
+      "label": "lawn_panel_count",
+      "source_value": 8,
+      "source_unit": "count",
+      "source_relation": "exact_count"
+    },
+    {
+      "label": "typical_lawn_panel_length",
+      "source_value": 450,
+      "source_unit": "feet",
+      "source_relation": "approximate",
+      "converted_m": 137.16
+    },
+    {
+      "label": "typical_lawn_panel_width",
+      "source_value": 170,
+      "source_unit": "feet",
+      "source_relation": "approximate",
+      "converted_m": 51.816
+    },
+    {
+      "label": "perimeter_gravel_path_width",
+      "source_value": 35,
+      "source_unit": "feet",
+      "source_relation": "approximate",
+      "converted_m": 10.668
+    },
+    {
+      "label": "tree_grove_width",
+      "source_value": 130,
+      "source_unit": "feet",
+      "source_relation": "approximate",
+      "converted_m": 39.624
+    }
+  ],
+  "authoring": {
+    "module_scope": "one_typical_panel_of_eight",
+    "ground_thickness_m": 0.1,
+    "path_thickness_m": 0.08,
+    "grove_envelope_thickness_m": 0.06,
+    "grove_band_length_policy": "match_outer_path_length",
+    "tree_geometry": "not_authored",
+    "collision": "not_authored",
+    "textures": "not_authored",
+    "runtime_import": "not_claimed"
+  }
+}
