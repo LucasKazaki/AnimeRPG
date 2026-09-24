@@ -1,107 +1,92 @@
-# E11 Editor Runtime Smoke task, 2026-09-23
+# E11 Editor Runtime Smoke
 
-## Scope and ownership
+## Scope and authority
 
-Bounded verification-only packet for the integrated Win32 `AstralEditor` on owned branch `engine/2026-09-22-editor-runtime-smoke`. Admitted baseline remains `e2c0cbe3c7bbdea646888bf31f25cfeb394693e1`.
+Verification-only packet for Astral Editor native runtime acceptance. Preserve the custom C++17/Win32/GDI Astral Engine. No game-content work, dependency changes, graphics-API changes, scheduler/runtime control, merge, release, deployment, or historical R0 execution is authorized here. Issue #7 remains open, so the historical R0 runner remains blocked.
 
-Allowed paths only:
+Allowed paths remain:
 
-- `CMakeLists.txt`
-- `Tests/EditorRuntimeSmoke.cpp`
-- this task
-- `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`
-- `Docs/Research/ENGINE-CAPABILITIES.json`
+1. `CMakeLists.txt`
+2. `Tests/EditorRuntimeSmoke.cpp`
+3. `Tasks/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`
+4. `Docs/QA/E11-EDITOR-RUNTIME-SMOKE-2026-09-22.md`
+5. `Docs/Research/ENGINE-CAPABILITIES.json`
 
-Do not add editor/game features, change rendering or graphics API architecture, add dependencies, alter scheduler/runtime state, merge/rebase, deploy/release, invoke R0, or restart paused engine-worker content. One active writer only. Issue #7 was rechecked on 2026-09-23 and remains open, so the historical R0 runner remains blocked.
+## Current bounded implementation
 
-## Exact starting checkpoint for this pass
+Source repair: `20cc436569cfcebcec0d8b9c195380df5a2a5b1b`
 
-- PR #13 is open, draft, mergeable and unmerged.
-- pre-pass evidence/control head: `4f1996e98a24c0478157c4ad1de9083ed35f0642`.
-- current runtime-smoke source candidate remains `57a7867aa4273def5d1dfbb73766883945881c7c`.
-- `Tests/EditorRuntimeSmoke.cpp` blob: `290b4931b3a4083555f0a5ddcae4ee14cbaebe6a`.
-- `CMakeLists.txt` blob: `4fd471151acb4b5919ccef4a92f49da12bd8d1f1`.
-- latest durable observed `main`: `6d22da88402db71843ecd5a35766c0c77e62dca6`.
-- current source-associated hosted integration evidence is green: Windows run `35933677666` / job `107425789093`, profiling `35933677505`, release-manifest `35933677460`; those `pull_request` workflows exercised synthetic merge `ec0dee8274e6b3fd1ffeb4fe5480c88590c96fbf` over tested base `6d22da88402db71843ecd5a35766c0c77e62dca6` and source parent `57a7867aa4273def5d1dfbb73766883945881c7c`.
-- exact pre-pass evidence head `4f1996e...` also has green hosted evidence: Windows run `35934076273` / job `107427047961`, profiling `35934076239`, release-manifest `35934076556`; its PR integration commit is `9e42ea5a12659d84e852ce8c1e5901bbd98adc9a`, with parents tested base `6d22da88402db71843ecd5a35766c0c77e62dca6` and head `4f1996e98a24c0478157c4ad1de9083ed35f0642`.
-- hosted CTest intentionally excludes interactive `EditorRuntimeSmoke`; `native_evidence` remains empty.
+`Tests/EditorRuntimeSmoke.cpp` blob: `5bae7e024eed7ab88be772775abc2b1fa9479c14`
 
-## Fresh independent-review reconciliation
+GitHub commit diff: 35 additions, 12 deletions, only `Tests/EditorRuntimeSmoke.cpp`.
 
-Fresh Codex review of exact pre-pass head `4f1996e98a24c0478157c4ad1de9083ed35f0642` completed at `2026-09-23T23:38:32Z`. It produced one current P2 evidence/control finding, thread `PRRT_kwDOTo2Ig86lYKi9`, top-level comment `4088355136`: the task and QA next-action text still told the next operator to repeat evidence synchronization that commits `21ae5174c9dc578da120ffafc11bea5916ee9231` and `4f1996e98a24c0478157c4ad1de9083ed35f0642` had already completed.
+The repaired `SelectCubeAndNotify` carries the same three-second selection deadline into `PostSelectionMutationWhileOwnerPinned`. Both asynchronous selection mutations now fail closed if the phase is exhausted before the owner pin or immediately before `PostMessageW`. The polling loop also rejects `LB_GETCURSEL == 3` when Cube is first observed at or after the deadline. Exact launched PID/TID ownership, retained process/thread liveness, zero-prior-count suspension, `GetThreadContext(CONTEXT_CONTROL)`, Outliner identity/style checks, asynchronous posting, immediate `ResumeThread`, the 135-second global budget, shell semantics, containment, resize deadlines, maximize/restore validation, exact restore rectangle and cleanup contracts remain intact.
 
-This pass removes that stale instruction. Because this evidence/control repair changes the exact branch head, the repaired head still requires fresh independent review before E11 can be accepted. Review by the coordinator is not independent acceptance.
+The preceding evidence-control review finding was also repaired in `2a8604f52cbb52c91f125a91b1fe7b01de4c4d17`: `benchmark_proposals` and `progression_rules` were restored to the capability map. Review thread `PRRT_kwDOTo2Ig86lYyrl` was answered with exact evidence and resolved.
 
-## Additional bounded coordinator audit finding
+## Reproduction and portable regression evidence
 
-While reconciling the review, a source-level deadline gap was reproduced in the current `SelectCubeAndNotify` acceptance path. This is a coordinator finding, not an independent-review finding and not native evidence.
+The prior defect allowed two out-of-budget transitions:
 
-Current source establishes a three-second selection deadline and a scoped message deadline, but the first selection poll executes `if (selection == 3) break;` before checking whether the three-second deadline has already expired. The code then enters `PostSelectionMutationWhileOwnerPinned(...)` for `WM_COMMAND/LBN_SELCHANGE`. That owner-pin helper does not receive or check the selection phase deadline before its final `PostMessageW` side effect.
+- `LB_GETCURSEL == 3` could be observed exactly at the three-second boundary and accepted before the deadline check.
+- Cube could be observed in-budget, then owner pinning/context validation could consume the remaining time and allow `WM_COMMAND/LBN_SELCHANGE` to be queued after the phase deadline.
 
-Therefore two bounded cases can issue a selection notification after the advertised three-second phase:
+Disposable C++17 source-logic fixture SHA-256:
 
-1. `LB_GETCURSEL` first observes Cube at or just after the deadline and breaks before the existing deadline check.
-2. Cube is observed just before the deadline, but owner pinning and the `GetThreadContext` barrier consume the remaining time and the helper posts `WM_COMMAND/LBN_SELCHANGE` after the deadline.
+`b02ed747e51817b150bfe7e9d0adca255a36efc97c61d5f5ba3860042736ee25`
 
-Later shell validation is still deadline-bounded, so this finding is not evidence of a false PASS. It is a bounded-side-effect defect: a mutation/notification can be enqueued after the phase that claims to contain all selection synchronization work. Native handoff must not use the current smoke as final acceptance evidence until this is repaired and re-reviewed.
+Checks executed in the sandbox:
 
-## Reproduction evidence
+- GCC 14.2.0, `-std=c++17 -Wall -Wextra -Werror -pedantic`: PASS.
+- Clang 17.0.0, `-std=c++17 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer`, with ASan leak detection and halt-on-error: PASS.
 
-Disposable coordinator fixture: `/mnt/data/e11_selection_deadline_fixture.cpp` during this pass only.
+The fixture rejects an observation at/after deadline, rejects a post whose owner-pin phase crosses the deadline, and retains normal in-budget admission. This is source-logic evidence only, not Win32 GUI evidence.
 
-SHA-256: `383f71febc58529fa9c7e2887936463eaf5ff67c663a2763a27d4d7a3b8c18b7`.
+## Primary research basis, rechecked 2026-09-24
 
-Executed successfully:
+- Microsoft Learn `PostMessageW`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postmessagew . It posts to the creating thread's queue and returns without waiting for processing, so the phase budget must gate the enqueue itself.
+- Microsoft Learn `GetTickCount64`: https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-gettickcount64 . It supplies elapsed milliseconds; this packet treats `now >= deadline` as exhausted.
+- Microsoft Learn `GetThreadContext`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadcontext . A valid context cannot be obtained for a running thread, which is the existing post-suspend execution barrier.
+- Microsoft Learn `SuspendThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-suspendthread . Microsoft describes it as debugger-oriented, not general synchronization. E11 therefore uses it only for the short verification-only identity-and-enqueue interval and performs no target-dependent wait while suspended.
+- Unreal Engine 5.8 editor viewport workflows: https://dev.epicgames.com/documentation/en-us/unreal-engine/using-editor-viewports-in-unreal-engine . Behavioral reference only.
+- Unity 6.0 `EditorWindow.maximized`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html . Behavioral reference only.
 
-```text
-g++ (Debian 14.2.0-19) 14.2.0
-g++ -std=c++17 -Wall -Wextra -Werror -pedantic e11_selection_deadline_fixture.cpp
-=> e11 selection deadline fixture: PASS
+No proprietary engine source was copied and no dependency was imported.
 
-clang version 17.0.0
-clang++ -std=c++17 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer e11_selection_deadline_fixture.cpp
-ASAN_OPTIONS=detect_leaks=1:halt_on_error=1
-UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
-=> e11 selection deadline fixture: PASS
-```
+## Hosted evidence for source `20cc436...`
 
-The fixture covers: selection first observed exactly at the phase deadline, selection observed in time followed by an owner-pin/post that finishes after the deadline, and a fully in-budget success case. It demonstrates the control-flow contract only. It is not a Win32 build, GUI run, GPU run, or substitute for native acceptance.
+All three source-associated pull-request workflows completed successfully:
 
-## Primary-source basis rechecked 2026-09-23
+- Windows build and deterministic tests: run `35942799798`, job `107454197090`, completed `2026-09-24T01:26:40Z`, success.
+- Profiling capture portability: run `35942799775`, success.
+- Release manifest integrity: run `35942799781`, success.
 
-- Microsoft `PostMessageW`: https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-postmessagew . It posts to the queue associated with the thread that created the target window and returns without waiting for processing. The current selection harness therefore must gate the enqueue itself, not only later completion polling.
-- Microsoft `GetTickCount64`: https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-gettickcount64 . It returns elapsed milliseconds since system start; its resolution is limited by the system timer. E11 uses it for bounded phase deadlines, so acceptance rules must be consistent at the boundary.
-- Microsoft `GetThreadContext`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadcontext . A valid context cannot be obtained for a running thread; the existing owner pin uses this as its post-suspend execution barrier.
-- Microsoft `SuspendThread`: https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-suspendthread . Microsoft describes it as debugger-oriented rather than general synchronization. E11 therefore keeps suspension limited to the short verification-only identity/enqueue interval and performs no target-dependent wait while suspended.
-- Epic Unreal Engine 5.8, `Using Editor Viewports`: https://dev.epicgames.com/documentation/unreal-engine/using-editor-viewports-in-unreal-engine . Perspective 3D, orthographic 2D, multi-viewport layouts, maximized viewports and immersive mode remain editor workflow comparison targets.
-- Unity 6.0, `EditorWindow.maximized`: https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow-maximized.html . Maximized editor-window state remains a comparison workflow property.
+The Windows job passed repository/R0 safety contracts, VS2022 x64 configuration, Debug build and deterministic tests, Release build and deterministic tests, release dependency/prerequisite checks, static milestone verifiers and clean-tree verification. Hosted deterministic CI intentionally does not establish the interactive GUI behavior of `EditorRuntimeSmoke`.
 
-These are public behavioral/API references only. No proprietary Epic/Unity source was copied and no dependency was imported.
+At this checkpoint, current `main` is `e38760070e0d021293e9f907834e61e6a6edca23`. GitHub's current PR synthetic merge for source `20cc436...` is `45c3685897ca8c31cdca62052f97d6d738752045`, whose commit message records merge of `20cc436...` into `e387600...`. Keep source association distinct from the integration tree exercised by default pull-request checkout.
 
-## Required source repair packet
+## Native acceptance matrix retained
 
-The smallest admitted source repair is still within `Tests/EditorRuntimeSmoke.cpp` and must not change production editor behavior:
+Native evidence remains empty. The registered Windows executor must use one owned interactive desktop and retain source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driver identity, exact commands, stdout/stderr, exit codes, UTC timestamps, hashes and screenshots where applicable.
 
-1. carry the existing selection-phase deadline into `PostSelectionMutationWhileOwnerPinned(...)` or an equivalent exact helper boundary;
-2. reject the asynchronous `LB_SETCURSEL` and `WM_COMMAND/LBN_SELCHANGE` enqueue if the selection deadline is already exhausted immediately before the side effect;
-3. when polling observes `LB_GETCURSEL == 3`, reject an at/after-deadline observation before advancing to notification;
-4. preserve exact PID/TID owner pinning, zero-prior suspension, `CONTEXT_CONTROL` barrier, asynchronous `PostMessageW`, immediate resume, global 135-second work budget, and all existing shell/containment assertions;
-5. add/retain a regression fixture for late-selection and late-owner-pin cases without weakening any existing acceptance assertion.
+Required native checks, after fresh independent review of the exact handoff tree:
 
-After implementation, run applicable warning-clean portable fixture checks, hosted Debug/Release deterministic suites, profiling/release-manifest checks, record actual synthetic merge/base/source identities, and obtain fresh independent review of the exact evidence head. Only then may the registered Windows executor run the native E11 matrix.
+1. Debug `EditorContainmentTests`.
+2. Release `EditorContainmentTests`.
+3. Debug and Release interactive `EditorRuntimeSmoke` as required by the packet controls.
+4. Startup untouched shell and Cube selection/Inspector synchronization.
+5. 800x600, 1280x720, 1440x900, actual maximized desktop plus exact restore to the pre-maximize outer rectangle, and 420x260 or the closest OS-permitted narrow state.
+6. Zero owned processes after normal success and every exercised failure/cleanup path.
+7. Separate `AstralGame` launch from the same build as a no-regression check.
 
-## Native acceptance matrix retained, but currently blocked by the source repair
+Do not shrink this matrix without explicit approved scope change.
 
-After the source repair, hosted checks, evidence synchronization and exact-head independent review are all clean, the registered Windows executor must use one owned interactive desktop and run Debug and Release `EditorContainmentTests` plus interactive `EditorRuntimeSmoke`, retaining source SHA, machine/Windows identity, MSVC/CMake versions, GPU/driver identity, exact commands, complete stdout/stderr, exit codes, UTC timestamps, screenshots and zero-owned-process cleanup proof.
+## Stop and rollback conditions
 
-The native matrix remains: untouched startup, Cube selection/Inspector synchronization, 800x600, 1280x720, 1440x900, actual maximized desktop followed by exact restore to the pre-maximize outer screen rectangle, and 420x260 or closest OS-permitted narrow state. Separately launch `AstralGame` from the same source/build as a no-regression check.
+Stop on the first deterministic regression, review finding requiring source changes, native ownership/cleanup ambiguity, or any request outside the allowed paths. Do not weaken an acceptance test to obtain green evidence. Roll back only this bounded packet if a repair cannot be validated; do not reset or overwrite concurrent work.
 
-Clean-machine packaging, comparative frame/RAM/VRAM measurement, broader stress/recovery, remaining E00-E17 capability gaps, and the required 24-hour soak remain unresolved. No UE5/Unity parity claim is permitted.
+## Remaining gates and single next action
 
-## Rollback and stop conditions
+Fresh independent review of the exact post-repair receipt tree is still required. Native GUI/GPU evidence, clean-machine packaging, comparative frame/RAM/VRAM measurement, stress/recovery, the remaining E00-E17 catalogue, and the required 24-hour soak remain unresolved. `parity_claim` remains false.
 
-Never weaken the acceptance test to obtain green results. Stop before production-runtime changes, dependency/API changes, unrelated workflow changes, rebase/merge, R0 execution, scheduler operations, release/deployment, or game-content work. Preserve the current source candidate if the deadline repair cannot be made safely in the owned packet and leave exact evidence instead.
-
-## Single next useful action
-
-Repair the selection-phase deadline at the side-effect boundary in `Tests/EditorRuntimeSmoke.cpp` as defined above. Then run the applicable hosted/portable checks, synchronize the task/QA/capability evidence to the resulting exact source and tested PR integration tree, and obtain fresh independent review. If and only if that exact reviewed tree is clean, hand it to the registered Windows executor for the retained Debug/Release native matrix and separate `AstralGame` launch. Do not repeat the already-completed `57a7867...` / `ec0dee8...` evidence synchronization and do not start another dependent editor feature while this gate is unresolved.
+Single next useful action: reconcile a fresh independent review of the exact receipt head containing source `20cc436...` and the synchronized records. If it is clean, hand that exact reviewed SHA to the registered Windows executor for the retained native acceptance matrix above. If review finds a source defect, repair only that bounded finding before native execution.
