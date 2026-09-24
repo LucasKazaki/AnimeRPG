@@ -5,6 +5,7 @@
 #include "Engine/Scene/ShadowbladeLoadout.h"
 #include "Engine/Scene/ShadowbladeLoadoutWorkbench.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -100,6 +101,35 @@ struct ShadowActionReadiness {
     int shadowMomentum{};
 };
 
+struct ProgressionCombatBriefing {
+    int shadowStepTier{};
+    int eclipseEdgeTier{};
+    int breakerFocusTier{};
+    int dashSkillRank{1};
+    int fatalStrikeSkillRank{1};
+    int defenseSkillRank{1};
+    float dashResourceRefund{};
+    float dashEffectiveCost{};
+    float fatalStrikeResourceRefund{};
+    float fatalStrikeEffectiveCost{};
+    float defenseCounterResourceRefund{};
+    float defenseCounterEffectiveCost{};
+    float staggerFollowUpResourceRefund{};
+    float staggerFollowUpEffectiveCost{};
+    float perfectDefenseResourceRestore{};
+};
+
+struct ProgressionShadowActionReport {
+    ShadowActionReport action{};
+    float resourceRestored{};
+    float effectiveResourceSpent{};
+};
+
+struct ProgressionDefenseReport {
+    DefenseReport defense{};
+    float resourceRestored{};
+};
+
 class ShadowbladeActions {
 public:
     static constexpr float MaximumResource = 100.0f;
@@ -138,6 +168,14 @@ public:
     static constexpr float MaximumLoadoutResourceRegenerationBonus = 10.0f;
     static constexpr int LoadoutGuardMitigationPerPoint = 2;
     static constexpr int MaximumLoadoutGuardDamageMitigation = 30;
+
+    // Pass 33: bounded progression-to-combat effects. These intentionally alter
+    // resource economy rather than generic engine timing or renderer behavior.
+    static constexpr float ShadowStepDashRefundPerTier = 2.0f;
+    static constexpr float EclipseEdgeCounterRefundPerTier = 2.0f;
+    static constexpr float BreakerFocusStaggerRefundPerTier = 2.0f;
+    static constexpr float SkillResourceRefundPerBonusRank = 1.0f;
+    static constexpr float DefensePerfectRestorePerBonusRank = 2.0f;
 
     void AdvanceTime(float deltaSeconds);
     float RestoreResource(float amount);
@@ -234,7 +272,116 @@ public:
     LoadoutActionResult PreviewPresetTuning(std::size_t slot,
         const CharacterProgression& progression, ShadowbladeActionTuning& tuning) const;
 
+    ProgressionCombatBriefing CurrentProgressionCombatBriefing(
+        const CharacterProgression& progression) const {
+        ProgressionCombatBriefing briefing{};
+        briefing.shadowStepTier = EquippedTalentTier(progression, CoreTalent::ShadowStep);
+        briefing.eclipseEdgeTier = EquippedTalentTier(progression, CoreTalent::EclipseEdge);
+        briefing.breakerFocusTier = EquippedTalentTier(progression, CoreTalent::BreakerFocus);
+        briefing.dashSkillRank = progression.SkillRank(ShadowSkill::Dash);
+        briefing.fatalStrikeSkillRank = progression.SkillRank(ShadowSkill::FatalStrike);
+        briefing.defenseSkillRank = progression.SkillRank(ShadowSkill::Defense);
+
+        const int dashBonusRanks = BonusSkillRanks(briefing.dashSkillRank);
+        const int fatalBonusRanks = BonusSkillRanks(briefing.fatalStrikeSkillRank);
+        const int defenseBonusRanks = BonusSkillRanks(briefing.defenseSkillRank);
+        briefing.dashResourceRefund =
+            ShadowStepDashRefundPerTier * static_cast<float>(briefing.shadowStepTier)
+            + SkillResourceRefundPerBonusRank * static_cast<float>(dashBonusRanks);
+        briefing.fatalStrikeResourceRefund =
+            SkillResourceRefundPerBonusRank * static_cast<float>(fatalBonusRanks);
+        briefing.defenseCounterResourceRefund = briefing.fatalStrikeResourceRefund
+            + EclipseEdgeCounterRefundPerTier * static_cast<float>(briefing.eclipseEdgeTier);
+        briefing.staggerFollowUpResourceRefund = briefing.fatalStrikeResourceRefund
+            + BreakerFocusStaggerRefundPerTier * static_cast<float>(briefing.breakerFocusTier);
+        briefing.perfectDefenseResourceRestore =
+            DefensePerfectRestorePerBonusRank * static_cast<float>(defenseBonusRanks);
+
+        briefing.dashEffectiveCost =
+            std::max(0.0f, DashCost - briefing.dashResourceRefund);
+        briefing.fatalStrikeEffectiveCost =
+            std::max(0.0f, FatalStrikeCost - briefing.fatalStrikeResourceRefund);
+        briefing.defenseCounterEffectiveCost = std::max(
+            0.0f, DefenseCounterFatalStrikeCost - briefing.defenseCounterResourceRefund);
+        briefing.staggerFollowUpEffectiveCost = std::max(
+            0.0f, StaggerFollowUpCost - briefing.staggerFollowUpResourceRefund);
+        return briefing;
+    }
+
+    ProgressionShadowActionReport TryProgressionDash(
+        const Math::Vec3& position, const Math::Vec3& direction,
+        const CharacterProgression& progression) {
+        ProgressionShadowActionReport report{};
+        report.action = TryDash(position, direction);
+        report.effectiveResourceSpent = report.action.resourceSpent;
+        if (report.action.result != ShadowActionResult::Activated) return report;
+
+        const ProgressionCombatBriefing briefing =
+            CurrentProgressionCombatBriefing(progression);
+        report.resourceRestored = RestoreResource(std::min(
+            report.action.resourceSpent, briefing.dashResourceRefund));
+        report.effectiveResourceSpent =
+            std::max(0.0f, report.action.resourceSpent - report.resourceRestored);
+        return report;
+    }
+
+    ProgressionShadowActionReport TryProgressionFatalStrike(
+        const Math::Vec3& position, CombatSandbox& combatSandbox,
+        const CharacterProgression& progression) {
+        const bool staggerOpening = combatSandbox.IsStaggered();
+        const bool counterOpening = !staggerOpening && HasDefenseCounter();
+
+        ProgressionShadowActionReport report{};
+        report.action = TryFatalStrike(position, combatSandbox);
+        report.effectiveResourceSpent = report.action.resourceSpent;
+        if (report.action.result != ShadowActionResult::Activated) return report;
+
+        const ProgressionCombatBriefing briefing =
+            CurrentProgressionCombatBriefing(progression);
+        float requestedRefund = briefing.fatalStrikeResourceRefund;
+        if (staggerOpening) {
+            requestedRefund = briefing.staggerFollowUpResourceRefund;
+        } else if (counterOpening) {
+            requestedRefund = briefing.defenseCounterResourceRefund;
+        }
+        report.resourceRestored = RestoreResource(std::min(
+            report.action.resourceSpent, requestedRefund));
+        report.effectiveResourceSpent =
+            std::max(0.0f, report.action.resourceSpent - report.resourceRestored);
+        return report;
+    }
+
+    ProgressionDefenseReport TryProgressionDefend(
+        DefenseInput input, const CharacterProgression& progression) {
+        ProgressionDefenseReport report{};
+        report.defense = TryDefend(input);
+        if (report.defense.result != DefenseResult::PerfectGuard
+            && report.defense.result != DefenseResult::PerfectDodge) {
+            return report;
+        }
+
+        const ProgressionCombatBriefing briefing =
+            CurrentProgressionCombatBriefing(progression);
+        report.resourceRestored = RestoreResource(briefing.perfectDefenseResourceRestore);
+        return report;
+    }
+
 private:
+    static int EquippedTalentTier(
+        const CharacterProgression& progression, CoreTalent talent) {
+        for (std::size_t slot = 0; slot < CharacterProgression::EquippedTalentSlots; ++slot) {
+            if (progression.TalentSlotOccupied(slot)
+                && progression.EquippedTalent(slot) == talent) {
+                return std::max(0, progression.TalentTier(talent));
+            }
+        }
+        return 0;
+    }
+
+    static int BonusSkillRanks(int rank) {
+        return std::max(0, rank - 1);
+    }
+
     static double FloatHalfUlpSeconds(float seconds);
     double DefenseTimingToleranceSeconds(double deadlineUncertaintySeconds) const;
     static bool DefenseDeadlineReached(double now, double deadline, double toleranceSeconds);
