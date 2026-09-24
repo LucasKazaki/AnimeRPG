@@ -16,7 +16,7 @@
   "task_packet": "Tasks/GAME-PASS34-RIFT-WARDEN-COMBAT-GUIDANCE-2026-09-24.md",
   "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS34-BACKLOG.json",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS34.md",
-  "pr": null,
+  "pr": 58,
   "final_head": "pending_exact_head_gates_and_review",
   "final_receipt_location": "implementation_PR_comment_after_exact_head_acceptance_and_merge",
   "counts": {
@@ -56,5 +56,5 @@
     "community_request": "ZZZ_player_confusion_about_attack_prompt_meaning_and_relearning_plus_independent_visual_clarity_feedback",
     "current_resolution": "existing_ZZZ_tutorial_acknowledged_exact_post_mistake_wrong_action_vs_late_timing_breakdown_unestablished"
   },
-  "next_action": "Open the scoped PR, require exact-head hosted Windows Debug/Release and Release-manifest success plus fresh independent review, repair and rerun if needed, then reread main/head/diff/threads and merge with expected-head guard only if every gate is clean."
+  "next_action": "Require exact-head hosted Windows Debug/Release and Release-manifest success plus fresh independent review on PR 58, repair and rerun if needed, then reread main/head/diff/threads and merge with expected-head guard only if every gate is clean."
 }
