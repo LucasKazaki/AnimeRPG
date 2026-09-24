@@ -16,35 +16,34 @@ Blender 5.2.2 LTS remains the pinned DCC for this representative round trip. Off
 
 The initial Codex review of `cb0de51ff52119ab6a9e790faedcc6ebfadcda52` found three issues. They were repaired before `64ffc277811b8cb8f95578b862384f0593f5841f`: the verifier owns the ART-006B source hash independently, computes bounds from indexed vertices, and compares visible material semantics.
 
-A second exact-head Codex review of `64ffc277811b8cb8f95578b862384f0593f5841f` found one P1 and four P2 issues. The current repair addresses all five:
+A second exact-head Codex review of `64ffc277811b8cb8f95578b862384f0593f5841f` found one P1 and four P2 issues. Those were repaired on `fb2867ae5f3151e27c7cfaa2b109379c705e9fc1` by fixing the acceptance tolerance, winding-preserving triangle signatures, attribute payload validation, receipt type checks, and exact active-scene mesh inventory.
 
-1. The acceptance tolerance is a verifier-owned constant, exactly `1e-4` metre. The Python API and CLI no longer accept a caller-supplied tolerance override.
-2. The semantic gate compares canonicalized indexed triangles while preserving winding. Triangle order and cyclic first-corner rotation may change, but reversing winding or changing connectivity does not pass.
-3. `NORMAL`, `TANGENT` and `TEXCOORD_0` are decoded, must have the same nonzero element count as `POSITION`, and their referenced payloads participate in each triangle signature.
-4. Receipt inventories must be JSON arrays of strings with exact expected membership/count, and each export setting must have the exact expected JSON/Python type and value. Numeric `1`/`0` cannot substitute for booleans.
-5. Every scene-reachable mesh-bearing node must be one of the seven expected semantic instances, and duplicate expected mesh-instance names are rejected.
+A third exact-head Codex review of `fb2867ae5f3151e27c7cfaa2b109379c705e9fc1` found two additional P2 issues. This repair addresses both:
 
-The topology signature includes material binding plus per-corner quantized `POSITION`, `NORMAL`, `TANGENT` and `TEXCOORD_0` data at the same fixed `1e-4` comparison resolution used by the bounded geometry/material gate. This lets Blender repack accessors and reorder triangles without treating winding, shading-basis or UV drift as equivalent.
+1. Each semantic mesh instance now records the handedness of its full inherited world transform. A negative-scale reflection that preserves center, dimensions and local topology is rejected as `transform parity drift` instead of being accepted with reversed world-space winding.
+2. The bounded profile now rejects `EXT_mesh_gpu_instancing` both when declared at the glTF root and when attached to a scene node. One mesh-bearing node can therefore no longer hide multiple rendered instances behind a single semantic node count.
+
+The verifier also rejects newly introduced camera payloads in the bounded output scope and validates that extension declaration lists and node extension containers have the expected JSON types before applying the instancing rule.
 
 ## Author verification executed in sandbox
 
-Executed after the second review repair:
+Executed after the third review repair:
 
 ```text
 python Scripts/test_blender_roundtrip_national_mall_panel.py
-# PASS: 34/34 Blender round-trip verifier tests
+# PASS: 37/37 Blender round-trip verifier tests
 
 python -m py_compile Scripts/verify_blender_roundtrip_national_mall_panel.py Scripts/test_blender_roundtrip_national_mall_panel.py
 # exit 0
 ```
 
-Regression coverage now includes the earlier source/hash/manifest/version/resource/material/transform cases plus fixed-tolerance enforcement, type-invalid receipt arrays/settings, unexpected and duplicate mesh instances, winding reversal, zero/mismatched attribute counts, and normal/UV payload drift.
+Regression coverage now includes the earlier source/hash/manifest/version/resource/material/transform cases plus fixed-tolerance enforcement, type-invalid receipt arrays/settings, unexpected and duplicate mesh instances, winding reversal, zero/mismatched attribute counts, normal/UV payload drift, reflected world transforms, node-level GPU instancing and root-level GPU-instancing declarations.
 
-Hosted Windows workflow `35979325879` (run #1025) passed on `64ffc277...`, but the second-review source repairs change the candidate head. That run is therefore historical evidence only. A new exact-head hosted run and a fresh independent review are required before this PR leaves draft.
+The prior exact-head Windows workflow `35986951177` (run #1035) passed on `fb2867ae...`, but this repair changes the candidate head. That run is historical evidence only. A new exact-head hosted run and a fresh independent review are required before this PR leaves draft.
 
 ## Verification model
 
-The verifier does not require byte-identical glTF output. It decodes the embedded buffers/accessors, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, compares material semantics, and compares canonical winding-preserving triangle/attribute signatures for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
+The verifier does not require byte-identical glTF output. It decodes the embedded buffers/accessors, traverses the active scene hierarchy, derives world-space instance bounds from referenced vertices, checks world-transform handedness, rejects GPU-instanced duplicates, compares material semantics, and compares canonical winding-preserving triangle/attribute signatures for the seven semantic mesh instances. The fixed spatial/material/attribute tolerance is `1e-4`.
 
 This bounded gate is intentionally stricter than a filename/count check but is still only a DCC source-workflow gate. It cannot establish Astral compatibility.
 
