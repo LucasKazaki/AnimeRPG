@@ -106,6 +106,7 @@ if os.name != "nt" and returncode < 0:
         signal.signal(signal_number, signal.SIG_DFL)
     except (OSError, ValueError):
         pass
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal_number})
     os.kill(os.getpid(), signal_number)
     os._exit(128 + signal_number)
 raise SystemExit(returncode)
