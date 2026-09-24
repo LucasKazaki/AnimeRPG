@@ -241,6 +241,32 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertFalse(sentinel.exists(), "a descendant survived the timeout cleanup")
             self.assertTrue(runner.records[0].timed_out)
 
+    def test_run_command_spawn_failure_is_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            missing = root / "missing-r0-executable"
+            with self.assertRaisesRegex(r0.RecoveryFailure, "could not start"):
+                runner.run_command(
+                    "spawn-failure-fixture", [missing],
+                    cwd=args.worktree, timeout_seconds=0.5,
+                )
+            log = (args.evidence_root / "01-spawn-failure-fixture.log").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("spawn_error:", log)
+            self.assertIn("exit_code: None", log)
+            self.assertIn("timed_out: false", log)
+            self.assertIn("interrupted: false", log)
+            self.assertEqual(len(runner.records), 1)
+            self.assertIsNone(runner.records[0].exit_code)
+            self.assertFalse(runner.records[0].timed_out)
+            self.assertFalse(runner.records[0].interrupted)
+            self.assertIsNotNone(runner.records[0].spawn_error)
+
     def test_run_command_rejects_non_finite_override_before_spawn(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
