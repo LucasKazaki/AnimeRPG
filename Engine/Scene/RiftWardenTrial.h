@@ -104,6 +104,8 @@ struct RiftWardenBriefing {
 class RiftWardenTrial {
 public:
     static constexpr int MaximumPosture = 100;
+    static constexpr int MaximumPerfectDefenses = 16384;
+    static constexpr int MaximumMissedOpenings = 4096;
     static constexpr double MaximumElapsedSeconds = 3600.0;
     static constexpr double StaggerResponseWindowSeconds = 2.0;
 
@@ -154,7 +156,7 @@ public:
                 bestStreak_ = std::max(bestStreak_, currentStreak_);
             } else {
                 report.resolution = RiftWardenResolution::MissedOpening;
-                ++missedOpenings_;
+                missedOpenings_ = std::min(MaximumMissedOpenings, missedOpenings_ + 1);
                 currentStreak_ = 0;
             }
             posture_ = 0;
@@ -173,7 +175,7 @@ public:
             report.resolution = RiftWardenResolution::PerfectDefense;
             report.postureGain = PostureGain(difficulty_);
             posture_ = std::min(MaximumPosture, posture_ + report.postureGain);
-            ++perfectDefenses_;
+            perfectDefenses_ = std::min(MaximumPerfectDefenses, perfectDefenses_ + 1);
             ++currentStreak_;
             bestStreak_ = std::max(bestStreak_, currentStreak_);
             if (posture_ >= MaximumPosture) {
