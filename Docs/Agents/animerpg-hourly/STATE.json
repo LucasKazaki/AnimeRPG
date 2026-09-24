@@ -16,7 +16,7 @@
   "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS38-BACKLOG.json",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS38.md",
   "pr": 63,
-  "final_head": "pending_exact_head_gates_and_review",
+  "final_head": "this_state_commit_pending_exact_head_gates_and_review",
   "final_receipt_location": "implementation_PR_comment_after_exact_head_acceptance_and_merge",
   "counts": {
     "reference_features_researched_this_pass": 5,
@@ -37,13 +37,24 @@
     {"id":"GAME-191","title":"Posture break and bounded recovery","status":"implemented_pending_exact_final_head_acceptance"},
     {"id":"QOL-039","title":"Sticky manual target focus","status":"implemented_pending_exact_final_head_acceptance"}
   ],
+  "review_repairs": {
+    "stale_room_timeline": "repaired_and_regression_covered",
+    "actual_posture_delta": "repaired_and_regression_covered",
+    "actual_capped_failure_damage_delta": "repaired_and_regression_covered",
+    "completed_skirmish_defeat_cleanup": "repaired_and_regression_covered",
+    "latest_implementation_commits": [
+      "7a9cf9d2caa35cc02d6cfb6be67b369a4e190b9b",
+      "3549f472f52a4d806453f0f291966a7f61e67d06",
+      "cae55b6093cb308f02b4def64cb7ca5979c05db5"
+    ]
+  },
   "verification": {
-    "sandbox_cpp17": "standalone ShadowCryptSkirmish logic compiled and ran with g++ -std=c++17 -Wall -Wextra -Werror -pedantic; exit 0",
+    "sandbox_cpp17": "standalone ShadowCryptSkirmish logic compiled and ran with g++ -std=c++17 -Wall -Wextra -Werror -pedantic before PR; exit 0",
     "registered_test_target": "ThoughtCommandsTests_with_ShadowCryptSkirmishPass38Tests_inc",
-    "hosted_windows_ci": "pending_exact_final_head",
-    "release_manifest": "pending_exact_final_head",
+    "hosted_windows_ci": "pending_exact_final_head_after_state_freeze",
+    "release_manifest": "pending_exact_final_head_after_state_freeze",
     "native_windows_interactive": "not_run_not_claimed_no_input_UI_or_renderer_changes",
-    "independent_review": "requested_on_PR63_pending_exact_final_head",
+    "independent_review": "pending_fresh_exact_final_head_rereview",
     "cross_process_persistence": "not_changed_or_claimed"
   },
   "coordination": {
@@ -56,5 +67,5 @@
     "community_request": "manual/sticky target focus request adapted without claiming a current comparator defect",
     "current_resolution": "current Genshin target-lock resolution unverified; older ZZZ discussion explicitly notes an existing manual-lock option"
   },
-  "next_action": "Resolve any CI or independent-review findings, freeze one repaired exact head, require fresh exact-head Windows Debug/Release plus Release-manifest checks and fresh Codex review, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
+  "next_action": "Treat this state commit as the candidate freeze, require fresh exact-head Windows Debug/Release plus Release-manifest checks and a fresh Codex review, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
 }
