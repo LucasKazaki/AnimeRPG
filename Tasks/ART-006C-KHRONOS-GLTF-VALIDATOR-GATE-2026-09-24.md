@@ -47,7 +47,7 @@ The adapter must fail closed unless all of the following hold:
 5. Message severities exactly reproduce the report summary counts and output is not truncated.
 6. Error count is zero and warnings stay at or below the explicit limit, default zero.
 7. glTF version is `2.0`.
-8. The ART-006B self-contained asset has no validator-reported external resource, and every reported resource has a recognized storage mode.
+8. When self-containment is required, `info.resources` is present and non-empty, every reported resource has a recognized storage mode, and no resource is validator-reported as external.
 9. Current upstream info statistic fields are accepted with strict integer/boolean typing when present.
 10. The source asset SHA-256 equals the explicitly supplied expected pin. A detached report still requires a native invocation receipt to prove which bytes produced it.
 11. Focused regressions and `py_compile` pass before publication.
