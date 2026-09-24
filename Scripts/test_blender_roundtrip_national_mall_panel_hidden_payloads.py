@@ -12,7 +12,7 @@ def cases():
     return [
         (
             "GPU instancing unreachable node",
-            fail("GPU instancing/lights unsupported"),
+            fail("GPU instancing unsupported"),
             lambda paths: base.mutate_output(
                 paths,
                 lambda gltf: gltf["nodes"].append(
@@ -29,7 +29,7 @@ def cases():
         ),
         (
             "punctual light payload",
-            fail("GPU instancing/lights unsupported"),
+            fail("lights unsupported"),
             lambda paths: base.mutate_output(
                 paths,
                 lambda gltf: (
@@ -80,6 +80,36 @@ def cases():
             fail("round-trip glTF scope invalid"),
             lambda paths: base.mutate_output(
                 paths, lambda gltf: gltf.__setitem__("cameras", {})
+            ),
+        ),
+        (
+            "world rotation drift",
+            fail("world transform drift"),
+            lambda paths: base.mutate_output(
+                paths, lambda gltf: gltf["nodes"][0].__setitem__("rotation", [0, 1, 0, 0])
+            ),
+        ),
+        (
+            "morph target deformation",
+            fail("morph targets unsupported"),
+            lambda paths: base.mutate_output(
+                paths,
+                lambda gltf: (
+                    gltf["meshes"][0]["primitives"][0].__setitem__(
+                        "targets", [{"POSITION": 0}]
+                    ),
+                    gltf["meshes"][0].__setitem__("weights", [1.0]),
+                ),
+            ),
+        ),
+        (
+            "vertex color attribute",
+            fail("unexpected rendering attributes"),
+            lambda paths: base.mutate_output(
+                paths,
+                lambda gltf: gltf["meshes"][0]["primitives"][0]["attributes"].__setitem__(
+                    "COLOR_0", 0
+                ),
             ),
         ),
     ]
