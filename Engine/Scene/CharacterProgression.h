@@ -160,6 +160,20 @@ public:
         return GrantRewards(experience, masteryPoints, enhancementMaterials);
     }
 
+    bool MallResonanceFirstClearClaimed() const { return mallResonanceFirstClearClaimed_; }
+
+    ProgressionRewardReport ClaimMallResonanceFirstClearReward(int experience,
+        int masteryPoints, int enhancementMaterials, bool& granted) {
+        granted = false;
+        if (mallResonanceFirstClearClaimed_
+            || experience < 0 || masteryPoints < 0 || enhancementMaterials < 0) {
+            return {};
+        }
+        mallResonanceFirstClearClaimed_ = true;
+        granted = true;
+        return GrantRewards(experience, masteryPoints, enhancementMaterials);
+    }
+
     int GrantExperience(int amount, int& levelsGained) {
         levelsGained = 0;
         if (amount <= 0 || level_ >= MaximumLevel) return 0;
@@ -463,6 +477,7 @@ private:
     std::array<bool, JourneyMilestoneCount> journeyMilestoneClaimed_{};
     bool shadowCryptFirstClearClaimed_{};
     bool manaReactorFirstClearClaimed_{};
+    bool mallResonanceFirstClearClaimed_{};
 };
 
 } // namespace Astral::Scene
