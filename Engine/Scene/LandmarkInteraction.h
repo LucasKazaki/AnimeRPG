@@ -4,6 +4,7 @@
 #include "Engine/Scene/ExplorationFieldGuide.h"
 #include "Engine/Scene/LandmarkDialogue.h"
 #include "Engine/Scene/LandmarkDialogueContinuity.h"
+#include "Engine/Scene/MallResonancePuzzle.h"
 #include "Engine/Scene/ManaReactorMission.h"
 #include "Engine/Scene/ShadowCryptMission.h"
 #include "Engine/Scene/ShadowbladeActions.h"
@@ -138,6 +139,41 @@ public:
     FieldGuideBriefing FieldBriefing() const { return fieldGuide_.Briefing(); }
     const ExplorationFieldGuide& FieldGuide() const { return fieldGuide_; }
 
+    bool BeginMallResonancePuzzle(MallResonanceDifficulty difficulty,
+        MallResonanceAssistMode assistMode = MallResonanceAssistMode::Off) {
+        if (progression_ == nullptr || !ObjectiveComplete()
+            || (mallResonanceProgressionOwner_ != nullptr
+                && mallResonanceProgressionOwner_ != progression_)) {
+            return false;
+        }
+        if (!mallResonancePuzzle_.Begin(true, difficulty, assistMode)) return false;
+        mallResonanceProgressionOwner_ = progression_;
+        return true;
+    }
+    MallResonanceActionReport RotateMallResonanceAnchor(MallResonanceAnchor anchor) {
+        return mallResonancePuzzle_.Rotate(anchor);
+    }
+    bool AdvanceMallResonancePuzzle(float deltaSeconds) {
+        return mallResonancePuzzle_.AdvanceTime(deltaSeconds);
+    }
+    MallResonanceActionReport StabilizeMallResonancePuzzle() {
+        return mallResonancePuzzle_.TryStabilize();
+    }
+    bool ResetMallResonancePuzzle() { return mallResonancePuzzle_.ResetActiveRun(); }
+    MallResonanceBriefing MallResonancePuzzleBriefing() const {
+        return mallResonancePuzzle_.Briefing();
+    }
+    MallResonanceRecord MallResonanceBestRecord(MallResonanceDifficulty difficulty) const {
+        return mallResonancePuzzle_.BestRecord(difficulty);
+    }
+    MallResonanceRewardReport ClaimMallResonanceFirstClearReward() {
+        if (progression_ == nullptr || progression_ != mallResonanceProgressionOwner_) return {};
+        return mallResonancePuzzle_.ClaimFirstClearReward(*progression_);
+    }
+    const MallResonancePuzzle& MallResonancePuzzleState() const {
+        return mallResonancePuzzle_;
+    }
+
     bool BeginManaReactor(ManaReactorMode mode = ManaReactorMode::Expedition,
         ManaReactorDifficulty difficulty = ManaReactorDifficulty::Standard,
         ManaReactorProtocol protocol = ManaReactorProtocol::Baseline) {
@@ -259,9 +295,11 @@ private:
     bool objectiveStarted_{true};
     CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
     CharacterProgression* shadowCryptProgressionOwner_{}; // Identity only; never dereferenced directly.
+    CharacterProgression* mallResonanceProgressionOwner_{}; // Identity only; puzzle reward authority.
     LandmarkDialogue dialogue_{};
     LandmarkDialogueContinuity dialogueContinuity_{};
     ExplorationFieldGuide fieldGuide_{};
+    MallResonancePuzzle mallResonancePuzzle_{};
     ManaReactorMission manaReactorMission_{};
     ShadowCryptMission shadowCryptMission_{};
     LandmarkInteractionReport lastReport_{};
