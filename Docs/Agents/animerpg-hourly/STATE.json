@@ -15,9 +15,9 @@
   "task_packet": "Tasks/GAME-PASS40-SHADOW-CRYPT-MASTERY-REPLAY-2026-09-24.md",
   "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS40-BACKLOG.json",
   "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS40.md",
-  "pr": null,
+  "pr": 66,
   "final_head": "this_state_commit_is_the_candidate_for_exact_head_gates",
-  "final_receipt_location": "implementation_PR_comment_after_exact_head_acceptance_and_merge",
+  "final_receipt_location": "PR_66_comment_after_exact_head_acceptance_and_merge",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -57,5 +57,5 @@
     "community_request": "2026-09-18 ZZZ player request for direct post-boss Shiyu replay, with historical in-fight restart corroboration",
     "current_resolution": "player report states direct replay differs across ZZZ modes; not independently verified as an official current UI contract and not treated as consensus"
   },
-  "next_action": "Open one scoped PR, bind hosted Windows Debug/Release plus release-manifest checks and fresh Codex review to this exact state commit, repair findings if any, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
+  "next_action": "Bind hosted Windows Debug/Release plus release-manifest checks and fresh Codex review to this exact state commit, repair findings if any, then reread main/head/diff/threads and expected-head merge only if every gate is clean."
 }
