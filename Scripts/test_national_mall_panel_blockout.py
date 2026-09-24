@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Focused ART-006B regression suite."""
 from __future__ import annotations
-import copy, hashlib, json, tempfile
+import hashlib, json, sys, tempfile
 from pathlib import Path
 import generate_national_mall_panel_blockout as gen
 import verify_national_mall_panel_blockout as ver
@@ -31,6 +31,17 @@ def _repin(s,g,m):
     obj["gltf_sha256"]=hashlib.sha256(g.read_bytes()).hexdigest()
     obj["gltf_bytes"]=len(g.read_bytes())
     _dump(m,obj)
+
+def _run_generator_check(s,g,m):
+    old=sys.argv
+    sys.argv=[
+        "generate_national_mall_panel_blockout.py",
+        "--source",str(s),"--gltf",str(g),"--manifest",str(m),"--check",
+    ]
+    try:
+        gen.main()
+    finally:
+        sys.argv=old
 
 def t_valid():
     assert ver.verify(SOURCE,GLTF,MANIFEST)=={"nodes":7,"materials":3,"vertices":24,"indices":36}
@@ -117,6 +128,30 @@ def t_tangent_accessor_contract_drift():
         o=json.loads(g.read_text()); o["accessors"][2]["min"][3]=-1; _dump(g,o); _repin(s,g,m)
         _expect_fail(lambda: ver.verify(s,g,m))
 
+def t_bufferview_bool_integer_repin():
+    td,s,g,m=_fixture()
+    with td:
+        o=json.loads(g.read_text()); o["bufferViews"][0]["buffer"]=False; _dump(g,o); _repin(s,g,m)
+        _expect_fail(lambda: ver.verify(s,g,m))
+
+def t_accessor_bool_integer_repin():
+    td,s,g,m=_fixture()
+    with td:
+        o=json.loads(g.read_text()); o["accessors"][0]["bufferView"]=False; _dump(g,o); _repin(s,g,m)
+        _expect_fail(lambda: ver.verify(s,g,m))
+
+def t_material_bool_number_repin():
+    td,s,g,m=_fixture()
+    with td:
+        o=json.loads(g.read_text()); o["materials"][0]["pbrMetallicRoughness"]["metallicFactor"]=False; _dump(g,o); _repin(s,g,m)
+        _expect_fail(lambda: ver.verify(s,g,m))
+
+def t_mesh_bool_integer_repin():
+    td,s,g,m=_fixture()
+    with td:
+        o=json.loads(g.read_text()); o["meshes"][0]["primitives"][0]["material"]=False; _dump(g,o); _repin(s,g,m)
+        _expect_fail(lambda: ver.verify(s,g,m))
+
 def t_manifest_runtime_status():
     td,s,g,m=_fixture()
     with td:
@@ -138,16 +173,17 @@ def t_manifest_dimension_drift():
 def t_generator_check_detects_stale():
     td,s,g,m=_fixture()
     with td:
+        _run_generator_check(s,g,m)
         g.write_text(g.read_text()+"\n",encoding="utf-8")
-        good_g,good_m=gen.build_outputs(s)
-        assert g.read_bytes()!=good_g and m.read_bytes()==good_m
+        _expect_fail(lambda: _run_generator_check(s,g,m))
 
 TESTS=[
     t_valid,t_source_bool_schema,t_source_false_runtime_status,t_source_conversion_drift,
     t_ledger_blob_drift,t_root_extra_field,t_external_buffer_uri,t_node_scale_drift,
     t_node_mesh_swap,t_material_drift,t_geometry_corruption,t_tangent_handedness_drift_repin,
-    t_tangent_accessor_contract_drift,t_manifest_runtime_status,t_manifest_unknown_field,
-    t_manifest_dimension_drift,t_generator_check_detects_stale,
+    t_tangent_accessor_contract_drift,t_bufferview_bool_integer_repin,t_accessor_bool_integer_repin,
+    t_material_bool_number_repin,t_mesh_bool_integer_repin,t_manifest_runtime_status,
+    t_manifest_unknown_field,t_manifest_dimension_drift,t_generator_check_detects_stale,
 ]
 if __name__=="__main__":
     for i,t in enumerate(TESTS,1):
