@@ -126,7 +126,7 @@ def _cube_payload():
         # +Y
         ([(-.5,.5,.5),(.5,.5,.5),(.5,.5,-.5),(-.5,.5,-.5)], (0,1,0), (1,0,0,1)),
         # -Y
-        ([(-.5,-.5,-.5),(.5,-.5,-.5),(.5,-.5,.5),(-.5,-.5,.5)], (0,-1,0), (1,0,0,-1)),
+        ([(-.5,-.5,-.5),(.5,-.5,-.5),(.5,-.5,.5),(-.5,-.5,.5)], (0,-1,0), (1,0,0,1)),
     ]
     pos=[]; norm=[]; tan=[]; uv=[]; idx=[]
     uvs=[(0,0),(1,0),(1,1),(0,1)]
@@ -163,7 +163,7 @@ def build_gltf(src: dict) -> dict:
     acc=[
         {"bufferView":0,"componentType":5126,"count":24,"type":"VEC3","min":[-.5,-.5,-.5],"max":[.5,.5,.5]},
         {"bufferView":1,"componentType":5126,"count":24,"type":"VEC3","min":[-1,-1,-1],"max":[1,1,1]},
-        {"bufferView":2,"componentType":5126,"count":24,"type":"VEC4","min":[-1,0,-1,-1],"max":[1,0,1,1]},
+        {"bufferView":2,"componentType":5126,"count":24,"type":"VEC4","min":[-1,0,-1,1],"max":[1,0,1,1]},
         {"bufferView":3,"componentType":5126,"count":24,"type":"VEC2","min":[0,0],"max":[1,1]},
         {"bufferView":4,"componentType":5123,"count":36,"type":"SCALAR","min":[0],"max":[23]},
     ]
