@@ -3,21 +3,21 @@
   "owner": "animerpg-game-hourly",
   "updated": "2026-09-24",
   "target_branch": "main",
-  "last_verified_main_at_pass_start": "e38760070e0d021293e9f907834e61e6a6edca23",
+  "last_verified_main_at_pass_start": "332290bd9ba5f019aff182d74bf2d26eda7b681c",
   "last_merged_pass": {
-    "id": "GAME-PASS28-SHADOWBLADE-LOADOUT-WORKBENCH-2026-09-24",
-    "pr": 48,
-    "merge_sha": "e38760070e0d021293e9f907834e61e6a6edca23",
-    "head_sha": "6120debceca50a126a7b5256442e8e48c26e5f75",
+    "id": "GAME-PASS29-FIELD-GUIDE-MAP-QOL-2026-09-24",
+    "pr": 50,
+    "merge_sha": "332290bd9ba5f019aff182d74bf2d26eda7b681c",
+    "head_sha": "167b44e0fc2022f98a1b71ef0eb03413ad874766",
     "native_playable": false
   },
-  "working_branch": "game/2026-09-24-field-guide-map-qol-pass29",
-  "pass": "GAME-PASS29-FIELD-GUIDE-MAP-QOL-2026-09-24",
-  "task_packet": "Tasks/GAME-PASS29-FIELD-GUIDE-MAP-QOL-2026-09-24.md",
-  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS29-BACKLOG.json",
-  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS29.md",
-  "pr": 50,
-  "final_head": "record_in_PR_gate_comment_after_exact_head_checks_and_review",
+  "working_branch": "game/2026-09-24-dialogue-continuity-pass30",
+  "pass": "GAME-PASS30-DIALOGUE-CONTINUITY-2026-09-24",
+  "task_packet": "Tasks/GAME-PASS30-DIALOGUE-CONTINUITY-2026-09-24.md",
+  "bounded_backlog": "Docs/Agents/animerpg-hourly/PASS30-BACKLOG.json",
+  "run_receipt": "Docs/Agents/animerpg-hourly/RUN-2026-09-24-PASS30.md",
+  "pr": null,
+  "final_head": "record_after_operating_records_and_exact_head_gates",
   "counts": {
     "reference_features_researched_this_pass": 5,
     "community_improvements_researched_this_pass": 1,
@@ -30,40 +30,31 @@
     "increments_merged": 0
   },
   "increments": [
-    {"id":"GAME-142","title":"Operation-aware next-step hint","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-143","title":"Next-incomplete operation tracking","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-144","title":"Bounded multi-stop field route","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-145","title":"Unread field-journal notices","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"GAME-146","title":"Consolidated field briefing","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
-    {"id":"QOL-030","title":"Route-pin category visibility filter","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"}
+    {"id":"GAME-147","title":"Relationship tier readout","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-148","title":"Per-topic substantive dialogue checkpoint","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-149","title":"Idempotent ending archive","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-150","title":"Evidence-gated story episodes","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"GAME-151","title":"Non-mutating checkpoint revisit","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"},
+    {"id":"QOL-031","title":"Interruption-safe latest dialogue recovery","status":"implemented_owner_integrated_registered_regression_pending_exact_head_gates"}
   ],
   "verification": {
-    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ExplorationFieldGuidePass29Tests",
-    "sandbox_cpp17": "initial_pass29_domain_and_pass14_compatibility_checks_passed_before_review_repairs; final acceptance relies_on_exact_head_hosted_gates",
-    "hosted_windows_ci": "pending_exact_final_head_after_review_repairs",
-    "release_manifest": "pending_exact_final_head_after_review_repairs",
-    "native_windows_interactive": "not_applicable_to_game_domain_packet_no_input_or_ui_wiring_not_run_not_claimed",
-    "independent_review": "first review found production owner reachability gap; second exact-head review found two regression-coverage gaps; all three repaired; fresh_exact_head_review_required",
-    "integration": "LandmarkInteraction owns ExplorationFieldGuide and forwards next-operation route filter journal-acknowledgement and briefing APIs; ShadowCrypt and ManaReactor continue reading the same authoritative guide",
-    "persistent_cross_process_save": "field_guide_state_not_cross_process_persisted_not_claimed"
+    "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_LandmarkDialogueContinuityPass30Tests",
+    "hosted_windows_ci": "pending_exact_final_head",
+    "release_manifest": "pending_exact_final_head",
+    "native_windows_interactive": "not_run_not_claimed_no_rendered_dialogue_ui_or_input_changes",
+    "independent_review": "pending_fresh_exact_head_review",
+    "integration": "LandmarkInteraction owns LandmarkDialogueContinuity and records existing authoritative dialogue beats/outcomes after LandmarkDialogue mutations",
+    "persistent_cross_process_save": "continuity_state_in_memory_only_not_claimed_cross_process"
   },
   "coordination": {
-    "open_engine_and_art_prs": "inspected_and_left_unchanged",
+    "open_engine_and_art_prs": "13_23_26_28_33_45_49_inspected_and_left_unchanged",
     "shared_engine_paths": "renderer_platform_editor_import_animation_audio_physics_CMake_workflows_dependencies_R0_release_deployment_networking_unchanged",
-    "gameplay_paths": "ExplorationFieldGuide_h_plus_thin_LandmarkInteraction_h_forwarders_plus_registered_game_tests_and_pass29_operating_records"
+    "gameplay_paths": "new_LandmarkDialogueContinuity_h_plus_thin_LandmarkInteraction_h_integration_plus_registered_game_tests_and_pass30_records"
   },
   "research": {
-    "reference_context": "official_Genshin_Interactive_Map_2_6_update_plus_official_current-era_Luna_III_multi-objective_tracking_and_official_pin-sync_guide",
-    "community_request": "historical_pin_visibility_filter_request_with_2026_retrospective_and_2020_independent_corroboration",
-    "current_resolution": "later_pin_management_improvements_exist; equivalent_narrower_in-game_visibility_filter_not_established_in_inspected_current_sources"
+    "reference_context": "official_Genshin_Hangout_ZZZ_Trust_Quality_Time_Granblue_Fate_Episodes_and_journal",
+    "community_request": "corroborated_ZZZ_dialogue_retrigger_and_interruption_reports",
+    "current_resolution": "specific_retrigger_interruption_fix_not_established_in_inspected_later_official_material"
   },
-  "review_history": {
-    "material_findings_repaired_this_pass": 3,
-    "summary": [
-      "P2: mutating pass29 APIs were only directly callable on standalone ExplorationFieldGuide objects; added thin LandmarkInteraction owner forwarding and live-owner regression coverage",
-      "P2: next-incomplete test did not cross the final-enum modulo boundary; added ShadowCryptLead-to-MallSurvey wraparound regression",
-      "P2: production owner clear wrapper was tested only against an already-empty route; added nonempty clear count/state regression and reseeded visit-pruning coverage"
-    ]
-  },
-  "next_action": "Require exact-head Windows Debug/Release and Release-manifest workflows plus fresh independent Codex review on PR 50; repair and rerun if needed, then re-read main/head/diff/threads and expected-head merge if clean."
+  "next_action": "Create the scoped PR, capture its exact head, require hosted Windows Debug/Release and Release-manifest gates plus fresh independent review, repair/rerun if necessary, then reread main/head/diff/threads before expected-head merge if clean."
 }
