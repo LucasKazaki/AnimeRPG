@@ -74,6 +74,35 @@ def _finite_list(v,n,name):
 def _eq_list(a,b,tol=1e-6):
     return len(a)==len(b) and all(math.isclose(float(x),float(y),rel_tol=0.0,abs_tol=tol) for x,y in zip(a,b))
 
+def _assert_contract(got,want,name):
+    """Compare a closed JSON contract without Python bool/int equality leakage."""
+    if type(want) is dict:
+        if type(got) is not dict or set(got)!=set(want):
+            raise ValueError(f"{name} object contract changed")
+        for key in want:
+            _assert_contract(got[key],want[key],f"{name}.{key}")
+        return
+    if type(want) is list:
+        if type(got) is not list or len(got)!=len(want):
+            raise ValueError(f"{name} list contract changed")
+        for i,(gv,wv) in enumerate(zip(got,want)):
+            _assert_contract(gv,wv,f"{name}[{i}]")
+        return
+    if type(want) is bool:
+        if type(got) is not bool or got is not want:
+            raise ValueError(f"{name} boolean contract changed")
+        return
+    if type(want) is int:
+        if type(got) is not int or got!=want:
+            raise ValueError(f"{name} integer contract changed")
+        return
+    if type(want) is float:
+        if isinstance(got,bool) or not isinstance(got,(int,float)) or not math.isfinite(float(got)) or float(got)!=want:
+            raise ValueError(f"{name} numeric contract changed")
+        return
+    if type(got) is not type(want) or got!=want:
+        raise ValueError(f"{name} value contract changed")
+
 def _sub(a,b): return tuple(x-y for x,y in zip(a,b))
 def _mul(a,s): return tuple(x*s for x in a)
 def _cross(a,b): return (a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0])
@@ -134,9 +163,9 @@ def verify(source_path: Path, gltf_path: Path, manifest_path: Path):
     src=gen.load_source(source_path)
     g=_load_json(gltf_path); m=_load_json(manifest_path)
     if type(g) is not dict or set(g)!=ROOT_KEYS: raise ValueError("glTF root keys must match closed ART-006B profile")
-    if g["asset"]!={"version":"2.0","generator":gen.GENERATOR_ID}: raise ValueError("glTF asset metadata changed")
+    _assert_contract(g["asset"],{"version":"2.0","generator":gen.GENERATOR_ID},"asset")
     if type(g["scene"]) is not int or g["scene"]!=0: raise ValueError("scene must be integer 0")
-    if g["scenes"]!=[{"name":"National_Mall_Core_Panel_Module","nodes":[0,1,2,3,4,5,6]}]: raise ValueError("scene ownership changed")
+    _assert_contract(g["scenes"],[{"name":"National_Mall_Core_Panel_Module","nodes":[0,1,2,3,4,5,6]}],"scenes")
     if type(g["buffers"]) is not list or len(g["buffers"])!=1 or set(g["buffers"][0])!={"byteLength","uri"}: raise ValueError("buffer profile invalid")
     uri=g["buffers"][0]["uri"]; prefix="data:application/octet-stream;base64,"
     if type(uri) is not str or not uri.startswith(prefix): raise ValueError("buffer must be embedded application/octet-stream data URI")
@@ -144,13 +173,14 @@ def verify(source_path: Path, gltf_path: Path, manifest_path: Path):
     except Exception as e: raise ValueError("invalid base64 buffer") from e
     if type(g["buffers"][0]["byteLength"]) is not int or g["buffers"][0]["byteLength"]!=len(blob): raise ValueError("buffer byteLength mismatch")
     if len(blob)!=1224: raise ValueError("canonical fixture buffer length changed")
-    if g["bufferViews"]!=CANON_BUFFER_VIEWS or g["accessors"]!=CANON_ACCESSORS: raise ValueError("bufferView/accessor contract changed")
-    if g["materials"]!=CANON_MATERIALS: raise ValueError("material blockout contract changed")
-    if g["meshes"]!=CANON_MESHES: raise ValueError("mesh/material ownership changed")
+    _assert_contract(g["bufferViews"],CANON_BUFFER_VIEWS,"bufferViews")
+    _assert_contract(g["accessors"],CANON_ACCESSORS,"accessors")
+    _assert_contract(g["materials"],CANON_MATERIALS,"materials")
+    _assert_contract(g["meshes"],CANON_MESHES,"meshes")
     want_nodes=_expected_nodes(src)
     if type(g["nodes"]) is not list or len(g["nodes"])!=len(want_nodes): raise ValueError("node count invalid")
     for got,want in zip(g["nodes"],want_nodes):
-        if set(got)!={"name","mesh","translation","scale"}: raise ValueError("node keys invalid")
+        if type(got) is not dict or set(got)!={"name","mesh","translation","scale"}: raise ValueError("node keys invalid")
         if got["name"]!=want["name"] or type(got["mesh"]) is not int or got["mesh"]!=want["mesh"]: raise ValueError("node identity/mesh ownership changed")
         if not _eq_list(_finite_list(got["translation"],3,got["name"]+".translation"),want["translation"]): raise ValueError("node translation changed")
         if not _eq_list(_finite_list(got["scale"],3,got["name"]+".scale"),want["scale"]): raise ValueError("node scale changed")
