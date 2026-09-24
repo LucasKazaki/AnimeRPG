@@ -9,36 +9,38 @@
   "pr": 50,
   "sources": [
     {
-      "id": "GENSHIN-5.4-MAP",
-      "kind": "current-version-history-and-update-detail-mirror",
-      "published": "2025-02-12",
+      "id": "GENSHIN-OFFICIAL-INTERACTIVE-MAP-2.6",
+      "kind": "official_developer_gameplay_explanation",
+      "published": "2022-03-30",
       "accessed": "2026-09-24",
-      "urls": [
-        "https://genshin-impact.fandom.com/wiki/Version/5.4",
-        "https://traveler.gg/moonlight-amidst-dreams-version-5-4-update-details/"
-      ],
+      "url": "https://www.hoyolab.com/article/4029408",
       "used_for": [
-        "map destination selection",
-        "quest hints",
-        "consolidated reward hints",
-        "tracked custom-marker visibility"
-      ],
-      "caveat": "Secondary retention/mirror of developer update details; mechanics are design references only."
+        "quick area/location selection",
+        "personal pin creation and editing",
+        "filter-list interaction",
+        "own/synced pin visibility and distribution"
+      ]
     },
     {
-      "id": "GENSHIN-5.6-MAP",
-      "kind": "current-version-history-and-update-detail-mirror",
-      "published": "2025-05-07",
+      "id": "GENSHIN-OFFICIAL-LUNA-III-UPDATE",
+      "kind": "official_developer_release_notes",
+      "published": "2025-12-02",
       "accessed": "2026-09-24",
-      "urls": [
-        "https://genshin-impact.fandom.com/wiki/Version/5.6",
-        "https://traveler.gg/paralogism-version-5-6-update-details/"
-      ],
+      "url": "https://www.hoyolab.com/article_pre/21389",
       "used_for": [
-        "category-scoped custom-pin management",
-        "relevant-only map sidebar information"
-      ],
-      "caveat": "Secondary retention/mirror of developer update details; no proprietary data or UI is copied."
+        "current-era simultaneous tracking of up to three nearby objective locations"
+      ]
+    },
+    {
+      "id": "GENSHIN-OFFICIAL-INTERACTIVE-MAP-GUIDE",
+      "kind": "official_platform_gameplay_guide",
+      "published": "2023",
+      "accessed": "2026-09-24",
+      "url": "https://www.hoyolab.com/article/17673509",
+      "used_for": [
+        "syncing in-game pins",
+        "player-authored exploration routing workflow"
+      ]
     },
     {
       "id": "GENSHIN-PLAYER-PIN-FILTER-20230920",
@@ -50,7 +52,7 @@
         "QOL-030 route-pin category visibility filter"
       ],
       "sentiment": "Specific player request with corroborating replies, not consensus.",
-      "current_resolution": "partially_revalidated_unestablished_for_visibility_filter"
+      "current_resolution": "later pin-management improvements exist; equivalent narrower in-game visibility filter not established in inspected current sources"
     },
     {
       "id": "GENSHIN-PLAYER-QOL-RETROSPECTIVE-20260115",
@@ -63,6 +65,13 @@
       ],
       "sentiment": "Retrospective says many old requests were gradually added while still listing pin filtering among old requests; not proof of a current defect."
     }
+  ],
+  "reference_lessons": [
+    "actionable location and target guidance",
+    "custom route-pin creation and management",
+    "category/filter-based map decluttering",
+    "simultaneous multi-objective tracking",
+    "consolidated relevant navigation information"
   ],
   "features": [
     {
