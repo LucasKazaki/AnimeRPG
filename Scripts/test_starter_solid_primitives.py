@@ -359,6 +359,16 @@ def test_crlf_source_line_endings_preserve_manifest_pin():
         assert result=={"meshes":4,"materials":1,"vertices":249,"indices":906}
     finally: td.cleanup()
 
+def test_crlf_expected_manifest_line_endings_preserve_pin():
+    td,src,gltf,manifest=workspace()
+    try:
+        expected=Path(td.name)/"expected-manifest-crlf.json"
+        normalized=EXPECTED_MANIFEST.read_bytes().replace(b"\r\n",b"\n").replace(b"\r",b"\n")
+        expected.write_bytes(normalized.replace(b"\n",b"\r\n"))
+        result=verify(src,gltf,manifest,expected)
+        assert result=={"meshes":4,"materials":1,"vertices":249,"indices":906}
+    finally: td.cleanup()
+
 TESTS=[v for k,v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
 
 if __name__=="__main__":

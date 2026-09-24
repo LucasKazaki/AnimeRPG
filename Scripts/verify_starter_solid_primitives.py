@@ -144,9 +144,15 @@ def verify_manifest(manifest_path,source_path,gltf_path):
     if m["primitive_ids"]!=ORDER: fail("manifest primitive ids invalid")
     return m
 
+def normalized_manifest_pin_bytes(path):
+    # Preserve the exact checked-in pin apart from platform newline translation.
+    # Do not canonicalize JSON here: spacing, key order, number spellings, and all
+    # other bytes remain part of the deterministic manifest contract.
+    return Path(path).read_bytes().replace(b"\r\n",b"\n").replace(b"\r",b"\n")
+
 def verify_expected_manifest(manifest_path, expected_manifest_path):
-    actual=Path(manifest_path).read_bytes()
-    expected=Path(expected_manifest_path).read_bytes()
+    actual=normalized_manifest_pin_bytes(manifest_path)
+    expected=normalized_manifest_pin_bytes(expected_manifest_path)
     if actual!=expected:
         fail("generated manifest does not match checked-in expected manifest")
 

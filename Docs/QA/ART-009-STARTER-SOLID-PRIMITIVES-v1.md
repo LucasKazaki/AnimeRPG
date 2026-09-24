@@ -22,8 +22,8 @@ Total: 249 vertices, 906 indices. These are functional source meshes, not render
 - glTF SHA-256: `e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17`
 - expected manifest SHA-256: `653d120860b9fcf248d2c50ab3b880d98d26a69b4c681ec212a3b39d8f90f71e`
 - generator Git blob: `3b77c487c7a20ea444155bab8453d4a54ac1e85a`
-- verifier Git blob: `3871d8dda7971766408580b4063a895748a7c27f`
-- tests Git blob: `4b6ac10b6ec4e1ee7a1117466da013ac1598327e`
+- verifier Git blob: `865f2ad6280eac9459d5eece16df056dbd8745f7`
+- tests Git blob: `19d5ed097fbca624ef85b3a3f4c18f0193f1028d`
 
 ## Review-driven repair
 
@@ -41,6 +41,9 @@ An independent clean Windows worktree on candidate `f9bfce5eacd94b8524f94e453eb4
 
 The generator and independent verifier now hash the parsed source contract serialized as canonical JSON bytes instead of hashing checkout line endings. The checked-in expected manifest remains pinned to the canonical LF identity. A 32nd focused regression rewrites the same source contract with CRLF line endings, regenerates the packet, and requires the exact checked-in manifest plus semantic verifier to accept it. This is a determinism repair only; no asset geometry, material, runtime state, or integration claim changed.
 
+
+A second clean Windows sync on candidate `c52a2c992932c92474b430cb7ec9ac8aaaef5170` exposed the remaining half of the same portability class: Git checked out `expected-manifest.json` with CRLF while fresh generator output retained LF, so the verifier's raw-byte expected-manifest comparison still rejected an otherwise identical pin. The expected-manifest gate now normalizes only CRLF/CR line endings to LF before byte comparison. It deliberately does not canonicalize parsed JSON, so whitespace, key order, number spellings, and every other byte remain pinned. A 33rd focused regression supplies a CRLF checkout of the checked-in expected manifest and requires the source-valid packet to pass.
+
 ## Sandbox execution
 
 The following sandbox evidence was recorded on repaired candidate `d0c61b25f2ac3e29a0b50882933d1f77c58a88fb`, before the follow-up per-vertex tangent repair. It reproduced the pinned generator output byte-for-byte (`26,172` bytes, SHA-256 `e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17`). Do not reuse the 30/30 result below as exact-head acceptance for the follow-up verifier-only repair:
@@ -57,7 +60,7 @@ The 30 focused tests include deterministic/stale-output behavior, overwrite refu
 
 ## Gate state
 
-The current generator/verifier/regression repair still requires the packet's exact generator/check/verifier/regression/compile commands on the exact branch head plus a fresh independent review. The focused suite inventory is now 32 cases, but no 32/32 execution result is claimed until those exact commands run on this head. The earlier exact-head Windows lane on `f9bfce5e...` was green but did not execute this focused Python suite; it therefore does not close the new source-determinism gate.
+The current generator/verifier/regression repair still requires the packet's exact generator/check/verifier/regression/compile commands on the exact branch head plus a fresh independent review. The clean-Windows CRLF expected-manifest failure from `c52a2c992932c92474b430cb7ec9ac8aaaef5170` is the specific defect repaired by this follow-up. The focused suite inventory is now 33 cases, but no 33/33 execution result is claimed until those exact commands run on this head. The earlier exact-head Windows lane on `f9bfce5e...` was green but did not execute this focused Python suite; it therefore does not close the new source-determinism gate.
 
 ## Evidence boundary
 
