@@ -391,6 +391,11 @@ private:
         if (candidate.missedOpenings != current.missedOpenings) {
             return candidate.missedOpenings < current.missedOpenings;
         }
+        // A saturated count only means "at least MaximumMissedOpenings". Once a
+        // valid record already has that sentinel, another saturated candidate
+        // cannot prove it had fewer misses, so do not let later tie-breakers make
+        // an unknown-or-worse run replace the established record.
+        if (candidate.missedOpenings >= MaximumMissedOpenings) return false;
         if (candidate.damageTaken != current.damageTaken) {
             return candidate.damageTaken < current.damageTaken;
         }
