@@ -219,9 +219,6 @@ public:
     // owner that produces the authoritative ShadowCryptLead evidence.
     bool BeginShadowCrypt() {
         if (progression_ == nullptr || !shadowCryptMission_.Begin(fieldGuide_)) return false;
-        // Bind reward/replay authority to the protagonist owner that entered the
-        // run. A later pointer swap cannot redirect a completed clear to a
-        // different progression object.
         shadowCryptProgressionOwner_ = progression_;
         return true;
     }
@@ -238,8 +235,8 @@ public:
     }
     bool ReportShadowCryptDefeat() {
         const bool reported = shadowCryptMission_.ReportDefeat();
-        if (reported && shadowCryptSkirmish_.Active()) {
-            shadowCryptSkirmish_.Cancel();
+        if (reported && (shadowCryptSkirmish_.Active() || shadowCryptSkirmish_.Complete())) {
+            shadowCryptSkirmish_ = ShadowCryptSkirmish{};
             shadowCryptSkirmishObjectiveAdvanced_ = false;
         }
         return reported;
@@ -264,9 +261,6 @@ public:
         return shadowCryptMission_.ClaimFirstClearReward(*progression_);
     }
 
-    // Pass 37 mission-planning and records integration. Keep protagonist identity
-    // authority in this live owner so entry guidance never advertises an action
-    // that Begin/Replay would reject.
     bool SetShadowCryptFocusMode(ShadowCryptMissionFocusMode mode) {
         return shadowCryptMission_.SetFocusMode(mode);
     }
@@ -302,9 +296,6 @@ public:
     }
     const ShadowCryptMission& ShadowCrypt() const { return shadowCryptMission_; }
 
-    // Pass 38 room-level enemy combat. Keep skirmish authority attached to the
-    // same protagonist and mission timeline; a completed skirmish advances one
-    // objective step exactly once and failed defense contributes mission damage.
     bool BeginShadowCryptSkirmish() {
         if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_) return false;
         const ShadowCryptMissionBriefing briefing = shadowCryptMission_.Briefing();
@@ -377,9 +368,6 @@ public:
         return shadowCryptSkirmish_;
     }
 
-    // Pass 32 game-owned Rift Warden mastery trial. Entry is dependency-ready:
-    // it consumes the already-authoritative completed Shadow Crypt state and a
-    // persistent protagonist owner, without changing engine/runtime facilities.
     bool BeginRiftWardenTrial(RiftWardenDifficulty difficulty) {
         if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
             || !shadowCryptMission_.Briefing().complete
@@ -503,10 +491,10 @@ private:
     LandmarkObjectiveActivationMode objectiveActivationMode_{
         LandmarkObjectiveActivationMode::AutoStart};
     bool objectiveStarted_{true};
-    CharacterProgression* progression_{}; // Non-owning; caller controls the progression lifetime.
-    CharacterProgression* shadowCryptProgressionOwner_{}; // Identity only; never dereferenced directly.
-    CharacterProgression* mallResonanceProgressionOwner_{}; // Identity only; puzzle reward authority.
-    CharacterProgression* riftWardenProgressionOwner_{}; // Identity only; trial action authority.
+    CharacterProgression* progression_{};
+    CharacterProgression* shadowCryptProgressionOwner_{};
+    CharacterProgression* mallResonanceProgressionOwner_{};
+    CharacterProgression* riftWardenProgressionOwner_{};
     LandmarkDialogue dialogue_{};
     LandmarkDialogueContinuity dialogueContinuity_{};
     ExplorationFieldGuide fieldGuide_{};
