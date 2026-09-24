@@ -39,12 +39,12 @@
   ],
   "verification": {
     "registered_test_target": "ThoughtCommandsTests_via_existing_aggregation_plus_ExplorationFieldGuidePass29Tests",
-    "sandbox_cpp17": "initial_pass29_domain_and_pass14_compatibility_checks_passed_before_review_repair; final owner-integration acceptance relies_on_exact_head_hosted_gates",
-    "hosted_windows_ci": "pending_exact_final_head_after_owner_repair",
-    "release_manifest": "pending_exact_final_head_after_owner_repair",
+    "sandbox_cpp17": "initial_pass29_domain_and_pass14_compatibility_checks_passed_before_review_repairs; final acceptance relies_on_exact_head_hosted_gates",
+    "hosted_windows_ci": "pending_exact_final_head_after_review_repairs",
+    "release_manifest": "pending_exact_final_head_after_review_repairs",
     "native_windows_interactive": "not_applicable_to_game_domain_packet_no_input_or_ui_wiring_not_run_not_claimed",
-    "independent_review": "initial_review_found_production_owner_reachability_gap; repaired; fresh_exact_head_review_required",
-    "integration": "LandmarkInteraction owns ExplorationFieldGuide and now forwards next-operation route filter journal-acknowledgement and briefing APIs; ShadowCrypt and ManaReactor continue reading the same authoritative guide",
+    "independent_review": "first review found production owner reachability gap; second exact-head review found two regression-coverage gaps; all three repaired; fresh_exact_head_review_required",
+    "integration": "LandmarkInteraction owns ExplorationFieldGuide and forwards next-operation route filter journal-acknowledgement and briefing APIs; ShadowCrypt and ManaReactor continue reading the same authoritative guide",
     "persistent_cross_process_save": "field_guide_state_not_cross_process_persisted_not_claimed"
   },
   "coordination": {
@@ -58,10 +58,12 @@
     "current_resolution": "later_pin_management_improvements_exist; equivalent_narrower_in-game_visibility_filter_not_established_in_inspected_current_sources"
   },
   "review_history": {
-    "material_findings_repaired_this_pass": 1,
+    "material_findings_repaired_this_pass": 3,
     "summary": [
-      "P2: mutating pass29 APIs were only directly callable on standalone ExplorationFieldGuide objects; added thin LandmarkInteraction owner forwarding and live-owner regression coverage"
+      "P2: mutating pass29 APIs were only directly callable on standalone ExplorationFieldGuide objects; added thin LandmarkInteraction owner forwarding and live-owner regression coverage",
+      "P2: next-incomplete test did not cross the final-enum modulo boundary; added ShadowCryptLead-to-MallSurvey wraparound regression",
+      "P2: production owner clear wrapper was tested only against an already-empty route; added nonempty clear count/state regression and reseeded visit-pruning coverage"
     ]
   },
-  "next_action": "Wait for exact-head Windows Debug/Release and Release-manifest workflows plus fresh independent Codex review on PR 50; repair and rerun if needed, then re-read main/head/diff/threads and expected-head merge if clean."
+  "next_action": "Require exact-head Windows Debug/Release and Release-manifest workflows plus fresh independent Codex review on PR 50; repair and rerun if needed, then re-read main/head/diff/threads and expected-head merge if clean."
 }
