@@ -255,7 +255,8 @@ public:
     // it consumes the already-authoritative completed Shadow Crypt state and a
     // persistent protagonist owner, without changing engine/runtime facilities.
     bool BeginRiftWardenTrial(RiftWardenDifficulty difficulty) {
-        if (progression_ == nullptr || !shadowCryptMission_.Briefing().complete
+        if (progression_ == nullptr || progression_ != shadowCryptProgressionOwner_
+            || !shadowCryptMission_.Briefing().complete
             || (riftWardenProgressionOwner_ != nullptr
                 && riftWardenProgressionOwner_ != progression_)) {
             return false;
