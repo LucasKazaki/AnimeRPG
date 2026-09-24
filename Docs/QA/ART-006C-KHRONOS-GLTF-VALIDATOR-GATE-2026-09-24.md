@@ -20,7 +20,7 @@ Executed against the final authored ART-006C files before publication:
 
 ```text
 python Scripts/test_khronos_gltf_validator_report.py
-# PASS: 20/20 Khronos glTF report adapter tests
+# PASS: 22/22 Khronos glTF report adapter tests
 
 python -m py_compile \
   Scripts/verify_khronos_gltf_validator_report.py \
@@ -28,15 +28,17 @@ python -m py_compile \
 # exit 0
 ```
 
-The regression suite covers a representative current official-style info block plus fail-closed behavior for boolean-as-integer issue counts, validator errors, warnings above the default limit, truncated output, a same-name asset at a different resolved path, malformed validator semver, summary/message count mismatch, boolean severity, wrong glTF version, boolean official info counters, non-boolean official info flags, external resources, missing/boolean/unknown resource storage, unknown root fields, pointer-plus-offset ambiguity, wrong asset SHA-256, and the actual CLI adapter entry point.
+The regression suite covers a representative current official-style info block plus fail-closed behavior for boolean-as-integer issue counts, validator errors, warnings above the default limit, truncated output, a same-name asset at a different resolved path, malformed validator semver, summary/message count mismatch, boolean severity, wrong glTF version, boolean official info counters, non-boolean official info flags, external resources, missing/empty resource evidence, missing/boolean/unknown resource storage, unknown root fields, pointer-plus-offset ambiguity, wrong asset SHA-256, and the actual CLI adapter entry point.
 
 ## Review repair
 
-The first independent review on pre-repair head `ec28dd8129...` found three material issues. The final code addresses all three:
+The first independent review on pre-repair head `ec28dd8129...` found three material issues. The repaired code addresses all three:
 
 1. current upstream info statistic fields are accepted and their integer/boolean types are checked;
-2. report URI comparison now resolves and compares the complete asset path rather than only the basename;
+2. report URI comparison resolves and compares the complete asset path rather than only the basename;
 3. self-contained evidence rejects missing, non-string, unknown, and external resource-storage values.
+
+A later exact-head review on `0b216531...` found one additional P1: an omitted or empty `info.resources` array still allowed a `self_contained: true` receipt. The current code now requires `info.resources` to be present and non-empty whenever self-containment is required, then applies the recognized-storage and external-resource checks to every entry. Two focused regressions cover both omitted and empty arrays.
 
 A detached JSON report still cannot cryptographically prove which historical bytes produced it. The future native receipt must therefore retain the validator executable/version, working directory, command, exit code, and pre/post asset hashes in addition to the raw report and adapter result. The adapter independently checks the current exact path and expected asset hash.
 
