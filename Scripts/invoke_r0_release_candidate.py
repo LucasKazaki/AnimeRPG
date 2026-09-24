@@ -376,12 +376,12 @@ class R0Runner:
             cwd=str(cwd or self.source),
             text=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             errors="replace",
             **self._popen_isolation(),
         )
         try:
-            output, _ = process.communicate(timeout=timeout)
+            output, supervisor_control = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
             self._terminate_process_tree(process, wait_for_parent=False)
             try:
@@ -401,6 +401,22 @@ class R0Runner:
             except (OSError, subprocess.SubprocessError):
                 pass
             raise
+        setup_error: str | None = None
+        spawn_error: str | None = None
+        for line in (supervisor_control or "").splitlines():
+            if line.startswith(SUPERVISOR_SETUP_ERROR_PREFIX):
+                setup_error = line[len(SUPERVISOR_SETUP_ERROR_PREFIX) :].strip()
+            elif line.startswith(SUPERVISOR_SPAWN_ERROR_PREFIX):
+                spawn_error = line[len(SUPERVISOR_SPAWN_ERROR_PREFIX) :].strip()
+        if process.returncode == 126 and setup_error:
+            raise RecoveryFailure(
+                "Command could not start because supervisor setup failed: "
+                f"{setup_error}: {' '.join(normalized)}"
+            )
+        if process.returncode == 127 and spawn_error:
+            raise RecoveryFailure(
+                f"Command could not start: {spawn_error}: {' '.join(normalized)}"
+            )
         result = subprocess.CompletedProcess(normalized, process.returncode, output, None)
         if check and result.returncode != 0:
             raise RecoveryFailure(
