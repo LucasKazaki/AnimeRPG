@@ -280,6 +280,33 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertFalse(sentinel.exists(), "a descendant survived the timeout cleanup")
             self.assertTrue(runner.records[0].timed_out)
 
+    def test_run_command_timeout_kills_descendant_after_direct_parent_exits(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            sentinel = root / "run-command-exited-parent-escaped.txt"
+            with self.assertRaisesRegex(r0.RecoveryFailure, "timed out"):
+                runner.run_command(
+                    "exited-parent-timeout-fixture",
+                    self._exited_parent_with_live_stdout_descendant_command(sentinel),
+                    cwd=args.worktree,
+                    timeout_seconds=0.8,
+                )
+            log = (args.evidence_root / "01-exited-parent-timeout-fixture.log").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("exited-parent-output-marker", log)
+            self.assertIn("timed_out: true", log)
+            time.sleep(2.2)
+            self.assertFalse(
+                sentinel.exists(),
+                "a run_command descendant escaped after its direct parent exited",
+            )
+            self.assertTrue(runner.records[0].timed_out)
+
     def test_run_command_spawn_failure_is_recorded(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
