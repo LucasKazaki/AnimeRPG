@@ -1,0 +1,332 @@
+{
+  "coordinate_system": {
+    "forward": "+Z",
+    "handedness": "right_handed",
+    "right": "-X",
+    "up": "+Y"
+  },
+  "counts": {
+    "collision_indices": 348,
+    "collision_proxies": 7,
+    "collision_vertices": 234,
+    "materials": 2,
+    "meshes": 14,
+    "nodes": 14,
+    "render_indices": 528,
+    "render_modules": 7,
+    "render_vertices": 384,
+    "scenes": 2
+  },
+  "generator_id": "astral-modular-architecture-v1-1",
+  "gltf_bytes": 60411,
+  "gltf_sha256": "655729f14bc3a7c207b9ccccbe695fd783fd8ff5c4de1b8001e0401311b221c2",
+  "modules": [
+    {
+      "collision_bounds_max_m": [
+        4.0,
+        0.0,
+        4.0
+      ],
+      "collision_bounds_min_m": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "collision_indices": 36,
+      "collision_type": "box",
+      "collision_vertices": 24,
+      "id": "floor_4x4",
+      "render_bounds_max_m": [
+        4.0,
+        0.0,
+        4.0
+      ],
+      "render_bounds_min_m": [
+        0.0,
+        -0.25,
+        0.0
+      ],
+      "render_indices": 36,
+      "render_vertices": 24,
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          4.0
+        ],
+        [
+          4.0,
+          0.0,
+          4.0
+        ]
+      ]
+    },
+    {
+      "collision_bounds_max_m": [
+        4.0,
+        3.0,
+        0.25
+      ],
+      "collision_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "collision_indices": 36,
+      "collision_type": "box",
+      "collision_vertices": 24,
+      "id": "wall_4x3",
+      "render_bounds_max_m": [
+        4.0,
+        3.0,
+        0.25
+      ],
+      "render_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "render_indices": 36,
+      "render_vertices": 24,
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "collision_bounds_max_m": [
+        2.0,
+        3.0,
+        0.25
+      ],
+      "collision_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "collision_indices": 36,
+      "collision_type": "box",
+      "collision_vertices": 24,
+      "id": "wall_2x3",
+      "render_bounds_max_m": [
+        2.0,
+        3.0,
+        0.25
+      ],
+      "render_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "render_indices": 36,
+      "render_vertices": 24,
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "collision_bounds_max_m": [
+        2.0,
+        3.0,
+        2.0
+      ],
+      "collision_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "collision_indices": 72,
+      "collision_type": "two_box_L",
+      "collision_vertices": 48,
+      "id": "corner_2x2x3",
+      "render_bounds_max_m": [
+        2.0,
+        3.0,
+        2.0
+      ],
+      "render_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "render_indices": 72,
+      "render_vertices": 48,
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          2.0
+        ]
+      ]
+    },
+    {
+      "collision_bounds_max_m": [
+        4.0,
+        3.0,
+        0.25
+      ],
+      "collision_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "collision_indices": 108,
+      "collision_type": "three_box_frame",
+      "collision_vertices": 72,
+      "id": "doorway_4x3",
+      "render_bounds_max_m": [
+        4.0,
+        3.0,
+        0.25
+      ],
+      "render_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "render_indices": 108,
+      "render_vertices": 72,
+      "snap_points_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0,
+          0.0
+        ]
+      ]
+    },
+    {
+      "collision_bounds_max_m": [
+        2.0,
+        2.0,
+        4.0
+      ],
+      "collision_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "collision_indices": 24,
+      "collision_type": "walkable_ramp_prism",
+      "collision_vertices": 18,
+      "id": "stairs_2x4x2",
+      "render_bounds_max_m": [
+        2.0,
+        2.0,
+        4.0
+      ],
+      "render_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "render_indices": 204,
+      "render_vertices": 168,
+      "snap_points_m": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          2.0,
+          4.0
+        ]
+      ]
+    },
+    {
+      "collision_bounds_max_m": [
+        0.5,
+        3.0,
+        0.5
+      ],
+      "collision_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "collision_indices": 36,
+      "collision_type": "box",
+      "collision_vertices": 24,
+      "id": "pillar_0p5x3",
+      "render_bounds_max_m": [
+        0.5,
+        3.0,
+        0.5
+      ],
+      "render_bounds_min_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "render_indices": 36,
+      "render_vertices": 24,
+      "snap_points_m": [
+        [
+          0.25,
+          0.0,
+          0.25
+        ],
+        [
+          0.25,
+          3.0,
+          0.25
+        ]
+      ]
+    }
+  ],
+  "provenance": {
+    "distribution_scope": "repository_source_only",
+    "generator_family": "python_standard_library",
+    "origin": "original_project_procedural",
+    "third_party_content": false
+  },
+  "schema_version": 1,
+  "snap_grid_m": 0.25,
+  "source_sha256": "d121f4a056e10823a7c3b8521e913618bdc4b62b7229597df32086d37de3dbae",
+  "status": "source_validated_not_imported",
+  "units": "metres",
+  "uv_units_per_meter": 1.0
+}
