@@ -97,6 +97,48 @@ The post asks about removing preset configurations. Replies also specifically co
 5. A fresh independent authorized reviewer must review the exact final head. Material findings must be repaired and all affected checks rerun before merge.
 6. Re-read `main`, PR head, full diff, checks and review state immediately before an expected-head merge.
 
+### Exact reproducible hosted commands
+
+The existing `.github/workflows/windows-ci.yml` runs these literal core commands on `windows-2022` with an external `$env:BUILD_ROOT`:
+
+```powershell
+cmake -S . -B "$env:BUILD_ROOT" -G "Visual Studio 17 2022" -A x64
+cmake --build "$env:BUILD_ROOT" --config Debug --parallel
+ctest --test-dir "$env:BUILD_ROOT" -C Debug --output-on-failure -E "RuntimeSmoke" --no-tests=error
+cmake --build "$env:BUILD_ROOT" --config Release --parallel
+ctest --test-dir "$env:BUILD_ROOT" -C Release --output-on-failure -E "RuntimeSmoke" --no-tests=error
+python Scripts/verify_milestone1.py
+python Scripts/verify_milestone2.py
+python Scripts/verify_milestone3.py
+git diff --check
+git status --porcelain --untracked-files=no
+```
+
+The same workflow also executes the repository's R0-parser safety, PE dependency, Windows-prerequisite/runtime/compatibility/bootstrap, and Release test-safety contract scripts before and around those build/test commands. A workflow run is accepted only when every required step concludes `success`; a nonzero command exits the step/job.
+
+The existing `.github/workflows/release-manifest-validation.yml` additionally runs these literal contract/package commands on the same source head, with workflow-owned temporary build/package paths:
+
+```powershell
+python Scripts/test_release_manifest.py
+python Scripts/test_package_runtime_smoke.py
+python Scripts/test_package_restart_stress.py
+python Scripts/test_package_continuous_soak.py
+python Scripts/test_package_soak_telemetry_analysis.py
+python Scripts/test_benchmark_manifest.py
+python Scripts/test_pe_reproducibility_diagnostic.py
+cmake -S . -B $build -G "Visual Studio 17 2022" -A x64
+cmake --build $build --config Release --target AstralGame --parallel
+python Scripts/diagnose_pe_reproducibility.py $exeA $exeB --json $report
+python Scripts/release_manifest.py create $package $manifest --commit $commit
+python Scripts/release_manifest.py verify $manifest $package --expected-commit $commit --expected-executable-sha256 $exeHash --json $report
+git diff --check
+git status --porcelain --untracked-files=no
+```
+
+For the superseded head `06b5f57e880737ab286e421244d75234139968bc`, Windows run `35934957614` and Release-manifest run `35934957584` both completed successfully, so every required non-skipped command/step above returned exit code `0`; the release lane classified its two fresh Release executables as byte-identical. Because this task-packet repair changes the PR head, those results are historical evidence only and fresh exact-head runs are still required.
+
+No native interactive runtime command is applicable to pass-28 acceptance because this packet adds no Win32/controller/menu wiring. Hosted CTest intentionally excludes `RuntimeSmoke`. Therefore native playable verification remains `0`, and no runtime exit code is claimed.
+
 ## Evidence boundary
 
 These APIs are integrated into the live `ShadowbladeActions` game-domain owner, but there is still no Win32/controller/menu loadout workbench UI. Hosted deterministic tests are not a native interactive playtest. No GPU/rendering, animation, art/audio, cross-process workbench-state persistence, or performance claim is made by this packet.
