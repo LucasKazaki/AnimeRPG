@@ -62,11 +62,12 @@ A successful native DCC pass requires all of the following:
 5. The verifier independently hashes input/output resources and enforces the fixed export-profile types and values.
 6. The active exported scene contains exactly the seven expected mesh-bearing instances, with no extras or duplicates.
 7. Each primitive is indexed triangles with float `POSITION`, `NORMAL`, `TANGENT`, `TEXCOORD_0` accessors, equal nonzero attribute counts and an unsigned scalar index accessor.
-8. World center/dimensions match the source within the fixed, non-overridable `1e-4` metre tolerance.
+8. World center/dimensions match the source within the fixed, non-overridable `1e-4` metre tolerance, and each semantic instance preserves world-transform handedness so an AABB-preserving reflection cannot pass.
 9. Canonical indexed-triangle signatures preserve winding and referenced position/normal/tangent/UV payloads. Triangle ordering and cyclic first-corner choice may vary, but connectivity, culling orientation and shading/UV semantics may not drift.
 10. Semantic material bindings and visible PBR factors remain equivalent within the same fixed numeric tolerance.
-11. The output introduces no animation, image or texture payload absent from the source.
-12. Native shell evidence separately records the real Blender command, executable/version, working directory and process exit code.
+11. The bounded output may not introduce `EXT_mesh_gpu_instancing` or `KHR_lights_punctual` through declarations, root payloads or any node, including unreachable nodes. Node camera payloads are also prohibited because cameras are disabled.
+12. `animations`, `images`, `textures`, and `cameras` must be absent or actual empty JSON arrays. Empty objects, booleans, numbers and other falsy substitutes are invalid evidence.
+13. Native shell evidence separately records the real Blender command, executable/version, working directory and process exit code.
 
 The verifier compares functional scene semantics rather than requiring byte-identical glTF output. Blender may repack buffers/accessors without weakening the acceptance gate.
 
