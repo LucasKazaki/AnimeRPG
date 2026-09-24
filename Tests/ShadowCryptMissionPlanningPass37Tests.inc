@@ -7,6 +7,26 @@ Astral::Scene::ExplorationFieldGuide UnlockedShadowCryptGuidePass37() {
     return guide;
 }
 
+void UnlockShadowCryptProductionOwnerPass37(Astral::Scene::LandmarkInteraction& owner,
+    Astral::Scene::WorldBlockout& world, Astral::Scene::ShadowbladeActions& actions) {
+    using namespace Astral::Scene;
+    const Astral::Math::Vec3 positions[3]{
+        {-8.0f, 18.0f, 0.0f},
+        {4.0f, 39.0f, 0.0f},
+        {5.0f, 68.0f, 0.0f},
+    };
+    for (const Astral::Math::Vec3& position : positions) {
+        Expect(owner.TryInteract(position, world, actions).result
+                == LandmarkInteractionResult::Discovered,
+            "pass37 production setup discovers each National Mall landmark");
+    }
+    Expect(owner.TryDialogueChoice(DialogueTopic::ShadowCrypt, DialogueChoice::Reassure).loreUnlocked
+            && owner.TryDialogueChoice(DialogueTopic::ShadowCrypt,
+                    DialogueChoice::ShareEvidence).clueUnlocked
+            && owner.FieldGuide().OperationProgress(FieldOperation::ShadowCryptLead).Complete(),
+        "pass37 production setup creates both authoritative Shadow Crypt lead witnesses");
+}
+
 void AdvanceShadowCryptMissionPass37ToRiftNave(Astral::Scene::ShadowCryptMission& mission) {
     using namespace Astral::Scene;
     Expect(mission.RecordObjectiveStep() && mission.RecordObjectiveStep()
@@ -73,7 +93,7 @@ void TestShadowCryptMissionPlanningPass37() {
     const ShadowCryptEntryReport readyEntry = lockedMission.EntryReport(guide);
     Expect(readyEntry.readyToBegin && readyEntry.blocker == ShadowCryptEntryBlocker::None
             && lockedMission.EntryGuidance(guide) == ShadowCryptEntryGuidance::EnterShadowCrypt,
-        "pass37 complete lead exposes a deterministic ready-to-enter state");
+        "pass37 mission-domain lead gate exposes a deterministic ready-to-enter state");
 
     // QOL-038: encounter intel is available before commitment and does not create
     // a run or invent enemy statistics.
@@ -89,6 +109,52 @@ void TestShadowCryptMissionPlanningPass37() {
             && preview.finalObjective == ShadowCryptObjective::DefeatRiftWarden
             && !lockedMission.Briefing().available,
         "pass37 read-only preview exposes the authored room plan and Warden finale before starting");
+
+    // Independent review required the new planning behavior to route through the
+    // production LandmarkInteraction owner, including its protagonist gate.
+    WorldBlockout productionWorld;
+    ShadowbladeActions productionActions;
+    LandmarkInteraction productionOwner;
+    UnlockShadowCryptProductionOwnerPass37(productionOwner, productionWorld, productionActions);
+    ShadowCryptEntryReport productionEntry = productionOwner.ShadowCryptEntryStatus();
+    Expect(!productionEntry.readyToBegin
+            && productionEntry.blocker == ShadowCryptEntryBlocker::ProtagonistUnavailable
+            && productionOwner.ShadowCryptEntryNextAction()
+                == ShadowCryptEntryGuidance::BindProtagonist,
+        "pass37 live entry report refuses to advertise entry before a protagonist owner is bound");
+    const ShadowCryptMissionPreview productionPreview = productionOwner.ShadowCryptPreview();
+    Expect(productionPreview.available && productionPreview.riftWardenFinalEncounter
+            && !productionOwner.ShadowCryptBriefing().available,
+        "pass37 live owner exposes pre-entry encounter intel without starting the mission");
+
+    CharacterProgression productionProgression;
+    productionOwner.SetCharacterProgression(&productionProgression);
+    productionEntry = productionOwner.ShadowCryptEntryStatus();
+    Expect(productionEntry.readyToBegin
+            && productionOwner.ShadowCryptEntryNextAction()
+                == ShadowCryptEntryGuidance::EnterShadowCrypt
+            && productionOwner.BeginShadowCrypt(),
+        "pass37 binding progression turns the exact live entry report into a successful production entry");
+    Expect(productionOwner.AdvanceShadowCryptObjective()
+            && productionOwner.AdvanceShadowCryptObjective()
+            && productionOwner.AdvanceShadowCryptObjective()
+            && productionOwner.AdvanceShadowCryptObjective()
+            && productionOwner.AdvanceShadowCryptObjective()
+            && productionOwner.ShadowCryptBriefing().room == ShadowCryptRoom::RiftNave,
+        "pass37 live owner reaches Rift Nave through authoritative objective steps");
+    Expect(productionOwner.ShadowCryptBriefing().guidance
+                == ShadowCryptGuidanceAction::DiscoverCoolingCache
+            && productionOwner.SetShadowCryptFocusMode(ShadowCryptMissionFocusMode::Focused)
+            && productionOwner.ShadowCryptBriefing().focusMode
+                == ShadowCryptMissionFocusMode::Focused
+            && productionOwner.ShadowCryptBriefing().guidance
+                == ShadowCryptGuidanceAction::StabilizeRiftNode,
+        "pass37 live owner can actually select Focused mission guidance");
+    Expect(productionOwner.DiscoverShadowCryptCoolingCache()
+            && productionOwner.SetShadowCryptFocusMode(ShadowCryptMissionFocusMode::Standard)
+            && productionOwner.ShadowCryptBriefing().guidance
+                == ShadowCryptGuidanceAction::ClearCoolingCache,
+        "pass37 live focus route preserves optional-cache state when returning to Standard");
 
     ShadowCryptMission mission;
     Expect(mission.Begin(guide), "pass37 unlocked mission begins exactly once");
