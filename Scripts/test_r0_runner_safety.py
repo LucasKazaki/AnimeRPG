@@ -324,6 +324,7 @@ class R0RunnerSafetyTests(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn("spawn_error:", log)
+            self.assertIn("supervisor_control:", log)
             self.assertIn("exit_code: None", log)
             self.assertIn("timed_out: false", log)
             self.assertIn("interrupted: false", log)
@@ -332,6 +333,36 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertFalse(runner.records[0].timed_out)
             self.assertFalse(runner.records[0].interrupted)
             self.assertIsNotNone(runner.records[0].spawn_error)
+
+    def test_run_command_output_cannot_spoof_supervisor_spawn_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            spoof = r0.SUPERVISOR_SPAWN_ERROR_PREFIX + "spoofed command output"
+            command = [
+                sys.executable,
+                "-c",
+                f"import sys; print({spoof!r}, flush=True); sys.exit(127)",
+            ]
+            with self.assertRaisesRegex(r0.RecoveryFailure, "failed with exit code 127"):
+                runner.run_command(
+                    "spawn-marker-spoof-fixture",
+                    command,
+                    cwd=args.worktree,
+                    timeout_seconds=1.0,
+                )
+            log = (args.evidence_root / "01-spawn-marker-spoof-fixture.log").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(spoof, log)
+            self.assertIn("exit_code: 127", log)
+            self.assertIn("spawn_error: none", log)
+            self.assertEqual(len(runner.records), 1)
+            self.assertEqual(runner.records[0].exit_code, 127)
+            self.assertIsNone(runner.records[0].spawn_error)
 
     def test_run_command_rejects_non_finite_override_before_spawn(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
