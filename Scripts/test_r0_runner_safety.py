@@ -334,6 +334,41 @@ class R0RunnerSafetyTests(unittest.TestCase):
             self.assertFalse(runner.records[0].interrupted)
             self.assertIsNotNone(runner.records[0].spawn_error)
 
+    def test_run_command_supervisor_setup_failure_is_pre_start_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            args = make_args(root)
+            args.source_repository.mkdir()
+            args.worktree.mkdir()
+            runner = r0.R0Runner(args)
+            setup_prefix = "__ASTRAL_R0_SUPERVISOR_SETUP_ERROR__="
+            supervisor_code = (
+                "import sys; "
+                f"print({setup_prefix!r} + 'synthetic job setup failure', "
+                "file=sys.stderr, flush=True); "
+                "raise SystemExit(126)"
+            )
+            requested = [sys.executable, "-c", "print('MUST_NOT_RUN')"]
+            with mock.patch.object(r0, "CAPTURE_SUPERVISOR_CODE", supervisor_code):
+                with self.assertRaisesRegex(r0.RecoveryFailure, "could not start"):
+                    runner.run_command(
+                        "supervisor-setup-failure-fixture",
+                        requested,
+                        cwd=args.worktree,
+                        timeout_seconds=1.0,
+                    )
+            log = (args.evidence_root / "01-supervisor-setup-failure-fixture.log").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(setup_prefix + "synthetic job setup failure", log)
+            self.assertNotIn("MUST_NOT_RUN", log)
+            self.assertIn("exit_code: None", log)
+            self.assertIn("timed_out: false", log)
+            self.assertIn("interrupted: false", log)
+            self.assertEqual(len(runner.records), 1)
+            self.assertIsNone(runner.records[0].exit_code)
+            self.assertIsNotNone(runner.records[0].spawn_error)
+
     def test_run_command_output_cannot_spoof_supervisor_spawn_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
