@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "asset_id": "national-mall-core-panel-module-v1",
+  "status": "source_validated_not_imported",
+  "ledger_ref": "Content/Reference/NationalMall/reference-ledger.json",
+  "ledger_blob_sha1": "ba8ec205d2aecfa4b2ace15c13c71fb9932cb7f4",
+  "source_sha256": "5ec46c554172b0f83859ed6185df07bbd2d35cb89f13fe66d9ac10246d9005b1",
+  "gltf_file": "mall_core_panel_blockout.gltf",
+  "gltf_sha256": "5cb742530dda8b474bf4009d26274ce01755fd5033f38d8f2c0d7a3e6e5b95b9",
+  "gltf_bytes": 6948,
+  "unique_meshes": 3,
+  "mesh_instances": 7,
+  "materials": 3,
+  "unit_box_vertices": 24,
+  "unit_box_indices": 36,
+  "dimensions_m": {
+    "lawn_longitudinal": 137.16,
+    "lawn_cross": 51.816,
+    "path_width": 10.668,
+    "grove_band_width": 39.624,
+    "outer_path_longitudinal": 158.496,
+    "outer_path_cross": 73.152,
+    "total_module_cross": 152.4
+  }
+}
