@@ -149,4 +149,51 @@ void TestExplorationFieldGuidePass29() {
     Expect(!complete.TrackNextIncompleteOperation()
             && complete.TrackedOperation() == before,
         "pass29 next-incomplete tracking is a no-op once every operation is complete");
+
+    // Independent-review repair: exercise the new mutations through the real
+    // LandmarkInteraction-owned production guide instead of only standalone
+    // ExplorationFieldGuide fixtures.
+    LandmarkInteraction owner;
+    Expect(owner.AddFieldRouteTarget(LandmarkKind::WashingtonMonument, FieldPinCategory::Note)
+            && owner.AddFieldRouteTarget(LandmarkKind::ReflectingPool, FieldPinCategory::Resource)
+            && owner.SetFieldRouteFilter(FieldPinFilter::Resource),
+        "pass29 production owner can create and filter the bounded field route");
+    const FieldGuideBriefing ownerRouteBriefing = owner.FieldBriefing();
+    Expect(ownerRouteBriefing.routeStops == 2
+            && ownerRouteBriefing.target.available
+            && ownerRouteBriefing.target.source == FieldTargetSource::RoutePin
+            && ownerRouteBriefing.target.landmark == LandmarkKind::ReflectingPool,
+        "pass29 production briefing reflects owner-routed route state");
+    Expect(!owner.SetFieldRouteFilter(FieldPinFilter::Count)
+            && owner.FieldGuide().RouteFilter() == FieldPinFilter::Resource,
+        "pass29 production owner rejects an invalid route filter without mutation");
+    Expect(owner.RemoveFieldRouteTarget(LandmarkKind::WashingtonMonument)
+            && !owner.RemoveFieldRouteTarget(LandmarkKind::WashingtonMonument)
+            && owner.FieldBriefing().routeStops == 1,
+        "pass29 production owner removal is exact and idempotent");
+    Expect(owner.TrackFieldOperation(FieldOperation::RiftInvestigation)
+            && owner.TrackNextIncompleteFieldOperation()
+            && owner.FieldBriefing().trackedOperation == FieldOperation::ShadowCryptLead,
+        "pass29 production owner can select the next incomplete operation");
+
+    WorldBlockout world;
+    ShadowbladeActions actions;
+    Expect(owner.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions).result
+            == LandmarkInteractionResult::Discovered
+            && owner.FieldBriefing().journalUnread == 1
+            && owner.MarkFieldJournalRead(FieldJournalEntry::LincolnFieldNote)
+            && owner.FieldBriefing().journalUnread == 0,
+        "pass29 live landmark discovery creates a journal notice that owner-level acknowledgement clears");
+    Expect(!owner.MarkFieldJournalRead(FieldJournalEntry::LincolnFieldNote)
+            && !owner.MarkFieldJournalRead(FieldJournalEntry::ShadowCryptLead),
+        "pass29 production journal acknowledgement remains idempotent and locked-entry safe");
+    Expect(owner.TryInteract({4.0f, 39.0f, 0.0f}, world, actions).result
+            == LandmarkInteractionResult::Discovered
+            && owner.MarkAllFieldJournalRead() == 1
+            && owner.FieldBriefing().journalUnread == 0
+            && owner.MarkAllFieldJournalRead() == 0,
+        "pass29 production owner read-all acknowledges exactly the newly discovered note once");
+    Expect(owner.ClearFieldRouteTargets() == 0
+            && owner.FieldBriefing().routeStops == 0,
+        "pass29 live route auto-pruning and batch clear stay consistent after visiting the remaining stop");
 }
