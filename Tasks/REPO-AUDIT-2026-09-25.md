@@ -39,3 +39,14 @@ opt-in with `-DASTRAL_AUDIT_SANITIZERS=ON` and a supported Clang/GCC toolchain.
 No dependencies are installed. Stop at a tested draft PR, fresh independent
 review request and explicit coverage/remaining-gaps report; do not claim a full
 line-by-line, native or security certification of all repository history.
+
+## Dependent static-gate repair admitted during hosted verification
+
+The root Windows job at c5f71349e6ffc88430a64833ebb81de2527b3db0 passed builds
+and all 16 deterministic tests in both configurations, then failed Milestone 2
+because Scripts/verify_milestone2.py requires the removed recursive
+`parent->WorldPosition` expression. Add ONLY that script to the allowed paths.
+Replace its transform-presence markers with the checked iterative interface and
+parent traversal; do not restore recursion or spoof the obsolete marker in a
+comment. Keep all other file/mesh/marker checks and existing workflows intact.
+Actual hierarchy behavior remains covered by SceneTests and NumericAuditTests.
