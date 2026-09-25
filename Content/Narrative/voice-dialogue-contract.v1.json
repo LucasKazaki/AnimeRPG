@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "status": "authoring_fixture_not_runtime",
+  "required_locales": [
+    "en-US",
+    "ja-JP"
+  ],
+  "playable_character_id": "protagonist",
+  "allow_party_switching": false,
+  "gacha": {
+    "enabled": false,
+    "permitted_categories": [
+      "armor",
+      "tools",
+      "weapons",
+      "cosmetics"
+    ],
+    "characters_permitted": false,
+    "real_money_authorized": false
+  },
+  "presentation": {
+    "default_text": "instant",
+    "manual_advance_waits_for_voice": false,
+    "manual_advance_waits_for_animation": false,
+    "skip_stops_at_meaningful_choice": true,
+    "history_is_read_only": true,
+    "independent_voice_and_text_locales": true,
+    "ui_advance_event": "ui.dialogue.advance",
+    "ui_sound_can_be_muted": true
+  },
+  "expressions": [
+    "neutral",
+    "warm",
+    "concerned",
+    "skeptical",
+    "determined",
+    "amused",
+    "sad",
+    "angry",
+    "afraid",
+    "surprised"
+  ],
+  "characters": [
+    {
+      "id": "protagonist",
+      "playable": true,
+      "role": "Persistent main character. Voice preset and appearance do not create another playable identity.",
+      "personality": [
+        "observant",
+        "compassionate",
+        "dry humor"
+      ],
+      "speech_style": "Short, direct sentences; asks useful questions and does not narrate every thought.",
+      "voice_identity": "Clear middle register, grounded delivery, light texture; confidence without constant shouting.",
+      "locales": {
+        "en-US": {
+          "casting_key": "protagonist.en-US.v1",
+          "status": "unassigned",
+          "provider_voice_id": null,
+          "direction": "Natural contemporary English; understated humor, no celebrity imitation.",
+          "reference_origin": "designed_synthetic",
+          "reference_asset": null,
+          "rights_review": "pending",
+          "native_language_review": "pending"
+        },
+        "ja-JP": {
+          "casting_key": "protagonist.ja-JP.v1",
+          "status": "unassigned",
+          "provider_voice_id": null,
+          "direction": "Natural Japanese; calm phrasing, light conversational register; avoid an English accent.",
+          "reference_origin": "designed_synthetic",
+          "reference_asset": null,
+          "rights_review": "pending",
+          "native_language_review": "pending"
+        }
+      }
+    },
+    {
+      "id": "rift_researcher",
+      "playable": false,
+      "role": "Proposed adult NPC audition role, not a new approved canonical character.",
+      "personality": [
+        "curious",
+        "precise",
+        "quietly anxious"
+      ],
+      "speech_style": "Explains evidence plainly; excitement speeds the cadence, not the exposition length.",
+      "voice_identity": "Lighter upper-middle register, crisp consonants, measured breath with small lifts of curiosity.",
+      "locales": {
+        "en-US": {
+          "casting_key": "rift_researcher.en-US.v1",
+          "status": "unassigned",
+          "provider_voice_id": null,
+          "direction": "Precise contemporary English, warm rather than robotic.",
+          "reference_origin": "designed_synthetic",
+          "reference_asset": null,
+          "rights_review": "pending",
+          "native_language_review": "pending"
+        },
+        "ja-JP": {
+          "casting_key": "rift_researcher.ja-JP.v1",
+          "status": "unassigned",
+          "provider_voice_id": null,
+          "direction": "Natural Japanese; polite but not excessively formal; clear names and technical readings.",
+          "reference_origin": "designed_synthetic",
+          "reference_asset": null,
+          "rights_review": "pending",
+          "native_language_review": "pending"
+        }
+      }
+    },
+    {
+      "id": "field_quartermaster",
+      "playable": false,
+      "role": "Proposed adult NPC audition role, not a new approved canonical character.",
+      "personality": [
+        "practical",
+        "protective",
+        "wry"
+      ],
+      "speech_style": "Compact advice and dry observations; reassurance is expressed through practical help.",
+      "voice_identity": "Lower register, rounded resonance and relaxed cadence; occasional subtle vocal grain.",
+      "locales": {
+        "en-US": {
+          "casting_key": "field_quartermaster.en-US.v1",
+          "status": "unassigned",
+          "provider_voice_id": null,
+          "direction": "Relaxed English; economical phrasing, no exaggerated caricature.",
+          "reference_origin": "designed_synthetic",
+          "reference_asset": null,
+          "rights_review": "pending",
+          "native_language_review": "pending"
+        },
+        "ja-JP": {
+          "casting_key": "field_quartermaster.ja-JP.v1",
+          "status": "unassigned",
+          "provider_voice_id": null,
+          "direction": "Natural Japanese; relaxed, steady delivery with restrained dry humor.",
+          "reference_origin": "designed_synthetic",
+          "reference_asset": null,
+          "rights_review": "pending",
+          "native_language_review": "pending"
+        }
+      }
+    }
+  ],
+  "sample_lines": [
+    {
+      "id": "rift_warning_01",
+      "speaker": "rift_researcher",
+      "texts": {
+        "en-US": "The rift is spreading. We should clear the plaza first.",
+        "ja-JP": "亀裂が広がっています。まず広場の人たちを避難させましょう。"
+      },
+      "expression": "concerned",
+      "intensity_permille": 600,
+      "delivery": "natural, concise; preserve the character voice",
+      "audio_status": "not_generated",
+      "translation_status": "draft_needs_native_review"
+    },
+    {
+      "id": "rift_warning_02",
+      "speaker": "protagonist",
+      "texts": {
+        "en-US": "You guide them out. I'll hold the entrance.",
+        "ja-JP": "みんなを誘導して。入口は私が守る。"
+      },
+      "expression": "determined",
+      "intensity_permille": 600,
+      "delivery": "natural, concise; preserve the character voice",
+      "audio_status": "not_generated",
+      "translation_status": "draft_needs_native_review"
+    },
+    {
+      "id": "rift_warning_03",
+      "speaker": "field_quartermaster",
+      "texts": {
+        "en-US": "Take this shield. Bring it back, preferably with you behind it.",
+        "ja-JP": "この盾を持っていけ。無事に返せよ。もちろん、お前も一緒にな。"
+      },
+      "expression": "warm",
+      "intensity_permille": 600,
+      "delivery": "natural, concise; preserve the character voice",
+      "audio_status": "not_generated",
+      "translation_status": "draft_needs_native_review"
+    }
+  ]
+}

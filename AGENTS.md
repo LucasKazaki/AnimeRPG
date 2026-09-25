@@ -52,3 +52,24 @@ Lucas explicitly requested an hourly AnimeRPG game worker, separate from the hou
 For that worker only, [the operating contract](Docs/Agents/ANIMERPG-HOURLY.md) records standing push/merge approval and dependency-ready parallel game work. This supersedes older blanket game-content-pause and per-merge-human-approval wording within that scope. It does not waive independent implementation review, applicable tests, native acceptance, dependency/architecture approvals, or repository protections. An unresolved gate blocks dependent work, not unrelated independently verifiable game work. Documentation-only operating records are not product implementation and require content/structural validation and applicable checks, not fabricated gameplay acceptance.
 
 Do not broaden this authorization to the engine worker, its unreviewed PR stack, unrelated repositories, local execution, deployment, or release. Keep the original rules above for all other work. Use the [game backlog](Docs/Agents/animerpg-hourly/BACKLOG.json) and a scoped task packet; verify live ownership before changing gameplay files that happen to reside under `Engine/Scene`.
+
+## September 24, 2026: voices, protagonist and dialogue direction
+
+Lucas requests AI-generated English/Japanese character voices, distinct character
+personalities and voice identities, only the persistent protagonist playable,
+optional armor/tools/weapons/cosmetics gacha, a crisp dialogue-advance cue and
+shorter conversations with story-directed expressions. This direction applies
+to both engine-facing interfaces and game-facing authoring, within scoped tasks.
+Read [the game instructions](Docs/Game/CHARACTERS-VOICES-DIALOGUE.md),
+[engine contract](Docs/Engine/DIALOGUE-AUDIO-EXPRESSION-CONTRACT.md), and
+[VD-001 packet](Tasks/VOICE-DIALOGUE-2026-09-24.md) before related work.
+
+NPCs/companions are not controllable characters; no character banners or party
+switching. Avatar/class/build variants remain the same protagonist. Generate and
+review speech offline; do not make story progression depend on live TTS. Use an
+original procedural advance cue unless exact third-party reuse is documented.
+No copied game audio or unapproved actor cloning. Keep manual advance independent
+of voice/animation waits and preserve narrative effects exactly once on skip.
+This update authorizes the requested instructions/source-fixture work, not model
+installation, spending, a payment system, native execution, merging or release.
+Existing ownership, independent review and runtime evidence requirements remain.
