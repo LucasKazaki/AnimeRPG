@@ -148,3 +148,28 @@ registered native executor for movement/camera/near-clipping, ordinary combat,
 large/invalid settings failure behavior, and all relevant interactive regressions.
 Do not weaken the tests, modify another worker's branch or merge based on this
 author receipt. No independent/native acceptance is asserted here.
+
+## Post-publication workflow correction
+
+The final delivery check caught an error introduced by this audit in the initial
+workflow at commit `924cc13343d608d9c6bcf9de8b5492900e412acd`: job-level `env`
+referenced `runner.temp`. GitHub's context availability table does not permit
+`runner` in `jobs.<job_id>.env`, but permits it in step `run` expressions. Merely
+parsing YAML did not detect this platform-specific restriction. The first queried
+workflow list contained existing jobs but did not establish a numeric-audit run.
+
+The follow-up removes job-level build-root variables and resolves the temporary
+build directories in the configure/build/test steps instead. No production code,
+CMake target, numerical test or head/merge coverage is weakened or changed. A
+local semantic check rejects the original job-level context and accepts the
+repaired workflow, with read-only permissions, explicit revision verification,
+Windows/Linux Debug/Release matrix and fail-on-no-tests retained. This focused
+check is not a complete replacement for GitHub's workflow validation.
+
+Source: GitHub Actions context availability, checked September 25, 2026:
+https://docs.github.com/en/actions/reference/workflows-and-actions/contexts
+
+Initial-head review/CI is not reused as final-head acceptance. Obtain fresh
+workflow and independent review receipts for the follow-up commit. The prior
+local 45-case and legacy-scene test results still bind to the unchanged C++ source;
+no hosted or native success is inferred from this configuration repair.
