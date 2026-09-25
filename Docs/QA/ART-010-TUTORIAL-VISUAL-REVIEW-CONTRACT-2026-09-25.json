@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "task_id": "ART-010",
+  "loop_id": "astral-art-hourly-20260922",
+  "run_date": "2026-09-25",
+  "scope": "tutorial_room_fixed_visual_review_contract",
+  "validated_parent_head": "2453c7630dd8acfabdea1a5a0de68c740fb9f282",
+  "published_commit": "fe585cc71a1f5f289ee6c260157c8afc8f65724f",
+  "published_file": {
+    "path": "Content/Starter/ModularArchitectureV1/tutorial-room-visual-review-contract.json",
+    "git_blob_sha1": "b788a585ec71e26041d6df589e0bd7e7c6de5ff6"
+  },
+  "verification": {
+    "remote_json_parse": "passed",
+    "semantic_assertions_passed": 99,
+    "shot_count": 5,
+    "source_pin_count": 7,
+    "workflow_runs_for_published_commit": 0,
+    "combined_status_entries_for_published_commit": 0,
+    "local_prepublication_design_validation": "passed before publication",
+    "native_astral_execution": "not_run",
+    "offline_dcc_render": "not_run",
+    "independent_visual_review": "not_run"
+  },
+  "reference_basis": [
+    {
+      "source": "Unreal Engine 5.8 Auto Exposure documentation",
+      "url": "https://dev.epicgames.com/documentation/unreal-engine/auto-exposure-in-unreal-engine",
+      "observed": "2026-09-25",
+      "use": "fixed/manual exposure lesson for matched technical captures"
+    },
+    {
+      "source": "Unity URP Color Adjustments manual",
+      "url": "https://docs.unity3d.com/6000.0/Documentation/Manual/urp/Post-Processing-Color-Adjustments.html",
+      "observed": "2026-09-25",
+      "use": "hold post exposure and grading fixed or disabled for matched technical captures"
+    }
+  ],
+  "delivered": [
+    "five fixed review shots covering doorway, front seams, rear and side seams, intentional corner overlaps and floor seams",
+    "proposed neutral technical capture profile with auto/local exposure and creative grading disabled for matched comparisons",
+    "proposed neutral and grazing-light review intents",
+    "explicit source, offline DCC, imported, runtime_verified and art_approved evidence stages",
+    "technical geometry, shading, UV and scene-readability review criteria",
+    "review receipt fields for later independent art acceptance"
+  ],
+  "evidence_boundary": {
+    "status": "source_only_review_contract",
+    "runtime_verified": false,
+    "art_approved": false,
+    "not_claimed": [
+      "Astral camera or lighting support",
+      "Astral post-processing parity",
+      "Blender round-trip",
+      "Khronos validator execution",
+      "native performance",
+      "independent visual-art acceptance",
+      "UE5, Unity, Genshin Impact or Zenless Zone Zero parity"
+    ]
+  },
+  "blocked_attempt": {
+    "path": "Scripts/generate_starter_modular_architecture.py",
+    "result": "repository connector safety gate rejected executable-script creation before this disjoint visual-review increment",
+    "response": "did not retry the identical blocked write; advanced an independent art-owned source contract instead"
+  },
+  "next_action": "independent source review of the fixed shot and presentation contract; executable generator/verifier/test publication remains a separate blocked source-tooling gate"
+}
