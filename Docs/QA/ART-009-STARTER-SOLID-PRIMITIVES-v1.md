@@ -24,9 +24,9 @@ Candidate code/data head before this documentation refresh: `d6cd5703985ef932493
 - glTF SHA-256: `e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17`
 - glTF bytes: `26,172`
 - expected manifest SHA-256: `5ef9f93bcd31e0192dbff6e1a6c60f5820defd663efc51e81fd3913c8ca2f2a1`
-- generator Git blob: `8dc1f08670ba5271b6d1a580c4591ca31bddb43f`
+- generator Git blob: `e196124dd73577f9758eec8791a39cd4307e8e29`
 - verifier Git blob: `abb0b592aee0adb5f4c3dc9eb9454ccb541211fb`
-- tests Git blob: `5918a7ef3a919305d5d2e74c0c792bc5dc8eb11d`
+- tests Git blob: `e283f4e04d4b90e56256b5bd9f38079b14ea63db`
 
 The source identity is SHA-256 of canonical parsed JSON bytes, so LF and CRLF checkouts share one source pin. The checked-in expected-manifest comparison normalizes only CRLF and lone CR to LF. Spacing, key order, number spellings and all other bytes remain part of the manifest pin.
 
@@ -56,6 +56,12 @@ The generator previously checked and wrote its two destinations sequentially. Wi
 
 Two focused regressions cover the occupied-second-output case and aliased output paths. The focused suite inventory is now 36 cases. This repair changes generator safety behavior only; source identity, geometry, material values, generated glTF bytes, and runtime state are unchanged.
 
+## Exclusive-create race repair
+
+The preflight still had a time-of-check/time-of-use window because the final writes used overwrite-capable `write_bytes()`. Another process could create a destination after the `exists()` checks and have that file truncated by this generator. Output creation now uses exclusive `xb` mode. If a destination races into existence, generation refuses and removes any earlier output created by the current invocation so it does not leave a half packet.
+
+A focused regression injects a manifest creation after preflight, requires refusal, preserves the other writer's bytes, and requires the generator-created glTF to be removed. The focused suite inventory is now 37 cases. Geometry, material values, canonical source identity, and generated glTF bytes are unchanged.
+
 ## Verification evidence
 
 Historical exact-head clean-Windows verification at `d36c50e559d7aca9c9aee07136bd1630027edb43` recorded generator pass, generator `--check` pass, independent verifier pass for all four meshes, focused suite `PASS: 33/33`, Python compilation pass, `git diff --check` pass, and successful hosted Windows run `36053365291`. That result predates the linear base-color contract repair and is not reused as 34-case acceptance.
@@ -64,7 +70,7 @@ For linear-factor repair head `d6cd5703985ef93249376cd9c07eaa76315d3556`, GitHub
 
 ## Current gate state
 
-The packet remains `source_validated_not_imported`. The exact output-preflight repair head still needs fresh generator output, generator `--check`, independent verifier, focused 36/36 regression suite, Python compile, applicable hosted repository checks, and a fresh independent review with no unresolved blocking finding.
+The packet remains `source_validated_not_imported`. The exact exclusive-create repair head still needs fresh generator output, generator `--check`, independent verifier, focused 37/37 regression suite, Python compile, applicable hosted repository checks, and a fresh independent review with no unresolved blocking finding.
 
 The older tangent review thread is stale relative to repaired source and regression coverage but still needs an explicit repair reply and resolution. A new independent review should target the final exact head after this QA refresh.
 

@@ -458,8 +458,26 @@ def write_or_check(source_path: Path, gltf_path: Path, manifest_path: Path, chec
 
     for path, _ in expected:
         path.parent.mkdir(parents=True, exist_ok=True)
-    for path, data in expected:
-        path.write_bytes(data)
+
+    created = []
+    try:
+        for path, data in expected:
+            try:
+                handle = path.open("xb")
+            except FileExistsError:
+                raise SystemExit(f"REFUSE: output already exists: {path}")
+            created.append(path)
+            with handle:
+                handle.write(data)
+    except BaseException:
+        # Preserve the no-half-packet contract if a destination becomes occupied
+        # after preflight or a later output write fails.
+        for path in reversed(created):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+        raise
     print("PASS: generated starter solid primitives v1")
 
 

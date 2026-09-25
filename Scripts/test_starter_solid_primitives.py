@@ -9,6 +9,7 @@ import json
 import struct
 import tempfile
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
@@ -149,6 +150,29 @@ def test_generator_rejects_aliased_outputs_before_writing():
         output=root/"packet.json"
         expect_fail(lambda: GEN.write_or_check(src,output,output,False),"alias")
         assert not output.exists()
+    finally: td.cleanup()
+
+def test_generator_exclusive_create_rejects_post_preflight_race():
+    td=tempfile.TemporaryDirectory()
+    try:
+        root=Path(td.name)
+        src=root/"source-contract.json"; src.write_bytes(SOURCE.read_bytes())
+        gltf=root/"starter_solid_primitives_v1.gltf"
+        manifest=root/"manifest.json"
+        real_exists=Path.exists
+        injected={"done":False}
+
+        def raced_exists(path):
+            if path == manifest and not injected["done"]:
+                injected["done"]=True
+                manifest.write_bytes(b"other-worker\n")
+                return False
+            return real_exists(path)
+
+        with mock.patch.object(Path,"exists",raced_exists):
+            expect_fail(lambda: GEN.write_or_check(src,gltf,manifest,False),"REFUSE")
+        assert not gltf.exists()
+        assert manifest.read_bytes()==b"other-worker\n"
     finally: td.cleanup()
 
 def test_source_schema_bool_rejected_both():
