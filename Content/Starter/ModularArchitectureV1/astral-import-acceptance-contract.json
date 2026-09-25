@@ -1,0 +1,406 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-modular-architecture-import-acceptance-v1",
+  "task_id": "ART-010",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "proposed_engine_handoff_not_imported",
+  "purpose": "machine-readable art-owned acceptance contract for importing and reviewing the pinned ART-010 modular architecture fixture in Astral without claiming importer or runtime support",
+  "validated_parent_head": "a86e3e2e64ef647ba6e022a81486c5ab95459770",
+  "ownership": {
+    "art_worker": "defines source geometry, appearance intent, fixture pins and acceptance observations",
+    "engine_worker": "owns importer, renderer, editor integration, collision/navigation facilities and native acceptance",
+    "implementation_changes_in_this_contract": false
+  },
+  "source_pins": {
+    "source_contract": {
+      "path": "Content/Starter/ModularArchitectureV1/source-contract.json",
+      "git_blob_sha1": "81fc2d4589d8e8552990268a6b557972797c8cc4"
+    },
+    "expected_manifest": {
+      "path": "Content/Starter/ModularArchitectureV1/expected-manifest.json",
+      "git_blob_sha1": "fded85d5658d991bd4a83015fb4d35d0e2c5a098"
+    },
+    "tutorial_room_source": {
+      "path": "Content/Starter/ModularArchitectureV1/tutorial-room-source.json",
+      "git_blob_sha1": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a"
+    },
+    "tutorial_room_assembly_ledger": {
+      "path": "Content/Starter/ModularArchitectureV1/tutorial-room-assembly-ledger.json",
+      "git_blob_sha1": "3ebdadc121755eca900aeb326a9cea713037eecb"
+    },
+    "tutorial_room_joint_contract": {
+      "path": "Content/Starter/ModularArchitectureV1/tutorial-room-joint-contract.json",
+      "git_blob_sha1": "e62b5d86a4edbff8663a1df145c36f8596ca26d2"
+    },
+    "tutorial_room_construction_sequence": {
+      "path": "Content/Starter/ModularArchitectureV1/tutorial-room-construction-sequence.json",
+      "git_blob_sha1": "e2af700ec63e7e2eed46a042cededd4076cfd457"
+    }
+  },
+  "external_spec_basis": {
+    "observed_2026_09_25": [
+      {
+        "source": "Khronos glTF 2.0 Specification",
+        "url": "https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html",
+        "requirements_used": [
+          "right-handed coordinate system",
+          "+Y up, +Z forward, -X right",
+          "linear units in metres",
+          "POSITION accessors define min and max",
+          "NORMAL and TANGENT.xyz are normalized",
+          "TANGENT.w is +1 or -1",
+          "bitangent = cross(normal, tangent.xyz) * tangent.w"
+        ]
+      },
+      {
+        "source": "Blender 5.2 LTS glTF 2.0 manual",
+        "url": "https://docs.blender.org/manual/en/5.2/addons/scene_gltf2.html",
+        "requirements_used": [
+          "future DCC round-trip reference uses glTF +Y-up conversion",
+          "UVs, vertex normals and vertex tangents are exportable mesh data"
+        ]
+      }
+    ]
+  },
+  "pinned_fixture": {
+    "gltf_file": "starter_modular_architecture_v1.gltf",
+    "gltf_sha256": "7916d56be9e14201dffa59380efbe280b00b3c5c52c4a4c1b40ab8be4294f9b5",
+    "gltf_bytes": 24685,
+    "module_count": 6,
+    "material_count": 1,
+    "vertex_count_total": 176,
+    "index_count_total": 264,
+    "primitive_mode": 4,
+    "buffer_policy": "one embedded application/octet-stream base64 data URI; no network or executable payload",
+    "extensions_required": [],
+    "extensions_used": []
+  },
+  "coordinate_and_transform_acceptance": {
+    "source_convention": {
+      "handedness": "right",
+      "up": "+Y",
+      "forward": "+Z",
+      "right": "-X",
+      "linear_unit": "metre"
+    },
+    "import_observation_requirement": "document any Astral-native axis, handedness or unit conversion explicitly rather than silently assuming Unreal or Unity conventions",
+    "source_pivot_policy": "local minimum corner on base plane",
+    "snap": {
+      "translation_increment_m": 0.25,
+      "rotation_increment_deg": 90
+    },
+    "proposed_numeric_tolerances": {
+      "world_position_abs_m": 0.0001,
+      "bounds_abs_m": 0.0001,
+      "unit_vector_abs": 0.0001,
+      "orthogonality_abs": 0.0001
+    }
+  },
+  "mesh_acceptance": {
+    "required_attributes": [
+      "POSITION",
+      "NORMAL",
+      "TANGENT",
+      "TEXCOORD_0"
+    ],
+    "indices": {
+      "component_type": 5125,
+      "description": "UNSIGNED_INT",
+      "must_be_in_range": true
+    },
+    "attribute_contract": {
+      "POSITION": {
+        "accessor_type": "VEC3",
+        "component_type": 5126,
+        "finite": true,
+        "requires_min_max": true
+      },
+      "NORMAL": {
+        "accessor_type": "VEC3",
+        "component_type": 5126,
+        "finite": true,
+        "unit_length": true
+      },
+      "TANGENT": {
+        "accessor_type": "VEC4",
+        "component_type": 5126,
+        "finite": true,
+        "xyz_unit_length": true,
+        "w_allowed": [
+          -1,
+          1
+        ]
+      },
+      "TEXCOORD_0": {
+        "accessor_type": "VEC2",
+        "component_type": 5126,
+        "finite": true,
+        "source_policy": "planar face UVs at one repeat per metre"
+      }
+    },
+    "triangle_checks": [
+      "indexed triangle list",
+      "no out-of-range indices",
+      "no zero-area triangles",
+      "outward winding against authored normals",
+      "normal and tangent are orthogonal within proposed tolerance",
+      "bitangent handedness agrees with tangent.w"
+    ],
+    "module_expectations": [
+      {
+        "id": "floor-1x1",
+        "mesh_name": "Starter_Floor_1x1m",
+        "vertices": 24,
+        "indices": 36,
+        "bounds_m": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0.25,
+            1
+          ]
+        ]
+      },
+      {
+        "id": "floor-2x2",
+        "mesh_name": "Starter_Floor_2x2m",
+        "vertices": 24,
+        "indices": 36,
+        "bounds_m": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            0.25,
+            2
+          ]
+        ]
+      },
+      {
+        "id": "wall-1x3",
+        "mesh_name": "Starter_Wall_1x3m",
+        "vertices": 24,
+        "indices": 36,
+        "bounds_m": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            3,
+            0.25
+          ]
+        ]
+      },
+      {
+        "id": "wall-2x3",
+        "mesh_name": "Starter_Wall_2x3m",
+        "vertices": 24,
+        "indices": 36,
+        "bounds_m": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            3,
+            0.25
+          ]
+        ]
+      },
+      {
+        "id": "doorway-2x3",
+        "mesh_name": "Starter_Doorway_2x3m",
+        "vertices": 56,
+        "indices": 84,
+        "bounds_m": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            3,
+            0.25
+          ]
+        ],
+        "opening_bounds_m": [
+          [
+            0.5,
+            0,
+            0
+          ],
+          [
+            1.5,
+            2,
+            0.25
+          ]
+        ]
+      },
+      {
+        "id": "pillar-025x3",
+        "mesh_name": "Starter_Pillar_025x3m",
+        "vertices": 24,
+        "indices": 36,
+        "bounds_m": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0.25,
+            3,
+            0.25
+          ]
+        ]
+      }
+    ]
+  },
+  "material_acceptance": {
+    "material_count": 1,
+    "name": "StarterNeutralArchitecture",
+    "base_color_linear_factor": [
+      0.56,
+      0.58,
+      0.62,
+      1
+    ],
+    "metallic_factor": 0,
+    "roughness_factor": 0.72,
+    "alpha_mode": "OPAQUE",
+    "double_sided": false,
+    "texture_dependency_count": 0,
+    "review_note": "this neutral material is an import/calibration material, not a professional final architectural surface"
+  },
+  "tutorial_scene_acceptance_after_engine_support": {
+    "placement_count": 13,
+    "room_outer_bounds_m": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        4
+      ]
+    ],
+    "doorway_clearance_world_bounds_m": [
+      [
+        1.5,
+        0,
+        0
+      ],
+      [
+        2.5,
+        2,
+        0.25
+      ]
+    ],
+    "declared_relationship_counts": {
+      "floor_flush_seams": 4,
+      "wall_flush_seams": 5,
+      "intentional_corner_overlaps": 4,
+      "floor_wall_base_embeddings": 10,
+      "total": 23
+    },
+    "construction_stage_count": 6,
+    "acceptance_method": [
+      "assemble placements from tutorial-room-source.json without scale overrides",
+      "compare imported world AABBs against tutorial-room-assembly-ledger.json using proposed bounds tolerance",
+      "verify the 23 declared relationships from tutorial-room-joint-contract.json",
+      "preserve the centered 1 m wide by 2 m high doorway clearance",
+      "treat player-start and tutorial-camera as review markers until engine-owned runtime marker support is separately accepted"
+    ]
+  },
+  "fail_closed_fixture_cases": [
+    "JSON or base64 decode failure",
+    "embedded buffer byteLength mismatch",
+    "bufferView or accessor range outside the embedded buffer",
+    "non-finite numeric payload",
+    "boolean used where an integer index or accessor binding is required",
+    "unsupported primitive mode for this fixture",
+    "missing POSITION/NORMAL/TANGENT/TEXCOORD_0 binding",
+    "out-of-range triangle index",
+    "zero-area triangle",
+    "invalid normal or tangent length",
+    "tangent.w outside -1 or +1",
+    "unexpected extension requirement",
+    "fixture hash or expected byte count mismatch when running exact ART-010 acceptance"
+  ],
+  "promotion_gates": {
+    "source_validated": {
+      "required": [
+        "deterministic generator reproduces pinned glTF bytes",
+        "independent source verifier passes",
+        "focused negative regressions pass"
+      ],
+      "current_claim": "prepared locally but repository-head executable tooling remains pending publication"
+    },
+    "imported": {
+      "required": [
+        "Astral importer consumes the exact pinned fixture",
+        "import receipt records source hash, build, platform, command and conversion decisions",
+        "module count, names, local bounds, pivots, material and attributes match this contract"
+      ],
+      "current_claim": false
+    },
+    "runtime_verified": {
+      "required": [
+        "native Astral render of representative modules and assembled tutorial room",
+        "axis, winding, UV orientation, normal/tangent response and material response inspected",
+        "native load/save/reopen path succeeds where supported",
+        "performance and memory observations recorded separately"
+      ],
+      "current_claim": false
+    },
+    "art_approved": {
+      "required": [
+        "independent visual-art review of representative runtime captures",
+        "readability, seams, scale, material response and tutorial usefulness accepted"
+      ],
+      "current_claim": false
+    }
+  },
+  "required_engine_receipt_fields": [
+    "repository_commit",
+    "platform_and_build_configuration",
+    "importer_or_editor_entry_point",
+    "exact_command_or_reproduction_steps",
+    "fixture_sha256",
+    "observed_axis_unit_conversion",
+    "module_count_and_names",
+    "local_bounds_and_pivots",
+    "material_mapping",
+    "warnings_or_rejections",
+    "runtime_capture_or_artifact_reference_when_available"
+  ],
+  "evidence_boundary": {
+    "runtime_verified": false,
+    "art_approved": false,
+    "not_claimed": [
+      "existing Astral glTF support",
+      "editor snapping implementation",
+      "collision or navigation",
+      "physics contact resolution",
+      "Blender round-trip",
+      "Khronos validator execution",
+      "native performance",
+      "UE5, Unity, Genshin Impact or Zenless Zone Zero parity"
+    ]
+  }
+}
