@@ -30,3 +30,18 @@ Source packet may be considered source-validated when fresh generation, exact re
 ## Not claimed
 
 No Blender round-trip, Khronos validator run, Astral import/render, editor primitive registration, collision/physics, LODs, navigation, native GPU measurements, or visual-art approval.
+
+## Allowed paths
+
+This bounded ART-010 packet owns only the following repository paths on its dedicated branch:
+
+- `Content/Starter/ModularArchitectureV1/**`
+- `Docs/QA/ART-010-*`
+- `Docs/Agents/art-hourly/BACKLOG.json`
+- `Docs/Agents/art-hourly/runs/*art010*`
+- `Tasks/ART-010-STARTER-MODULAR-ARCHITECTURE-v1.md`
+- `Scripts/generate_starter_modular_architecture.py`
+- `Scripts/verify_starter_modular_architecture.py`
+- `Scripts/test_starter_modular_architecture.py`
+
+Renderer, editor, gameplay, build/CI, engine runtime, dependency, and other workers' paths are explicitly out of scope.
