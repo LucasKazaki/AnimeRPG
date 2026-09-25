@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-ui-icons-v1",
+  "task_id": "ART-011",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "source_validated_not_imported",
+  "purpose": "generic_original_2d_ui_icon_source_pack_for_starter_content_and_prototypes",
+  "provenance": {
+    "origin": "original_vector_source",
+    "external_assets": [],
+    "authoring_method": "hand-authored deterministic SVG primitives and paths",
+    "seed": null,
+    "distribution": "repository_project_policy"
+  },
+  "reference_scope": {
+    "observed_2026_09_25": [
+      {
+        "source": "W3C SVG 2",
+        "url": "https://www.w3.org/TR/SVG/",
+        "lesson": "SVG is XML-based scalable vector source suitable for inspectable resolution-independent authoring."
+      },
+      {
+        "source": "Unreal Engine 5.8 UImage",
+        "url": "https://dev.epicgames.com/documentation/unreal-engine/API/Runtime/UMG/UImage",
+        "lesson": "leading-engine UI workflows use reusable image assets through a UI image widget / brush abstraction; implementation is not copied."
+      },
+      {
+        "source": "Unity 6 UI Toolkit graphic and font asset preparation",
+        "url": "https://docs.unity3d.com/6000.0/Documentation/Manual/best-practice-guides/ui-toolkit-for-advanced-unity-developers/graphic-and-font-assets-preparation.html",
+        "lesson": "Unity currently recommends raster images for production UI Toolkit while vector support is a separate path; Astral should therefore treat SVG as source until its own runtime image contract is proven."
+      }
+    ],
+    "copying_prohibited": true,
+    "parity_claim": false
+  },
+  "source_format": {
+    "format": "SVG",
+    "source_only": true,
+    "sheet_view_box": [0, 0, 96, 72],
+    "icon_view_box": [0, 0, 24, 24],
+    "grid_layout": {
+      "columns": 4,
+      "rows": 3,
+      "cell_units": [24, 24]
+    },
+    "color_policy": ["currentColor", "none"],
+    "default_preview_color": "#000000 contact-sheet wrapper only; symbols themselves have no fixed theme color",
+    "scripts_allowed": false,
+    "external_references_allowed": false,
+    "embedded_raster_allowed": false,
+    "fonts_allowed": false,
+    "animation_allowed": false
+  },
+  "style": {
+    "primary_stroke_units": 2.0,
+    "stroke_linecap": "round",
+    "stroke_linejoin": "round where corners need it",
+    "filled_marks_allowed_for_solid_transport_primitives": true,
+    "target_icon_grid_units": [24, 24],
+    "safe_margin_guidance_units": 2.0,
+    "theme_color_baked_into_symbol": false,
+    "accessibility_note": "shape semantics must not rely on color alone; runtime labels, focus states, touch targets and contrast remain UI-system responsibilities"
+  },
+  "icons": [
+    {"id": "icon-play", "semantic": "play / start"},
+    {"id": "icon-pause", "semantic": "pause"},
+    {"id": "icon-stop", "semantic": "stop"},
+    {"id": "icon-check", "semantic": "confirm / complete"},
+    {"id": "icon-close", "semantic": "close / cancel"},
+    {"id": "icon-warning", "semantic": "warning / caution"},
+    {"id": "icon-info", "semantic": "information"},
+    {"id": "icon-settings", "semantic": "settings / configuration"},
+    {"id": "icon-eye", "semantic": "visibility / preview"},
+    {"id": "icon-lock", "semantic": "locked / protected"},
+    {"id": "icon-search", "semantic": "search / inspect"},
+    {"id": "icon-menu", "semantic": "menu / navigation"}
+  ],
+  "derivation_policy": {
+    "runtime_svg_support": "not_claimed",
+    "preferred_next_step": "derive raster PNG or engine-native image assets only after Astral's actual UI texture/import contract is measured",
+    "atlas_policy": "not_authored_yet",
+    "dpi_policy": "not_authored_yet",
+    "sdf_policy": "not_authored_yet"
+  },
+  "promotion_gates": {
+    "source_validated": {
+      "current_claim": true,
+      "required": [
+        "XML parses",
+        "12 expected unique symbols",
+        "24x24 symbol viewBoxes",
+        "local-only use references",
+        "no prohibited active/external content",
+        "manifest hash pin"
+      ]
+    },
+    "imported": {
+      "current_claim": false,
+      "required": [
+        "Astral-supported image representation selected",
+        "exact source-to-runtime derivation recorded",
+        "runtime asset dimensions and alpha/color handling verified"
+      ]
+    },
+    "runtime_verified": {
+      "current_claim": false,
+      "required": [
+        "native Astral UI renders representative icons at multiple sizes",
+        "scaling, alpha, filtering, color/tint and focus-state behavior inspected"
+      ]
+    },
+    "art_approved": {
+      "current_claim": false,
+      "required": [
+        "independent visual review for clarity, consistency, optical balance and small-size readability"
+      ]
+    }
+  }
+}
