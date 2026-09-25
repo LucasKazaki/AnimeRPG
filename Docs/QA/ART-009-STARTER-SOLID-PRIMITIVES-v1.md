@@ -50,6 +50,12 @@ The source contract previously named the neutral material field `base_color_srgb
 
 Both generator and independent verifier require the new field name. A focused negative regression restores the obsolete `base_color_srgb` spelling and requires both validators to reject the contract. The focused suite inventory is now 34 cases.
 
+## Output preflight repair
+
+The generator previously checked and wrote its two destinations sequentially. With a fresh glTF destination and an already occupied manifest destination, it could write the glTF and only then refuse the manifest, leaving a half-generated packet. The repaired generator resolves and compares both destinations first, rejects aliases, refuses if either destination already exists, creates parent directories only after those checks, and then writes both files.
+
+Two focused regressions cover the occupied-second-output case and aliased output paths. The focused suite inventory is now 36 cases. This repair changes generator safety behavior only; source identity, geometry, material values, generated glTF bytes, and runtime state are unchanged.
+
 ## Verification evidence
 
 Historical exact-head clean-Windows verification at `d36c50e559d7aca9c9aee07136bd1630027edb43` recorded generator pass, generator `--check` pass, independent verifier pass for all four meshes, focused suite `PASS: 33/33`, Python compilation pass, `git diff --check` pass, and successful hosted Windows run `36053365291`. That result predates the linear base-color contract repair and is not reused as 34-case acceptance.
@@ -58,7 +64,7 @@ For linear-factor repair head `d6cd5703985ef93249376cd9c07eaa76315d3556`, GitHub
 
 ## Current gate state
 
-The packet remains `source_validated_not_imported`. The exact post-documentation branch head still needs fresh generator output, generator `--check`, independent verifier, focused 34/34 regression suite, Python compile, applicable hosted repository checks, and a fresh independent review with no unresolved blocking finding.
+The packet remains `source_validated_not_imported`. The exact output-preflight repair head still needs fresh generator output, generator `--check`, independent verifier, focused 36/36 regression suite, Python compile, applicable hosted repository checks, and a fresh independent review with no unresolved blocking finding.
 
 The older tangent review thread is stale relative to repaired source and regression coverage but still needs an explicit repair reply and resolution. A new independent review should target the final exact head after this QA refresh.
 

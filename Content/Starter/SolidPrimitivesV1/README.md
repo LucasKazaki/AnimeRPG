@@ -56,4 +56,6 @@ python Scripts/verify_starter_solid_primitives.py \
 python Scripts/test_starter_solid_primitives.py
 ```
 
+Non-check generation preflights both resolved output destinations. Aliased paths are rejected, and if either destination already exists the generator refuses before writing either output. This prevents a half-generated packet when a later destination is occupied.
+
 The generated glTF is intentionally not checked into the repository; its exact bytes are pinned by `expected-manifest.json`. These commands establish only the source contract. They do not establish Blender round-trip behavior, Khronos validator acceptance, Astral import/rendering, collision, editor registration, tutorial installation, runtime performance, or visual-art approval.

@@ -127,6 +127,30 @@ def test_generator_refuses_overwrite():
     try: expect_fail(lambda: GEN.write_or_check(src,gltf,manifest,False),"REFUSE")
     finally: td.cleanup()
 
+def test_generator_preflights_second_output_before_writing():
+    td=tempfile.TemporaryDirectory()
+    try:
+        root=Path(td.name)
+        src=root/"source-contract.json"; src.write_bytes(SOURCE.read_bytes())
+        gltf=root/"starter_solid_primitives_v1.gltf"
+        manifest=root/"manifest.json"
+        manifest.write_bytes(b"occupied\n")
+        before=manifest.read_bytes()
+        expect_fail(lambda: GEN.write_or_check(src,gltf,manifest,False),"REFUSE")
+        assert not gltf.exists()
+        assert manifest.read_bytes()==before
+    finally: td.cleanup()
+
+def test_generator_rejects_aliased_outputs_before_writing():
+    td=tempfile.TemporaryDirectory()
+    try:
+        root=Path(td.name)
+        src=root/"source-contract.json"; src.write_bytes(SOURCE.read_bytes())
+        output=root/"packet.json"
+        expect_fail(lambda: GEN.write_or_check(src,output,output,False),"alias")
+        assert not output.exists()
+    finally: td.cleanup()
+
 def test_source_schema_bool_rejected_both():
     td,src,gltf,manifest=workspace()
     try:

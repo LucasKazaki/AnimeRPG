@@ -448,10 +448,17 @@ def write_or_check(source_path: Path, gltf_path: Path, manifest_path: Path, chec
                 raise SystemExit(f"FAIL: stale or missing generated file: {path}")
         print("PASS: deterministic starter solid primitives match pinned files")
         return
-    for path, data in expected:
-        if path.exists():
-            raise SystemExit(f"REFUSE: output already exists: {path}")
+    resolved = [path.resolve(strict=False) for path, _ in expected]
+    if resolved[0] == resolved[1]:
+        raise SystemExit(f"REFUSE: output paths alias the same destination: {gltf_path}")
+
+    occupied = [path for path, _ in expected if path.exists()]
+    if occupied:
+        raise SystemExit(f"REFUSE: output already exists: {occupied[0]}")
+
+    for path, _ in expected:
         path.parent.mkdir(parents=True, exist_ok=True)
+    for path, data in expected:
         path.write_bytes(data)
     print("PASS: generated starter solid primitives v1")
 

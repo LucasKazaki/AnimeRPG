@@ -42,6 +42,7 @@ This packet adopts only cube, sphere, cylinder and plane as a bounded first slic
 - exact vertex/index budgets pinned by source and manifest
 - manifest source identity is SHA-256 of canonical parsed JSON bytes, so LF and CRLF checkouts share one deterministic pin
 - checked-in expected-manifest comparison normalizes only CRLF/CR to LF; every other byte remains part of the deterministic pin
+- non-check generation preflights both resolved output destinations, rejects aliased paths, and refuses any occupied destination before writing either output
 - finite positions, unit normals/tangents, tangent-normal orthogonality, normalized UV range
 - each shape's declared UV mapping policy is checked against its exact seams/corners/parameterization, not only `[0,1]` bounds
 - every supplied triangle-vertex tangent must individually agree with the independently derived triangle `dP/du` direction; the triangle-average tangent/reconstructed-bitangent check remains a supplemental handedness/consistency gate (`TANGENT.w`)
