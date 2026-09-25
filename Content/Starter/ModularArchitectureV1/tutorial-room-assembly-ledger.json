@@ -1,0 +1,411 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-modular-architecture-tutorial-room-assembly-ledger-v1",
+  "task_id": "ART-010",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "source_validated_not_imported",
+  "source_pins": {
+    "module_contract_path": "Content/Starter/ModularArchitectureV1/source-contract.json",
+    "module_contract_git_blob_sha1": "81fc2d4589d8e8552990268a6b557972797c8cc4",
+    "tutorial_room_path": "Content/Starter/ModularArchitectureV1/tutorial-room-source.json",
+    "tutorial_room_git_blob_sha1": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a"
+  },
+  "coordinate_system": {
+    "handedness": "right",
+    "up": "+Y",
+    "forward": "+Z",
+    "right": "-X",
+    "linear_unit": "metre"
+  },
+  "snap": {
+    "translation_increment_m": 0.25,
+    "rotation_increment_deg": 90
+  },
+  "verification_scope": "derived_world_bounds_and_intentional_corner_overlap_contract",
+  "semantic_assertions_passed": 40,
+  "placements": [
+    {
+      "id": "floor-sw",
+      "module_id": "floor-2x2",
+      "translation_m": [
+        0,
+        0,
+        0
+      ],
+      "rotation_y_deg": 0,
+      "world_bounds_m": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          2,
+          0.25,
+          2
+        ]
+      ]
+    },
+    {
+      "id": "floor-se",
+      "module_id": "floor-2x2",
+      "translation_m": [
+        2,
+        0,
+        0
+      ],
+      "rotation_y_deg": 0,
+      "world_bounds_m": [
+        [
+          2,
+          0,
+          0
+        ],
+        [
+          4,
+          0.25,
+          2
+        ]
+      ]
+    },
+    {
+      "id": "floor-nw",
+      "module_id": "floor-2x2",
+      "translation_m": [
+        0,
+        0,
+        2
+      ],
+      "rotation_y_deg": 0,
+      "world_bounds_m": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          2,
+          0.25,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "floor-ne",
+      "module_id": "floor-2x2",
+      "translation_m": [
+        2,
+        0,
+        2
+      ],
+      "rotation_y_deg": 0,
+      "world_bounds_m": [
+        [
+          2,
+          0,
+          2
+        ],
+        [
+          4,
+          0.25,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "front-left",
+      "module_id": "wall-1x3",
+      "translation_m": [
+        0,
+        0,
+        0
+      ],
+      "rotation_y_deg": 0,
+      "world_bounds_m": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          3,
+          0.25
+        ]
+      ]
+    },
+    {
+      "id": "front-door",
+      "module_id": "doorway-2x3",
+      "translation_m": [
+        1,
+        0,
+        0
+      ],
+      "rotation_y_deg": 0,
+      "world_bounds_m": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          3,
+          3,
+          0.25
+        ]
+      ]
+    },
+    {
+      "id": "front-right",
+      "module_id": "wall-1x3",
+      "translation_m": [
+        3,
+        0,
+        0
+      ],
+      "rotation_y_deg": 0,
+      "world_bounds_m": [
+        [
+          3,
+          0,
+          0
+        ],
+        [
+          4,
+          3,
+          0.25
+        ]
+      ]
+    },
+    {
+      "id": "back-west",
+      "module_id": "wall-2x3",
+      "translation_m": [
+        0,
+        0,
+        3.75
+      ],
+      "rotation_y_deg": 0,
+      "world_bounds_m": [
+        [
+          0,
+          0,
+          3.75
+        ],
+        [
+          2,
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "back-east",
+      "module_id": "wall-2x3",
+      "translation_m": [
+        2,
+        0,
+        3.75
+      ],
+      "rotation_y_deg": 0,
+      "world_bounds_m": [
+        [
+          2,
+          0,
+          3.75
+        ],
+        [
+          4,
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "left-south",
+      "module_id": "wall-2x3",
+      "translation_m": [
+        0.25,
+        0,
+        0
+      ],
+      "rotation_y_deg": -90,
+      "world_bounds_m": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0.25,
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "id": "left-north",
+      "module_id": "wall-2x3",
+      "translation_m": [
+        0.25,
+        0,
+        2
+      ],
+      "rotation_y_deg": -90,
+      "world_bounds_m": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          0.25,
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "id": "right-south",
+      "module_id": "wall-2x3",
+      "translation_m": [
+        4,
+        0,
+        0
+      ],
+      "rotation_y_deg": -90,
+      "world_bounds_m": [
+        [
+          3.75,
+          0,
+          0
+        ],
+        [
+          4,
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "id": "right-north",
+      "module_id": "wall-2x3",
+      "translation_m": [
+        4,
+        0,
+        2
+      ],
+      "rotation_y_deg": -90,
+      "world_bounds_m": [
+        [
+          3.75,
+          0,
+          2
+        ],
+        [
+          4,
+          3,
+          4
+        ]
+      ]
+    }
+  ],
+  "intentional_corner_overlaps": [
+    {
+      "a": "front-left",
+      "b": "left-south",
+      "overlap_bounds_m": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0.25,
+          3,
+          0.25
+        ]
+      ]
+    },
+    {
+      "a": "front-right",
+      "b": "right-south",
+      "overlap_bounds_m": [
+        [
+          3.75,
+          0,
+          0
+        ],
+        [
+          4,
+          3,
+          0.25
+        ]
+      ]
+    },
+    {
+      "a": "back-west",
+      "b": "left-north",
+      "overlap_bounds_m": [
+        [
+          0,
+          0,
+          3.75
+        ],
+        [
+          0.25,
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "a": "back-east",
+      "b": "right-north",
+      "overlap_bounds_m": [
+        [
+          3.75,
+          0,
+          3.75
+        ],
+        [
+          4,
+          3,
+          4
+        ]
+      ]
+    }
+  ],
+  "room_outer_bounds_m": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      4,
+      3,
+      4
+    ]
+  ],
+  "door_opening_world_bounds_m": [
+    [
+      1.5,
+      0,
+      0
+    ],
+    [
+      2.5,
+      2,
+      0.25
+    ]
+  ],
+  "notes": [
+    "World AABBs are derived from module-local bounds plus source translation and multiples-of-90-degree +Y rotation.",
+    "The four 0.25 m x 3 m x 0.25 m corner overlaps are intentional per the source overlap policy.",
+    "Floor-wall base embedding/contact is allowed by the source policy but is not treated as a collision or physics acceptance result."
+  ],
+  "runtime_verified": false,
+  "art_approved": false
+}
