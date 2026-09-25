@@ -196,6 +196,7 @@ public:
 
     CombatSandbox();
 
+    // Rejects invalid deltas or elapsed times outside the safe microsecond domain.
     void AdvanceTime(float deltaSeconds);
     AttackReport TryAttack(AttackType type, const Math::Vec3& attackerPosition);
     int ApplyDamage(int damage);
@@ -242,7 +243,10 @@ public:
     bool ClearBossPracticePhase();
     ComboFinisherReport TryComboFinisher(const Math::Vec3& attackerPosition);
     ManaReactionReport ApplyManaAffinity(ManaAffinity affinity);
-    void SetCombatAssistPreset(CombatAssistPreset preset) { assistPreset_ = preset; }
+    void SetCombatAssistPreset(CombatAssistPreset preset) {
+        if (preset == CombatAssistPreset::Standard || preset == CombatAssistPreset::Accessible)
+            assistPreset_ = preset;
+    }
 
     const TrainingDummy& Dummy() const { return dummy_; }
     const AttackReport& LastAttack() const { return lastAttack_; }

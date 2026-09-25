@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-09-25",
+  "repository_baseline": "2958741188279a0b438dd489ad00cac546012c25",
+  "status": "source_research_not_runtime_acceptance",
+  "sources": [
+    {
+      "id": "N1",
+      "title": "C++ floating-integral conversions",
+      "url": "https://eel.is/c++draft/conv.fpint",
+      "access": "retrieved",
+      "supported_claim": "Unrepresentable floating-to-integer conversion; live working draft, not pinned C++17 publication."
+    },
+    {
+      "id": "N2",
+      "title": "Microsoft cmath",
+      "url": "https://learn.microsoft.com/en-us/cpp/standard-library/cmath?view=msvc-170",
+      "access": "retrieved",
+      "supported_claim": "Three-argument hypot overload; source documentation, not local MSVC execution."
+    },
+    {
+      "id": "N3",
+      "title": "Linux hypot manual",
+      "url": "https://man7.org/linux/man-pages/man3/hypot.3.html",
+      "access": "retrieved",
+      "supported_claim": "Avoidable intermediate overflow/underflow; C hypot manual does not itself establish a C++ three-argument overload."
+    },
+    {
+      "id": "A1",
+      "title": "Khronos glTF specification",
+      "url": "https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html",
+      "access": "retrieved",
+      "supported_claim": "Coordinate units, hierarchy and color transfer rules; retrieved header 2.0.1 commit 8e798b02d254cea97659a333cfcb20875b62bdd4."
+    },
+    {
+      "id": "A2",
+      "title": "cgltf README",
+      "url": "https://github.com/jkuhlmann/cgltf",
+      "access": "retrieved",
+      "supported_claim": "Parsing is separate from external buffer/image loading; not a complete Astral importer."
+    },
+    {
+      "id": "A3",
+      "title": "bgfx overview",
+      "url": "https://bkaradzic.github.io/bgfx/overview.html",
+      "access": "retrieved",
+      "supported_claim": "BSD-2-Clause rendering library; native-window/thread integration; not engine parity."
+    },
+    {
+      "id": "V1",
+      "title": "Qwen3-TTS README",
+      "url": "https://github.com/QwenLM/Qwen3-TTS",
+      "access": "retrieved",
+      "supported_claim": "Distinct model interfaces and design-then-clone workflow; no performance/quality audition."
+    },
+    {
+      "id": "C1",
+      "title": "GitHub workflow events",
+      "url": "https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows",
+      "access": "retrieved",
+      "supported_claim": "pull_request merge SHA differs from head SHA; neither implies native GUI acceptance."
+    }
+  ],
+  "limitations": [
+    "Library/model documentation is not an integration or quality benchmark.",
+    "No installation, paid API call, account billing audit, native GPU run or voice audition performed.",
+    "Earlier Blender/Unreal exact release pins were not independently cleared in this pass; access failure is not proof a pin is false.",
+    "Model/reference/asset/dependency rights still need exact-version review."
+  ],
+  "deferred_checks": [
+    {
+      "topic": "Blender LTS version pin",
+      "url": "https://www.blender.org/download/lts/",
+      "result": "retrieval_failed_not_cleared"
+    },
+    {
+      "topic": "Complete engine catalogue and local evidence",
+      "result": "incomplete_not_a_completion_percentage"
+    }
+  ]
+}

@@ -32,7 +32,12 @@ std::int64_t CombatSandbox::CurrentMicros() const {
 void CombatSandbox::AdvanceTime(float deltaSeconds) {
     if (deltaSeconds <= 0.0f || !std::isfinite(deltaSeconds)) return;
 
-    elapsedSecondsPrecise_ += static_cast<double>(deltaSeconds);
+    // Keep headroom for deadline additions and subtraction from negative sentinels.
+    constexpr double maximumSeconds = static_cast<double>(
+        std::numeric_limits<std::int64_t>::max() / 4) / MicrosPerSecond;
+    const double nextSeconds = elapsedSecondsPrecise_ + static_cast<double>(deltaSeconds);
+    if (!std::isfinite(nextSeconds) || nextSeconds > maximumSeconds) return;
+    elapsedSecondsPrecise_ = nextSeconds;
     const std::int64_t now = CurrentMicros();
 
     if (comboCount_ > 0
@@ -61,18 +66,19 @@ void CombatSandbox::AdvanceTime(float deltaSeconds) {
     if (dummy_.posture > 0) {
         const std::int64_t recoveryMicros = std::max<std::int64_t>(0,
             now - lastPostureHitMicros_ - SecondsToMicros(PostureRecoveryDelaySeconds));
-        const std::int64_t recovered = static_cast<std::int64_t>(std::floor(
-            static_cast<double>(PostureRecoveryPerSecond)
-                * static_cast<double>(recoveryMicros)
-                / static_cast<double>(MicrosPerSecond)));
-        dummy_.posture = std::max(0,
-            postureAtRecoveryStart_ - static_cast<int>(recovered));
+        const double recovered = std::floor(static_cast<double>(PostureRecoveryPerSecond)
+            * static_cast<double>(recoveryMicros) / static_cast<double>(MicrosPerSecond));
+        // Bound before narrowing: a long valid pause must not wrap posture above max.
+        const int appliedRecovery = static_cast<int>(std::min(
+            static_cast<double>(postureAtRecoveryStart_), recovered));
+        dummy_.posture = postureAtRecoveryStart_ - appliedRecovery;
         if (dummy_.posture == 0) postureAtRecoveryStart_ = 0;
     }
 }
 
 AttackReport CombatSandbox::TryAttack(AttackType type, const Math::Vec3& attackerPosition) {
     lastAttack_ = {type, AttackResult::OutOfRange, 0, comboCount_, false, false, false, false};
+    if (type != AttackType::Light && type != AttackType::Heavy) return lastAttack_;
     if (dummy_.IsDefeated()) {
         lastAttack_.result = AttackResult::TargetDefeated;
         return lastAttack_;
@@ -185,6 +191,9 @@ void CombatSandbox::ResetTrainingSession() {
 }
 
 bool CombatSandbox::SetTrainingEnemyProfile(TrainingEnemyProfile profile) {
+    if (profile != TrainingEnemyProfile::Standard && profile != TrainingEnemyProfile::Vanguard
+        && profile != TrainingEnemyProfile::Bulwark && profile != TrainingEnemyProfile::Boss)
+        return false;
     if (profile == enemyProfile_) return false;
     enemyProfile_ = profile;
     if (profile != TrainingEnemyProfile::Boss) {
@@ -196,6 +205,7 @@ bool CombatSandbox::SetTrainingEnemyProfile(TrainingEnemyProfile profile) {
 }
 
 bool CombatSandbox::SetTrainingTargetMode(TrainingTargetMode mode) {
+    if (mode != TrainingTargetMode::Standard && mode != TrainingTargetMode::Endless) return false;
     if (mode == targetMode_) return false;
     targetMode_ = mode;
     ResetTrainingSession();
@@ -302,7 +312,8 @@ ComboFinisherReport CombatSandbox::TryComboFinisher(const Math::Vec3& attackerPo
 ManaReactionReport CombatSandbox::ApplyManaAffinity(ManaAffinity affinity) {
     ManaReactionReport report{
         affinity, targetAffinity_, targetAffinity_, ManaReaction::None, 0, false};
-    if (affinity == ManaAffinity::None || dummy_.IsDefeated()) {
+    if ((affinity != ManaAffinity::Solar && affinity != ManaAffinity::Umbral)
+        || dummy_.IsDefeated()) {
         return report;
     }
 
@@ -417,13 +428,17 @@ std::int64_t CombatSandbox::TrainingChallengeScore() const {
 }
 
 float CombatSandbox::TrainingDps() const {
-    return elapsedSecondsPrecise_ > 0.0
-        ? static_cast<float>(static_cast<double>(stats_.totalDamage) / elapsedSecondsPrecise_)
-        : 0.0f;
+    if (elapsedSecondsPrecise_ <= 0.0) return 0.0f;
+    const double dps = static_cast<double>(stats_.totalDamage) / elapsedSecondsPrecise_;
+    return static_cast<float>(std::min(dps,
+        static_cast<double>(std::numeric_limits<float>::max())));
 }
 
 const AttackDefinition& CombatSandbox::Definition(AttackType type) const {
-    return type == AttackType::Light ? lightAttack_ : heavyAttack_;
+    static const AttackDefinition invalid{};
+    if (type == AttackType::Light) return lightAttack_;
+    if (type == AttackType::Heavy) return heavyAttack_;
+    return invalid;
 }
 
 bool CombatSandbox::ApplyPostureDamage(int postureDamage) {

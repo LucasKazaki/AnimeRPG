@@ -1,0 +1,86 @@
+name: Numeric audit regression
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Engine/Math/**'
+      - 'Engine/Scene/**'
+      - 'Engine/Assets/**'
+      - 'Tests/NumericAudit/**'
+      - 'Tests/SceneTests.cpp'
+      - 'Tests/AssertionsEnabled.cpp'
+      - 'cmake/AstralTestSafety.cmake'
+      - '.github/workflows/numeric-audit.yml'
+  pull_request:
+    paths:
+      - 'Engine/Math/**'
+      - 'Engine/Scene/**'
+      - 'Engine/Assets/**'
+      - 'Tests/NumericAudit/**'
+      - 'Tests/SceneTests.cpp'
+      - 'Tests/AssertionsEnabled.cpp'
+      - 'cmake/AstralTestSafety.cmake'
+      - '.github/workflows/numeric-audit.yml'
+
+permissions:
+  contents: read
+concurrency:
+  group: numeric-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable-regression:
+    name: ${{ matrix.os }} / ${{ matrix.config }} / ${{ matrix.revision }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2022]
+        config: [Debug, Release]
+        revision: ${{ fromJSON(github.event_name == 'pull_request' && '["head","merge"]' || '["head"]') }}
+    env:
+      EXPECTED_SHA: ${{ matrix.revision == 'head' && github.event.pull_request.head.sha || github.sha }}
+      BUILD_ROOT: ${{ runner.temp }}/astral-numeric-audit
+    steps:
+      - name: Check out the explicit revision
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          persist-credentials: false
+      - name: Verify checkout identity
+        run: python -c "import os, subprocess; actual=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); expected=os.environ['EXPECTED_SHA']; print('tested_revision='+actual); raise SystemExit(0 if actual == expected else 1)"
+      - name: Configure standalone registered regressions
+        run: cmake -S Tests/NumericAudit -B "${{ env.BUILD_ROOT }}" -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DBUILD_TESTING=ON
+      - name: Build
+        run: cmake --build "${{ env.BUILD_ROOT }}" --config ${{ matrix.config }} --parallel 2
+      - name: Run numeric and existing scene tests
+        run: ctest --test-dir "${{ env.BUILD_ROOT }}" -C ${{ matrix.config }} --output-on-failure --no-tests=error
+
+  sanitizers:
+    name: Clang sanitizers / exact head
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BUILD_ROOT: ${{ runner.temp }}/astral-numeric-sanitized
+      ASAN_OPTIONS: detect_leaks=1
+    steps:
+      - name: Check out the explicit revision
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          persist-credentials: false
+      - name: Verify checkout identity
+        run: python -c "import os, subprocess; actual=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(); expected=os.environ['EXPECTED_SHA']; print('tested_revision='+actual); raise SystemExit(0 if actual == expected else 1)"
+      - name: Configure with installed Clang
+        run: cmake -S Tests/NumericAudit -B "${{ env.BUILD_ROOT }}" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DBUILD_TESTING=ON -DASTRAL_AUDIT_SANITIZERS=ON
+      - name: Build
+        run: cmake --build "${{ env.BUILD_ROOT }}" --parallel 2
+      - name: Run instrumented regressions
+        run: ctest --test-dir "${{ env.BUILD_ROOT }}" --output-on-failure --no-tests=error
+
+# Standard hosted jobs verify source regressions, not interactive Win32/GPU,
+# native sound/animation, full-game acceptance or the required engine soak.
