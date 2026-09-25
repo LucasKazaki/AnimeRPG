@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "task_id": "ART-010",
+  "loop_id": "astral-art-hourly-20260922",
+  "artifact": "Content/Starter/ModularArchitectureV1/tutorial-room-construction-sequence.json",
+  "status": "source_validated_not_imported",
+  "verified_exact_head": "865bda59b12b074d4005fd98a15f5f756e260f04",
+  "artifact_git_blob_sha1": "e2af700ec63e7e2eed46a042cededd4076cfd457",
+  "source_git_blob_sha1s": {
+    "module_contract": "81fc2d4589d8e8552990268a6b557972797c8cc4",
+    "tutorial_room": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a",
+    "joint_contract": "e62b5d86a4edbff8663a1df145c36f8596ca26d2"
+  },
+  "verification": {
+    "semantic_assertions_passed": 158,
+    "stage_count": 6,
+    "placement_count": 13,
+    "final_declared_relationship_count": 23,
+    "expected_stage_placement_counts": [
+      4,
+      7,
+      9,
+      11,
+      13,
+      13
+    ],
+    "expected_stage_relationship_totals": [
+      4,
+      10,
+      13,
+      18,
+      23,
+      23
+    ],
+    "source_pins_match_live_branch": true,
+    "source_grid_and_rotation_checks": true,
+    "final_placement_coverage_exact": true,
+    "runtime_verified": false,
+    "art_approved": false
+  },
+  "evidence_boundary": {
+    "hosted_ci": "not_run_no_art010_pr",
+    "blender_roundtrip": "not_run",
+    "khronos_validator": "not_run",
+    "astral_import_render": "not_run",
+    "native_performance": "not_run",
+    "independent_visual_review": "not_run"
+  }
+}
