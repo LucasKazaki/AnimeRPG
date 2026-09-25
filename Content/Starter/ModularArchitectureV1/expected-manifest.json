@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-modular-architecture-v1",
+  "status": "source_validated_not_imported",
+  "generator_id": "Astral ART-010 Starter Modular Architecture 1",
+  "source_file": "source-contract.json",
+  "source_sha256": "97a18585893dfc49ea9b309702ea4b569bc463bde35f291fc5c462da0a36e26b",
+  "gltf_file": "starter_modular_architecture_v1.gltf",
+  "gltf_sha256": "7916d56be9e14201dffa59380efbe280b00b3c5c52c4a4c1b40ab8be4294f9b5",
+  "gltf_bytes": 24685,
+  "module_count": 6,
+  "material_count": 1,
+  "vertex_count_total": 176,
+  "index_count_total": 264,
+  "modules": [
+    {"id":"floor-1x1","mesh_name":"Starter_Floor_1x1m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[1.0,0.25,1.0]],"pivot_m":[0.0,0.0,0.0]},
+    {"id":"floor-2x2","mesh_name":"Starter_Floor_2x2m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[2.0,0.25,2.0]],"pivot_m":[0.0,0.0,0.0]},
+    {"id":"wall-1x3","mesh_name":"Starter_Wall_1x3m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[1.0,3.0,0.25]],"pivot_m":[0.0,0.0,0.0]},
+    {"id":"wall-2x3","mesh_name":"Starter_Wall_2x3m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[2.0,3.0,0.25]],"pivot_m":[0.0,0.0,0.0]},
+    {"id":"doorway-2x3","mesh_name":"Starter_Doorway_2x3m","kind":"doorway_frame","vertex_count":56,"index_count":84,"bounds_m":[[0.0,0.0,0.0],[2.0,3.0,0.25]],"pivot_m":[0.0,0.0,0.0]},
+    {"id":"pillar-025x3","mesh_name":"Starter_Pillar_025x3m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[0.25,3.0,0.25]],"pivot_m":[0.0,0.0,0.0]}
+  ],
+  "snap": {
+    "translation_increment_m": 0.25,
+    "rotation_increment_deg": 90,
+    "pivot_policy": "local_minimum_corner_on_base_plane",
+    "module_dimensions_must_align_to_grid": true
+  },
+  "geometry": {
+    "topology": "TRIANGLES",
+    "attributes": ["POSITION","NORMAL","TANGENT","TEXCOORD_0"],
+    "uv_policy": "planar_face_uvs_at_one_repeat_per_metre",
+    "uv_repeats_per_metre": 1.0,
+    "lod_policy": "source_lod0_only",
+    "collision_policy": "not_authored_engine_owned"
+  },
+  "external_assets": [],
+  "runtime_verified": false,
+  "art_approved": false
+}

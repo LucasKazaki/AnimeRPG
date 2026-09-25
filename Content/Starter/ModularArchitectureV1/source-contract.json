@@ -1,101 +1,161 @@
 {
   "schema_version": 1,
-  "id": "astral.starter.modular_architecture.v1",
-  "status": "proposed_source_fixture",
-  "runtime_status": "source_validated_not_imported",
+  "asset_id": "astral-starter-modular-architecture-v1",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "source_validated_not_imported",
+  "purpose": "generic_grid_snapping_modular_blockout_and_import_calibration",
   "provenance": {
     "origin": "original_procedural",
     "external_assets": [],
     "authoring_tool": "Python standard library procedural generator",
     "seed": null,
-    "distribution": "pending_repository_policy"
+    "distribution": "repository_project_policy"
   },
   "reference_scope": {
-    "purpose": "generic grid-snapping modular blockout kit",
-    "reference_engines": [
-      "Unreal Engine 5.8",
-      "Unity current manual"
+    "observed_2026_09_25": [
+      {
+        "engine": "Unreal Engine 5.8",
+        "official_url": "https://dev.epicgames.com/documentation/unreal-engine/actor-snapping-in-unreal-engine",
+        "note": "Level Viewport supports configurable translation, rotation and scale grid snapping."
+      },
+      {
+        "engine": "Unreal Engine 5.8",
+        "official_url": "https://dev.epicgames.com/documentation/unreal-engine/cubegrid-tool-in-unreal-engine",
+        "note": "CubeGrid is a grid-based blockout tool for creating and editing meshes."
+      },
+      {
+        "engine": "Unity 6.2",
+        "official_url": "https://docs.unity3d.com/6000.2/Documentation/Manual/GridSnapping.html",
+        "note": "Scene view supports automatic grid snapping, incremental transforms and grid alignment."
+      }
     ],
+    "coverage_statement": "ART-010 implements a small original modular blockout source kit only; it is not editor, content-count, workflow or quality parity with Unreal Engine or Unity.",
     "copying_prohibited": true
   },
-  "coordinates": {
-    "unit": "metre",
-    "handedness": "right_handed",
+  "coordinate_system": {
+    "handedness": "right",
     "up": "+Y",
     "forward": "+Z",
-    "right": "-X"
+    "right": "-X",
+    "linear_unit": "metre"
   },
   "snap": {
     "translation_increment_m": 0.25,
     "rotation_increment_deg": 90,
-    "pivot_policy": "local minimum corner on floor/base plane",
+    "pivot_policy": "local_minimum_corner_on_base_plane",
     "module_dimensions_must_align_to_grid": true
   },
+  "geometry": {
+    "topology": "TRIANGLES",
+    "attributes": [
+      "POSITION",
+      "NORMAL",
+      "TANGENT",
+      "TEXCOORD_0"
+    ],
+    "uv_policy": "planar_face_uvs_at_one_repeat_per_metre",
+    "uv_repeats_per_metre": 1.0,
+    "lod_policy": "source_lod0_only",
+    "collision_policy": "not_authored_engine_owned"
+  },
   "material": {
-    "name": "MAT_StarterNeutral",
+    "name": "StarterNeutralArchitecture",
     "base_color_linear_factor": [
       0.56,
       0.58,
       0.62,
       1.0
     ],
-    "metallic_factor": 0.0,
-    "roughness_factor": 0.72,
-    "alpha_mode": "OPAQUE"
+    "metallic": 0.0,
+    "roughness": 0.72,
+    "alpha_mode": "OPAQUE",
+    "double_sided": false
   },
   "modules": [
     {
-      "id": "floor_1x1",
-      "name": "SM_Starter_Floor_1x1",
-      "kind": "floor",
-      "bounds_m": [[0.0,0.0,0.0],[1.0,0.25,1.0]],
-      "parts": [[[0.0,0.0,0.0],[1.0,0.25,1.0]]],
-      "gallery_translation_m": [0.0,0.0,0.0]
+      "id": "floor-1x1",
+      "mesh_name": "Starter_Floor_1x1m",
+      "kind": "box",
+      "bounds_m": [[0.0, 0.0, 0.0], [1.0, 0.25, 1.0]],
+      "parts": [[[0.0, 0.0, 0.0], [1.0, 0.25, 1.0]]],
+      "pivot_m": [0.0, 0.0, 0.0],
+      "gallery_translation_m": [0.0, 0.0, 0.0],
+      "expected_vertices": 24,
+      "expected_indices": 36
     },
     {
-      "id": "floor_2x2",
-      "name": "SM_Starter_Floor_2x2",
-      "kind": "floor",
-      "bounds_m": [[0.0,0.0,0.0],[2.0,0.25,2.0]],
-      "parts": [[[0.0,0.0,0.0],[2.0,0.25,2.0]]],
-      "gallery_translation_m": [2.0,0.0,0.0]
+      "id": "floor-2x2",
+      "mesh_name": "Starter_Floor_2x2m",
+      "kind": "box",
+      "bounds_m": [[0.0, 0.0, 0.0], [2.0, 0.25, 2.0]],
+      "parts": [[[0.0, 0.0, 0.0], [2.0, 0.25, 2.0]]],
+      "pivot_m": [0.0, 0.0, 0.0],
+      "gallery_translation_m": [2.0, 0.0, 0.0],
+      "expected_vertices": 24,
+      "expected_indices": 36
     },
     {
-      "id": "wall_1x3",
-      "name": "SM_Starter_Wall_1x3",
-      "kind": "wall",
-      "bounds_m": [[0.0,0.0,0.0],[1.0,3.0,0.25]],
-      "parts": [[[0.0,0.0,0.0],[1.0,3.0,0.25]]],
-      "gallery_translation_m": [0.0,0.0,3.0]
+      "id": "wall-1x3",
+      "mesh_name": "Starter_Wall_1x3m",
+      "kind": "box",
+      "bounds_m": [[0.0, 0.0, 0.0], [1.0, 3.0, 0.25]],
+      "parts": [[[0.0, 0.0, 0.0], [1.0, 3.0, 0.25]]],
+      "pivot_m": [0.0, 0.0, 0.0],
+      "gallery_translation_m": [0.0, 0.0, 3.0],
+      "expected_vertices": 24,
+      "expected_indices": 36
     },
     {
-      "id": "wall_2x3",
-      "name": "SM_Starter_Wall_2x3",
-      "kind": "wall",
-      "bounds_m": [[0.0,0.0,0.0],[2.0,3.0,0.25]],
-      "parts": [[[0.0,0.0,0.0],[2.0,3.0,0.25]]],
-      "gallery_translation_m": [2.0,0.0,3.0]
+      "id": "wall-2x3",
+      "mesh_name": "Starter_Wall_2x3m",
+      "kind": "box",
+      "bounds_m": [[0.0, 0.0, 0.0], [2.0, 3.0, 0.25]],
+      "parts": [[[0.0, 0.0, 0.0], [2.0, 3.0, 0.25]]],
+      "pivot_m": [0.0, 0.0, 0.0],
+      "gallery_translation_m": [2.0, 0.0, 3.0],
+      "expected_vertices": 24,
+      "expected_indices": 36
     },
     {
-      "id": "doorway_2x3",
-      "name": "SM_Starter_Doorway_2x3",
-      "kind": "doorway",
-      "bounds_m": [[0.0,0.0,0.0],[2.0,3.0,0.25]],
-      "opening_bounds_m": [[0.5,0.0,0.0],[1.5,2.0,0.25]],
+      "id": "doorway-2x3",
+      "mesh_name": "Starter_Doorway_2x3m",
+      "kind": "doorway_frame",
+      "bounds_m": [[0.0, 0.0, 0.0], [2.0, 3.0, 0.25]],
+      "opening_bounds_m": [[0.5, 0.0, 0.0], [1.5, 2.0, 0.25]],
       "parts": [
-        [[0.0,0.0,0.0],[0.5,2.0,0.25]],
-        [[1.5,0.0,0.0],[2.0,2.0,0.25]],
-        [[0.0,2.0,0.0],[2.0,3.0,0.25]]
+        [[0.0, 0.0, 0.0], [0.5, 2.0, 0.25]],
+        [[1.5, 0.0, 0.0], [2.0, 2.0, 0.25]],
+        [[0.0, 2.0, 0.0], [2.0, 3.0, 0.25]]
       ],
-      "gallery_translation_m": [5.0,0.0,3.0]
+      "pivot_m": [0.0, 0.0, 0.0],
+      "gallery_translation_m": [5.0, 0.0, 3.0],
+      "expected_vertices": 56,
+      "expected_indices": 84
     },
     {
-      "id": "pillar_025x3",
-      "name": "SM_Starter_Pillar_025x3",
-      "kind": "pillar",
-      "bounds_m": [[0.0,0.0,0.0],[0.25,3.0,0.25]],
-      "parts": [[[0.0,0.0,0.0],[0.25,3.0,0.25]]],
-      "gallery_translation_m": [8.0,0.0,3.0]
+      "id": "pillar-025x3",
+      "mesh_name": "Starter_Pillar_025x3m",
+      "kind": "box",
+      "bounds_m": [[0.0, 0.0, 0.0], [0.25, 3.0, 0.25]],
+      "parts": [[[0.0, 0.0, 0.0], [0.25, 3.0, 0.25]]],
+      "pivot_m": [0.0, 0.0, 0.0],
+      "gallery_translation_m": [8.0, 0.0, 3.0],
+      "expected_vertices": 24,
+      "expected_indices": 36
+    }
+  ],
+  "assembly_checks": [
+    {
+      "id": "four-floor-1x1-equal-floor-2x2",
+      "module_id": "floor-1x1",
+      "translations_m": [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 1.0]],
+      "expected_union_bounds_m": [[0.0, 0.0, 0.0], [2.0, 0.25, 2.0]]
+    },
+    {
+      "id": "two-wall-1x3-equal-wall-2x3",
+      "module_id": "wall-1x3",
+      "translations_m": [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+      "expected_union_bounds_m": [[0.0, 0.0, 0.0], [2.0, 3.0, 0.25]]
     }
   ]
 }
