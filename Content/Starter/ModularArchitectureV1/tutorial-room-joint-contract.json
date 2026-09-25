@@ -1,0 +1,447 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-modular-architecture-tutorial-room-joints-v1",
+  "task_id": "ART-010",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "source_validated_not_imported",
+  "purpose": "source-only seam, corner-overlap, and floor-wall base-contact oracle for the ART-010 tutorial room",
+  "validated_parent_head": "8158d43025e28751efeb200a2aa8e415730be0c7",
+  "source_pins": {
+    "module_contract_path": "Content/Starter/ModularArchitectureV1/source-contract.json",
+    "module_contract_git_blob_sha1": "81fc2d4589d8e8552990268a6b557972797c8cc4",
+    "tutorial_room_path": "Content/Starter/ModularArchitectureV1/tutorial-room-source.json",
+    "tutorial_room_git_blob_sha1": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a",
+    "assembly_ledger_path": "Content/Starter/ModularArchitectureV1/tutorial-room-assembly-ledger.json",
+    "assembly_ledger_git_blob_sha1": "3ebdadc121755eca900aeb326a9cea713037eecb"
+  },
+  "coordinate_system": {
+    "handedness": "right",
+    "up": "+Y",
+    "forward": "+Z",
+    "right": "-X",
+    "linear_unit": "metre"
+  },
+  "snap": {
+    "translation_increment_m": 0.25,
+    "rotation_increment_deg": 90
+  },
+  "tolerance_m": 1e-9,
+  "counts": {
+    "floor_flush_seams": 4,
+    "wall_flush_seams": 5,
+    "intentional_corner_overlaps": 4,
+    "floor_wall_base_embeddings": 10,
+    "total_declared_relationships": 23
+  },
+  "floor_flush_seams": [
+    {
+      "a": "floor-sw",
+      "b": "floor-se",
+      "contact_bounds_m": [
+        [
+          2,
+          0,
+          0
+        ],
+        [
+          2,
+          0.25,
+          2
+        ]
+      ]
+    },
+    {
+      "a": "floor-sw",
+      "b": "floor-nw",
+      "contact_bounds_m": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          2,
+          0.25,
+          2
+        ]
+      ]
+    },
+    {
+      "a": "floor-se",
+      "b": "floor-ne",
+      "contact_bounds_m": [
+        [
+          2,
+          0,
+          2
+        ],
+        [
+          4,
+          0.25,
+          2
+        ]
+      ]
+    },
+    {
+      "a": "floor-nw",
+      "b": "floor-ne",
+      "contact_bounds_m": [
+        [
+          2,
+          0,
+          2
+        ],
+        [
+          2,
+          0.25,
+          4
+        ]
+      ]
+    }
+  ],
+  "wall_flush_seams": [
+    {
+      "a": "front-left",
+      "b": "front-door",
+      "contact_bounds_m": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          1,
+          3,
+          0.25
+        ]
+      ]
+    },
+    {
+      "a": "front-door",
+      "b": "front-right",
+      "contact_bounds_m": [
+        [
+          3,
+          0,
+          0
+        ],
+        [
+          3,
+          3,
+          0.25
+        ]
+      ]
+    },
+    {
+      "a": "back-west",
+      "b": "back-east",
+      "contact_bounds_m": [
+        [
+          2,
+          0,
+          3.75
+        ],
+        [
+          2,
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "a": "left-south",
+      "b": "left-north",
+      "contact_bounds_m": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          0.25,
+          3,
+          2
+        ]
+      ]
+    },
+    {
+      "a": "right-south",
+      "b": "right-north",
+      "contact_bounds_m": [
+        [
+          3.75,
+          0,
+          2
+        ],
+        [
+          4,
+          3,
+          2
+        ]
+      ]
+    }
+  ],
+  "intentional_corner_overlaps": [
+    {
+      "a": "front-left",
+      "b": "left-south",
+      "overlap_bounds_m": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0.25,
+          3,
+          0.25
+        ]
+      ]
+    },
+    {
+      "a": "front-right",
+      "b": "right-south",
+      "overlap_bounds_m": [
+        [
+          3.75,
+          0,
+          0
+        ],
+        [
+          4,
+          3,
+          0.25
+        ]
+      ]
+    },
+    {
+      "a": "back-west",
+      "b": "left-north",
+      "overlap_bounds_m": [
+        [
+          0,
+          0,
+          3.75
+        ],
+        [
+          0.25,
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "a": "back-east",
+      "b": "right-north",
+      "overlap_bounds_m": [
+        [
+          3.75,
+          0,
+          3.75
+        ],
+        [
+          4,
+          3,
+          4
+        ]
+      ]
+    }
+  ],
+  "floor_wall_base_embeddings": [
+    {
+      "wall": "front-left",
+      "floor": "floor-sw",
+      "overlap_bounds_m": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0.25,
+          0.25
+        ]
+      ]
+    },
+    {
+      "wall": "front-door",
+      "floor": "floor-sw",
+      "overlap_bounds_m": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          2,
+          0.25,
+          0.25
+        ]
+      ]
+    },
+    {
+      "wall": "front-door",
+      "floor": "floor-se",
+      "overlap_bounds_m": [
+        [
+          2,
+          0,
+          0
+        ],
+        [
+          3,
+          0.25,
+          0.25
+        ]
+      ]
+    },
+    {
+      "wall": "front-right",
+      "floor": "floor-se",
+      "overlap_bounds_m": [
+        [
+          3,
+          0,
+          0
+        ],
+        [
+          4,
+          0.25,
+          0.25
+        ]
+      ]
+    },
+    {
+      "wall": "back-west",
+      "floor": "floor-nw",
+      "overlap_bounds_m": [
+        [
+          0,
+          0,
+          3.75
+        ],
+        [
+          2,
+          0.25,
+          4
+        ]
+      ]
+    },
+    {
+      "wall": "back-east",
+      "floor": "floor-ne",
+      "overlap_bounds_m": [
+        [
+          2,
+          0,
+          3.75
+        ],
+        [
+          4,
+          0.25,
+          4
+        ]
+      ]
+    },
+    {
+      "wall": "left-south",
+      "floor": "floor-sw",
+      "overlap_bounds_m": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0.25,
+          0.25,
+          2
+        ]
+      ]
+    },
+    {
+      "wall": "left-north",
+      "floor": "floor-nw",
+      "overlap_bounds_m": [
+        [
+          0,
+          0,
+          2
+        ],
+        [
+          0.25,
+          0.25,
+          4
+        ]
+      ]
+    },
+    {
+      "wall": "right-south",
+      "floor": "floor-se",
+      "overlap_bounds_m": [
+        [
+          3.75,
+          0,
+          0
+        ],
+        [
+          4,
+          0.25,
+          2
+        ]
+      ]
+    },
+    {
+      "wall": "right-north",
+      "floor": "floor-ne",
+      "overlap_bounds_m": [
+        [
+          3.75,
+          0,
+          2
+        ],
+        [
+          4,
+          0.25,
+          4
+        ]
+      ]
+    }
+  ],
+  "doorway_clearance": {
+    "placement_id": "front-door",
+    "opening_world_bounds_m": [
+      [
+        1.5,
+        0,
+        0
+      ],
+      [
+        2.5,
+        2,
+        0.25
+      ]
+    ],
+    "clear_width_m": 1,
+    "clear_height_m": 2
+  },
+  "verification": {
+    "semantic_assertions_passed": 31,
+    "unexpected_wall_wall_volume_overlaps": 0,
+    "unexpected_wall_face_contacts": 0,
+    "unexpected_floor_volume_overlaps": 0
+  },
+  "evidence_boundary": {
+    "runtime_verified": false,
+    "art_approved": false,
+    "not_claimed": [
+      "Astral editor snap behavior",
+      "Astral import or rendering",
+      "collision or navigation",
+      "physics contact resolution",
+      "native performance",
+      "independent visual-art approval"
+    ]
+  }
+}
