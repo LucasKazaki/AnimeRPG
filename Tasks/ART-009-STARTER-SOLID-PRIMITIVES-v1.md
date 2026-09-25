@@ -35,6 +35,7 @@ This packet adopts only cube, sphere, cylinder and plane as a bounded first slic
 - right-handed, metres, `+Y` up, `+Z` forward, `-X` right
 - exact scene inventory: four named mesh nodes
 - one neutral opaque material
+- the numeric neutral base color is explicitly a linear `baseColorFactor` source field (`base_color_linear_factor`); it is not treated as sRGB texture data
 - every primitive is indexed `TRIANGLES`
 - exact attributes: `POSITION`, `NORMAL`, `TANGENT`, `TEXCOORD_0`
 - attribute and index bindings must be genuine JSON integers; booleans do not satisfy index semantics
