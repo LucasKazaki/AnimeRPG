@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "loop_id": "astral-art-hourly-20260922",
+  "task_id": "ART-010",
+  "asset_id": "astral-starter-modular-architecture-tutorial-room-v1",
+  "status": "source_validated_not_imported",
+  "verification_scope": "semantic_source_fixture_only",
+  "validated_repository_head": "eabf824278a8569c85d9b1ffab7ad6c60666141b",
+  "dependency_pins": {
+    "module_contract_path": "Content/Starter/ModularArchitectureV1/source-contract.json",
+    "module_contract_git_blob_sha": "81fc2d4589d8e8552990268a6b557972797c8cc4",
+    "tutorial_room_source_path": "Content/Starter/ModularArchitectureV1/tutorial-room-source.json",
+    "tutorial_room_git_blob_sha": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a"
+  },
+  "expected": {
+    "coordinate_system": {
+      "handedness": "right",
+      "up": "+Y",
+      "forward": "+Z",
+      "right": "-X",
+      "linear_unit": "metre"
+    },
+    "snap": {
+      "translation_increment_m": 0.25,
+      "rotation_increment_deg": 90
+    },
+    "placement_count": 13,
+    "unique_placement_id_count": 13,
+    "floor_module_count": 4,
+    "wall_module_count": 9,
+    "required_module_ids": [
+      "floor-2x2",
+      "wall-1x3",
+      "wall-2x3",
+      "doorway-2x3"
+    ],
+    "room_outer_bounds_m": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        4
+      ]
+    ],
+    "floor_bounds_m": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        0.25,
+        4
+      ]
+    ],
+    "door_opening_world_bounds_m": [
+      [
+        1.5,
+        0,
+        0
+      ],
+      [
+        2.5,
+        2,
+        0.25
+      ]
+    ],
+    "marker_ids": [
+      "player-start",
+      "tutorial-camera"
+    ],
+    "closed_shell_except_doorway": true,
+    "runtime_verified": false,
+    "art_approved": false
+  },
+  "sandbox_live_source_assertions_passed": 106,
+  "not_claimed": [
+    "Astral import",
+    "Astral editor snapping or registration",
+    "collision or navigation",
+    "runtime rendering",
+    "native performance",
+    "independent visual-art approval"
+  ]
+}
