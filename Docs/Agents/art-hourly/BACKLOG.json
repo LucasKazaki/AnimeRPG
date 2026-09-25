@@ -62,9 +62,25 @@
     {
       "id": "ART-010",
       "title": "Starter modular architecture v1",
-      "status": "tutorial_construction_sequence_source_validated_tooling_pending",
-      "dependency": "publish the prepared ART-010 generator/verifier/focused tests, then run exact-head source QA and independent review; DCC/import gates remain separate",
-      "next_acceptance": "repository head reproduces the pinned 6-mesh glTF and validates the 13-placement, 6-stage tutorial room sequence before Blender/Khronos/Astral handoff"
+      "status": "transform_oracle_source_verified_publication_blocked",
+      "dependency": "GitHub write safety gate currently blocks publishing the prepared transform oracle and executable generator/verifier/tests; existing source contract, tutorial room and assembly ledger remain pinned and source-validated",
+      "next_acceptance": "publish tutorial-room-transform-oracle.json, then publish the prepared generator/verifier/focused tests and run exact-head source QA before Blender/Khronos/Astral handoff",
+      "latest_evidence": {
+        "observed_branch_head_before_write": "68f5eb076d88729a69658bdf382fc97f572a23ab",
+        "observed_main": "2958741188279a0b438dd489ad00cac546012c25",
+        "module_contract_git_blob_sha1": "81fc2d4589d8e8552990268a6b557972797c8cc4",
+        "tutorial_room_git_blob_sha1": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a",
+        "assembly_ledger_git_blob_sha1": "3ebdadc121755eca900aeb326a9cea713037eecb",
+        "transform_oracle_semantic_assertions": 103,
+        "transform_oracle_max_snap_error": 0,
+        "transform_oracle_max_bounds_error_m": 0,
+        "prepared_transform_oracle_sha256": "b0ac9ce846b4f39519080ee4b60c630390c003191ffb3e2e0c48652d448dfe1e",
+        "prepared_gltf_sha256": "7916d56be9e14201dffa59380efbe280b00b3c5c52c4a4c1b40ab8be4294f9b5",
+        "prepared_gltf_bytes": 24685,
+        "prepared_focused_tests": "37/37 sandbox pass from preserved handoff; not repository-head evidence",
+        "runtime_verified": false,
+        "art_approved": false
+      }
     }
   ]
 }
