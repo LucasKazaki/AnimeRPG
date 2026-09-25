@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-solid-primitives-v1",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "source_validated_not_imported",
+  "purpose": "generic_starter_content_and_scale_uv_tangent_calibration",
+  "coordinate_system": {
+    "handedness": "right",
+    "up": "+Y",
+    "forward": "+Z",
+    "right": "-X",
+    "linear_unit": "metre"
+  },
+  "material": {
+    "name": "StarterNeutral",
+    "base_color_linear_factor": [
+      0.62,
+      0.64,
+      0.68,
+      1.0
+    ],
+    "metallic": 0.0,
+    "roughness": 0.72,
+    "alpha_mode": "OPAQUE",
+    "double_sided": false
+  },
+  "primitives": [
+    {
+      "id": "cube-1m",
+      "mesh_name": "Starter_Cube_1m",
+      "shape": "cube",
+      "dimensions_m": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "vertex_count": 24,
+      "index_count": 36,
+      "uv_policy": "each_face_maps_0_to_1"
+    },
+    {
+      "id": "sphere-1m",
+      "mesh_name": "Starter_Sphere_1m",
+      "shape": "uv_sphere",
+      "diameter_m": 1.0,
+      "segments": 16,
+      "latitude_bands": 8,
+      "vertex_count": 151,
+      "index_count": 672,
+      "uv_policy": "longitude_latitude_with_seam_and_segment_poles"
+    },
+    {
+      "id": "cylinder-1x2m",
+      "mesh_name": "Starter_Cylinder_1x2m",
+      "shape": "cylinder",
+      "diameter_m": 1.0,
+      "height_m": 2.0,
+      "segments": 16,
+      "vertex_count": 70,
+      "index_count": 192,
+      "uv_policy": "side_wrap_once_caps_each_map_to_unit_disc"
+    },
+    {
+      "id": "plane-1m",
+      "mesh_name": "Starter_Plane_1m",
+      "shape": "plane",
+      "dimensions_m": [
+        1.0,
+        1.0
+      ],
+      "vertex_count": 4,
+      "index_count": 6,
+      "uv_policy": "single_0_to_1_square"
+    }
+  ],
+  "scene_layout": [
+    {
+      "primitive_id": "cube-1m",
+      "translation_m": [
+        -3.0,
+        0.5,
+        0.0
+      ]
+    },
+    {
+      "primitive_id": "sphere-1m",
+      "translation_m": [
+        -1.0,
+        0.5,
+        0.0
+      ]
+    },
+    {
+      "primitive_id": "cylinder-1x2m",
+      "translation_m": [
+        1.0,
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "primitive_id": "plane-1m",
+      "translation_m": [
+        3.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "reference_scope": {
+    "observed_2026_09_24": [
+      {
+        "engine": "Unity",
+        "official_url": "https://docs.unity3d.com/Manual/PrimitiveObjects.html",
+        "note": "current manual exposes Cube, Sphere, Capsule, Cylinder, Plane and Quad as editor primitives/placeholders"
+      },
+      {
+        "engine": "Unreal Engine 5.8",
+        "official_url": "https://dev.epicgames.com/documentation/unreal-engine/predefined-shapes-in-unreal-engine",
+        "note": "Modeling Mode documents Box, Sphere, Cylinder, Cone, Torus, Arrow, Rectangle, Disc and Stairs predefined shapes"
+      }
+    ],
+    "coverage_statement": "This v1 packet deliberately implements only cube, sphere, cylinder and plane. It is not parity with Unity or Unreal starter/modeling libraries."
+  }
+}
