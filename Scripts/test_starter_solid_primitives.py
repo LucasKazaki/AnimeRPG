@@ -369,6 +369,17 @@ def test_crlf_expected_manifest_line_endings_preserve_pin():
         assert result=={"meshes":4,"materials":1,"vertices":249,"indices":906}
     finally: td.cleanup()
 
+
+def test_source_material_color_space_key_rejected_both():
+    td,src,gltf,manifest=workspace()
+    try:
+        source=json.loads(src.read_text())
+        source["material"]["base_color_srgb"]=source["material"].pop("base_color_linear_factor")
+        src.write_text(canon(source))
+        expect_fail(lambda: GEN.load_source(src),"material")
+        expect_fail(lambda: VER.verify_source(src),"material")
+    finally: td.cleanup()
+
 TESTS=[v for k,v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
 
 if __name__=="__main__":

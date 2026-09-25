@@ -80,12 +80,12 @@ def load_source(path: Path) -> dict:
 
     material = source["material"]
     if type(material) is not dict or set(material) != {
-        "name", "base_color_srgb", "metallic", "roughness", "alpha_mode", "double_sided"
+        "name", "base_color_linear_factor", "metallic", "roughness", "alpha_mode", "double_sided"
     }:
         raise ValueError("material contract changed")
     if material["name"] != "StarterNeutral" or material["alpha_mode"] != "OPAQUE" or type(material["double_sided"]) is not bool:
         raise ValueError("material identity changed")
-    base = _vector(material["base_color_srgb"], 4, "base_color_srgb")
+    base = _vector(material["base_color_linear_factor"], 4, "base_color_linear_factor")
     if any(v < 0.0 or v > 1.0 for v in base):
         raise ValueError("base color must be normalized")
     metallic = _finite_number(material["metallic"], "metallic")
@@ -392,7 +392,7 @@ def build_gltf(source: dict) -> dict:
         "materials": [{
             "name": material["name"],
             "pbrMetallicRoughness": {
-                "baseColorFactor": material["base_color_srgb"],
+                "baseColorFactor": material["base_color_linear_factor"],
                 "metallicFactor": material["metallic"],
                 "roughnessFactor": material["roughness"],
             },

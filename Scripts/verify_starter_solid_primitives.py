@@ -82,10 +82,10 @@ def verify_source(source_path):
     if (c["handedness"],c["up"],c["forward"],c["right"],c["linear_unit"])!=("right","+Y","+Z","-X","metre"):
         fail("coordinate values changed")
     m=s["material"]
-    if type(m) is not dict or set(m)!={"name","base_color_srgb","metallic","roughness","alpha_mode","double_sided"}: fail("material source contract invalid")
+    if type(m) is not dict or set(m)!={"name","base_color_linear_factor","metallic","roughness","alpha_mode","double_sided"}: fail("material source contract invalid")
     if m["name"]!="StarterNeutral" or m["alpha_mode"]!="OPAQUE" or type(m["double_sided"]) is not bool or m["double_sided"]:
         fail("material source identity changed")
-    base=vector(m["base_color_srgb"],4,"base_color")
+    base=vector(m["base_color_linear_factor"],4,"base_color")
     if base!=[0.62,0.64,0.68,1.0] or number(m["metallic"],"metallic")!=0.0 or number(m["roughness"],"roughness")!=0.72:
         fail("material source values changed")
     plist=s["primitives"]

@@ -13,7 +13,7 @@
   },
   "material": {
     "name": "StarterNeutral",
-    "base_color_srgb": [
+    "base_color_linear_factor": [
       0.62,
       0.64,
       0.68,

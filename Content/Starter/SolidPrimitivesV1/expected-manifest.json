@@ -4,7 +4,7 @@
   "status": "source_validated_not_imported",
   "generator_id": "Astral ART-009 Starter Solid Primitives 1",
   "source_file": "source-contract.json",
-  "source_sha256": "12473281a43b46c8a41e04d9515c4d2b692387ba90ca175dcdd6e690c727b4cf",
+  "source_sha256": "ddf647df2aa7b5ef91d1bdca02384c52713cabc0f2d7e90c65e3d935663d5aa4",
   "gltf_file": "starter_solid_primitives_v1.gltf",
   "gltf_sha256": "e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17",
   "gltf_bytes": 26172,
