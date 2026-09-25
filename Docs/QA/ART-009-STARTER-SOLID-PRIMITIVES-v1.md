@@ -1,11 +1,11 @@
 # ART-009 Starter Solid Primitives v1 QA
 
 Date: 2026-09-24  
-Scope: source-only sandbox verification for a new generic starter-content asset packet.
+Scope: source-only verification for a new generic starter-content asset packet.
 
 ## Delivered asset
 
-A freshly generated `starter_solid_primitives_v1.gltf` contains four original indexed solid meshes with a single neutral material. The generated glTF is intentionally not checked in; the checked-in expected manifest pins its exact bytes:
+A freshly generated `starter_solid_primitives_v1.gltf` contains four original indexed solid meshes with one neutral material. The generated glTF is intentionally not checked in; the checked-in expected manifest pins its exact bytes.
 
 | Primitive | Vertices | Indices | Nominal size |
 |---|---:|---:|---|
@@ -16,54 +16,54 @@ A freshly generated `starter_solid_primitives_v1.gltf` contains four original in
 
 Total: 249 vertices, 906 indices. These are functional source meshes, not render screenshots or engine-installed assets.
 
-## Pinned source/output identity
+## Current pinned identity
 
-- source contract SHA-256: `12473281a43b46c8a41e04d9515c4d2b692387ba90ca175dcdd6e690c727b4cf`
+Candidate code/data head before this documentation refresh: `d6cd5703985ef93249376cd9c07eaa76315d3556`.
+
+- canonical source contract SHA-256: `ddf647df2aa7b5ef91d1bdca02384c52713cabc0f2d7e90c65e3d935663d5aa4`
 - glTF SHA-256: `e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17`
-- expected manifest SHA-256: `653d120860b9fcf248d2c50ab3b880d98d26a69b4c681ec212a3b39d8f90f71e`
-- generator Git blob: `3b77c487c7a20ea444155bab8453d4a54ac1e85a`
-- verifier Git blob: `865f2ad6280eac9459d5eece16df056dbd8745f7`
-- tests Git blob: `19d5ed097fbca624ef85b3a3f4c18f0193f1028d`
+- glTF bytes: `26,172`
+- expected manifest SHA-256: `5ef9f93bcd31e0192dbff6e1a6c60f5820defd663efc51e81fd3913c8ca2f2a1`
+- generator Git blob: `8dc1f08670ba5271b6d1a580c4591ca31bddb43f`
+- verifier Git blob: `abb0b592aee0adb5f4c3dc9eb9454ccb541211fb`
+- tests Git blob: `5918a7ef3a919305d5d2e74c0c792bc5dc8eb11d`
 
-## Review-driven repair
+The source identity is SHA-256 of canonical parsed JSON bytes, so LF and CRLF checkouts share one source pin. The checked-in expected-manifest comparison normalizes only CRLF and lone CR to LF. Spacing, key order, number spellings and all other bytes remain part of the manifest pin.
 
-The first independent review on candidate `3a8b174a4cba0e07bf368cd6369b937e8d608417` identified three P2 semantic-validation gaps. The repaired verifier now:
+## Review-driven tangent, UV and schema repairs
 
-1. derives each triangle's expected tangent and bitangent from position and UV derivatives, then checks the supplied tangent direction plus `TANGENT.w` handedness;
+The first independent review on candidate `3a8b174a4cba0e07bf368cd6369b937e8d608417` identified three P2 semantic-validation gaps. The repaired verifier:
+
+1. derives each triangle's expected tangent and bitangent from position and UV derivatives, then checks tangent direction plus `TANGENT.w` handedness;
 2. checks the declared per-shape UV mapping policies directly, including cube/plane corners, sphere seam and latitude/longitude parameterization, and cylinder side/cap mappings;
-3. applies strict JSON-integer validation to every attribute accessor binding so `false` cannot alias integer accessor `0` in Python equality semantics.
+3. applies strict JSON-integer validation to every attribute accessor binding so `false` cannot alias integer accessor `0`.
 
-The regression suite adds one negative test for each first-review finding, increasing focused coverage from 27 to 30 cases. A follow-up independent review then found that two opposing bad vertex tangents could cancel in the triangle-average tangent check. The verifier now checks every supplied vertex tangent directly against the independently derived triangle `dP/du` direction before retaining the average tangent/bitangent check as supplemental consistency evidence. The `0.975` per-vertex dot threshold is intentionally above the 16-segment sphere/cylinder chord case observed analytically (`cos(11.25 degrees) ~= 0.980785`) while decisively rejecting the reported approximately +/-80 degree cancellation case (`cos(80 degrees) ~= 0.173648`). This pass adds an explicit 31st regression that mutates cube tangent vertices 0 and 2 to opposing approximately +/-80 degree directions. That exact cancellation construction must now fail semantically even if asset bytes and the manifest are repinned together.
+A follow-up review found that opposing bad vertex tangents could cancel in the triangle-average check. The verifier now checks every supplied triangle-vertex tangent against the independently derived triangle `dP/du` direction before the average tangent/bitangent consistency checks. The focused suite contains an explicit opposing-tangent regression.
 
-## Cross-platform line-ending repair
+## Cross-platform line-ending repairs
 
-An independent clean Windows worktree on candidate `f9bfce5eacd94b8524f94e453eb4a0d490bfd3e2` exposed a deterministic portability defect: 30 focused cases passed, while `test_valid_packet` failed because Git's CRLF checkout changed the raw source bytes from the repository LF identity `12473281a43b46c8a41e04d9515c4d2b692387ba90ca175dcdd6e690c727b4cf` to `b96a2bc2b6140419fb6da23c817cc34f6d7fdfdc86c7885e0c3580eff2426da3`. The asset semantics were unchanged; the raw-byte source hash was platform-sensitive.
+Clean Windows verification exposed two portability defects in sequence: raw checkout bytes made the source hash line-ending sensitive, and raw expected-manifest comparison rejected a CRLF checkout of an otherwise identical pin. The generator and verifier now hash canonical parsed source JSON. The expected-manifest gate separately normalizes only line endings. Focused regressions cover both CRLF source and CRLF expected-manifest cases.
 
-The generator and independent verifier now hash the parsed source contract serialized as canonical JSON bytes instead of hashing checkout line endings. The checked-in expected manifest remains pinned to the canonical LF identity. A 32nd focused regression rewrites the same source contract with CRLF line endings, regenerates the packet, and requires the exact checked-in manifest plus semantic verifier to accept it. This is a determinism repair only; no asset geometry, material, runtime state, or integration claim changed.
+## Linear base-color contract repair
 
+The source contract previously named the neutral material field `base_color_srgb` even though the generator copied those values directly to glTF `baseColorFactor`. The source field is now `base_color_linear_factor`, matching the intended glTF material semantics. The numeric factor remains `[0.62, 0.64, 0.68, 1.0]`, so this repair does not intentionally change generated visual values or glTF bytes.
 
-A second clean Windows sync on candidate `c52a2c992932c92474b430cb7ec9ac8aaaef5170` exposed the remaining half of the same portability class: Git checked out `expected-manifest.json` with CRLF while fresh generator output retained LF, so the verifier's raw-byte expected-manifest comparison still rejected an otherwise identical pin. The expected-manifest gate now normalizes only CRLF/CR line endings to LF before byte comparison. It deliberately does not canonicalize parsed JSON, so whitespace, key order, number spellings, and every other byte remain pinned. A 33rd focused regression supplies a CRLF checkout of the checked-in expected manifest and requires the source-valid packet to pass.
+Both generator and independent verifier require the new field name. A focused negative regression restores the obsolete `base_color_srgb` spelling and requires both validators to reject the contract. The focused suite inventory is now 34 cases.
 
-## Sandbox execution
+## Verification evidence
 
-The following sandbox evidence was recorded on repaired candidate `d0c61b25f2ac3e29a0b50882933d1f77c58a88fb`, before the follow-up per-vertex tangent repair. It reproduced the pinned generator output byte-for-byte (`26,172` bytes, SHA-256 `e79789761f295c2ae73094cc6643d1747e5fb6852eaca627a972d7e475c36b17`). Do not reuse the 30/30 result below as exact-head acceptance for the follow-up verifier-only repair:
+Historical exact-head clean-Windows verification at `d36c50e559d7aca9c9aee07136bd1630027edb43` recorded generator pass, generator `--check` pass, independent verifier pass for all four meshes, focused suite `PASS: 33/33`, Python compilation pass, `git diff --check` pass, and successful hosted Windows run `36053365291`. That result predates the linear base-color contract repair and is not reused as 34-case acceptance.
 
-```text
-python Scripts/test_starter_solid_primitives.py
-PASS: 30/30 starter solid primitive tests
+For linear-factor repair head `d6cd5703985ef93249376cd9c07eaa76315d3556`, GitHub Actions `Windows build and deterministic tests` run `36076296993` / #1118 completed successfully. That hosted workflow does not execute the focused ART-009 Python suite, so no 34/34 exact-head source-suite result is claimed here.
 
-python -m py_compile Scripts/generate_starter_solid_primitives.py Scripts/verify_starter_solid_primitives.py Scripts/test_starter_solid_primitives.py
-exit 0
-```
+## Current gate state
 
-The 30 focused tests include deterministic/stale-output behavior, overwrite refusal, source-schema boolean confusion, false runtime status, manifest hash and JSON-integer checks, checked-in manifest pin enforcement, external-buffer rejection, unexpected rendering attributes, material drift including bool-as-number substitution, scene bool-as-index substitution, UV/normal/tangent corruption, index bounds, reversed winding, sphere/cylinder/plane geometry drift, bufferView target/range changes, stale accessor bounds, unknown glTF root fields, UV-policy drift, official-reference drift, semantically wrong orthonormal tangents, collapsed-but-in-range UVs, and bool-as-accessor-binding substitution.
+The packet remains `source_validated_not_imported`. The exact post-documentation branch head still needs fresh generator output, generator `--check`, independent verifier, focused 34/34 regression suite, Python compile, applicable hosted repository checks, and a fresh independent review with no unresolved blocking finding.
 
-## Gate state
-
-The current generator/verifier/regression repair still requires the packet's exact generator/check/verifier/regression/compile commands on the exact branch head plus a fresh independent review. The clean-Windows CRLF expected-manifest failure from `c52a2c992932c92474b430cb7ec9ac8aaaef5170` is the specific defect repaired by this follow-up. The focused suite inventory is now 33 cases, but no 33/33 execution result is claimed until those exact commands run on this head. The earlier exact-head Windows lane on `f9bfce5e...` was green but did not execute this focused Python suite; it therefore does not close the new source-determinism gate.
+The older tangent review thread is stale relative to repaired source and regression coverage but still needs an explicit repair reply and resolution. A new independent review should target the final exact head after this QA refresh.
 
 ## Evidence boundary
 
-This pass did not execute Blender, glTF-Validator, Astral Engine, a native Windows GPU runtime, collision, physics, LOD generation, editor registration or independent visual review. The asset remains `source_validated_not_imported`.
+This packet does not establish Blender/DCC round-trip behavior, Khronos glTF-Validator acceptance, Astral import/rendering, editor primitive registration, collision or physics, LODs, native GPU/performance evidence, tutorial installation, independent visual-art approval, or UE5/Unity/Genshin/ZZZ parity.
 
 A green hosted build or source regression suite cannot promote it to `imported`, `runtime_verified`, or `art_approved`.
