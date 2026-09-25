@@ -54,3 +54,30 @@ merge another worker's unreviewed PRs, change architecture, invoke unsafe R0,
 start local execution, deploy, or release under this authorization.
 Company Runtime remains the sole workstation scheduler/executor. These
 operating records themselves are documentation, not playable-game acceptance.
+
+## September 24, 2026 operator update: character voice and presentation scope
+
+Lucas explicitly requests these product constraints and matching engine support:
+- Only the persistent main character is playable. A voiced supporting cast and
+  AI allies do not authorize party switching or playable NPC story segments.
+- AI-generated character voices start in English and Japanese. Each character
+  has a distinct personality and stable voice identity across their lines, with
+  reviewed language-specific direction. Voice/text languages are independent.
+- Optional gacha is limited to armor, tools, weapons and cosmetics, never playable
+  characters. Real-money activation, rates and pricing are not decided here.
+- Dialogue should be shorter and responsive: no forced voice/gesture waits for
+  manual advance, safe skip with recap, meaningful choices and read-only history.
+- Facial expressions follow story/performance direction and work alongside
+  language-specific lip sync. Voice synthesis belongs to offline asset production.
+- The desired Genshin/Pokemon-like advance feedback is represented by an original
+  short cue in this packet. No exact reference recording or reuse permission was
+  supplied; do not claim an exact match or copy a third-party game asset.
+
+The [game instructions](Docs/Game/CHARACTERS-VOICES-DIALOGUE.md) and
+[engine contract](Docs/Engine/DIALOGUE-AUDIO-EXPRESSION-CONTRACT.md) split ownership.
+[VD-001](Tasks/VOICE-DIALOGUE-2026-09-24.md) admits instructions, research, strict
+source-fixture validation and original audio generation without modifying live
+combat/narrative state, runtime backends or another worker's files. This explicit
+request permits this independent work despite older blanket content-pause text.
+It does not accept the engine, waive native/QA gates, authorize dependencies or
+purchases, modify local scheduling, or authorize this cross-lane packet to merge.
