@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-modular-architecture-tutorial-sequence-v1",
+  "task_id": "ART-010",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "source_validated_not_imported",
+  "purpose": "source-only staged construction sequence and acceptance checkpoints for the ART-010 tutorial room",
+  "validated_parent_head": "38fb570755d52a5576bd7d5353d6aee1b60b7f71",
+  "source_pins": {
+    "module_contract_path": "Content/Starter/ModularArchitectureV1/source-contract.json",
+    "module_contract_git_blob_sha1": "81fc2d4589d8e8552990268a6b557972797c8cc4",
+    "tutorial_room_path": "Content/Starter/ModularArchitectureV1/tutorial-room-source.json",
+    "tutorial_room_git_blob_sha1": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a",
+    "joint_contract_path": "Content/Starter/ModularArchitectureV1/tutorial-room-joint-contract.json",
+    "joint_contract_git_blob_sha1": "e62b5d86a4edbff8663a1df145c36f8596ca26d2"
+  },
+  "coordinate_system": {
+    "handedness": "right",
+    "up": "+Y",
+    "forward": "+Z",
+    "right": "-X",
+    "linear_unit": "metre"
+  },
+  "snap": {
+    "translation_increment_m": 0.25,
+    "rotation_increment_deg": 90
+  },
+  "construction_policy": {
+    "placement_is_atomic": true,
+    "scale_override_allowed": false,
+    "preserve_source_placement_ids": true,
+    "source_transform_authority": "tutorial-room-source.json",
+    "relationship_authority": "tutorial-room-joint-contract.json"
+  },
+  "stages": [
+    {
+      "stage": 1,
+      "id": "floor-base",
+      "title": "Build the 4 x 4 m floor",
+      "delta_placement_ids": [
+        "floor-sw",
+        "floor-se",
+        "floor-nw",
+        "floor-ne"
+      ],
+      "expected_relationships_after_stage": {
+        "floor_flush_seams": 4,
+        "wall_flush_seams": 0,
+        "intentional_corner_overlaps": 0,
+        "floor_wall_base_embeddings": 0,
+        "total": 4
+      },
+      "checks": [
+        "Four floor-2x2 modules cover the 4 x 4 m floor bounds with no volume overlap.",
+        "All four internal floor seams match the joint contract."
+      ],
+      "cumulative_placement_count": 4
+    },
+    {
+      "stage": 2,
+      "id": "front-wall-and-door",
+      "title": "Build the front wall and centered doorway",
+      "delta_placement_ids": [
+        "front-left",
+        "front-door",
+        "front-right"
+      ],
+      "expected_relationships_after_stage": {
+        "floor_flush_seams": 4,
+        "wall_flush_seams": 2,
+        "intentional_corner_overlaps": 0,
+        "floor_wall_base_embeddings": 4,
+        "total": 10
+      },
+      "checks": [
+        "Front wall spans x = 0..4 m at z = 0..0.25 m.",
+        "Doorway clearance remains x = 1.5..2.5 m and y = 0..2 m."
+      ],
+      "cumulative_placement_count": 7
+    },
+    {
+      "stage": 3,
+      "id": "rear-wall",
+      "title": "Close the rear wall",
+      "delta_placement_ids": [
+        "back-west",
+        "back-east"
+      ],
+      "expected_relationships_after_stage": {
+        "floor_flush_seams": 4,
+        "wall_flush_seams": 3,
+        "intentional_corner_overlaps": 0,
+        "floor_wall_base_embeddings": 6,
+        "total": 13
+      },
+      "checks": [
+        "Rear wall spans x = 0..4 m at z = 3.75..4 m.",
+        "The rear wall center seam is flush."
+      ],
+      "cumulative_placement_count": 9
+    },
+    {
+      "stage": 4,
+      "id": "left-wall",
+      "title": "Close the left side",
+      "delta_placement_ids": [
+        "left-south",
+        "left-north"
+      ],
+      "expected_relationships_after_stage": {
+        "floor_flush_seams": 4,
+        "wall_flush_seams": 4,
+        "intentional_corner_overlaps": 2,
+        "floor_wall_base_embeddings": 8,
+        "total": 18
+      },
+      "checks": [
+        "Both modules are rotated -90 degrees about +Y.",
+        "The left side creates only the two declared 0.25 m corner overlaps."
+      ],
+      "cumulative_placement_count": 11
+    },
+    {
+      "stage": 5,
+      "id": "right-wall",
+      "title": "Close the right side",
+      "delta_placement_ids": [
+        "right-south",
+        "right-north"
+      ],
+      "expected_relationships_after_stage": {
+        "floor_flush_seams": 4,
+        "wall_flush_seams": 5,
+        "intentional_corner_overlaps": 4,
+        "floor_wall_base_embeddings": 10,
+        "total": 23
+      },
+      "checks": [
+        "Both modules are rotated -90 degrees about +Y.",
+        "The completed shell has only the four declared corner overlaps and the centered doorway opening."
+      ],
+      "cumulative_placement_count": 13
+    },
+    {
+      "stage": 6,
+      "id": "final-source-review",
+      "title": "Run the source-only review",
+      "delta_placement_ids": [],
+      "expected_relationships_after_stage": {
+        "floor_flush_seams": 4,
+        "wall_flush_seams": 5,
+        "intentional_corner_overlaps": 4,
+        "floor_wall_base_embeddings": 10,
+        "total": 23
+      },
+      "checks": [
+        "All 13 placement IDs are present exactly once.",
+        "Player-start and tutorial-camera remain review markers only.",
+        "Do not label the scene imported, runtime-verified, or art-approved."
+      ],
+      "cumulative_placement_count": 13
+    }
+  ],
+  "review_markers": [
+    {
+      "id": "player-start",
+      "kind": "spawn_marker",
+      "runtime_support": "not_claimed"
+    },
+    {
+      "id": "tutorial-camera",
+      "kind": "review_camera_marker",
+      "runtime_support": "not_claimed"
+    }
+  ],
+  "acceptance": {
+    "source_placement_count": 13,
+    "final_declared_relationship_count": 23,
+    "semantic_assertions_passed": 129,
+    "all_source_placements_covered_once": true,
+    "runtime_verified": false,
+    "art_approved": false
+  },
+  "evidence_boundary": {
+    "not_claimed": [
+      "Astral editor snap behavior",
+      "Astral import or rendering",
+      "collision or navigation",
+      "runtime tutorial execution",
+      "native performance",
+      "independent visual-art approval"
+    ]
+  }
+}
