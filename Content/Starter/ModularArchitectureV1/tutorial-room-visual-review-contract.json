@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-modular-architecture-tutorial-room-visual-review-v1",
+  "task_id": "ART-010",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "proposed_art_review_contract_source_only",
+  "purpose": "fixed-camera, fixed-presentation review contract for comparing ART-010 source, DCC, imported, and runtime captures without conflating those evidence stages",
+  "validated_parent_head": "2453c7630dd8acfabdea1a5a0de68c740fb9f282",
+  "source_pins": {
+    "module_contract": {
+      "path": "Content/Starter/ModularArchitectureV1/source-contract.json",
+      "git_blob_sha1": "81fc2d4589d8e8552990268a6b557972797c8cc4"
+    },
+    "expected_manifest": {
+      "path": "Content/Starter/ModularArchitectureV1/expected-manifest.json",
+      "git_blob_sha1": "fded85d5658d991bd4a83015fb4d35d0e2c5a098"
+    },
+    "tutorial_room_source": {
+      "path": "Content/Starter/ModularArchitectureV1/tutorial-room-source.json",
+      "git_blob_sha1": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a"
+    },
+    "assembly_ledger": {
+      "path": "Content/Starter/ModularArchitectureV1/tutorial-room-assembly-ledger.json",
+      "git_blob_sha1": "3ebdadc121755eca900aeb326a9cea713037eecb"
+    },
+    "joint_contract": {
+      "path": "Content/Starter/ModularArchitectureV1/tutorial-room-joint-contract.json",
+      "git_blob_sha1": "e62b5d86a4edbff8663a1df145c36f8596ca26d2"
+    },
+    "construction_sequence": {
+      "path": "Content/Starter/ModularArchitectureV1/tutorial-room-construction-sequence.json",
+      "git_blob_sha1": "e2af700ec63e7e2eed46a042cededd4076cfd457"
+    },
+    "import_acceptance_contract": {
+      "path": "Content/Starter/ModularArchitectureV1/astral-import-acceptance-contract.json",
+      "git_blob_sha1": "62660f10648e08aa1fc788aaefe04d3f9475e3fe"
+    }
+  },
+  "external_reference_basis": {
+    "observed_2026_09_25": [
+      {
+        "source": "Unreal Engine 5.8 Auto Exposure documentation",
+        "url": "https://dev.epicgames.com/documentation/unreal-engine/auto-exposure-in-unreal-engine",
+        "lesson_used": "manual metering can hold a fixed exposure value; technical comparison captures should avoid view-dependent exposure drift"
+      },
+      {
+        "source": "Unity URP Color Adjustments manual",
+        "url": "https://docs.unity3d.com/6000.0/Documentation/Manual/urp/Post-Processing-Color-Adjustments.html",
+        "lesson_used": "post exposure and grading can alter final brightness and tone; matched technical captures should hold them fixed or disabled"
+      }
+    ],
+    "reference_boundary": "workflow lessons only; no Epic or Unity content is copied and no parity is claimed"
+  },
+  "coordinate_system": {
+    "handedness": "right",
+    "up": "+Y",
+    "forward": "+Z",
+    "right": "-X",
+    "linear_unit": "metre"
+  },
+  "room_reference": {
+    "outer_bounds_m": [[0.0, 0.0, 0.0], [4.0, 3.0, 4.0]],
+    "doorway_clearance_world_bounds_m": [[1.5, 0.0, 0.0], [2.5, 2.0, 0.25]],
+    "placement_count": 13,
+    "declared_relationship_count": 23
+  },
+  "capture_profile": {
+    "status": "proposed_until_independently_reviewed",
+    "aspect_ratio": "16:9",
+    "resolution_reference_px": [1920, 1080],
+    "projection": "perspective",
+    "default_vertical_fov_deg": 50.0,
+    "exposure_policy": "fixed_manual_when_supported",
+    "auto_exposure": "disabled_for_matched_technical_capture",
+    "local_exposure": "disabled_for_matched_technical_capture",
+    "creative_lut_or_grade": "disabled_for_matched_technical_capture",
+    "white_balance": "neutral_6500K_when_supported",
+    "depth_of_field": "disabled",
+    "motion_blur": "disabled",
+    "bloom": "disabled",
+    "vignette": "disabled",
+    "chromatic_aberration": "disabled",
+    "lens_distortion": "disabled",
+    "output_color_note": "record actual runtime/DCC output transform; do not assume identical tonemapping across tools",
+    "absolute_light_units": "engine_owned_not_defined_by_art_contract",
+    "comparison_rule": "same camera transform, same field of view, same review material intent and fixed presentation settings for every compared stage"
+  },
+  "review_lighting_intent": {
+    "status": "proposed",
+    "technical_neutral": {
+      "key_direction_world": [-0.45, -0.8, -0.4],
+      "key_white_point": "D65_or_nearest_supported_neutral",
+      "fill_policy": "neutral_fill_without_colored_creative_grade",
+      "key_to_fill_ratio_target": "approximately_2_to_1",
+      "baked_lighting_in_source_textures": false
+    },
+    "grazing_normal_check": {
+      "purpose": "make flipped normals, tangent discontinuities, coplanar z-fighting and seam gaps visually obvious",
+      "light_direction_may_move": true,
+      "camera_transform_must_not_move": true
+    }
+  },
+  "shots": [
+    {
+      "id": "front-doorway-establishing",
+      "intent": "show complete front wall, centered opening, scale, front seams and both front corners",
+      "camera_position_m": [2.0, 1.6, -5.0],
+      "look_at_m": [2.0, 1.4, 1.0],
+      "vertical_fov_deg": 50.0,
+      "must_show": ["full doorway opening", "front-left/front-door seam", "front-door/front-right seam", "left-front corner", "right-front corner"]
+    },
+    {
+      "id": "interior-doorway-backlook",
+      "intent": "inspect doorway silhouette and front-wall shading from inside the room",
+      "camera_position_m": [2.0, 1.6, 3.2],
+      "look_at_m": [2.0, 1.25, 0.0],
+      "vertical_fov_deg": 55.0,
+      "must_show": ["door jambs", "door lintel", "interior front-wall seams", "doorway clearance"]
+    },
+    {
+      "id": "rear-left-corner-grazing",
+      "intent": "inspect rear center seam, left wall seam and intentional rear-left corner overlap under grazing light",
+      "camera_position_m": [3.15, 1.4, 1.35],
+      "look_at_m": [0.18, 1.25, 3.82],
+      "vertical_fov_deg": 50.0,
+      "must_show": ["back-west/back-east seam", "left-south/left-north seam", "rear-left intentional corner overlap"]
+    },
+    {
+      "id": "front-right-corner-grazing",
+      "intent": "inspect right wall seam and intentional front-right corner overlap under grazing light",
+      "camera_position_m": [0.85, 1.4, 2.8],
+      "look_at_m": [3.82, 1.25, 0.18],
+      "vertical_fov_deg": 50.0,
+      "must_show": ["right-south/right-north seam", "front-right intentional corner overlap", "floor-to-wall contact"]
+    },
+    {
+      "id": "floor-seam-overhead",
+      "intent": "inspect all four floor modules, the cross-shaped seam network and one-repeat-per-metre UV scale if a checker review material is available",
+      "camera_position_m": [2.0, 6.0, 2.0],
+      "look_at_m": [2.0, 0.0, 2.0],
+      "vertical_fov_deg": 45.0,
+      "must_show": ["entire 4 x 4 m floor", "four internal floor seams", "floor perimeter contact with walls"]
+    }
+  ],
+  "technical_visual_acceptance": {
+    "geometry": [
+      "no visible crack along declared flush seams at matched source positions",
+      "no visible z-fighting on coplanar or intentionally overlapping corner geometry",
+      "no inverted-face disappearance with backface culling enabled",
+      "doorway remains visibly centered, 1 m wide and 2 m high",
+      "floor remains visually planar without transform-induced steps"
+    ],
+    "shading": [
+      "neutral material response is consistent across coplanar modules",
+      "grazing-light review shows no flipped normals",
+      "tangent discontinuities are limited to authored face/UV seams rather than random module corruption",
+      "review lighting does not hide geometry failures with a creative grade"
+    ],
+    "uv": [
+      "if a checker diagnostic is substituted, one authored UV repeat per metre is preserved",
+      "no unintended mirrored orientation is introduced by import conversion",
+      "UV evidence is diagnostic only and does not convert the neutral material into final production surfacing"
+    ],
+    "scene_readability": [
+      "doorway is readable from the front establishing shot",
+      "room scale reads consistently across exterior and interior shots",
+      "technical captures avoid depth-of-field, motion-blur or lens effects that conceal seams"
+    ]
+  },
+  "evidence_stages": [
+    {
+      "stage": "source",
+      "allowed_evidence": ["source JSON", "pinned generated glTF", "semantic verifier output"],
+      "may_claim_runtime": false
+    },
+    {
+      "stage": "offline_dcc",
+      "allowed_evidence": ["Blender or other authorized DCC viewport/render using the pinned source"],
+      "may_claim_runtime": false
+    },
+    {
+      "stage": "imported",
+      "allowed_evidence": ["Astral import receipt and persisted imported asset data"],
+      "may_claim_runtime": false
+    },
+    {
+      "stage": "runtime_verified",
+      "allowed_evidence": ["native Astral captures from the matched shot contract plus command/build receipt"],
+      "may_claim_runtime": true
+    },
+    {
+      "stage": "art_approved",
+      "allowed_evidence": ["independent visual review against matched captures and this contract"],
+      "may_claim_runtime": true
+    }
+  ],
+  "review_record_requirements": [
+    "repository commit and exact source pins",
+    "stage under review",
+    "tool/build/version",
+    "camera shot id",
+    "actual projection/FOV and transform",
+    "actual exposure/grade settings",
+    "actual lighting settings or unsupported note",
+    "capture or artifact reference",
+    "geometry/shading/UV findings",
+    "cleanup time or correction count if a defect is found",
+    "reviewer identity or role",
+    "accepted/rejected plus rationale"
+  ],
+  "promotion_boundary": {
+    "runtime_verified": false,
+    "art_approved": false,
+    "not_claimed": [
+      "Astral camera or lighting support",
+      "Astral post-processing parity",
+      "Blender round-trip",
+      "Khronos validator execution",
+      "native performance",
+      "UE5, Unity, Genshin Impact or Zenless Zone Zero parity"
+    ]
+  }
+}
