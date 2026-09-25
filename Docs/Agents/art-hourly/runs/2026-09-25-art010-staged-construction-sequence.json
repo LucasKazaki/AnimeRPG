@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "loop_id": "astral-art-hourly-20260922",
+  "task_id": "ART-010",
+  "date": "2026-09-25",
+  "baseline": {
+    "latest_observed_main": "2958741188279a0b438dd489ad00cac546012c25",
+    "owned_branch": "art/2026-09-25-starter-modular-architecture-v1-pass1",
+    "validated_branch_head": "bca57b1971f2e4295ac27a8a967c7b28cad6f94a",
+    "pull_request": null,
+    "stacked_predecessor_pr": 65
+  },
+  "delivered": [
+    {
+      "path": "Tasks/ART-010-STARTER-MODULAR-ARCHITECTURE-v1.md",
+      "result": "declared explicit ART-010 owned paths"
+    },
+    {
+      "path": "Content/Starter/ModularArchitectureV1/tutorial-room-construction-sequence.json",
+      "result": "published six-stage source-only build sequence covering all 13 room placements exactly once"
+    },
+    {
+      "path": "Docs/QA/ART-010-TUTORIAL-CONSTRUCTION-SEQUENCE-2026-09-25.json",
+      "result": "published semantic source-QA receipt"
+    },
+    {
+      "path": "Docs/Agents/art-hourly/BACKLOG.json",
+      "result": "advanced ART-010 durable status without claiming runtime integration"
+    }
+  ],
+  "source_evidence": {
+    "module_contract_git_blob_sha1": "81fc2d4589d8e8552990268a6b557972797c8cc4",
+    "tutorial_room_git_blob_sha1": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a",
+    "joint_contract_git_blob_sha1": "e62b5d86a4edbff8663a1df145c36f8596ca26d2",
+    "construction_sequence_git_blob_sha1": "e2af700ec63e7e2eed46a042cededd4076cfd457",
+    "construction_sequence_qa_git_blob_sha1": "8da82c5032deeaf3a8a91a079c9555e45c1e6689"
+  },
+  "verification": {
+    "semantic_assertions_passed": 158,
+    "stage_placement_counts": [
+      4,
+      7,
+      9,
+      11,
+      13,
+      13
+    ],
+    "stage_relationship_totals": [
+      4,
+      10,
+      13,
+      18,
+      23,
+      23
+    ],
+    "source_pins_match_live_branch": true,
+    "exact_final_placement_coverage": true,
+    "runtime_verified": false,
+    "art_approved": false
+  },
+  "review_and_checks": {
+    "art010_pr": "not_created",
+    "art010_hosted_ci": "not_run",
+    "independent_art010_review": "not_run",
+    "predecessor_pr65": "open_draft_mergeable",
+    "predecessor_pr65_head": "0083fe2f2762ad224898dddfa6dac3570f009518"
+  },
+  "not_run": [
+    "prepared ART-010 generator/verifier/37-case repository-head suite",
+    "Blender round-trip",
+    "Khronos glTF validator",
+    "Astral import/render",
+    "editor snapping",
+    "collision/navigation/LOD",
+    "native performance",
+    "independent visual-art approval"
+  ],
+  "blocker": "ART-010 generator/verifier/focused test scripts remain unpublished, so the branch still cannot reproduce and independently verify the six-mesh glTF from repository head alone.",
+  "next_action": "publish the three prepared ART-010 source-tooling scripts through an allowed GitHub write path, then rerun exact-head generation, deterministic check, independent verification, focused regressions, and review."
+}
