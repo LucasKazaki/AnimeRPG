@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "id": "astral.starter.modular_architecture.v1",
+  "status": "proposed_source_fixture",
+  "runtime_status": "source_validated_not_imported",
+  "provenance": {
+    "origin": "original_procedural",
+    "external_assets": [],
+    "authoring_tool": "Python standard library procedural generator",
+    "seed": null,
+    "distribution": "pending_repository_policy"
+  },
+  "reference_scope": {
+    "purpose": "generic grid-snapping modular blockout kit",
+    "reference_engines": [
+      "Unreal Engine 5.8",
+      "Unity current manual"
+    ],
+    "copying_prohibited": true
+  },
+  "coordinates": {
+    "unit": "metre",
+    "handedness": "right_handed",
+    "up": "+Y",
+    "forward": "+Z",
+    "right": "-X"
+  },
+  "snap": {
+    "translation_increment_m": 0.25,
+    "rotation_increment_deg": 90,
+    "pivot_policy": "local minimum corner on floor/base plane",
+    "module_dimensions_must_align_to_grid": true
+  },
+  "material": {
+    "name": "MAT_StarterNeutral",
+    "base_color_linear_factor": [
+      0.56,
+      0.58,
+      0.62,
+      1.0
+    ],
+    "metallic_factor": 0.0,
+    "roughness_factor": 0.72,
+    "alpha_mode": "OPAQUE"
+  },
+  "modules": [
+    {
+      "id": "floor_1x1",
+      "name": "SM_Starter_Floor_1x1",
+      "kind": "floor",
+      "bounds_m": [[0.0,0.0,0.0],[1.0,0.25,1.0]],
+      "parts": [[[0.0,0.0,0.0],[1.0,0.25,1.0]]],
+      "gallery_translation_m": [0.0,0.0,0.0]
+    },
+    {
+      "id": "floor_2x2",
+      "name": "SM_Starter_Floor_2x2",
+      "kind": "floor",
+      "bounds_m": [[0.0,0.0,0.0],[2.0,0.25,2.0]],
+      "parts": [[[0.0,0.0,0.0],[2.0,0.25,2.0]]],
+      "gallery_translation_m": [2.0,0.0,0.0]
+    },
+    {
+      "id": "wall_1x3",
+      "name": "SM_Starter_Wall_1x3",
+      "kind": "wall",
+      "bounds_m": [[0.0,0.0,0.0],[1.0,3.0,0.25]],
+      "parts": [[[0.0,0.0,0.0],[1.0,3.0,0.25]]],
+      "gallery_translation_m": [0.0,0.0,3.0]
+    },
+    {
+      "id": "wall_2x3",
+      "name": "SM_Starter_Wall_2x3",
+      "kind": "wall",
+      "bounds_m": [[0.0,0.0,0.0],[2.0,3.0,0.25]],
+      "parts": [[[0.0,0.0,0.0],[2.0,3.0,0.25]]],
+      "gallery_translation_m": [2.0,0.0,3.0]
+    },
+    {
+      "id": "doorway_2x3",
+      "name": "SM_Starter_Doorway_2x3",
+      "kind": "doorway",
+      "bounds_m": [[0.0,0.0,0.0],[2.0,3.0,0.25]],
+      "opening_bounds_m": [[0.5,0.0,0.0],[1.5,2.0,0.25]],
+      "parts": [
+        [[0.0,0.0,0.0],[0.5,2.0,0.25]],
+        [[1.5,0.0,0.0],[2.0,2.0,0.25]],
+        [[0.0,2.0,0.0],[2.0,3.0,0.25]]
+      ],
+      "gallery_translation_m": [5.0,0.0,3.0]
+    },
+    {
+      "id": "pillar_025x3",
+      "name": "SM_Starter_Pillar_025x3",
+      "kind": "pillar",
+      "bounds_m": [[0.0,0.0,0.0],[0.25,3.0,0.25]],
+      "parts": [[[0.0,0.0,0.0],[0.25,3.0,0.25]]],
+      "gallery_translation_m": [8.0,0.0,3.0]
+    }
+  ]
+}
