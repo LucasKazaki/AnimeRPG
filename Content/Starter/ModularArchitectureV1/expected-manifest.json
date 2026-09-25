@@ -13,12 +13,150 @@
   "vertex_count_total": 176,
   "index_count_total": 264,
   "modules": [
-    {"id":"floor-1x1","mesh_name":"Starter_Floor_1x1m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[1.0,0.25,1.0]],"pivot_m":[0.0,0.0,0.0]},
-    {"id":"floor-2x2","mesh_name":"Starter_Floor_2x2m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[2.0,0.25,2.0]],"pivot_m":[0.0,0.0,0.0]},
-    {"id":"wall-1x3","mesh_name":"Starter_Wall_1x3m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[1.0,3.0,0.25]],"pivot_m":[0.0,0.0,0.0]},
-    {"id":"wall-2x3","mesh_name":"Starter_Wall_2x3m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[2.0,3.0,0.25]],"pivot_m":[0.0,0.0,0.0]},
-    {"id":"doorway-2x3","mesh_name":"Starter_Doorway_2x3m","kind":"doorway_frame","vertex_count":56,"index_count":84,"bounds_m":[[0.0,0.0,0.0],[2.0,3.0,0.25]],"pivot_m":[0.0,0.0,0.0]},
-    {"id":"pillar-025x3","mesh_name":"Starter_Pillar_025x3m","kind":"box","vertex_count":24,"index_count":36,"bounds_m":[[0.0,0.0,0.0],[0.25,3.0,0.25]],"pivot_m":[0.0,0.0,0.0]}
+    {
+      "id": "floor-1x1",
+      "mesh_name": "Starter_Floor_1x1m",
+      "kind": "box",
+      "vertex_count": 24,
+      "index_count": 36,
+      "bounds_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          0.25,
+          1.0
+        ]
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "floor-2x2",
+      "mesh_name": "Starter_Floor_2x2m",
+      "kind": "box",
+      "vertex_count": 24,
+      "index_count": 36,
+      "bounds_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.25,
+          2.0
+        ]
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "wall-1x3",
+      "mesh_name": "Starter_Wall_1x3m",
+      "kind": "box",
+      "vertex_count": 24,
+      "index_count": 36,
+      "bounds_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          1.0,
+          3.0,
+          0.25
+        ]
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "wall-2x3",
+      "mesh_name": "Starter_Wall_2x3m",
+      "kind": "box",
+      "vertex_count": 24,
+      "index_count": 36,
+      "bounds_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          2.0,
+          3.0,
+          0.25
+        ]
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "doorway-2x3",
+      "mesh_name": "Starter_Doorway_2x3m",
+      "kind": "doorway_frame",
+      "vertex_count": 56,
+      "index_count": 84,
+      "bounds_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          2.0,
+          3.0,
+          0.25
+        ]
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "pillar-025x3",
+      "mesh_name": "Starter_Pillar_025x3m",
+      "kind": "box",
+      "vertex_count": 24,
+      "index_count": 36,
+      "bounds_m": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.25,
+          3.0,
+          0.25
+        ]
+      ],
+      "pivot_m": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
   ],
   "snap": {
     "translation_increment_m": 0.25,
@@ -28,7 +166,12 @@
   },
   "geometry": {
     "topology": "TRIANGLES",
-    "attributes": ["POSITION","NORMAL","TANGENT","TEXCOORD_0"],
+    "attributes": [
+      "POSITION",
+      "NORMAL",
+      "TANGENT",
+      "TEXCOORD_0"
+    ],
     "uv_policy": "planar_face_uvs_at_one_repeat_per_metre",
     "uv_repeats_per_metre": 1.0,
     "lod_policy": "source_lod0_only",
