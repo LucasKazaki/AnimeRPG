@@ -13,7 +13,9 @@ required = [
 ]
 markers = {
     ROOT / "Engine/Assets/StaticMesh.cpp": ["LoadFromFile", "ASTRAL_MESH", "vertices_.clear"],
-    ROOT / "Engine/Scene/Transform.cpp": ["WorldPosition", "parent->WorldPosition"],
+    # RA-001 replaces recursive parent lookup with checked iterative traversal.
+    # Presence only: SceneTests/NumericAuditTests verify hierarchy behavior.
+    ROOT / "Engine/Scene/Transform.cpp": ["TryWorldPosition", "node = node->parent"],
     ROOT / "Engine/Scene/Camera.cpp": ["WorldToScreen", "worldWidth", "worldHeight"],
     # M5 evolved the original RenderDebugScene entry point into RenderWorld.
     ROOT / "Engine/Renderer/Renderer.cpp": ["RenderWorld", "CreatePen", "LineTo"],
