@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-modular-architecture-tutorial-room-v1",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "source_validated_not_imported",
+  "purpose": "source-only snap-and-assembly tutorial scene for Starter Modular Architecture v1",
+  "coordinate_system": {
+    "handedness": "right",
+    "up": "+Y",
+    "forward": "+Z",
+    "right": "-X",
+    "linear_unit": "metre"
+  },
+  "snap": {
+    "translation_increment_m": 0.25,
+    "rotation_increment_deg": 90
+  },
+  "dependency": {
+    "module_contract": "source-contract.json",
+    "required_asset_id": "astral-starter-modular-architecture-v1",
+    "required_module_ids": [
+      "floor-2x2",
+      "wall-1x3",
+      "wall-2x3",
+      "doorway-2x3"
+    ]
+  },
+  "scene": {
+    "name": "Starter_Modular_Tutorial_Room_v1",
+    "room_outer_bounds_m": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        4.0,
+        3.0,
+        4.0
+      ]
+    ],
+    "floor_bounds_m": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        4.0,
+        0.25,
+        4.0
+      ]
+    ],
+    "door_opening_world_bounds_m": [
+      [
+        1.5,
+        0.0,
+        0.0
+      ],
+      [
+        2.5,
+        2.0,
+        0.25
+      ]
+    ],
+    "placements": [
+      {
+        "id": "floor-sw",
+        "module_id": "floor-2x2",
+        "translation_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "id": "floor-se",
+        "module_id": "floor-2x2",
+        "translation_m": [
+          2.0,
+          0.0,
+          0.0
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "id": "floor-nw",
+        "module_id": "floor-2x2",
+        "translation_m": [
+          0.0,
+          0.0,
+          2.0
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "id": "floor-ne",
+        "module_id": "floor-2x2",
+        "translation_m": [
+          2.0,
+          0.0,
+          2.0
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "id": "front-left",
+        "module_id": "wall-1x3",
+        "translation_m": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "id": "front-door",
+        "module_id": "doorway-2x3",
+        "translation_m": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "id": "front-right",
+        "module_id": "wall-1x3",
+        "translation_m": [
+          3.0,
+          0.0,
+          0.0
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "id": "back-west",
+        "module_id": "wall-2x3",
+        "translation_m": [
+          0.0,
+          0.0,
+          3.75
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "id": "back-east",
+        "module_id": "wall-2x3",
+        "translation_m": [
+          2.0,
+          0.0,
+          3.75
+        ],
+        "rotation_y_deg": 0
+      },
+      {
+        "id": "left-south",
+        "module_id": "wall-2x3",
+        "translation_m": [
+          0.25,
+          0.0,
+          0.0
+        ],
+        "rotation_y_deg": -90
+      },
+      {
+        "id": "left-north",
+        "module_id": "wall-2x3",
+        "translation_m": [
+          0.25,
+          0.0,
+          2.0
+        ],
+        "rotation_y_deg": -90
+      },
+      {
+        "id": "right-south",
+        "module_id": "wall-2x3",
+        "translation_m": [
+          4.0,
+          0.0,
+          0.0
+        ],
+        "rotation_y_deg": -90
+      },
+      {
+        "id": "right-north",
+        "module_id": "wall-2x3",
+        "translation_m": [
+          4.0,
+          0.0,
+          2.0
+        ],
+        "rotation_y_deg": -90
+      }
+    ],
+    "markers": [
+      {
+        "id": "player-start",
+        "kind": "spawn_marker",
+        "position_m": [
+          2.0,
+          0.25,
+          2.0
+        ],
+        "forward": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "runtime_support": "not_claimed"
+      },
+      {
+        "id": "tutorial-camera",
+        "kind": "review_camera_marker",
+        "position_m": [
+          2.0,
+          1.6,
+          6.0
+        ],
+        "look_at_m": [
+          2.0,
+          1.4,
+          1.8
+        ],
+        "runtime_support": "not_claimed"
+      }
+    ],
+    "allowed_overlap_policy": "floor-wall contact and 0.25 m corner wall intersections are intentional; no other solid-volume overlap is intended"
+  },
+  "tutorial_steps": [
+    "Place four floor-2x2 modules on the 0.25 m grid to form a 4 x 4 m floor.",
+    "Build the front wall from wall-1x3, doorway-2x3, wall-1x3 so the doorway opening is centered.",
+    "Build the rear wall from two wall-2x3 modules at z = 3.75 m.",
+    "Rotate four wall-2x3 modules by -90 degrees around +Y to close the left and right sides.",
+    "Verify all translations remain on the 0.25 m grid and rotations remain multiples of 90 degrees.",
+    "Treat this file as source layout data only until Astral editor/import support is independently verified."
+  ],
+  "acceptance": {
+    "placement_count": 13,
+    "floor_module_count": 4,
+    "wall_module_count": 9,
+    "closed_shell_except_doorway": true,
+    "runtime_verified": false,
+    "art_approved": false
+  }
+}
