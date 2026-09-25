@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "loop_id": "astral-art-hourly-20260922",
+  "task_id": "ART-010",
+  "date": "2026-09-25",
+  "evidence_type": "sandbox_live_source_semantic_validation",
+  "validated_repository_head": "eabf824278a8569c85d9b1ffab7ad6c60666141b",
+  "source_contract_git_blob_sha": "81fc2d4589d8e8552990268a6b557972797c8cc4",
+  "tutorial_room_git_blob_sha": "bffd051c787e9b6b5d5199b9e06f5895a2254a8a",
+  "result": {
+    "assertions_passed": 106,
+    "placement_count": 13,
+    "unique_placement_ids": 13,
+    "floor_module_count": 4,
+    "wall_module_count": 9,
+    "translation_increment_m": 0.25,
+    "rotation_increment_deg": 90,
+    "room_outer_bounds_m": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        4
+      ]
+    ],
+    "floor_bounds_m": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        0.25,
+        4
+      ]
+    ],
+    "door_opening_world_bounds_m": [
+      [
+        1.5,
+        0,
+        0
+      ],
+      [
+        2.5,
+        2,
+        0.25
+      ]
+    ],
+    "required_module_ids": [
+      "floor-2x2",
+      "wall-1x3",
+      "wall-2x3",
+      "doorway-2x3"
+    ],
+    "marker_ids": [
+      "player-start",
+      "tutorial-camera"
+    ],
+    "runtime_verified": false,
+    "art_approved": false
+  },
+  "repository_publication": {
+    "tutorial_room_expected_manifest_commit": "b35456c5de1e3d9860c6efb26f3ee990fffbea16",
+    "tutorial_room_expected_manifest_git_blob_sha": "dad777c200c9fe651a7a7d38c30e30ea1e047b50"
+  },
+  "remaining_gates": [
+    "publish deterministic generator",
+    "publish independent verifier",
+    "publish focused regression suite",
+    "run exact-head source QA",
+    "independent review",
+    "Blender round trip",
+    "Khronos glTF validation",
+    "Astral import and runtime rendering",
+    "editor snapping and registration",
+    "native performance",
+    "independent visual-art approval"
+  ]
+}
