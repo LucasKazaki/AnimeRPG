@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-ui-icons-v1",
+  "task_id": "ART-011",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "proposed_raster_derivation_contract_source_only",
+  "source_reference": {
+    "expected_path": "Content/Starter/UIIconsV1/starter-ui-icons.svg",
+    "sha256": "6532d497f710c2818e1cadbc4d1683c676c6001fca73f17254a68bec41dc5fbf",
+    "bytes": 4029,
+    "repository_presence_at_pass_start": false,
+    "evidence_scope": "exact preserved handoff bytes; not repository-head source acceptance"
+  },
+  "runtime_representation_candidate": {
+    "format": "PNG",
+    "pixel_format": "RGBA8 candidate",
+    "alpha": "straight alpha candidate; confirm with Astral importer before adoption",
+    "color": "neutral monochrome raster with transparent background; semantic/theme tint remains runtime-owned",
+    "color_space": "not promoted until Astral texture/UI contract proves expected sampling",
+    "mip_policy": "not selected until native UI sampling is measured",
+    "atlas_policy": "single-image acceptance first; do not atlas before import/render behavior is proven"
+  },
+  "review_sizes_px": [
+    16,
+    20,
+    24,
+    32,
+    48,
+    64
+  ],
+  "derivation_requirements": [
+    "preserve square aspect ratio and exact symbol geometry",
+    "transparent background; no baked lighting, shadow, bevel, gradient, or semantic theme color",
+    "no nonzero-alpha pixels may touch the raster edge at review sizes",
+    "do not upscale a lower-resolution raster to create a higher-resolution accepted derivative",
+    "retain the SVG as canonical editable source even if runtime uses raster derivatives",
+    "measure Astral alpha, filtering, tint, DPI/layout scaling and atlas behavior before runtime promotion"
+  ],
+  "accessibility_reference_policy": {
+    "non_text_contrast": "proposed runtime/theme review: meaningful icon or component-state visuals should target at least 3:1 against adjacent colors where applicable; source art alone cannot prove this",
+    "target_size": "glyph dimensions are not the interactive hit target; pointer/touch target acceptance belongs to the UI layout/control layer",
+    "compliance_claim": false
+  },
+  "offline_reference_raster": {
+    "renderer": "CairoSVG 2.8.2",
+    "decoder": "Pillow 12.3.0",
+    "environment": "sandbox Linux; not Astral runtime",
+    "icon_count": 12,
+    "candidate_png_count": 72,
+    "summary_by_size": {
+      "16": {
+        "all_visible": true,
+        "all_no_edge_touch": true,
+        "min_outer_margin_px": 1,
+        "min_alpha_ge_128_pixels": 16,
+        "min_coverage_icon": "icon-close"
+      },
+      "20": {
+        "all_visible": true,
+        "all_no_edge_touch": true,
+        "min_outer_margin_px": 1,
+        "min_alpha_ge_128_pixels": 24,
+        "min_coverage_icon": "icon-pause"
+      },
+      "24": {
+        "all_visible": true,
+        "all_no_edge_touch": true,
+        "min_outer_margin_px": 2,
+        "min_alpha_ge_128_pixels": 38,
+        "min_coverage_icon": "icon-check"
+      },
+      "32": {
+        "all_visible": true,
+        "all_no_edge_touch": true,
+        "min_outer_margin_px": 2,
+        "min_alpha_ge_128_pixels": 70,
+        "min_coverage_icon": "icon-check"
+      },
+      "48": {
+        "all_visible": true,
+        "all_no_edge_touch": true,
+        "min_outer_margin_px": 4,
+        "min_alpha_ge_128_pixels": 162,
+        "min_coverage_icon": "icon-check"
+      },
+      "64": {
+        "all_visible": true,
+        "all_no_edge_touch": true,
+        "min_outer_margin_px": 5,
+        "min_alpha_ge_128_pixels": 292,
+        "min_coverage_icon": "icon-check"
+      }
+    },
+    "claim_boundary": "offline source-derived technical evidence only; candidate PNGs are not committed and do not establish Astral import, runtime behavior, accessibility, performance, or art approval"
+  },
+  "reference_evidence": [
+    {
+      "source": "Unreal Engine 5.8 DPI Scaling",
+      "url": "https://dev.epicgames.com/documentation/unreal-engine/dpi-scaling-in-unreal-engine",
+      "lesson": "resolution-independent UI uses explicit DPI scaling rules, so review must cover multiple effective sizes"
+    },
+    {
+      "source": "Unity 6 Graphic and font assets preparation",
+      "url": "https://docs.unity3d.com/6000.0/Documentation/Manual/best-practice-guides/ui-toolkit-for-advanced-unity-developers/graphic-and-font-assets-preparation.html",
+      "lesson": "raster UI images remain recommended for UI Toolkit; preserve high-quality editable source and validate atlas/runtime behavior separately"
+    },
+    {
+      "source": "W3C WCAG 2.2 Understanding 1.4.11",
+      "url": "https://www.w3.org/WAI/WCAG22/understanding/non-text-contrast.html",
+      "lesson": "3:1 is the relevant non-text contrast reference for meaningful UI component/state visuals; runtime theme must be tested separately"
+    },
+    {
+      "source": "W3C WCAG 2.2 Understanding 2.5.8",
+      "url": "https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum",
+      "lesson": "interactive target size is a control/layout property, distinct from icon glyph art size"
+    }
+  ],
+  "promotion_gates": {
+    "source_validated": "blocked until exact SVG and expected manifest are present and independently checked on repository head",
+    "raster_candidate_validated": "requires an accepted derivation tool/version, exact derivative manifest and independent decode checks",
+    "imported": "requires an Astral-supported representation and import receipt",
+    "runtime_verified": "requires native Astral captures at multiple effective UI scales with alpha/filtering/tint checks",
+    "art_approved": "requires independent visual review"
+  }
+}
