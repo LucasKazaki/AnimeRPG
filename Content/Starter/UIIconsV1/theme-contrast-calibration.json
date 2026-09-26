@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-ui-icons-v1-theme-contrast-calibration",
+  "task_id": "ART-011",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "source_calibration_fixture_not_runtime_theme",
+  "purpose": "generic light/dark contrast fixtures for starter-icon optical review before Astral UI runtime support exists",
+  "scope_boundary": "These colors are review fixtures, not the AnimeRPG final UI theme, not a renderer implementation, and not an accessibility certification.",
+  "color_space": "sRGB hex values; relative luminance and contrast use the WCAG 2.2 sRGB formula",
+  "reference": {
+    "standard": "WCAG 2.2 Understanding SC 1.4.11 Non-text Contrast",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+    "review_threshold": 3.0,
+    "threshold_note": "Meaningful UI graphics and state cues target at least 3:1 against adjacent colors. Do not round a sub-3.0 result up to passing."
+  },
+  "rules": [
+    "The icon SVG remains currentColor-driven; semantic and theme color stay outside glyph geometry.",
+    "Every enabled icon role listed below must meet the 3:1 review threshold against both the theme canvas and default control surface.",
+    "Thin antialiased strokes can appear weaker than nominal color math; visual review at 16, 20, 24, 32, 48 and 64 px remains required.",
+    "Inactive/disabled styling is intentionally omitted from this acceptance fixture rather than using low contrast as a default design.",
+    "Focus treatment is a separate state cue and must remain distinguishable from its adjacent background in native Astral UI once that path exists."
+  ],
+  "themes": {
+    "dark_reference": {
+      "canvas": "#16181D",
+      "surface": "#23262D",
+      "roles": {
+        "primary": {"color": "#F2F4F8", "contrast_vs_canvas": 16.1277, "contrast_vs_surface": 13.7539},
+        "secondary": {"color": "#AEB4BE", "contrast_vs_canvas": 8.5173, "contrast_vs_surface": 7.2636},
+        "warning": {"color": "#FFD166", "contrast_vs_canvas": 12.3162, "contrast_vs_surface": 10.5034},
+        "info": {"color": "#7CC7FF", "contrast_vs_canvas": 9.7, "contrast_vs_surface": 8.2723},
+        "focus": {"color": "#A78BFA", "contrast_vs_canvas": 6.5256, "contrast_vs_surface": 5.5651},
+        "danger": {"color": "#FF7B72", "contrast_vs_canvas": 7.0428, "contrast_vs_surface": 6.0062},
+        "success": {"color": "#62DCA5", "contrast_vs_canvas": 10.4016, "contrast_vs_surface": 8.8706}
+      }
+    },
+    "light_reference": {
+      "canvas": "#F7F8FA",
+      "surface": "#FFFFFF",
+      "roles": {
+        "primary": {"color": "#1B1F27", "contrast_vs_canvas": 15.5376, "contrast_vs_surface": 16.5108},
+        "secondary": {"color": "#5E6673", "contrast_vs_canvas": 5.4531, "contrast_vs_surface": 5.7946},
+        "warning": {"color": "#7A4B00", "contrast_vs_canvas": 6.9734, "contrast_vs_surface": 7.4102},
+        "info": {"color": "#005EA8", "contrast_vs_canvas": 6.241, "contrast_vs_surface": 6.6319},
+        "focus": {"color": "#5B2CBF", "contrast_vs_canvas": 7.7274, "contrast_vs_surface": 8.2114},
+        "danger": {"color": "#B42318", "contrast_vs_canvas": 6.1868, "contrast_vs_surface": 6.5743},
+        "success": {"color": "#136C4B", "contrast_vs_canvas": 6.0355, "contrast_vs_surface": 6.4136}
+      }
+    }
+  },
+  "verification": {
+    "role_pairs_checked": 28,
+    "minimum_recorded_ratio": 5.4531,
+    "minimum_pair": "light_reference.secondary vs canvas",
+    "all_recorded_enabled_role_pairs_meet_3_to_1": true,
+    "runtime_verified": false,
+    "art_approved": false
+  },
+  "next_acceptance": [
+    "render the exact repository-head icon source against both reference themes with one accepted rasterizer",
+    "compare 16/20/24/32/48/64 px outputs for antialiasing, stroke loss and optical balance",
+    "repeat the same checks in native Astral UI after image import, tint, filtering and DPI behavior exist",
+    "keep final game theme approval separate from this generic starter calibration fixture"
+  ]
+}
