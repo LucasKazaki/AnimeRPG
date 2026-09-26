@@ -81,6 +81,27 @@
         "runtime_verified": false,
         "art_approved": false
       }
+    },
+    {
+      "id": "ART-011",
+      "title": "Starter UI icons v1",
+      "status": "source_contract_present_asset_publication_blocked",
+      "dependency": "exact starter-ui-icons.svg and expected manifest must be present before repository-head source validation; Astral UI image import/runtime remains engine-owned",
+      "next_acceptance": "publish the exact SVG and expected manifest, run independent exact-head source QA, then select and test an Astral-supported raster or engine-native runtime representation",
+      "latest_evidence": {
+        "pr": 78,
+        "source_contract_git_blob_sha1": "1e74bdd0b4c4207758840a298eb2c337e693af23",
+        "task_git_blob_sha1": "20c7e275bf4eb249b40e7421f5904f0d12a4118b",
+        "qa_path": "Docs/QA/ART-011-SOURCE-CLAIM-REPAIR-2026-09-25.json",
+        "prepared_svg_sha256": "6532d497f710c2818e1cadbc4d1683c676c6001fca73f17254a68bec41dc5fbf",
+        "prepared_svg_bytes": 4029,
+        "repository_svg_present": false,
+        "repository_manifest_present": false,
+        "source_validated": false,
+        "imported": false,
+        "runtime_verified": false,
+        "art_approved": false
+      }
     }
   ]
 }
