@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "loop_id": "astral-art-hourly-20260922",
+  "task_id": "ART-011",
+  "date": "2026-09-25",
+  "focus": "repair contradictory source-validation claim without weakening acceptance gates",
+  "branch": "art/2026-09-25-starter-ui-icons-v1-pass1",
+  "pr": 78,
+  "observed_head_before_write": "8e14569be3430aa6a381cd15c5995f29b1a21615",
+  "verification": {
+    "source_contract_git_blob_sha1": "1e74bdd0b4c4207758840a298eb2c337e693af23",
+    "task_git_blob_sha1": "20c7e275bf4eb249b40e7421f5904f0d12a4118b",
+    "starter_svg_present_on_branch": false,
+    "expected_manifest_present_on_branch": false,
+    "corrected_status": "source_prepared_not_imported",
+    "source_validated_current_claim": false,
+    "prepared_svg_sha256": "6532d497f710c2818e1cadbc4d1683c676c6001fca73f17254a68bec41dc5fbf",
+    "prepared_svg_bytes": 4029,
+    "prepared_svg_evidence_scope": "external preserved handoff only; not repository-head acceptance",
+    "consistency_checks": [
+      "source validation cannot be true while a required manifest hash pin is absent",
+      "prepared source hash/size are explicitly separated from repository-presence claims",
+      "imported remains false",
+      "runtime_verified remains false",
+      "art_approved remains false"
+    ],
+    "imported": false,
+    "runtime_verified": false,
+    "art_approved": false
+  },
+  "blocker": "Exact SVG and expected manifest are still absent from this branch after prior connected-write rejections.",
+  "next_action": "Publish the exact SVG and expected manifest when permitted, then independently validate the branch contents before promoting source_validated."
+}
