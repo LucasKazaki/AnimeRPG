@@ -3,7 +3,7 @@
   "asset_id": "astral-starter-ui-icons-v1",
   "task_id": "ART-011",
   "loop_id": "astral-art-hourly-20260922",
-  "status": "source_validated_not_imported",
+  "status": "source_prepared_not_imported",
   "purpose": "generic_original_2d_ui_icon_source_pack_for_starter_content_and_prototypes",
   "provenance": {
     "origin": "original_vector_source",
@@ -36,14 +36,30 @@
   "source_format": {
     "format": "SVG",
     "source_only": true,
-    "sheet_view_box": [0, 0, 96, 72],
-    "icon_view_box": [0, 0, 24, 24],
+    "sheet_view_box": [
+      0,
+      0,
+      96,
+      72
+    ],
+    "icon_view_box": [
+      0,
+      0,
+      24,
+      24
+    ],
     "grid_layout": {
       "columns": 4,
       "rows": 3,
-      "cell_units": [24, 24]
+      "cell_units": [
+        24,
+        24
+      ]
     },
-    "color_policy": ["currentColor", "none"],
+    "color_policy": [
+      "currentColor",
+      "none"
+    ],
     "default_preview_color": "#000000 contact-sheet wrapper only; symbols themselves have no fixed theme color",
     "scripts_allowed": false,
     "external_references_allowed": false,
@@ -52,28 +68,67 @@
     "animation_allowed": false
   },
   "style": {
-    "primary_stroke_units": 2.0,
+    "primary_stroke_units": 2,
     "stroke_linecap": "round",
     "stroke_linejoin": "round where corners need it",
     "filled_marks_allowed_for_solid_transport_primitives": true,
-    "target_icon_grid_units": [24, 24],
-    "safe_margin_guidance_units": 2.0,
+    "target_icon_grid_units": [
+      24,
+      24
+    ],
+    "safe_margin_guidance_units": 2,
     "theme_color_baked_into_symbol": false,
     "accessibility_note": "shape semantics must not rely on color alone; runtime labels, focus states, touch targets and contrast remain UI-system responsibilities"
   },
   "icons": [
-    {"id": "icon-play", "semantic": "play / start"},
-    {"id": "icon-pause", "semantic": "pause"},
-    {"id": "icon-stop", "semantic": "stop"},
-    {"id": "icon-check", "semantic": "confirm / complete"},
-    {"id": "icon-close", "semantic": "close / cancel"},
-    {"id": "icon-warning", "semantic": "warning / caution"},
-    {"id": "icon-info", "semantic": "information"},
-    {"id": "icon-settings", "semantic": "settings / configuration"},
-    {"id": "icon-eye", "semantic": "visibility / preview"},
-    {"id": "icon-lock", "semantic": "locked / protected"},
-    {"id": "icon-search", "semantic": "search / inspect"},
-    {"id": "icon-menu", "semantic": "menu / navigation"}
+    {
+      "id": "icon-play",
+      "semantic": "play / start"
+    },
+    {
+      "id": "icon-pause",
+      "semantic": "pause"
+    },
+    {
+      "id": "icon-stop",
+      "semantic": "stop"
+    },
+    {
+      "id": "icon-check",
+      "semantic": "confirm / complete"
+    },
+    {
+      "id": "icon-close",
+      "semantic": "close / cancel"
+    },
+    {
+      "id": "icon-warning",
+      "semantic": "warning / caution"
+    },
+    {
+      "id": "icon-info",
+      "semantic": "information"
+    },
+    {
+      "id": "icon-settings",
+      "semantic": "settings / configuration"
+    },
+    {
+      "id": "icon-eye",
+      "semantic": "visibility / preview"
+    },
+    {
+      "id": "icon-lock",
+      "semantic": "locked / protected"
+    },
+    {
+      "id": "icon-search",
+      "semantic": "search / inspect"
+    },
+    {
+      "id": "icon-menu",
+      "semantic": "menu / navigation"
+    }
   ],
   "derivation_policy": {
     "runtime_svg_support": "not_claimed",
@@ -84,15 +139,18 @@
   },
   "promotion_gates": {
     "source_validated": {
-      "current_claim": true,
+      "current_claim": false,
       "required": [
+        "exact starter-ui-icons.svg is present on the branch",
         "XML parses",
         "12 expected unique symbols",
         "24x24 symbol viewBoxes",
         "local-only use references",
         "no prohibited active/external content",
-        "manifest hash pin"
-      ]
+        "expected manifest is present and pins exact byte/hash/count metadata",
+        "independent source QA validates the branch contents"
+      ],
+      "blocking_reason": "The exact SVG and expected manifest are not present on this branch, so the manifest-hash and repository-head source gates are not satisfied."
     },
     "imported": {
       "current_claim": false,
@@ -115,5 +173,12 @@
         "independent visual review for clarity, consistency, optical balance and small-size readability"
       ]
     }
+  },
+  "prepared_source_reference": {
+    "repository_presence": "absent_on_this_branch",
+    "expected_path": "Content/Starter/UIIconsV1/starter-ui-icons.svg",
+    "prepared_sha256": "6532d497f710c2818e1cadbc4d1683c676c6001fca73f17254a68bec41dc5fbf",
+    "prepared_bytes": 4029,
+    "evidence_scope": "preserved external handoff only; not repository-head source acceptance"
   }
 }
