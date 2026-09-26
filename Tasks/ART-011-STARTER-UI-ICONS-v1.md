@@ -71,5 +71,10 @@ Prepared original source asset: `starter-ui-icons.svg` with 12 functional symbol
 - independent visual self-check corrected the initial settings mark from a sun-like radial symbol to a recognizable gear silhouette before pinning the hash
 - Astral import/runtime/art approval: not run and not claimed
 
-Publication of the source contract and SVG under `Content/Starter/UIIconsV1/**` was attempted after this task packet was published, but the connected GitHub write path rejected the content write. No alternate or low-level bypass was used. The source package remains preserved as a handoff pending a permitted repository write.
+`Content/Starter/UIIconsV1/source-contract.json` is now present on this branch. The exact `starter-ui-icons.svg` and its expected manifest are still absent because their prior publication attempts were rejected by the connected GitHub write path. Because the source contract requires the manifest hash pin and repository-head source QA, `source_validated.current_claim` is now explicitly `false` until those files land and are independently checked. No alternate or low-level bypass was used. The prepared source package remains preserved as a handoff pending a permitted repository write.
 
+
+
+## 2026-09-25 claim-consistency correction
+
+The branch previously carried a contradictory state: the source contract claimed `source_validated=true` while one of its own required gates, the manifest hash pin, could not be satisfied because neither the exact SVG nor manifest was present. This pass repairs that claim without weakening the gate. The contract now records the prepared source hash/size only as external handoff evidence and keeps repository-head source validation false until publication plus independent QA.
