@@ -20,6 +20,8 @@ public:
 
 private:
     static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
+    bool KeyDown(int virtualKey) const;
+    bool ConsumeKeyPress(int virtualKey);
 
     HWND window_{};
     Scene::PerspectiveCamera camera_;
@@ -30,6 +32,8 @@ private:
     Scene::LandmarkInteraction landmarkInteraction_;
     Scene::ShadowbladeActions shadowbladeActions_;
     Scene::ThoughtCommands thoughtCommands_;
+    std::array<bool, 256> keysDown_{};
+    std::array<bool, 256> keysPressed_{};
     bool lightAttackPressed_{};
     bool heavyAttackPressed_{};
     bool dashPressed_{};

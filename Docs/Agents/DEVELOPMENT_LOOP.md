@@ -1,5 +1,7 @@
 # Bounded Development Loop
 
+Current operator direction (2026-09-11): engine-only, local models, native 3D primary with 2D support. Read GAME_DEVELOPMENT_CONTROL.md first. Engine research and synthetic runtime/stress fixtures are allowed; game content, art/audio production and game playtests are paused until engine acceptance and later operator resumption.
+
 1. Producer creates a task packet in `Tasks/` with allowed files, forbidden actions, commands, acceptance criteria, risk, and test instructions.
 2. Coordinator creates one dedicated worktree under `C:/AI/worktrees/AnimeRPG/<task-id>` from the current branch. No two coding agents share a worktree.
 3. One implementation agent edits only its packet's allowed files and returns a diff plus exact commands.

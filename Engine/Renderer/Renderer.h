@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Renderer/ArtAssets.h"
 #include "Engine/Scene/Camera.h"
 #include "Engine/Scene/CombatSandbox.h"
 #include "Engine/Scene/LandmarkEncounter.h"
@@ -23,6 +24,9 @@ public:
         const Scene::ThoughtCommands& thoughtCommands,
         const Scene::LandmarkInteraction& landmarkInteraction,
         const Scene::LandmarkEncounter& landmarkEncounter) const;
+
+private:
+    ArtAssets assets_;
 };
 
 } // namespace Astral::Renderer

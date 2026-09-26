@@ -1,10 +1,13 @@
 #include <windows.h>
 
+#include "Tests/WindowInput.h"
+
 #include <iostream>
 #include <string>
 #include <vector>
 
 namespace {
+Astral::Tests::WindowInputTarget g_inputTarget;
 struct WindowSearch {
     DWORD processId{};
     HWND window{};
@@ -47,15 +50,7 @@ bool WaitForTitle(HWND window, const std::wstring& marker, std::wstring& observe
 }
 
 bool SendKey(WORD key) {
-    INPUT input{};
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = key;
-    if (SendInput(1, &input, sizeof(INPUT)) != 1) return false;
-    Sleep(100);
-    input.ki.dwFlags = KEYEVENTF_KEYUP;
-    if (SendInput(1, &input, sizeof(INPUT)) != 1) return false;
-    Sleep(100);
-    return true;
+    return g_inputTarget.SendKey(key);
 }
 
 bool CaptureFocusRegion(HWND window, std::vector<COLORREF>& colors) {
@@ -92,6 +87,7 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wstring command = L"\"" + std::wstring(argv[1]) + L"\"";
     STARTUPINFOW startup{sizeof(startup)};
+    Astral::Tests::PrepareNoActivate(startup);
     PROCESS_INFORMATION process{};
     if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr, argv[2],
             &startup, &process)) {
@@ -107,8 +103,8 @@ int wmain(int argc, wchar_t** argv) {
     std::wstring focusTitle;
     int focusPixels = 0;
     std::vector<COLORREF> focusBaseline;
-    if (window && WaitForTitle(window, L"M8 Thought Commands", initialTitle)) {
-        SetForegroundWindow(window);
+    if (window && g_inputTarget.Bind(window, process.dwProcessId, process.dwThreadId, process.hProcess)
+        && WaitForTitle(window, L"M8 Thought Commands", initialTitle)) {
         Sleep(250);
         const bool commandSucceeded = SendKey('1')
             && WaitForTitle(window, L"Command: dash | ACCEPTED", successTitle)

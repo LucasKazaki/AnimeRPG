@@ -10,6 +10,7 @@ add_executable(AstralGame WIN32
     Engine/Core/Clock.cpp
     Engine/Core/Logger.cpp
     Engine/Platform/Win32Application.cpp
+    Engine/Renderer/ArtAssets.cpp
     Engine/Renderer/Renderer.cpp
     Engine/Scene/Camera.cpp
     Engine/Scene/CombatSandbox.cpp
@@ -25,7 +26,12 @@ add_executable(AstralGame WIN32
 
 target_include_directories(AstralGame PRIVATE .)
 target_compile_definitions(AstralGame PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_link_libraries(AstralGame PRIVATE user32 gdi32)
+target_link_libraries(AstralGame PRIVATE user32 gdi32 gdiplus)
+if (EXISTS "${CMAKE_SOURCE_DIR}/Game/Assets")
+    add_custom_command(TARGET AstralGame POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_SOURCE_DIR}/Game/Assets" "$<TARGET_FILE_DIR:AstralGame>/Assets")
+endif()
 
 include(CTest)
 if(BUILD_TESTING)
@@ -43,6 +49,17 @@ if(BUILD_TESTING)
     target_include_directories(AstralSceneTests PRIVATE .)
     add_test(NAME AstralSceneTests COMMAND AstralSceneTests)
 
+    add_executable(JobSchedulerTests
+        Engine/Core/Clock.cpp
+        Tests/JobSchedulerTests.cpp
+    )
+    target_include_directories(JobSchedulerTests PRIVATE .)
+    add_test(NAME JobSchedulerTests COMMAND JobSchedulerTests)
+    add_executable(SceneSerializationTests
+        Tests/SceneSerializationTests.cpp
+    )
+    target_include_directories(SceneSerializationTests PRIVATE .)
+    add_test(NAME SceneSerializationTests COMMAND SceneSerializationTests)
     add_executable(WorldBlockoutTests
         Engine/Scene/WorldBlockout.cpp
         Tests/WorldBlockoutTests.cpp

@@ -1,46 +1,50 @@
-# Milestone Backlog and Vertical Slice
+# Astral Engine milestones, acceptance gates and historical slice record
 
-Source: Product Requirements Document v0.2, extracted 2026-07-21.
+**Active scope:** engine-first, local-only. This file supersedes its former
+game-content-oriented backlog for planning purposes. The controlling source is
+`GAME_DEVELOPMENT_CONTROL.md`; the detailed UE5-reference capability ledger is
+[`ASTRAL_UE5_CAPABILITY_ROADMAP.md`](ASTRAL_UE5_CAPABILITY_ROADMAP.md).
 
-## Staged backlog
+## Active milestones
 
-| ID | Milestone | Exit evidence | Priority |
-|---|---|---|---|
-| M0 | Repository, rules, task packets, build probe | Clean-clone configure/build instructions; ownership and safety docs | P0 |
-| M1 | Astral window/core loop | Native window, loop, input, logs, stable delta time, clear color, math test | P0 |
-| M2 | Renderer/scene foundation | Static mesh, camera, transforms, asset load, debug grid | P0 |
-| M3 | Third-person controller | Movement, camera follow, jump, sprint, collision, dodge stub | P0 |
-| M4 | Combat sandbox | Light/heavy attacks, hit detection, damage, dummy death | P0 |
-| M5 | National Mall blockout | Lincoln Memorial, Reflecting Pool, Washington Monument traversal | P0 |
-| M6 | Destruction prototype | Breakable props, crystals, boss pillar, reset behavior | P1 |
-| M7 | Shadowblade | Shadow Dash, Fatal Strike, Guard, Command, resource/cooldowns | P0 |
-| M8 | Thought commands | Slow-time, typed rule parser, ability/summon/environment routing | P0 |
-| M9 | Shadow summon | Follow, attack, protect, focus boss, interrupt caster, retreat | P0 |
-| M10 | Enemy set | Melee, caster, brute with distinct AI | P1 |
-| M11 | Shadow Crypt | Enter, 3 encounters, mini-boss, reward, reset | P0 |
-| M12 | Mana Reactor | Enter, crystals/anchors, Gate Warden boss, completion/reset | P0 |
-| M13 | Arc Mage/Aegis prototypes | Class switching; two abilities each | P1 |
-| M14 | Art pass 1 | Male/female characters, enemies, readable materials/VFX | P1 |
-| M15 | QA/vertical slice lock | 15–30 minute completion; no P0 crashes; test report | P0 |
+| ID | Milestone | Required exit evidence | Dependency |
+| --- | --- | --- | --- |
+| E0 | Evidence and reproducibility baseline | Current Present/Partial/Missing ledger; exact CMake/Debug/Release test census; hardware/config capture; trace/receipt schema | None |
+| E1 | Runtime, jobs, ownership and serialization | Deterministic jobs/tick/lifetime/serialization tests; clean shutdown and error evidence | E0 |
+| E2 | World, entities and streaming | Stable entity/cell lifecycle, load/unload, layers, scene precision and HLOD/culling seam evidence | E1 |
+| E3 | GPU renderer and image foundation | D3D12 capability matrix, render graph, shader/material/mesh lifecycle, camera, direct lights, baseline shadows/post, 3D capture | E1 |
+| E4 | Asset and package pipeline | Import/reimport, registry/dependencies, cache, async data/package read, validation, standalone package launch | E1, E3 |
+| E5 | Motion, interaction and sound systems | Skeletal graph, collision/physics, navigation/AI framework, audio mixer, action mapping, save/replay evidence | E1–E4 as applicable |
+| E6 | Genuine independent 2D and developer tooling | Separately runnable 2D sprite/tile/UI fixture; editor inspection; automation/trace/validation tools | E1, E3, E4 |
+| E7 | Mature capability paths | Each eligible lighting/streaming/VFX/animation/physics/cinematic Compatible row has measured adoption or an explicit maintained deferment | E2–E6 |
+| E8 | Engine stress and independent acceptance | Full Debug/Release regressions; 3D and 2D integration; budget distributions; package launch; mixed-workload 24-hour soak; independent verdict | E0–E7 |
 
-## Smallest executable vertical slice
-M1 is the first gate. The first playable combat slice begins only after M1–M3 are verified: move a placeholder character in a windowed test scene. Combat and art are intentionally not started in parallel until those contracts exist.
+## Execution rule
 
-## Next queued packet
-M8 Thought Commands in a fresh isolated worktree after verified M7 is merged. Dynamic selection favors this P0 player-command capability over the P1 M6 destruction prototype. A new packet must bound slow-time semantics, parser grammar, ability/summon/environment routing contracts, live controls, focused tests, and native runtime evidence before implementation begins.
+The active director must select work through the roadmap's packet-selection
+algorithm. A milestone is not completed by a task title, a build or a report.
+It exits only with exact source, test, runtime, performance and independent
+review evidence. When the current work queue empties, the Loop Operations
+Supervisor and the director must create a repair, acceptance or next eligible
+capability packet according to the roadmap's no-frontier recovery ladder.
 
-## M3 implementation evidence
+Game milestones, game art/audio, gameplay tuning and player playtests remain
+paused. Engine test fixtures may use original procedural/synthetic content.
 
-The bounded controller/camera contract is implemented and verified on `task/m3-third-person-controller` in the dedicated M3 worktree. Debug and Release builds, both CTest runs, static verification, and the Lucas-accepted automated native runtime substitute are passing; see `Docs/QA/MILESTONE-3.md`.
+## Historical vertical-slice record — non-authoritative while engine-first
 
-## M4 implementation evidence
+The entries below preserve historic receipt references; they do not authorize
+game work or establish current engine readiness.
 
-The bounded deterministic combat sandbox is implemented and verified on `task/m4-combat-sandbox`: light/heavy attacks, range and cooldown rejection, dummy damage/defeat, live J/K input, GDI state feedback, focused tests, and an automated native runtime path pass in Debug and Release. See `Docs/QA/MILESTONE-4.md`.
+| Historical ID | Retained claim | Current use |
+| --- | --- | --- |
+| M1 | Native window/core loop, input, logs, timing and clear color were developed. | Regression evidence only; audit under E0/ARC-001/005/007. |
+| M2 | Static mesh/camera/transforms/assets/debug grid were explored. | Partial renderer/scene seed; audit under E2/E3. |
+| M3 | Third-person controller/camera packet has retained evidence. | Historical input/physics regression only; no game progression. |
+| M4 | Deterministic combat sandbox packet has retained evidence. | Historical test code only; no combat development. |
+| M5 | Perspective wireframe blockout packet has retained evidence. | Synthetic 3D fixture seed only; audit as E2/E3 evidence. |
+| M7 | Shadowblade action kit packet has retained evidence. | Historical regression only; no game ability/content work. |
 
-## M5 implementation evidence
-
-The bounded perspective wireframe world is implemented and verified on `task/m5-national-mall-blockout`: deterministic perspective projection, positive near-plane rejection, player-follow traversal on an X/Z grid, three deterministic landmark proxies at distinct depths, retained player/dummy combat state, and captured native GDI frame evidence pass in Debug and Release. See `Docs/QA/MILESTONE-5.md`.
-
-## M7 implementation evidence
-
-The bounded deterministic Shadowblade action kit is implemented and verified on `task/m7-shadowblade`: Q dash through the bounded controller path, L fatal strike through the combat domain, held left-Shift guard/conflict state, capped resource and cooldown rules, visible GDI/title feedback, and actual-game runtime input evidence pass in Debug and Release. Existing M4/M5 runtime smokes remain green. See `Docs/QA/MILESTONE-7.md`.
+The historic M6 and M8–M15 game-content backlog is deliberately parked rather
+than deleted. It cannot be selected until E8 has an independently accepted
+engine candidate and the operator explicitly reopens game production.

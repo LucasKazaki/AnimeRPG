@@ -1,11 +1,14 @@
 #include <windows.h>
 
+#include "Tests/WindowInput.h"
+
 #include <cstdint>
 #include <iostream>
 #include <string>
 #include <vector>
 
 namespace {
+Astral::Tests::WindowInputTarget g_inputTarget;
 struct WindowSearch {
     DWORD processId{};
     HWND window{};
@@ -58,23 +61,11 @@ bool WaitForTitle(HWND window, const std::wstring& marker, std::wstring& observe
 }
 
 bool SendKey(WORD key) {
-    INPUT input{};
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = key;
-    if (SendInput(1, &input, sizeof(INPUT)) != 1) return false;
-    Sleep(100);
-    input.ki.dwFlags = KEYEVENTF_KEYUP;
-    return SendInput(1, &input, sizeof(INPUT)) == 1;
+    return g_inputTarget.SendKey(key, 100, 0);
 }
 
 bool HoldKey(WORD key, DWORD milliseconds) {
-    INPUT input{};
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = key;
-    if (SendInput(1, &input, sizeof(INPUT)) != 1) return false;
-    Sleep(milliseconds);
-    input.ki.dwFlags = KEYEVENTF_KEYUP;
-    return SendInput(1, &input, sizeof(INPUT)) == 1;
+    return g_inputTarget.HoldKey(key, milliseconds, 0);
 }
 
 bool CaptureFrame(HWND window, FrameEvidence& evidence) {
@@ -88,7 +79,13 @@ bool CaptureFrame(HWND window, FrameEvidence& evidence) {
     HDC memory = CreateCompatibleDC(source);
     HBITMAP bitmap = CreateCompatibleBitmap(source, width, height);
     HGDIOBJ previous = SelectObject(memory, bitmap);
-    const BOOL copied = BitBlt(memory, 0, 0, width, height, source, 0, 0, SRCCOPY);
+    // PrintWindow asks the target process for its client rendering and remains
+    // stable when the native smoke window is occluded by the test runner. Fall
+    // back to a direct client-DC copy for environments that do not implement it.
+    BOOL copied = PrintWindow(window, memory, PW_CLIENTONLY);
+    if (!copied) {
+        copied = BitBlt(memory, 0, 0, width, height, source, 0, 0, SRCCOPY);
+    }
 
     BITMAPINFO info{};
     info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -129,7 +126,11 @@ bool HasWorldEvidence(const FrameEvidence& frame) {
 
 bool CaptureWorldFrame(HWND window, FrameEvidence& best) {
     int bestScore = -1;
-    for (int attempt = 0; attempt < 30; ++attempt) {
+    // GDI invalidation can briefly expose a partially repainted frame when the
+    // test host is busy. Ask the target window to finish a paint and wait on
+    // the actual world evidence instead of sampling a fixed short delay.
+    for (int attempt = 0; attempt < 100; ++attempt) {
+        if (!IsWindow(window)) return false;
         FrameEvidence candidate{};
         if (!CaptureFrame(window, candidate)) return false;
         const int score = candidate.gridPixels + candidate.lincolnPixels
@@ -140,7 +141,7 @@ bool CaptureWorldFrame(HWND window, FrameEvidence& best) {
             bestScore = score;
         }
         if (HasWorldEvidence(candidate)) return true;
-        Sleep(20);
+        Sleep(30);
     }
     return HasWorldEvidence(best);
 }
@@ -154,6 +155,7 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wstring command = L"\"" + std::wstring(argv[1]) + L"\"";
     STARTUPINFOW startup{sizeof(startup)};
+    Astral::Tests::PrepareNoActivate(startup);
     PROCESS_INFORMATION process{};
     if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr, argv[2],
             &startup, &process)) {
@@ -169,9 +171,9 @@ int wmain(int argc, wchar_t** argv) {
     FrameEvidence initialFrame{};
     FrameEvidence beforeMoveFrame{};
     FrameEvidence movedFrame{};
-    if (window && WaitForTitle(window, L"M5 Perspective Mall", initialTitle)
+    if (window && g_inputTarget.Bind(window, process.dwProcessId, process.dwThreadId, process.hProcess)
+        && WaitForTitle(window, L"M5 Perspective Mall", initialTitle)
         && initialTitle.find(L"Pos: (0.000000, 0.000000)") != std::wstring::npos) {
-        SetForegroundWindow(window);
         Sleep(300);
         const bool initialRendered = CaptureWorldFrame(window, initialFrame);
         const bool combatPersisted = initialRendered && SendKey('J')

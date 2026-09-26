@@ -1,9 +1,12 @@
 #include <windows.h>
 
+#include "Tests/WindowInput.h"
+
 #include <iostream>
 #include <string>
 
 namespace {
+Astral::Tests::WindowInputTarget g_inputTarget;
 struct WindowSearch {
     DWORD processId{};
     HWND window{};
@@ -46,27 +49,11 @@ bool WaitForTitle(HWND window, const std::wstring& marker, std::wstring& observe
 }
 
 bool SendKey(WORD key) {
-    INPUT input{};
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = key;
-    if (SendInput(1, &input, sizeof(INPUT)) != 1) return false;
-    Sleep(100);
-    input.ki.dwFlags = KEYEVENTF_KEYUP;
-    if (SendInput(1, &input, sizeof(INPUT)) != 1) return false;
-    Sleep(120);
-    return true;
+    return g_inputTarget.SendKey(key, 100, 120);
 }
 
 bool HoldKey(WORD key, DWORD milliseconds) {
-    INPUT input{};
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = key;
-    if (SendInput(1, &input, sizeof(INPUT)) != 1) return false;
-    Sleep(milliseconds);
-    input.ki.dwFlags = KEYEVENTF_KEYUP;
-    if (SendInput(1, &input, sizeof(INPUT)) != 1) return false;
-    Sleep(150);
-    return true;
+    return g_inputTarget.HoldKey(key, milliseconds, 150);
 }
 
 int CountEncounterColor(HWND window, COLORREF expected) {
@@ -90,6 +77,7 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wstring command = L"\"" + std::wstring(argv[1]) + L"\"";
     STARTUPINFOW startup{sizeof(startup)};
+    Astral::Tests::PrepareNoActivate(startup);
     PROCESS_INFORMATION process{};
     if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr, argv[2],
             &startup, &process)) {
@@ -105,9 +93,9 @@ int wmain(int argc, wchar_t** argv) {
     std::wstring repeatedTitle;
     int activePixels = 0;
     int completedPixels = 0;
-    if (window && WaitForTitle(window, L"M10 Landmark Encounter | Encounter: Locked",
+    if (window && g_inputTarget.Bind(window, process.dwProcessId, process.dwThreadId, process.hProcess)
+        && WaitForTitle(window, L"M10 Landmark Encounter | Encounter: Locked",
             initialTitle)) {
-        SetForegroundWindow(window);
         Sleep(250);
         const bool prepared = SendKey('2')
             && WaitForTitle(window, L"Command: fatal | ACCEPTED", activeTitle)

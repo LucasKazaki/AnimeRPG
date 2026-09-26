@@ -1,4 +1,5 @@
 #include "Engine/Platform/Win32Application.h"
+#include "Engine/Platform/WindowInputMessages.h"
 
 #include "Engine/Core/Clock.h"
 #include "Engine/Core/Logger.h"
@@ -158,7 +159,7 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
     }
 
     window_ = CreateWindowExW(0, kWindowClass, L"Astral Engine", WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, nullptr, nullptr, instance, nullptr);
+        CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, nullptr, nullptr, instance, this);
     if (!window_) {
         g_logger.Info("CreateWindowExW failed");
         return false;
@@ -166,6 +167,9 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
 
     ShowWindow(window_, showCommand);
     UpdateWindow(window_);
+    // Put the fresh playtest window in the foreground so keyboard polling is
+    // reliable when launched from a build shell or native smoke harness.
+    SetForegroundWindow(window_);
     playerController_.SetPosition({0.0f, 0.0f, 0.0f});
     landmarkInteraction_.UpdateSelection(playerController_.TransformState().WorldPosition(), world_);
     camera_.Follow(playerController_.TransformState());
@@ -199,37 +203,37 @@ int Win32Application::Run() {
             frameCount = 0;
         }
 
-        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
+        if (ConsumeKeyPress(VK_ESCAPE)) {
             PostMessageW(window_, WM_CLOSE, 0, 0);
         }
 
         const float simulationDelta = thoughtCommands_.ScaleDelta(deltaSeconds);
         const Scene::MovementInput input{
-            (GetAsyncKeyState('W') & 0x8000) != 0,
-            (GetAsyncKeyState('S') & 0x8000) != 0,
-            (GetAsyncKeyState('A') & 0x8000) != 0,
-            (GetAsyncKeyState('D') & 0x8000) != 0,
+            KeyDown('W'),
+            KeyDown('S'),
+            KeyDown('A'),
+            KeyDown('D'),
         };
         playerController_.Update(input, simulationDelta);
         camera_.Follow(playerController_.TransformState());
         combatSandbox_.AdvanceTime(simulationDelta);
         shadowbladeActions_.AdvanceTime(simulationDelta);
 
-        const bool physicalGuarding = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
+        const bool physicalGuarding = KeyDown(VK_LSHIFT);
         const bool effectiveGuarding = physicalGuarding
             || thoughtCommands_.IsCommandGuardActive();
         const bool guardChanged = effectiveGuarding != shadowbladeActions_.IsGuarding();
         thoughtCommands_.ApplyGuardState(physicalGuarding, shadowbladeActions_);
         const bool guarding = shadowbladeActions_.IsGuarding();
 
-        const bool lightAttackDown = (GetAsyncKeyState('J') & 0x8000) != 0;
-        const bool heavyAttackDown = (GetAsyncKeyState('K') & 0x8000) != 0;
-        const bool dashDown = (GetAsyncKeyState('Q') & 0x8000) != 0;
-        const bool fatalStrikeDown = (GetAsyncKeyState('L') & 0x8000) != 0;
-        const bool interactDown = (GetAsyncKeyState('E') & 0x8000) != 0;
+        const bool lightAttackDown = ConsumeKeyPress('J');
+        const bool heavyAttackDown = ConsumeKeyPress('K');
+        const bool dashDown = ConsumeKeyPress('Q');
+        const bool fatalStrikeDown = ConsumeKeyPress('L');
+        const bool interactDown = ConsumeKeyPress('E');
         bool commandDown[6]{};
         for (int index = 0; index < 6; ++index) {
-            commandDown[index] = (GetAsyncKeyState('0' + index) & 0x8000) != 0;
+            commandDown[index] = ConsumeKeyPress('0' + index);
         }
         bool attacked = false;
         bool shadowAction = false;
@@ -318,9 +322,51 @@ int Win32Application::Run() {
     return static_cast<int>(message.wParam);
 }
 
+bool Win32Application::KeyDown(int virtualKey) const {
+    return virtualKey >= 0 && virtualKey < static_cast<int>(keysDown_.size())
+        && keysDown_[static_cast<std::size_t>(virtualKey)];
+}
+
+bool Win32Application::ConsumeKeyPress(int virtualKey) {
+    if (virtualKey < 0 || virtualKey >= static_cast<int>(keysPressed_.size())) return false;
+    const std::size_t index = static_cast<std::size_t>(virtualKey);
+    const bool pressed = keysPressed_[index];
+    keysPressed_[index] = false;
+    return pressed;
+}
+
 LRESULT CALLBACK Win32Application::WindowProc(HWND window, UINT message, WPARAM wParam,
     LPARAM lParam) {
+    if (message == WM_NCCREATE) {
+        const auto* create = reinterpret_cast<CREATESTRUCTW*>(lParam);
+        SetWindowLongPtrW(window, GWLP_USERDATA,
+            reinterpret_cast<LONG_PTR>(create->lpCreateParams));
+    }
+    auto* application = reinterpret_cast<Win32Application*>(
+        GetWindowLongPtrW(window, GWLP_USERDATA));
     switch (message) {
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+    case kTestKeyDownMessage:
+        if (application && wParam < application->keysDown_.size()) {
+            const std::size_t index = static_cast<std::size_t>(wParam);
+            if (!application->keysDown_[index]) application->keysPressed_[index] = true;
+            application->keysDown_[index] = true;
+        }
+        return 0;
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+    case kTestKeyUpMessage:
+        if (application && wParam < application->keysDown_.size()) {
+            application->keysDown_[static_cast<std::size_t>(wParam)] = false;
+        }
+        return 0;
+    case WM_KILLFOCUS:
+        if (application) {
+            application->keysDown_.fill(false);
+            application->keysPressed_.fill(false);
+        }
+        return 0;
     case WM_PAINT: {
         PAINTSTRUCT paint{};
         BeginPaint(window, &paint);

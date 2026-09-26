@@ -8,3 +8,11 @@ __pycache__/
 *.ilk
 *.exe
 *.log
+
+# Local persistent job logs, scratch and temporary files
+.agent-runtime/
+# Local dependency environments, caches, and generated evidence
+.venv/
+.pytest_cache/
+/Artifacts/
+/Microsoft/Windows/PowerShell/ModuleAnalysisCache/

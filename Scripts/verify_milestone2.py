@@ -15,8 +15,11 @@ markers = {
     ROOT / "Engine/Assets/StaticMesh.cpp": ["LoadFromFile", "ASTRAL_MESH", "vertices_.clear"],
     ROOT / "Engine/Scene/Transform.cpp": ["WorldPosition", "parent->WorldPosition"],
     ROOT / "Engine/Scene/Camera.cpp": ["WorldToScreen", "worldWidth", "worldHeight"],
-    ROOT / "Engine/Renderer/Renderer.cpp": ["RenderDebugScene", "CreatePen", "LineTo"],
-    ROOT / "Engine/Platform/Win32Application.cpp": ["debug_triangle.mesh", "RenderDebugScene"],
+    # M5 replaced the M2-only RenderDebugScene entry point with the superset
+    # RenderWorld path. Verify the current implementation rather than requiring
+    # an obsolete symbol that was deliberately removed by a later milestone.
+    ROOT / "Engine/Renderer/Renderer.cpp": ["RenderWorld", "CreatePen", "LineTo"],
+    ROOT / "Engine/Platform/Win32Application.cpp": ["RenderWorld"],
 }
 
 missing = [str(path.relative_to(ROOT)) for path in required if not path.is_file()]

@@ -1,0 +1,39 @@
+{
+    "schema":  "astral-procedural-streaming-baseline-receipt/v1",
+    "generatedAt":  "2026-09-18T12:59:01.6627699Z",
+    "scope":  "Astral engine-only procedural serialization load/unload baseline",
+    "sourceContract":  "Docs/Planning/ASTRAL_SCENE_SERIALIZATION_STREAMING_CONTRACT.md",
+    "sourceContractSha256":  "11cc0b38fb3dd7c4c173a928f343948cfac0b03c4a3c11eb19ffe5a684867ce0",
+    "debug":  {
+                  "schema":  "astral-procedural-streaming-baseline/v1",
+                  "scope":  "procedural serialization load-unload baseline; not a runtime streaming implementation",
+                  "chunks":  8,
+                  "entitiesPerChunk":  32,
+                  "cycles":  64,
+                  "roundTrips":  512,
+                  "failureRecoveryPass":  true,
+                  "elapsedMs":  223.215,
+                  "maxCycleMs":  4.7748,
+                  "peakWorkingSetBytes":  4820992
+              },
+    "release":  {
+                    "schema":  "astral-procedural-streaming-baseline/v1",
+                    "scope":  "procedural serialization load-unload baseline; not a runtime streaming implementation",
+                    "chunks":  8,
+                    "entitiesPerChunk":  32,
+                    "cycles":  64,
+                    "roundTrips":  512,
+                    "failureRecoveryPass":  true,
+                    "elapsedMs":  27.547,
+                    "maxCycleMs":  0.6228,
+                    "peakWorkingSetBytes":  4919296
+                },
+    "acceptance":  {
+                       "debugReleaseBuilds":  true,
+                       "deterministicRoundTrips":  true,
+                       "failureRecovery":  true,
+                       "gameplayScope":  "paused",
+                       "runtimeStreamingImplementation":  "not claimed",
+                       "vramMeasurement":  "not captured by this bounded harness"
+                   }
+}

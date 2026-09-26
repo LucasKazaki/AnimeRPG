@@ -1,0 +1,4 @@
+#include "Engine/Scene/SceneSerialization.h"
+#include <cmath>
+static bool same(const Astral::Scene::EntityRecord&a,const Astral::Scene::EntityRecord&b){return a.id==b.id&&std::fabs(a.x-b.x)<1e-6f&&std::fabs(a.y-b.y)<1e-6f&&std::fabs(a.z-b.z)<1e-6f;}
+int main(){using namespace Astral::Scene;SceneSnapshot in{{{2,2,3,4},{1,-1,.5f,8}}};auto text=SerializeCanonical(in);if(text.find("1|",text.find("count=2"))>text.find("2|",text.find("count=2")))return 1;SceneSnapshot out;std::string e;if(!DeserializeCanonical(text,out,&e)||out.entities.size()!=2)return 2;if(!same(out.entities[0],{1,-1,.5f,8})||!same(out.entities[1],{2,2,3,4}))return 3;if(DeserializeCanonical("ASTRAL_SCENE_V1\ncount=2\n1|0|0|0\n1|1|1|1\n",out,&e))return 4;if(DeserializeCanonical("ASTRAL_SCENE_V1\ncount=1\n1|nan|0|0\n",out,&e))return 5;if(DeserializeCanonical("ASTRAL_SCENE_V1\ncount=1\n1|0|0|0\ntrail\n",out,&e))return 6;if(DeserializeCanonical("ASTRAL_SCENE_V1\ncount=257\n",out,&e))return 7;return 0;}

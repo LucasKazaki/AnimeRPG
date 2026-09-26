@@ -1,10 +1,13 @@
 #include <windows.h>
 
+#include "Tests/WindowInput.h"
+
 #include <iostream>
 #include <string>
 #include <vector>
 
 namespace {
+Astral::Tests::WindowInputTarget g_inputTarget;
 struct WindowSearch {
     DWORD processId{};
     HWND window{};
@@ -52,21 +55,11 @@ bool WaitForTitle(HWND window, const std::wstring& marker, std::wstring& observe
 }
 
 bool SetKey(WORD key, bool down) {
-    INPUT input{};
-    input.type = INPUT_KEYBOARD;
-    input.ki.wVk = key;
-    if (!down) input.ki.dwFlags = KEYEVENTF_KEYUP;
-    return SendInput(1, &input, sizeof(INPUT)) == 1;
+    return g_inputTarget.SetKey(key, down);
 }
 
 bool SendKey(WORD key) {
-    if (!SetKey(key, true)) return false;
-    Sleep(100);
-    if (!SetKey(key, false)) return false;
-    // Let the live edge-triggered input loop observe the release before a
-    // second press of the same key.
-    Sleep(100);
-    return true;
+    return g_inputTarget.SendKey(key);
 }
 
 bool CaptureShadowPixels(HWND window, ShadowPixels& evidence) {
@@ -106,7 +99,11 @@ bool CaptureShadowPixels(HWND window, ShadowPixels& evidence) {
 }
 
 bool CaptureVisibleShadowState(HWND window, bool requireGuard, ShadowPixels& best) {
-    for (int attempt = 0; attempt < 30; ++attempt) {
+    // Rendering can be delayed while the Debug and Release smoke suites are
+    // running in quick succession on a freshly provisioned Windows install.
+    // Keep polling for visible evidence instead of treating a briefly black
+    // client surface as a gameplay failure.
+    for (int attempt = 0; attempt < 150; ++attempt) {
         ShadowPixels current{};
         if (!CaptureShadowPixels(window, current)) return false;
         if (current.resource > best.resource) best.resource = current.resource;
@@ -126,6 +123,7 @@ int wmain(int argc, wchar_t** argv) {
 
     std::wstring command = L"\"" + std::wstring(argv[1]) + L"\"";
     STARTUPINFOW startup{sizeof(startup)};
+    Astral::Tests::PrepareNoActivate(startup);
     PROCESS_INFORMATION process{};
     if (!CreateProcessW(nullptr, command.data(), nullptr, nullptr, FALSE, 0, nullptr, argv[2],
             &startup, &process)) {
@@ -144,10 +142,10 @@ int wmain(int argc, wchar_t** argv) {
     std::wstring cooldownTitle;
     ShadowPixels initialPixels{};
     ShadowPixels guardPixels{};
-    if (window && WaitForTitle(window, L"M7 Shadowblade", initialTitle)
+    if (window && g_inputTarget.Bind(window, process.dwProcessId, process.dwThreadId, process.hProcess)
+        && WaitForTitle(window, L"M7 Shadowblade", initialTitle)
         && initialTitle.find(L"Shadow: 100/100 | Guard: OFF") != std::wstring::npos
         && initialTitle.find(L"Pos: (0.000000, 0.000000)") != std::wstring::npos) {
-        SetForegroundWindow(window);
         Sleep(250);
         const bool initialVisible = CaptureVisibleShadowState(window, false, initialPixels);
         const bool guardDown = initialVisible && SetKey(VK_LSHIFT, true)

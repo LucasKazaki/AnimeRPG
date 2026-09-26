@@ -1,13 +1,24 @@
 #include "Engine/Renderer/Renderer.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cwchar>
+
+#include <gdiplus.h>
 
 namespace {
 using Astral::Math::Vec2;
 using Astral::Math::Vec3;
 using Astral::Scene::PerspectiveCamera;
+using Gdiplus::Color;
+using Gdiplus::Graphics;
+using Gdiplus::Image;
+using Gdiplus::Pen;
+using Gdiplus::Rect;
+using Gdiplus::RectF;
+using Gdiplus::SolidBrush;
+using Gdiplus::UnitPixel;
 
 bool DrawSegment(HDC deviceContext, const PerspectiveCamera& camera, int width, int height,
     Vec3 start, Vec3 end) {
@@ -100,6 +111,110 @@ void DrawLandmark(HDC deviceContext, const PerspectiveCamera& camera, int width,
         }
     }
 }
+
+void DrawBackdrop(HDC deviceContext, RECT viewport, Image* backdrop) {
+    if (!backdrop) return;
+
+    Graphics graphics(deviceContext);
+    graphics.SetInterpolationMode(Gdiplus::InterpolationModeBilinear);
+    const int width = viewport.right - viewport.left;
+    const int height = viewport.bottom - viewport.top;
+    graphics.DrawImage(backdrop, Rect(0, 0, width, height), 0, 0,
+        static_cast<int>(backdrop->GetWidth()), static_cast<int>(backdrop->GetHeight()),
+        UnitPixel);
+
+    // A restrained color wash preserves HUD contrast while letting the generated key art
+    // carry the scene's silhouette and mood.
+    SolidBrush wash(Color(38, 7, 12, 38));
+    graphics.FillRectangle(&wash, Rect(0, 0, width, height));
+}
+
+bool ProjectGround(const PerspectiveCamera& camera, int width, int height,
+    const Vec3& groundPosition, Vec2& screenPosition) {
+    return camera.WorldToScreen(groundPosition, width, height, screenPosition);
+}
+
+void DrawProjectedRing(HDC deviceContext, const PerspectiveCamera& camera, int width, int height,
+    const Vec3& groundPosition, float radius, Color color, float pulse = 1.0f) {
+    Vec2 center{};
+    Vec2 edge{};
+    if (!ProjectGround(camera, width, height, groundPosition, center)
+        || !ProjectGround(camera, width, height,
+            {groundPosition.x + radius * pulse, groundPosition.y, groundPosition.z}, edge)) {
+        return;
+    }
+
+    Graphics graphics(deviceContext);
+    Pen ringPen(color, 2.0f);
+    const float radiusPixels = std::max(8.0f, std::abs(edge.x - center.x));
+    graphics.DrawEllipse(&ringPen, RectF(center.x - radiusPixels, center.y - radiusPixels * 0.32f,
+        radiusPixels * 2.0f, radiusPixels * 0.64f));
+}
+
+void DrawBillboard(HDC deviceContext, const PerspectiveCamera& camera, int width, int height,
+    const Vec3& groundPosition, float worldHeight, Image* image, float opacity = 1.0f) {
+    if (!image || worldHeight <= 0.0f) return;
+
+    Vec2 bottom{};
+    Vec2 top{};
+    if (!ProjectGround(camera, width, height, groundPosition, bottom)
+        || !camera.WorldToScreen({groundPosition.x, groundPosition.y + worldHeight,
+            groundPosition.z}, width, height, top)) {
+        return;
+    }
+
+    const float pixelHeight = std::clamp(std::abs(bottom.y - top.y), 32.0f, 720.0f);
+    const float pixelWidth = pixelHeight * static_cast<float>(image->GetWidth())
+        / static_cast<float>(image->GetHeight());
+    const float alpha = std::clamp(opacity, 0.0f, 1.0f);
+    Graphics graphics(deviceContext);
+    graphics.SetInterpolationMode(Gdiplus::InterpolationModeBilinear);
+    if (alpha >= 0.999f) {
+        graphics.DrawImage(image,
+            RectF(bottom.x - pixelWidth * 0.5f, top.y, pixelWidth, pixelHeight));
+        return;
+    }
+
+    Gdiplus::ImageAttributes attributes;
+    const float matrixElements[5][5]{
+        {1.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f, alpha, 0.0f},
+        {0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
+    };
+    Gdiplus::ColorMatrix matrix{};
+    std::copy(&matrixElements[0][0], &matrixElements[0][0] + 25,
+        &matrix.m[0][0]);
+    attributes.SetColorMatrix(&matrix);
+    graphics.DrawImage(image,
+        RectF(bottom.x - pixelWidth * 0.5f, top.y, pixelWidth, pixelHeight),
+        0.0f, 0.0f, static_cast<float>(image->GetWidth()),
+        static_cast<float>(image->GetHeight()), UnitPixel, &attributes);
+}
+
+void DrawHudFrame(HDC deviceContext, int left, int top, int right, int bottom,
+    Color fill, Color outline) {
+    Graphics graphics(deviceContext);
+    SolidBrush brush(fill);
+    Pen pen(outline, 1.0f);
+    graphics.FillRectangle(&brush, Rect(left, top, right - left, bottom - top));
+    graphics.DrawRectangle(&pen, Rect(left, top, right - left, bottom - top));
+}
+
+void DrawWorldMarker(HDC deviceContext, const PerspectiveCamera& camera, int width, int height,
+    const Vec3& position, Color color, float pulse) {
+    Vec2 screen{};
+    if (!camera.WorldToScreen(position, width, height, screen)) return;
+
+    Graphics graphics(deviceContext);
+    Pen pen(color, 2.0f);
+    const float size = 12.0f + pulse * 4.0f;
+    graphics.DrawLine(&pen, screen.x - size, screen.y, screen.x + size, screen.y);
+    graphics.DrawLine(&pen, screen.x, screen.y - size, screen.x, screen.y + size);
+    graphics.DrawEllipse(&pen, RectF(screen.x - size * 0.65f, screen.y - size * 0.65f,
+        size * 1.3f, size * 1.3f));
+}
 }
 
 namespace Astral::Renderer {
@@ -108,6 +223,7 @@ void Renderer::Clear(HDC deviceContext, RECT viewport) const {
     const HBRUSH background = CreateSolidBrush(RGB(12, 18, 36));
     FillRect(deviceContext, &viewport, background);
     DeleteObject(background);
+    DrawBackdrop(deviceContext, viewport, assets_.WorldBackdrop());
 }
 
 void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
@@ -146,17 +262,35 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
         DeleteObject(landmarkPen);
     }
 
+    const float pulse = 0.5f + 0.5f
+        * std::sin(combatSandbox.ElapsedSeconds() * 3.5f);
+    if (landmarkInteraction.HasSelection()) {
+        const Scene::LandmarkProxy& selectedLandmark =
+            world.Landmarks()[landmarkInteraction.SelectedIndex()];
+        DrawWorldMarker(deviceContext, camera, width, height,
+            {selectedLandmark.position.x, 1.25f, selectedLandmark.position.z},
+            Color(215, 255, 95, 220), pulse);
+    }
+
     const Math::Vec3 player = world.GroundPosition(playerTransform.WorldPosition());
     const HPEN playerPen = CreatePen(PS_SOLID, 3, RGB(168, 92, 255));
     SelectObject(deviceContext, playerPen);
     const std::array<Math::Vec3, 4> playerBase{{
-        {player.x - 0.65f, 0.0f, player.z - 0.65f}, {player.x + 0.65f, 0.0f, player.z - 0.65f},
-        {player.x + 0.65f, 0.0f, player.z + 0.65f}, {player.x - 0.65f, 0.0f, player.z + 0.65f}}};
+        {player.x - 0.65f, 0.0f, player.z - 0.65f},
+        {player.x + 0.65f, 0.0f, player.z - 0.65f},
+        {player.x + 0.65f, 0.0f, player.z + 0.65f},
+        {player.x - 0.65f, 0.0f, player.z + 0.65f}}};
     const Math::Vec3 playerApex{player.x, 2.2f, player.z};
     for (std::size_t index = 0; index < playerBase.size(); ++index) {
         DrawSegment(deviceContext, camera, width, height, playerBase[index],
             playerBase[(index + 1) % playerBase.size()]);
         DrawSegment(deviceContext, camera, width, height, playerBase[index], playerApex);
+    }
+    if (assets_.Shadowblade()) {
+        DrawProjectedRing(deviceContext, camera, width, height, player, 1.0f,
+            Color(160, 88, 255, 200), 0.95f + pulse * 0.1f);
+        DrawBillboard(deviceContext, camera, width, height, player, 3.6f,
+            assets_.Shadowblade());
     }
 
     if (shadowbladeActions.IsGuarding()) {
@@ -180,6 +314,13 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
     const HPEN dummyPen = CreatePen(PS_SOLID, 3, dummyColor);
     SelectObject(deviceContext, dummyPen);
     DrawBox(deviceContext, camera, width, height, dummyGround, {1.2f, 2.5f, 1.2f});
+    if (assets_.TrainingDummy()) {
+        DrawProjectedRing(deviceContext, camera, width, height, dummyGround, 0.85f,
+            dummy.IsDefeated() ? Color(130, 135, 155, 170) : Color(255, 118, 70, 220),
+            0.95f + pulse * 0.1f);
+        DrawBillboard(deviceContext, camera, width, height, dummyGround, 3.2f,
+            assets_.TrainingDummy(), dummy.IsDefeated() ? 0.42f : 1.0f);
+    }
 
     const int healthWidth = dummy.maximumHealth > 0 ? (60 * dummy.health / dummy.maximumHealth) : 0;
     Math::Vec2 dummyTop{};
@@ -195,6 +336,14 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
             healthBackground.left + healthWidth, healthBackground.bottom};
         FillRect(deviceContext, &healthBackground, healthBackgroundBrush);
         FillRect(deviceContext, &health, healthBrush);
+    }
+
+    DrawHudFrame(deviceContext, 14, 12, 332, 164,
+        Color(185, 7, 12, 24), Color(130, 112, 180, 120));
+    if (assets_.AstralSigil()) {
+        Graphics graphics(deviceContext);
+        graphics.SetInterpolationMode(Gdiplus::InterpolationModeBilinear);
+        graphics.DrawImage(assets_.AstralSigil(), Rect(286, 18, 34, 34));
     }
 
     const HBRUSH shadowBackgroundBrush = CreateSolidBrush(RGB(25, 30, 52));
@@ -257,6 +406,26 @@ void Renderer::RenderWorld(HDC deviceContext, RECT viewport,
             : L"TRAINING ENCOUNTER LOCKED  DISCOVER LINCOLN");
     TextOutW(deviceContext, 20, 135, encounterLabel,
         static_cast<int>(wcslen(encounterLabel)));
+
+    const int rightPanelLeft = std::max(350, width - 356);
+    DrawHudFrame(deviceContext, rightPanelLeft, 16, width - 18, 94,
+        Color(165, 8, 13, 28), Color(105, 105, 170, 110));
+    if (assets_.AstralSigil()) {
+        Graphics graphics(deviceContext);
+        graphics.SetInterpolationMode(Gdiplus::InterpolationModeBilinear);
+        graphics.DrawImage(assets_.AstralSigil(), Rect(width - 62, 27, 34, 34));
+    }
+    SetTextColor(deviceContext, RGB(230, 235, 255));
+    const wchar_t* worldTitle = L"ASTRAL WINDOW  //  NIGHTFALL PROTOCOL";
+    TextOutW(deviceContext, rightPanelLeft + 14, 28, worldTitle,
+        static_cast<int>(wcslen(worldTitle)));
+    SetTextColor(deviceContext, RGB(155, 185, 225));
+    const wchar_t* worldSubtitle = encounterCompleted
+        ? L"RIFT STABILIZED  //  REWARD SECURED"
+        : (encounterActive ? L"RIFT SURGE  //  TRAINING SIGNAL LOCKED"
+            : L"RIFT ACTIVE  //  EXPLORE THE MEMORIAL AXIS");
+    TextOutW(deviceContext, rightPanelLeft + 14, 58, worldSubtitle,
+        static_cast<int>(wcslen(worldSubtitle)));
 
     SelectObject(deviceContext, previousPen);
     DeleteObject(gridPen);
