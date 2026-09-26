@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "loop_id": "astral-art-hourly-20260922",
+  "task_id": "ART-011",
+  "date": "2026-09-25",
+  "focus": "starter UI icon small-size readability and publication correction",
+  "branch": "art/2026-09-25-starter-ui-icons-v1-pass1",
+  "observed_head_before_write": "537bf4e8d8219c1cf7ad8959914d6a1a72b1e0ec",
+  "source_contract_git_blob_sha1": "b933aa5fe74805ffe3bfeb53054786ddf55b2ff2",
+  "source_sha256": "6532d497f710c2818e1cadbc4d1683c676c6001fca73f17254a68bec41dc5fbf",
+  "source_bytes": 4029,
+  "writes": {
+    "svg": {
+      "ok": false,
+      "error": "This tool call was blocked by OpenAI's safety checks. Please double check what you are sending."
+    },
+    "manifest": null,
+    "readability_contract": {
+      "ok": false,
+      "error": "This tool call was blocked by OpenAI's safety checks. Please double check what you are sending."
+    },
+    "qa": {
+      "ok": false,
+      "error": "This tool call was blocked by OpenAI's safety checks. Please double check what you are sending."
+    },
+    "task": {
+      "ok": false,
+      "error": "This tool call was blocked by OpenAI's safety checks. Please double check what you are sending."
+    },
+    "backlog": {
+      "ok": false,
+      "error": "This tool call was blocked by OpenAI's safety checks. Please double check what you are sending."
+    }
+  },
+  "verification": {
+    "source_structure_from_prior_pass": "12/12 symbols; no prohibited active/external elements",
+    "measured_sizes_px": [
+      16,
+      20,
+      24,
+      32,
+      48
+    ],
+    "all_12_visible_each_size": true,
+    "boundary_pixels_each_size": 0,
+    "min_16px_outer_margin_px": 1,
+    "min_16px_alpha_ge_128_pixels": 16,
+    "max_pairwise_jaccard": 0.625,
+    "offline_renderer": "CairoSVG 2.8.2 + Pillow 12.3.0",
+    "environment": "sandbox Linux; not Company Runtime",
+    "runtime_verified": false,
+    "independent_visual_review": false,
+    "art_approved": false
+  },
+  "next_action": "publish the exact SVG when the GitHub write gate permits it; keep measured contract as source-only evidence"
+}

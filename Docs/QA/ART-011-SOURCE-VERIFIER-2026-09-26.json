@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "task_id": "ART-011",
+  "loop_id": "astral-art-hourly-20260922",
+  "record": "source_verifier_and_manifest_state_gate",
+  "date": "2026-09-26",
+  "scope": "source-only verification tooling; no Astral import/runtime/art approval",
+  "repository": "LucasKazaki/AnimeRPG",
+  "branch": "art/2026-09-25-starter-ui-icons-v1-pass1",
+  "observed_main": "2958741188279a0b438dd489ad00cac546012c25",
+  "observed_head_before_receipt": "f8effed6b79040de3467cc345b90d895517d9ba2",
+  "deliverable": {
+    "path": "Content/Starter/UIIconsV1/verify_source.py",
+    "commit": "f8effed6b79040de3467cc345b90d895517d9ba2",
+    "git_blob_sha1": "e1c47db43279d264a44df123e58d71b1dfc96b51",
+    "implementation": "Python standard library only",
+    "checks": [
+      "SVG XML parse",
+      "manifest JSON parse",
+      "manifest source SHA-256 and byte count",
+      "exact 12-icon ID/order/count contract",
+      "96x72 sheet and 24x24 symbol viewBoxes",
+      "local-only use references",
+      "no prohibited active/embed/text elements",
+      "no external hrefs",
+      "no event-handler attributes",
+      "no CSS url() attribute references",
+      "currentColor/none paint policy",
+      "no symbol-level hard-coded color",
+      "single contact-sheet preview wrapper color",
+      "runtime_verified=false and art_approved=false",
+      "manifest status remains pre-independent-review"
+    ],
+    "claim_boundary": "The verifier is source QA tooling only. It does not establish Astral SVG support, raster acceptance, native runtime behavior, accessibility certification, or art approval."
+  },
+  "preserved_source_fixture": {
+    "provenance": "ART-011-starter-ui-icons-source-handoff.zip from prior ART-011 source production",
+    "svg_file": "starter-ui-icons.svg",
+    "svg_bytes": 4029,
+    "svg_sha256": "6532d497f710c2818e1cadbc4d1683c676c6001fca73f17254a68bec41dc5fbf",
+    "original_manifest_bytes": 723,
+    "original_manifest_sha256": "20ddca723ef5a5fc8b82bf0375f3837ad7ba03999bfa82e9c03a119ea1154982"
+  },
+  "sandbox_verification": {
+    "environment": "sandbox Linux x86_64",
+    "python": "3.13.5",
+    "exact_repository_head_execution": false,
+    "reason": "The committed GitHub file was read back through the connector, but the repository branch itself was not materialized or executed in the sandbox. The same verifier rule set was executed before publication against the preserved source fixture.",
+    "original_manifest_result": {
+      "exit_code": 1,
+      "checks": 31,
+      "passed": 30,
+      "failed": 1,
+      "failed_check": "manifest_status_not_premature",
+      "observed_status": "source_validated_not_imported",
+      "finding": "The preserved manifest prematurely claims source validation even though repository-head publication plus independent QA are still required."
+    },
+    "corrected_manifest_candidate": {
+      "status": "source_prepared_not_imported",
+      "bytes": 722,
+      "sha256": "bd881fa7db545192a4d1a8531e9dadf084eb0f1742e6e10784ccfb55a2aa32e4",
+      "exit_code": 0,
+      "checks": 31,
+      "passed": 31,
+      "failed": 0
+    },
+    "negative_tests": [
+      {
+        "mutation": "external href",
+        "expected": "reject",
+        "result": "rejected"
+      },
+      {
+        "mutation": "prohibited script element",
+        "expected": "reject",
+        "result": "rejected"
+      },
+      {
+        "mutation": "duplicate symbol id",
+        "expected": "reject",
+        "result": "rejected"
+      },
+      {
+        "mutation": "wrong manifest source hash",
+        "expected": "reject",
+        "result": "rejected"
+      }
+    ],
+    "python_compile": "passed"
+  },
+  "publication_state": {
+    "svg_present_on_branch": false,
+    "expected_manifest_present_on_branch": false,
+    "source_validated": false,
+    "svg_publication_attempt_this_pass": "blocked by connected GitHub write safety gate; not retried or bypassed",
+    "manifest_policy": "When publication becomes possible, use the corrected pre-independent-review status rather than the stale preserved source_validated_not_imported claim."
+  },
+  "review_state": {
+    "independent_source_review": "not_run",
+    "independent_visual_art_review": "not_run",
+    "astral_imported": false,
+    "astral_runtime_verified": false,
+    "art_approved": false
+  },
+  "next_action": "Publish the exact SVG plus the corrected pre-review manifest when permitted, then execute the committed verifier against exact repository-head bytes and obtain independent source review before setting source_validated=true."
+}

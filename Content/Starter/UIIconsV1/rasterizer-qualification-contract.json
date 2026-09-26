@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "asset_id": "astral-starter-ui-icons-v1",
+  "task_id": "ART-011",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "primary_rasterizer_candidate_qualified_not_executed",
+  "decision_date": "2026-09-26",
+  "source_pin": {
+    "expected_path": "Content/Starter/UIIconsV1/starter-ui-icons.svg",
+    "sha256": "6532d497f710c2818e1cadbc4d1683c676c6001fca73f17254a68bec41dc5fbf",
+    "bytes": 4029,
+    "repository_presence": false,
+    "claim_boundary": "prepared external handoff only; no repository-head source acceptance"
+  },
+  "primary_candidate": {
+    "tool": "resvg",
+    "version": "0.48.1",
+    "release_published_utc": "2026-08-02T14:14:17Z",
+    "upstream": "https://github.com/linebender/resvg",
+    "release": "https://github.com/linebender/resvg/releases/tag/v0.48.1",
+    "license": "Apache-2.0 OR MIT",
+    "role": "preferred deterministic SVG-to-PNG derivative renderer once independently executed and accepted",
+    "qualification_basis": [
+      "upstream describes static SVG rendering through library, C library and CLI",
+      "upstream states no dependency on system libraries for rendering and documents cross-platform pixel reproducibility",
+      "upstream documents checks intended to prevent endless loops and recursion stack overflows",
+      "source SVG contract already prohibits script, animation, external references, fonts and embedded raster content"
+    ],
+    "availability": {
+      "prebuilt_linux_x86_64": {
+        "asset": "resvg-linux-x86_64.tar.gz",
+        "bytes": 1930514,
+        "sha256": "fa8c26495a187e592c501db15bf9e8a9fdc051d4b2b336b39703d5b59f912b9d"
+      },
+      "prebuilt_windows_x86_64_in_release_assets": false,
+      "windows_note": "Do not claim a prebuilt Windows binary for v0.48.1. Windows execution requires an authorized, independently pinned build/install path or another verified upstream distribution.",
+      "local_installation_observed": false,
+      "local_execution_observed": false
+    },
+    "promotion_requirements": [
+      "exact repository-head SVG and manifest must exist and pass source QA",
+      "authorized resvg 0.48.1 executable or reproducible build must be independently pinned by hash",
+      "render all 12 icons at 16, 20, 24, 32, 48 and 64 px",
+      "record exact command line, environment and executable hash",
+      "require every icon visible and no nonzero-alpha pixel touching the raster edge",
+      "record decoded RGBA hashes for accepted derivatives",
+      "rerun a second time and require byte-identical PNG output from the same pinned executable and inputs",
+      "compare decoded pixels against an independent renderer without requiring cross-renderer byte identity",
+      "do not promote PNGs to imported/runtime_verified until Astral image import, alpha, tint, filtering, DPI and atlas behavior are natively proven"
+    ]
+  },
+  "comparison_tools": [
+    {
+      "tool": "CairoSVG",
+      "installed_observed_version": "2.8.2",
+      "current_upstream_release_observed": "2.9.1",
+      "current_release_published_utc": "2026-09-07T10:37:00Z",
+      "current_release": "https://github.com/Kozea/CairoSVG/releases/tag/2.9.1",
+      "status": "comparison_only_installed_version_not_accepted_for_untrusted_input",
+      "security_notes": [
+        "versions below 2.9.0 are affected by the upstream recursive-use amplification denial-of-service advisory",
+        "2.9.1 is itself a security update for specially crafted SVGs with very long paths causing exponential rendering time",
+        "the installed 2.8.2 copy is therefore not eligible as the canonical production rasterizer"
+      ]
+    },
+    {
+      "tool": "Inkscape",
+      "installed_observed_version": "1.4",
+      "current_stable_release_observed": "1.4.3",
+      "current_release_date": "2025-12-26",
+      "current_release": "https://inkscape.org/release/inkscape-1.4.3/",
+      "status": "independent_visual_reference_installed_version_stale",
+      "note": "Keep the installed 1.4 copy as an independent comparison renderer only; do not call it the current stable release or canonical derivative path."
+    }
+  ],
+  "acceptance_matrix": {
+    "source_validated": false,
+    "rasterizer_selected_for_trial": true,
+    "rasterizer_executed": false,
+    "deterministic_same_tool_repeat_verified": false,
+    "candidate_derivatives_validated": false,
+    "astral_imported": false,
+    "astral_runtime_verified": false,
+    "art_approved": false
+  },
+  "scope_boundary": "This contract selects a test candidate and acceptance procedure only. It installs nothing, spends nothing, changes no runtime code, and does not establish Astral image support or UE/Unity parity."
+}

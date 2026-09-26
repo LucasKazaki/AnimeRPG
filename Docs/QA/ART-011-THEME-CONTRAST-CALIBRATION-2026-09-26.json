@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "task_id": "ART-011",
+  "loop_id": "astral-art-hourly-20260922",
+  "pass": "theme_contrast_calibration_repository_head",
+  "observed_before_qa_write": {
+    "repository": "LucasKazaki/AnimeRPG",
+    "pr": 78,
+    "branch": "art/2026-09-25-starter-ui-icons-v1-pass1",
+    "head": "a390c010cbb5fa6e1b1a484032c2d084ade2f87e",
+    "main": "2958741188279a0b438dd489ad00cac546012c25",
+    "theme_fixture_git_blob_sha1": "fbe9a79c02a4d3a8dc72ab56399aac2438cc7008"
+  },
+  "deliverable": {
+    "path": "Content/Starter/UIIconsV1/theme-contrast-calibration.json",
+    "status": "source_calibration_fixture_not_runtime_theme",
+    "role_pairs_checked": 28,
+    "minimum_pair": "light_reference.secondary vs canvas",
+    "minimum_contrast_ratio": 5.4531
+  },
+  "verification": {
+    "method": "independent recomputation from the committed sRGB hex values using the WCAG 2.2 relative-luminance and contrast-ratio formula",
+    "semantic_assertions_passed": 28,
+    "semantic_assertions_total": 28,
+    "all_enabled_role_pairs_ge_3_to_1": true,
+    "maximum_absolute_ratio_delta_vs_committed_rounded_value": 0.000049,
+    "rounding_rule": "sub-threshold values must not be rounded up to passing",
+    "thin_shape_note": "nominal color math does not replace visual review because antialiasing can make thin marks appear weaker"
+  },
+  "reference": {
+    "name": "W3C WCAG 2.2 Understanding SC 1.4.11 Non-text Contrast",
+    "url": "https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html",
+    "observed_2026_09_26": "meaningful UI component/state indicators and graphical objects require at least 3:1 against adjacent colors where the criterion applies; inactive components are exempt"
+  },
+  "claim_boundaries": {
+    "final_animerpg_theme_approved": false,
+    "repository_svg_source_validated": false,
+    "astral_imported": false,
+    "astral_runtime_verified": false,
+    "accessibility_certified": false,
+    "art_approved": false,
+    "ue_unity_parity": false
+  },
+  "next_action": "publish and independently validate the exact starter-ui-icons.svg plus expected manifest; later render the committed icon source against both fixture themes with an accepted rasterizer and repeat in native Astral UI after import/tint/filtering/DPI support exists"
+}

@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "task_id": "ART-011",
+  "loop_id": "astral-art-hourly-20260922",
+  "date": "2026-09-26",
+  "scope": "source-only creative tooling qualification; no dependency install or runtime execution",
+  "repository": "LucasKazaki/AnimeRPG",
+  "branch": "art/2026-09-25-starter-ui-icons-v1-pass1",
+  "baseline_head_before_pass": "95ec2bbf99ad751296d2c0e1777b4f9220ade59f",
+  "delivered": {
+    "path": "Content/Starter/UIIconsV1/rasterizer-qualification-contract.json",
+    "commit": "ca4417ee853df42d88cf33efa7df2421d70109d7",
+    "git_blob_sha1": "2e287deb1a70e4f96d38167b974fadc0db5cfd21"
+  },
+  "current_upstream_observations": {
+    "resvg": {
+      "release": "0.48.1",
+      "published_utc": "2026-08-02T14:14:17Z",
+      "release_url": "https://github.com/linebender/resvg/releases/tag/v0.48.1",
+      "license": "Apache-2.0 OR MIT",
+      "linux_x86_64_release_asset_sha256": "fa8c26495a187e592c501db15bf9e8a9fdc051d4b2b336b39703d5b59f912b9d",
+      "windows_x86_64_prebuilt_asset_observed": false,
+      "local_execution": "not_run_not_installed"
+    },
+    "cairosvg": {
+      "installed_observed": "2.8.2",
+      "current_upstream_release": "2.9.1",
+      "current_release_published_utc": "2026-09-07T10:37:00Z",
+      "security_boundary": "installed 2.8.2 is below the 2.9.0 recursive-use DoS fix; 2.9.1 is also a security update for pathological long paths; comparison-only for this pass"
+    },
+    "inkscape": {
+      "installed_observed": "1.4",
+      "current_stable_release_observed": "1.4.3",
+      "current_release_date": "2025-12-26",
+      "role": "independent visual comparison only"
+    }
+  },
+  "repository_directory_observation": {
+    "Content/Starter/UIIconsV1": [
+      "raster-derivation-contract.json",
+      "rasterizer-qualification-contract.json",
+      "source-contract.json"
+    ],
+    "starter_ui_icons_svg_present": false,
+    "manifest_present": false
+  },
+  "semantic_verification": {
+    "passed": 21,
+    "total": 21,
+    "checks": [
+      "schema version and ART-011 identity",
+      "source SHA-256 and byte count pin",
+      "source repository presence remains false",
+      "resvg 0.48.1 primary candidate and dual-license pin",
+      "resvg Linux x86_64 release-asset digest pin",
+      "no v0.48.1 prebuilt Windows x86_64 release asset claimed",
+      "no local resvg execution claimed",
+      "CairoSVG current 2.9.1 versus installed 2.8.2 distinction",
+      "Inkscape current stable 1.4.3 versus installed 1.4 distinction",
+      "rasterizer execution remains false",
+      "Astral imported/runtime/art-approved remain false",
+      "exact SVG and manifest remain absent"
+    ],
+    "result": "pass"
+  },
+  "decision": "Use resvg 0.48.1 as the preferred deterministic rasterizer trial candidate, not as an accepted production tool yet. Promotion requires an authorized pinned executable/build, exact repository-head SVG and manifest, same-tool repeat determinism, decoded-pixel independent comparison, and later Astral-native import/render evidence.",
+  "not_claimed": [
+    "dependency installation",
+    "resvg execution",
+    "accepted PNG derivatives",
+    "Astral image import",
+    "Astral runtime verification",
+    "accessibility compliance",
+    "independent visual-art approval",
+    "UE5 or Unity parity"
+  ],
+  "next_action": "Publish the exact SVG and manifest when the repository write path permits it, then execute the pinned resvg candidate in an authorized environment and record derivative hashes plus same-tool repeat determinism before any runtime promotion."
+}
