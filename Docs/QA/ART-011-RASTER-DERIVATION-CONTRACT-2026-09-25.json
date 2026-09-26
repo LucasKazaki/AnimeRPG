@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "loop_id": "astral-art-hourly-20260922",
+  "task_id": "ART-011",
+  "date": "2026-09-25",
+  "focus": "raster derivative acceptance contract and measured multi-size source reference",
+  "observed_head_before_write": "3deb9721335a4bc28c904a447f31bb51cd9fd451",
+  "source_sha256": "6532d497f710c2818e1cadbc4d1683c676c6001fca73f17254a68bec41dc5fbf",
+  "source_bytes": 4029,
+  "independent_checks": {
+    "preserved_handoff_hash_match": true,
+    "xml_parse": true,
+    "expected_symbols": 12,
+    "review_sizes_px": [
+      16,
+      20,
+      24,
+      32,
+      48,
+      64
+    ],
+    "all_sizes_all_icons_visible": true,
+    "all_sizes_zero_edge_alpha": true,
+    "minimum_outer_margin_by_size_px": {
+      "16": 1,
+      "20": 1,
+      "24": 2,
+      "32": 2,
+      "48": 4,
+      "64": 5
+    },
+    "minimum_alpha_ge_128_by_size": {
+      "16": 16,
+      "20": 24,
+      "24": 38,
+      "32": 70,
+      "48": 162,
+      "64": 292
+    },
+    "candidate_png_count": 72,
+    "candidate_pngs_committed": false,
+    "source_on_repository_head_at_pass_start": false,
+    "runtime_verified": false,
+    "art_approved": false
+  },
+  "tool_receipt": {
+    "cairo_svg": "2.8.2",
+    "pillow": "12.3.0",
+    "environment": "sandbox Linux; not Company Runtime"
+  },
+  "claim_boundary": "No Astral image import, DPI/layout scaling, atlas behavior, runtime accessibility, native performance, or art approval is claimed.",
+  "next_action": "land exact SVG and expected manifest when allowed; independently validate repository-head source before promoting source_validated or generating accepted runtime derivatives"
+}
