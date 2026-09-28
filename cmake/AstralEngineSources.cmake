@@ -38,7 +38,29 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Serialization.cpp"
 )
 
+# Astral-mode presentation of the game (opt-in renderer, HUD, audio, VFX).
+# The root build compiles these into AstralGame next to the gameplay sources.
 set(ASTRAL_SHOWCASE_SOURCES
+    "${ASTRAL_ENGINE_ROOT}/Game/Showcase/CharacterPresenter.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Game/Showcase/GameplayBridge.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Game/Showcase/MallScene.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Game/Showcase/MallShowcase.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Game/Showcase/ShowcaseSession.cpp"
+)
+
+# Authoritative gameplay domains the showcase presents. The root build already
+# lists them for AstralGame; the portable build compiles them itself so the
+# headless capture tool and showcase suite drive the real rules.
+set(ASTRAL_GAMEPLAY_SOURCES
+    "${ASTRAL_ENGINE_ROOT}/Engine/Scene/Camera.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Scene/CombatSandbox.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Scene/LandmarkEncounter.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Scene/LandmarkInteraction.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Scene/PlayerController.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Scene/ShadowbladeActions.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Scene/ThoughtCommands.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Scene/Transform.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Scene/WorldBlockout.cpp"
 )
 
 # Each suite is Tests/<name>.cpp and links the runtime and showcase libraries.
@@ -51,4 +73,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EnginePhysicsTests
     EngineAnimationTests
     EngineSystemsTests
+    EngineShowcaseTests
 )
