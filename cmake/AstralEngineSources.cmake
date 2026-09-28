@@ -9,6 +9,13 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/GameTime.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/JobSystem.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/Profiler.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Image.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Mesh.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/PostProcess.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Rasterizer.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/RenderTarget.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/SceneRenderer.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Texture.cpp"
 )
 
 set(ASTRAL_SHOWCASE_SOURCES
@@ -18,4 +25,5 @@ set(ASTRAL_SHOWCASE_SOURCES
 set(ASTRAL_ENGINE_TEST_SUITES
     EngineMathTests
     EngineCoreTests
+    EngineGraphicsTests
 )
