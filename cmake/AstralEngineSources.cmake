@@ -19,6 +19,9 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/SceneRenderer.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Sprite2D.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Texture.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/World/Components.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/World/Registry.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/World/Serialization.cpp"
 )
 
 set(ASTRAL_SHOWCASE_SOURCES
@@ -30,4 +33,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineCoreTests
     EngineGraphicsTests
     Engine2DTests
+    EngineWorldTests
 )
