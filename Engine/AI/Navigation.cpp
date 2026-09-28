@@ -26,6 +26,7 @@ void NavGrid::SetWalkable(int x, int z, bool walkable) {
 }
 
 bool NavGrid::WorldToCell(Vec3 p, int& x, int& z) const {
+    x = z = -1;
     if (!IsFinite(p)) return false;
     x = static_cast<int>(std::floor((p.x - desc_.origin.x) / desc_.cellSize));
     z = static_cast<int>(std::floor((p.z - desc_.origin.z) / desc_.cellSize));
@@ -40,7 +41,7 @@ Vec3 NavGrid::CellCenter(int x, int z) const {
 void NavGrid::BlockBox(const AABB& box, float agentRadius) {
     if (!box.IsValid()) return;
     const float r = std::max(0.0f, agentRadius);
-    int x0, z0, x1, z1;
+    int x0 = 0, z0 = 0, x1 = 0, z1 = 0;
     WorldToCell({box.min.x - r, 0, box.min.z - r}, x0, z0);
     WorldToCell({box.max.x + r, 0, box.max.z + r}, x1, z1);
     x0 = std::clamp(x0, 0, desc_.width - 1);
@@ -70,7 +71,8 @@ void NavGrid::BakeFromPhysics(const Physics::PhysicsWorld& world, float agentRad
 }
 
 bool NavGrid::NearestWalkable(Vec3 p, int& x, int& z, int maxRadius) const {
-    int cx, cz;
+    if (!IsFinite(p)) return false;
+    int cx = 0, cz = 0;
     WorldToCell(p, cx, cz);
     cx = std::clamp(cx, 0, desc_.width - 1);
     cz = std::clamp(cz, 0, desc_.depth - 1);
@@ -101,7 +103,7 @@ bool NavGrid::NearestWalkable(Vec3 p, int& x, int& z, int maxRadius) const {
 
 bool NavGrid::LineWalkable(Vec3 a, Vec3 b) const {
     // Amanatides-Woo traversal over the cells the segment crosses.
-    int x, z, endX, endZ;
+    int x = 0, z = 0, endX = 0, endZ = 0;
     if (!WorldToCell(a, x, z) || !WorldToCell(b, endX, endZ)) return false;
     const float dx = b.x - a.x, dz = b.z - a.z;
     const int stepX = dx > 0 ? 1 : -1, stepZ = dz > 0 ? 1 : -1;
@@ -133,7 +135,7 @@ bool NavGrid::LineWalkable(Vec3 a, Vec3 b) const {
 
 PathResult NavGrid::FindPath(Vec3 start, Vec3 goal, int maxExpanded, bool smooth) const {
     PathResult result;
-    int sx, sz, gx, gz;
+    int sx = 0, sz = 0, gx = 0, gz = 0;
     if (!NearestWalkable(start, sx, sz) || !NearestWalkable(goal, gx, gz)) return result;
     const int width = desc_.width;
     const std::size_t count = static_cast<std::size_t>(width) * static_cast<std::size_t>(desc_.depth);
