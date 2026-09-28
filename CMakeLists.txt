@@ -5,6 +5,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Portable Astral engine runtime and the Astral-mode showcase (see
+# cmake/AstralEngineSources.cmake; Tests/EngineRuntime builds the same sources
+# headless on Linux with sanitizers).
+include(cmake/AstralEngineSources.cmake)
+find_package(Threads REQUIRED)
+add_library(AstralEngineRuntime STATIC ${ASTRAL_ENGINE_RUNTIME_SOURCES})
+target_include_directories(AstralEngineRuntime PUBLIC .)
+target_link_libraries(AstralEngineRuntime PUBLIC Threads::Threads)
+add_library(AstralShowcase STATIC ${ASTRAL_SHOWCASE_SOURCES} ${ASTRAL_GAMEPLAY_SOURCES})
+target_link_libraries(AstralShowcase PUBLIC AstralEngineRuntime)
+
 add_executable(AstralGame WIN32
     Engine/Assets/StaticMesh.cpp
     Engine/Core/BenchmarkRunControl.cpp
@@ -32,6 +43,10 @@ add_executable(AstralGame WIN32
 target_include_directories(AstralGame PRIVATE .)
 target_compile_definitions(AstralGame PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(AstralGame PRIVATE user32 gdi32)
+# Opt-in Astral renderer (F2 / ASTRAL_RENDER_MODE=astral). AstralGame already
+# compiles the gameplay sources, so it takes the showcase sources directly.
+target_sources(AstralGame PRIVATE ${ASTRAL_SHOWCASE_SOURCES} Game/Showcase/Win32AstralPresenter.cpp)
+target_link_libraries(AstralGame PRIVATE AstralEngineRuntime winmm)
 if(MSVC)
     target_link_options(AstralGame PRIVATE "$<$<CONFIG:Release>:/Brepro>")
 endif()
@@ -43,6 +58,10 @@ add_executable(AstralEditor WIN32
 target_include_directories(AstralEditor PRIVATE .)
 target_compile_definitions(AstralEditor PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(AstralEditor PRIVATE user32 gdi32)
+
+# Headless National Mall capture: PNG frames, WAV mix and Chrome trace.
+add_executable(AstralCapture Tools/AstralCapture.cpp)
+target_link_libraries(AstralCapture PRIVATE AstralShowcase)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -175,6 +194,36 @@ if(BUILD_TESTING)
     )
     target_include_directories(LandmarkEncounterTests PRIVATE .)
     astral_add_test(LandmarkEncounterTests)
+
+    # Portable engine suites (ASTRAL_ENGINE_TEST_SUITES); renders make them slower in Debug.
+    add_executable(EngineMathTests Tests/EngineMathTests.cpp)
+    target_link_libraries(EngineMathTests PRIVATE AstralShowcase)
+    astral_add_test(EngineMathTests)
+    add_executable(EngineCoreTests Tests/EngineCoreTests.cpp)
+    target_link_libraries(EngineCoreTests PRIVATE AstralShowcase)
+    astral_add_test(EngineCoreTests)
+    add_executable(EngineGraphicsTests Tests/EngineGraphicsTests.cpp)
+    target_link_libraries(EngineGraphicsTests PRIVATE AstralShowcase)
+    astral_add_test(EngineGraphicsTests)
+    add_executable(Engine2DTests Tests/Engine2DTests.cpp)
+    target_link_libraries(Engine2DTests PRIVATE AstralShowcase)
+    astral_add_test(Engine2DTests)
+    add_executable(EngineWorldTests Tests/EngineWorldTests.cpp)
+    target_link_libraries(EngineWorldTests PRIVATE AstralShowcase)
+    astral_add_test(EngineWorldTests)
+    add_executable(EnginePhysicsTests Tests/EnginePhysicsTests.cpp)
+    target_link_libraries(EnginePhysicsTests PRIVATE AstralShowcase)
+    astral_add_test(EnginePhysicsTests)
+    add_executable(EngineAnimationTests Tests/EngineAnimationTests.cpp)
+    target_link_libraries(EngineAnimationTests PRIVATE AstralShowcase)
+    astral_add_test(EngineAnimationTests)
+    add_executable(EngineSystemsTests Tests/EngineSystemsTests.cpp)
+    target_link_libraries(EngineSystemsTests PRIVATE AstralShowcase)
+    astral_add_test(EngineSystemsTests)
+    add_executable(EngineShowcaseTests Tests/EngineShowcaseTests.cpp)
+    target_link_libraries(EngineShowcaseTests PRIVATE AstralShowcase)
+    astral_add_test(EngineShowcaseTests)
+    set_tests_properties(${ASTRAL_ENGINE_TEST_SUITES} PROPERTIES TIMEOUT 300)
 
     add_executable(M4RuntimeSmoke Tests/CombatSandboxTests.cpp)
     target_include_directories(M4RuntimeSmoke PRIVATE .)
