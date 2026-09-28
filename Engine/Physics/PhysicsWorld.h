@@ -157,6 +157,8 @@ public:
 
     template <typename Fn>
     void ForEachBody(Fn&& fn) { bodies_.ForEach([&](Core::Handle, Body& body) { fn(body); }); }
+    template <typename Fn>
+    void ForEachBody(Fn&& fn) const { bodies_.ForEach([&](Core::Handle, const Body& body) { fn(body); }); }
 
 private:
     struct CachedPoint {

@@ -6,10 +6,13 @@
 get_filename_component(ASTRAL_ENGINE_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
 set(ASTRAL_ENGINE_RUNTIME_SOURCES
+    "${ASTRAL_ENGINE_ROOT}/Engine/AI/BehaviorTree.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/AI/Navigation.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Animator.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/HumanoidRig.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skeleton.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skinning.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Audio/AudioMixer.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/GameTime.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/JobSystem.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/Profiler.cpp"
@@ -23,6 +26,7 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/SceneRenderer.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Sprite2D.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Texture.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Input/InputSystem.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/BroadPhase.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/CharacterController.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/Collision.cpp"
@@ -30,6 +34,7 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/PhysicsWorld.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Components.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Registry.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/VFX/Particles.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Serialization.cpp"
 )
 
@@ -45,4 +50,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineWorldTests
     EnginePhysicsTests
     EngineAnimationTests
+    EngineSystemsTests
 )

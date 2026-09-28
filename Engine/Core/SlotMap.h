@@ -71,6 +71,12 @@ public:
             if (slots_[index].alive) fn(Handle{index, slots_[index].generation}, slots_[index].value);
         }
     }
+    template <typename Fn>
+    void ForEach(Fn&& fn) const {
+        for (std::uint32_t index = 0; index < slots_.size(); ++index) {
+            if (slots_[index].alive) fn(Handle{index, slots_[index].generation}, slots_[index].value);
+        }
+    }
 
 private:
     struct Slot {
