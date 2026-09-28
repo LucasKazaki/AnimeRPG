@@ -1,7 +1,7 @@
 #include "Engine/Graphics/SceneRenderer.h"
 
 #include "Engine/Core/Profiler.h"
-#include "Engine/Core/Random.h"
+#include "Engine/Math/Noise.h"
 
 #include <algorithm>
 #include <chrono>
@@ -22,30 +22,6 @@ double MillisecondsSince(SteadyClock::time_point start) {
 const Material& DefaultMaterial() {
     static const Material material;
     return material;
-}
-
-float ValueNoise(float x, float y) {
-    const float fx = std::floor(x), fy = std::floor(y);
-    const int ix = static_cast<int>(fx), iy = static_cast<int>(fy);
-    const float tx = x - fx, ty = y - fy;
-    auto corner = [](int cx, int cy) {
-        return static_cast<float>(Core::Hash32(static_cast<std::uint32_t>(cx) * 73856093u
-            ^ static_cast<std::uint32_t>(cy) * 19349663u) & 0xFFFFu) / 65535.0f;
-    };
-    const float sx = tx * tx * (3.0f - 2.0f * tx);
-    const float sy = ty * ty * (3.0f - 2.0f * ty);
-    return Lerp(Lerp(corner(ix, iy), corner(ix + 1, iy), sx), Lerp(corner(ix, iy + 1), corner(ix + 1, iy + 1), sx), sy);
-}
-
-float Fbm(float x, float y, int octaves) {
-    float sum = 0.0f, amplitude = 0.5f, frequency = 1.0f, norm = 0.0f;
-    for (int i = 0; i < octaves; ++i) {
-        sum += amplitude * ValueNoise(x * frequency, y * frequency);
-        norm += amplitude;
-        amplitude *= 0.5f;
-        frequency *= 2.03f;
-    }
-    return sum / norm;
 }
 
 Vec3 SafeNormal(Vec3 n) { return Normalize(n, {0.0f, 1.0f, 0.0f}); }
@@ -109,10 +85,10 @@ Color SceneRenderer::SkyColor(const RenderScene& scene, Vec3 dir) const {
             const float scale = 1.0f / (dir.y + 0.08f);
             const float u = dir.x * scale * 1.6f + 3.7f;
             const float v = dir.z * scale * 1.6f + 1.3f;
-            const float density = Fbm(u, v, 5);
+            const float density = Fbm2D(u, v, 5, 11u);
             const float coverage = SmoothStep(0.52f, 0.56f, density);
             if (coverage > 0.0f) {
-                const float shade = SmoothStep(0.52f, 0.75f, Fbm(u + 0.35f, v + 0.35f, 3));
+                const float shade = SmoothStep(0.52f, 0.75f, Fbm2D(u + 0.35f, v + 0.35f, 3, 11u));
                 const Color lit = Color{1.0f, 0.98f, 0.96f} * 1.25f;
                 const Color shadow = Color{0.62f, 0.66f, 0.82f};
                 const float fade = SmoothStep(0.02f, 0.18f, dir.y);
