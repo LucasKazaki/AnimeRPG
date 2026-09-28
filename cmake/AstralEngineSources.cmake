@@ -6,6 +6,10 @@
 get_filename_component(ASTRAL_ENGINE_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
 set(ASTRAL_ENGINE_RUNTIME_SOURCES
+    "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Animator.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Animation/HumanoidRig.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skeleton.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skinning.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/GameTime.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/JobSystem.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/Profiler.cpp"
@@ -40,4 +44,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     Engine2DTests
     EngineWorldTests
     EnginePhysicsTests
+    EngineAnimationTests
 )

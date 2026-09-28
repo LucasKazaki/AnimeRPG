@@ -87,6 +87,7 @@ struct SkySettings {
     Color ground{0.32f, 0.30f, 0.30f};
     Color sunColor{6.0f, 5.4f, 4.6f};
     float sunSizeDegrees{1.8f};
+    float cloudRotation{}; // radians about +Y; animate for drifting clouds at no cost
 };
 
 struct FogSettings {

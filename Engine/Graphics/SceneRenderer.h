@@ -38,11 +38,42 @@ struct RenderStats {
     std::size_t memoryBytes{};
 };
 
+// Scalability knobs (the role of UE's scalability groups). They cap or disable
+// scene-authored features; they never change gameplay or scene content.
 struct RendererSettings {
     int tileSize{64};
     int reflectionSteps{48};
     float reflectionMaxDistance{160.0f};
     bool clouds{true};
+    bool skyLut{true};       // cache the cloud sky in an equirect LUT (rebuilt on change)
+    int skyLutWidth{1024};
+    int maxShadowResolution{4096};
+    int shadowFilter{2};     // 0 = hard, 1 = 2x2 bilinear, 2 = 4x4 tent PCF
+    bool reflections{true};
+    bool bloom{true};
+    bool fxaa{true};
+    bool outlines{true};
+
+    // 0 = Low, 1 = Medium, 2 = High, 3 = Epic.
+    static RendererSettings Preset(int level) {
+        RendererSettings s;
+        switch (level <= 0 ? 0 : (level >= 3 ? 3 : level)) {
+        case 0:
+            s.reflectionSteps = 12; s.maxShadowResolution = 1024; s.shadowFilter = 0;
+            s.bloom = false; s.fxaa = false; s.clouds = false; s.skyLutWidth = 512;
+            break;
+        case 1:
+            s.reflectionSteps = 24; s.maxShadowResolution = 1536; s.shadowFilter = 1; s.skyLutWidth = 768;
+            break;
+        case 2:
+            s.reflectionSteps = 40; s.maxShadowResolution = 2048; s.shadowFilter = 2;
+            break;
+        default:
+            s.reflectionSteps = 64; s.maxShadowResolution = 4096; s.shadowFilter = 2; s.skyLutWidth = 2048;
+            break;
+        }
+        return s;
+    }
 };
 
 class SceneRenderer {
@@ -55,6 +86,7 @@ public:
 
     // Exposed for tests and tools.
     Color SkyColor(const RenderScene& scene, Math::Vec3 direction) const;
+    static Color SkyBase(const SkySettings& sky, Math::Vec3 direction, bool clouds);
     float ShadowFactor(Math::Vec3 worldPosition, Math::Vec3 normal) const;
 
 private:
@@ -83,6 +115,8 @@ private:
     void Reflections(const RenderScene& scene, const RenderView& view, RenderTarget& target);
     void Translucency(const RenderScene& scene, const RenderView& view, RenderTarget& target);
     void DrawDebugLines(const RenderScene& scene, const RenderView& view, RenderTarget& target);
+    void EnsureSkyLut(const RenderScene& scene);
+    Color SampleSkyLut(Math::Vec3 direction, float rotation) const;
 
     Core::JobSystem* jobs_{};
     RendererSettings settings_;
@@ -97,6 +131,10 @@ private:
     TileBins bins_;
     std::vector<Color> reflectionColor_;
     std::vector<float> reflectionWeight_;
+    std::vector<Color> skyLut_;
+    int skyLutWidth_{};
+    int skyLutHeight_{};
+    std::uint64_t skyLutKey_{};
     // View basis cached per frame.
     Math::Vec3 right_{}, up_{}, forward_{};
     float tanHalfX_{1.0f}, tanHalfY_{1.0f};

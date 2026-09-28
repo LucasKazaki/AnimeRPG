@@ -340,4 +340,34 @@ ASTRAL_TEST(ToneMapperIsMonotonicAndBounded) {
     ASTRAL_CHECK(hue.x > hue.y && hue.y > hue.z);
 }
 
+ASTRAL_TEST(SkyLutMatchesAnalyticSkyAndPresetsScale) {
+    TestScene test;
+    SceneRenderer cached(nullptr);
+    RenderTarget target;
+    cached.Render(test.scene, TestView(64, 36), target); // builds the LUT
+    for (const Vec3& dir : {Math::Normalize(Vec3{0.3f, 0.5f, 0.8f}), Math::Normalize(Vec3{-0.7f, 0.1f, 0.2f}),
+             Vec3{0, 1, 0}, Math::Normalize(Vec3{0.2f, -0.4f, 1.0f})}) {
+        const Color lut = cached.SkyColor(test.scene, dir);
+        const Color base = SceneRenderer::SkyBase(test.scene.sky, dir, true);
+        // Away from the sun the cached sky equals the analytic base sky (bilinear error only).
+        if (Math::Dot(dir, -Math::Normalize(test.scene.sun.direction)) < 0.5f) {
+            ASTRAL_CHECK_NEAR(lut.x, base.x, 0.08);
+            ASTRAL_CHECK_NEAR(lut.y, base.y, 0.08);
+            ASTRAL_CHECK_NEAR(lut.z, base.z, 0.08);
+        }
+    }
+    const RendererSettings low = RendererSettings::Preset(0), epic = RendererSettings::Preset(3);
+    ASTRAL_CHECK(low.maxShadowResolution < epic.maxShadowResolution);
+    ASTRAL_CHECK(low.reflectionSteps < epic.reflectionSteps);
+    ASTRAL_CHECK(!low.bloom && epic.bloom);
+    // Every preset renders the same scene without NaNs and keeps the sky on top.
+    for (int level = 0; level <= 3; ++level) {
+        SceneRenderer renderer(nullptr);
+        renderer.Settings() = RendererSettings::Preset(level);
+        renderer.Render(test.scene, TestView(96, 54), target);
+        ASTRAL_CHECK(target.flags[target.Index(48, 1)] & kPixelSky);
+        for (const Color& c : target.hdr) ASTRAL_CHECK(Math::IsFinite(c));
+    }
+}
+
 ASTRAL_TEST_MAIN("EngineGraphicsTests")

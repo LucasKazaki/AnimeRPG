@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <cmath>
 #include <limits>
 
@@ -75,12 +76,11 @@ void SceneRenderer::ParallelFor(std::size_t count, std::size_t batch,
     else if (count > 0) fn(0, count);
 }
 
-Color SceneRenderer::SkyColor(const RenderScene& scene, Vec3 dir) const {
-    const SkySettings& sky = scene.sky;
+Color SceneRenderer::SkyBase(const SkySettings& sky, Vec3 dir, bool clouds) {
     Color color;
     if (dir.y >= 0.0f) {
         color = Lerp(sky.horizon, sky.zenith, std::pow(Saturate(dir.y), 0.55f));
-        if (settings_.clouds && dir.y > 0.02f) {
+        if (clouds && dir.y > 0.02f) {
             // Stylised cumulus on a plane 1 unit above the eye: crisp anime edges.
             const float scale = 1.0f / (dir.y + 0.08f);
             const float u = dir.x * scale * 1.6f + 3.7f;
@@ -98,11 +98,79 @@ Color SceneRenderer::SkyColor(const RenderScene& scene, Vec3 dir) const {
     } else {
         color = Lerp(sky.horizon, sky.ground, Saturate(-dir.y * 5.0f));
     }
+    return color;
+}
+
+void SceneRenderer::EnsureSkyLut(const RenderScene& scene) {
+    const SkySettings& sky = scene.sky;
+    // Key on everything the cached base sky depends on.
+    std::uint64_t key = 1469598103934665603ull;
+    auto mix = [&key](float value) {
+        std::uint32_t bits;
+        std::memcpy(&bits, &value, sizeof(bits));
+        key = (key ^ bits) * 1099511628211ull;
+    };
+    for (const Color& c : {sky.zenith, sky.horizon, sky.ground}) {
+        mix(c.x);
+        mix(c.y);
+        mix(c.z);
+    }
+    mix(settings_.clouds ? 1.0f : 0.0f);
+    mix(static_cast<float>(settings_.skyLutWidth));
+    if (key == skyLutKey_ && !skyLut_.empty()) return;
+    ASTRAL_PROFILE_SCOPE("Render.SkyLut");
+    skyLutWidth_ = std::clamp(settings_.skyLutWidth, 64, 4096);
+    skyLutHeight_ = skyLutWidth_ / 2;
+    skyLut_.assign(static_cast<std::size_t>(skyLutWidth_) * static_cast<std::size_t>(skyLutHeight_), {});
+    ParallelFor(static_cast<std::size_t>(skyLutHeight_), 4, [&](std::size_t begin, std::size_t end) {
+        for (std::size_t row = begin; row < end; ++row) {
+            const float theta = (static_cast<float>(row) + 0.5f) / static_cast<float>(skyLutHeight_) * kPi;
+            for (int x = 0; x < skyLutWidth_; ++x) {
+                const float phi = ((static_cast<float>(x) + 0.5f) / static_cast<float>(skyLutWidth_) - 0.5f) * kTwoPi;
+                const Vec3 dir{std::sin(theta) * std::sin(phi), std::cos(theta), std::sin(theta) * std::cos(phi)};
+                skyLut_[row * static_cast<std::size_t>(skyLutWidth_) + static_cast<std::size_t>(x)] = SkyBase(sky, dir, settings_.clouds);
+            }
+        }
+    });
+    skyLutKey_ = key;
+}
+
+Color SceneRenderer::SampleSkyLut(Vec3 dir, float rotation) const {
+    const float phi = std::atan2(dir.x, dir.z) - rotation;
+    const float theta = std::acos(Clamp(dir.y, -1.0f, 1.0f));
+    float u = phi / kTwoPi + 0.5f;
+    u -= std::floor(u);
+    const float fx = u * static_cast<float>(skyLutWidth_) - 0.5f;
+    const float fy = Clamp(theta / kPi * static_cast<float>(skyLutHeight_) - 0.5f, 0.0f, static_cast<float>(skyLutHeight_ - 1));
+    const float bx = std::floor(fx), by = std::floor(fy);
+    const float tx = fx - bx, ty = fy - by;
+    const int x0 = (static_cast<int>(bx) % skyLutWidth_ + skyLutWidth_) % skyLutWidth_;
+    const int x1 = (x0 + 1) % skyLutWidth_;
+    const int y0 = static_cast<int>(by), y1 = std::min(skyLutHeight_ - 1, y0 + 1);
+    auto at = [&](int x, int y) { return skyLut_[static_cast<std::size_t>(y) * static_cast<std::size_t>(skyLutWidth_) + static_cast<std::size_t>(x)]; };
+    return Lerp(Lerp(at(x0, y0), at(x1, y0), tx), Lerp(at(x0, y1), at(x1, y1), tx), ty);
+}
+
+Color SceneRenderer::SkyColor(const RenderScene& scene, Vec3 dir) const {
+    const SkySettings& sky = scene.sky;
+    Color color;
+    if (!skyLut_.empty() && settings_.skyLut) {
+        color = SampleSkyLut(dir, sky.cloudRotation);
+    } else {
+        const float c = std::cos(-sky.cloudRotation), s = std::sin(-sky.cloudRotation);
+        color = SkyBase(sky, {dir.x * c + dir.z * s, dir.y, -dir.x * s + dir.z * c}, settings_.clouds);
+    }
     const Vec3 toSun = -Normalize(scene.sun.direction, {0, -1, 0});
     const float cosine = Dot(dir, toSun);
+    if (cosine <= 0.0f) return color;
     const float size = std::cos(Radians(sky.sunSizeDegrees));
     const float disc = SmoothStep(size - 0.0004f, size + 0.0002f, cosine);
-    const float glow = std::pow(std::max(0.0f, cosine), 48.0f) * 0.12f + std::pow(std::max(0.0f, cosine), 6.0f) * 0.05f;
+    // cos^6 and cos^48 by repeated squaring (cheaper than pow per pixel).
+    const float c3 = cosine * cosine * cosine;
+    const float c6 = c3 * c3;
+    const float c12 = c6 * c6;
+    const float c48 = c12 * c12 * c12 * c12;
+    const float glow = c48 * 0.12f + c6 * 0.05f;
     return color + sky.sunColor * (disc + glow * 0.2f);
 }
 
@@ -110,7 +178,7 @@ void SceneRenderer::RenderShadowMap(const RenderScene& scene) {
     ASTRAL_PROFILE_SCOPE("Render.Shadows");
     const ShadowSettings& settings = scene.shadows;
     shadow_.valid = false;
-    const int size = std::clamp(settings.resolution, 64, 8192);
+    const int size = std::clamp(std::min(settings.resolution, settings_.maxShadowResolution), 64, 8192);
     const float radius = std::max(1.0f, settings.radius);
     const Vec3 lightDir = Normalize(scene.sun.direction, {0, -1, 0});
     const Vec3 up = std::fabs(lightDir.y) > 0.99f ? Vec3{0, 0, 1} : Vec3{0, 1, 0};
@@ -174,6 +242,23 @@ float SceneRenderer::ShadowFactor(Vec3 p, Vec3 n) const {
     const float v = 0.5f - clip.y * 0.5f;
     if (u <= 0.0f || u >= 1.0f || v <= 0.0f || v >= 1.0f || clip.z >= 1.0f) return 1.0f;
     const float z = clip.z - shadow_.depthBias;
+    auto depthAt = [this](int x, int y) {
+        x = std::clamp(x, 0, shadow_.size - 1);
+        y = std::clamp(y, 0, shadow_.size - 1);
+        return shadow_.depth[static_cast<std::size_t>(y) * static_cast<std::size_t>(shadow_.size) + static_cast<std::size_t>(x)];
+    };
+    if (settings_.shadowFilter <= 0) {
+        return z <= depthAt(static_cast<int>(u * static_cast<float>(shadow_.size)), static_cast<int>(v * static_cast<float>(shadow_.size))) ? 1.0f : 0.0f;
+    }
+    if (settings_.shadowFilter == 1) {
+        const float sx = u * static_cast<float>(shadow_.size) - 0.5f, sy = v * static_cast<float>(shadow_.size) - 0.5f;
+        const float fx = std::floor(sx), fy = std::floor(sy);
+        const int x = static_cast<int>(fx), y = static_cast<int>(fy);
+        const float tx = sx - fx, ty = sy - fy;
+        const float l00 = z <= depthAt(x, y) ? 1.0f : 0.0f, l10 = z <= depthAt(x + 1, y) ? 1.0f : 0.0f;
+        const float l01 = z <= depthAt(x, y + 1) ? 1.0f : 0.0f, l11 = z <= depthAt(x + 1, y + 1) ? 1.0f : 0.0f;
+        return Lerp(Lerp(l00, l10, tx), Lerp(l01, l11, tx), ty);
+    }
     const float s = u * static_cast<float>(shadow_.size) - 0.5f;
     const float t = v * static_cast<float>(shadow_.size) - 0.5f;
     const float bs = std::floor(s), bt = std::floor(t);
@@ -666,6 +751,7 @@ void SceneRenderer::Render(const RenderScene& scene, const RenderView& view, Ren
     tanHalfX_ = view.projection.m[0][0] != 0.0f ? 1.0f / view.projection.m[0][0] : 1.0f;
     tanHalfY_ = view.projection.m[1][1] != 0.0f ? 1.0f / view.projection.m[1][1] : 1.0f;
 
+    if (settings_.skyLut) EnsureSkyLut(scene);
     auto phase = SteadyClock::now();
     if (scene.shadows.enabled && scene.sun.castShadows) RenderShadowMap(scene);
     else shadow_.valid = false;
@@ -701,7 +787,7 @@ void SceneRenderer::Render(const RenderScene& scene, const RenderView& view, Ren
     stats_.shadeMs = MillisecondsSince(phase);
 
     phase = SteadyClock::now();
-    Reflections(scene, view, target);
+    if (settings_.reflections) Reflections(scene, view, target);
     stats_.reflectionMs = MillisecondsSince(phase);
 
     phase = SteadyClock::now();
@@ -709,7 +795,11 @@ void SceneRenderer::Render(const RenderScene& scene, const RenderView& view, Ren
     stats_.translucencyMs = MillisecondsSince(phase);
 
     phase = SteadyClock::now();
-    post_.Run(target, scene.post, jobs_);
+    PostSettings post = scene.post;
+    post.bloom = post.bloom && settings_.bloom;
+    post.fxaa = post.fxaa && settings_.fxaa;
+    post.outlines = post.outlines && settings_.outlines;
+    post_.Run(target, post, jobs_);
     DrawDebugLines(scene, view, target);
     stats_.postMs = MillisecondsSince(phase);
 

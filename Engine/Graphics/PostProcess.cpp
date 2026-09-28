@@ -217,6 +217,8 @@ void PostProcessor::Run(RenderTarget& target, const PostSettings& settings, Core
 
     // Exposure, bloom composite, tone map and grade into display-linear LDR.
     ldr_.resize(target.PixelCount());
+    {
+    ASTRAL_PROFILE_SCOPE("Post.ToneMap");
     ParallelRows(jobs, height, [&](int begin, int end) {
         for (int y = begin; y < end; ++y) {
             for (int x = 0; x < width; ++x) {
@@ -238,6 +240,7 @@ void PostProcessor::Run(RenderTarget& target, const PostSettings& settings, Core
             }
         }
     });
+    }
 
     if (settings.fxaa) {
         ASTRAL_PROFILE_SCOPE("Post.FXAA");
@@ -278,6 +281,7 @@ void PostProcessor::Run(RenderTarget& target, const PostSettings& settings, Core
     }
 
     // Chromatic aberration, vignette and dithered sRGB encode.
+    ASTRAL_PROFILE_SCOPE("Post.Encode");
     const float cx = static_cast<float>(width) * 0.5f, cy = static_cast<float>(height) * 0.5f;
     const float inverseRadius = 1.0f / std::sqrt(cx * cx + cy * cy);
     ParallelRows(jobs, height, [&](int begin, int end) {
