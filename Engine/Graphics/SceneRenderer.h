@@ -116,6 +116,9 @@ private:
     void Translucency(const RenderScene& scene, const RenderView& view, RenderTarget& target);
     void DrawDebugLines(const RenderScene& scene, const RenderView& view, RenderTarget& target);
     void EnsureSkyLut(const RenderScene& scene);
+    void PrepareOcclusionFade(const RenderScene& scene, const RenderView& view);
+    // 1 = fully visible; smaller values are dithered out in the opaque pass.
+    float OcclusionCoverage(Math::Vec3 world) const;
     Color SampleSkyLut(Math::Vec3 direction, float rotation) const;
 
     Core::JobSystem* jobs_{};
@@ -128,6 +131,11 @@ private:
     std::vector<TranslucentItem> translucentItems_;
     std::vector<std::vector<SetupTriangle>> perDraw_;
     std::vector<std::uint32_t> drawList_;
+    std::vector<std::uint8_t> fadeDraws_;
+    Math::Mat4 inverseViewProjection_ = Math::Mat4::Identity();
+    Math::Vec3 fadeEye_{}, fadeFocus_{};
+    float fadeRadius_{};
+    bool fadeActive_{};
     TileBins bins_;
     std::vector<Color> reflectionColor_;
     std::vector<float> reflectionWeight_;

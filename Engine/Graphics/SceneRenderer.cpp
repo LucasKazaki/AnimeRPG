@@ -321,12 +321,46 @@ void SceneRenderer::BuildTriangles(const RenderScene& scene, const std::vector<s
     for (std::size_t i = 0; i < drawIndices.size(); ++i) out.insert(out.end(), perDraw_[i].begin(), perDraw_[i].end());
 }
 
+void SceneRenderer::PrepareOcclusionFade(const RenderScene& scene, const RenderView& view) {
+    fadeActive_ = false;
+    fadeDraws_.assign(scene.draws.size(), 0u);
+    if (!(view.occlusionRadius > 0.0f) || !IsFinite(view.occlusionFocus)) return;
+    for (std::size_t i = 0; i < scene.draws.size(); ++i) {
+        const Material* material = scene.draws[i].material;
+        if (material && material->cameraFade) {
+            fadeDraws_[i] = 1u;
+            fadeActive_ = true;
+        }
+    }
+    fadeActive_ = fadeActive_ && Inverse(view.ViewProjection(), inverseViewProjection_);
+    fadeEye_ = view.eye;
+    fadeFocus_ = view.occlusionFocus;
+    fadeRadius_ = view.occlusionRadius;
+}
+
+float SceneRenderer::OcclusionCoverage(Vec3 world) const {
+    // Anything hugging the lens fades regardless of the focus line.
+    float coverage = Lerp(0.2f, 1.0f, SmoothStep(1.2f, 3.6f, Length(world - fadeEye_)));
+    const Vec3 segment = fadeFocus_ - fadeEye_;
+    const float lengthSquared = LengthSquared(segment);
+    if (lengthSquared < 1.0e-6f) return coverage;
+    const float t = Dot(world - fadeEye_, segment) / lengthSquared;
+    if (t >= 0.97f) return coverage; // at or behind the focus: keep what the player stands on/beyond
+    const float distance = Length(world - (fadeEye_ + segment * Clamp(t, 0.0f, 1.0f)));
+    return std::min(coverage, Lerp(0.2f, 1.0f, SmoothStep(fadeRadius_ * 0.55f, fadeRadius_, distance)));
+}
+
 void SceneRenderer::RasterizeVisibility(RenderTarget& target) {
     ASTRAL_PROFILE_SCOPE("Render.Visibility");
     const int width = target.Width(), height = target.Height();
     std::fill(target.depth.begin(), target.depth.end(), 1.0f);
     std::fill(target.visibility.begin(), target.visibility.end(), 0u);
     bins_.Build(triangles_, width, height, settings_.tileSize);
+    // Ordered 4x4 Bayer thresholds for screen-door coverage.
+    static constexpr float kBayer[4][4] = {{0.5f / 16, 8.5f / 16, 2.5f / 16, 10.5f / 16},
+        {12.5f / 16, 4.5f / 16, 14.5f / 16, 6.5f / 16}, {3.5f / 16, 11.5f / 16, 1.5f / 16, 9.5f / 16},
+        {15.5f / 16, 7.5f / 16, 13.5f / 16, 5.5f / 16}};
+    const float invWidth = 2.0f / static_cast<float>(width), invHeight = 2.0f / static_cast<float>(height);
     ParallelFor(static_cast<std::size_t>(bins_.TileCount()), 1, [&](std::size_t begin, std::size_t end) {
         for (std::size_t tile = begin; tile < end; ++tile) {
             const int tx = static_cast<int>(tile) % bins_.tilesX;
@@ -334,10 +368,20 @@ void SceneRenderer::RasterizeVisibility(RenderTarget& target) {
             const int x0 = tx * bins_.tileSize, y0 = ty * bins_.tileSize;
             const int x1 = std::min(width, x0 + bins_.tileSize), y1 = std::min(height, y0 + bins_.tileSize);
             for (std::uint32_t index : bins_.bins[tile]) {
+                const bool fades = fadeActive_ && fadeDraws_[triangles_[index].drawIndex] != 0u;
                 RasterizeTriangle(triangles_[index], x0, y0, x1, y1,
                     [&](int x, int y, float z, float, float l1, float l2) {
                         const std::size_t p = target.Index(x, y);
                         if (z < target.depth[p]) {
+                            if (fades) {
+                                const Vec4 h = inverseViewProjection_
+                                    * Vec4{(static_cast<float>(x) + 0.5f) * invWidth - 1.0f,
+                                        1.0f - (static_cast<float>(y) + 0.5f) * invHeight, z, 1.0f};
+                                if (h.w != 0.0f
+                                    && OcclusionCoverage(Vec3{h.x, h.y, h.z} / h.w) <= kBayer[y & 3][x & 3]) {
+                                    return;
+                                }
+                            }
                             target.depth[p] = z;
                             target.visibility[p] = index + 1u;
                             target.barycentric[p] = {l1, l2};
@@ -414,6 +458,8 @@ void SceneRenderer::Shade(const RenderScene& scene, const RenderView& view, Rend
                 const float shadow = (shadowsOn && material.receiveShadows) ? ShadowFactor(world, n) : 1.0f;
                 Color radiance{};
                 std::uint8_t flags = material.outline ? kPixelOutline : 0;
+                // Dithered occluders would ink every screen-door gap; keep them clean.
+                if (fadeActive_ && fadeDraws_[tri.drawIndex] != 0u && OcclusionCoverage(world) < 1.0f) flags = 0;
                 float reflect = 0.0f;
                 switch (material.shading) {
                 case ShadingModel::Unlit:
@@ -779,6 +825,7 @@ void SceneRenderer::Render(const RenderScene& scene, const RenderView& view, Ren
     stats_.geometryMs = MillisecondsSince(phase);
 
     phase = SteadyClock::now();
+    PrepareOcclusionFade(scene, view);
     RasterizeVisibility(target);
     stats_.rasterMs = MillisecondsSince(phase);
 

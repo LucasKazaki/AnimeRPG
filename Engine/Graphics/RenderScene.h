@@ -22,6 +22,11 @@ struct RenderView {
     float farPlane{500.0f};
     int width{1280};
     int height{720};
+    // Camera-occlusion fade: surfaces of cameraFade materials inside the capsule
+    // from the eye to this point (radius occlusionRadius, 0 = off) are dithered
+    // out so props never hide the player. Shadows are unaffected.
+    Math::Vec3 occlusionFocus{};
+    float occlusionRadius{0.0f};
 
     static RenderView Perspective(Math::Vec3 eye, Math::Vec3 target, float verticalFovDegrees,
         int width, int height, float nearPlane = 0.25f, float farPlane = 600.0f) {

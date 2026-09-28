@@ -266,6 +266,45 @@ ASTRAL_TEST(SceneRendersWithDepthShadowsOutlinesAndSky) {
     ASTRAL_CHECK(edge.r + edge.g + edge.b < boxPixel.r + boxPixel.g + boxPixel.b);
 }
 
+ASTRAL_TEST(CameraOcclusionFadeDithersOnlyPropsBlockingTheFocus) {
+    TestScene test;
+    MeshData panel;
+    MeshBuilder(panel).AddBox({0, 0, 0}, {0.8f, 0.8f, 0.1f});
+    panel.ComputeBounds();
+    Material prop;
+    prop.baseColor = FromSrgb8(90, 90, 96);
+    prop.cameraFade = true;
+    test.scene.draws.push_back({&panel, &prop, Math::Translation({0.0f, 2.0f, 2.0f}), 20}); // on the eye->focus line
+    test.scene.draws.push_back({&panel, &prop, Math::Translation({4.0f, 1.0f, 8.0f}), 21}); // off to the side
+    SceneRenderer renderer(nullptr);
+    RenderTarget target;
+    RenderView view = TestView();
+    auto count = [&](std::uint32_t id, bool* outlined) {
+        int pixels = 0;
+        for (std::size_t p = 0; p < target.objectId.size(); ++p) {
+            if (target.objectId[p] != id) continue;
+            ++pixels;
+            if (outlined && (target.flags[p] & kPixelOutline)) *outlined = true;
+        }
+        return pixels;
+    };
+    renderer.Render(test.scene, view, target);
+    const int solidBlocking = count(20, nullptr), solidSide = count(21, nullptr);
+    view.occlusionFocus = {0.0f, 1.0f, 8.0f};
+    view.occlusionRadius = 1.5f;
+    renderer.Render(test.scene, view, target);
+    MaybeCapture(target, "graphics_occlusion_fade");
+    bool fadedOutlined = false;
+    const int fadedBlocking = count(20, &fadedOutlined), fadedSide = count(21, nullptr);
+    ASTRAL_CHECK(solidBlocking > 300);
+    ASTRAL_CHECK(fadedBlocking > 0);
+    ASTRAL_CHECK(fadedBlocking < solidBlocking * 35 / 100);
+    ASTRAL_CHECK(!fadedOutlined);
+    ASTRAL_CHECK(fadedSide == solidSide);
+    // What was behind the screen door is now visible through it (the red box region).
+    ASTRAL_CHECK(renderer.Stats().drawsVisible == 6);
+}
+
 ASTRAL_TEST(RenderingIsDeterministicAcrossThreadCounts) {
     TestScene test;
     const RenderView view = TestView(160, 90);

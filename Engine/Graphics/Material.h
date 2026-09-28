@@ -47,6 +47,8 @@ struct Material {
     bool castShadows{true};
     bool receiveShadows{true};
     bool outline{true};
+    // Dither out (screen-door) where it blocks the view to RenderView::occlusionFocus.
+    bool cameraFade{false};
     bool doubleSided{false};
     bool vertexColor{true}; // multiply albedo by the vertex colour
 };
