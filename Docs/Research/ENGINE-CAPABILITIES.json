@@ -70,5 +70,31 @@
     "Record source SHA, commands, exits, versions, files, hashes and deferred local checks.",
     "No second local scheduler, local process control or publication from this record.",
     "Advance after acceptance and stop/resume honestly at external gates."
-  ]
+  ],
+  "uplift_2026_09_28": {
+    "status": "portable_verified_msvc_and_native_pending",
+    "parity_claim": false,
+    "branch": "claude/loving-clarke-el24od",
+    "base": "2958741188279a0b438dd489ad00cac546012c25",
+    "task": "Tasks/ENGINE-UPLIFT-2026-09-28.md",
+    "audit": "Docs/Audit/ENGINE-AUDIT-2026-09-28.md",
+    "decision": "Docs/Architecture/ADR-0002-portable-runtime-and-astral-renderer.md",
+    "evidence": "Docs/QA/ENGINE-UPLIFT-2026-09-28.md",
+    "implemented_portable_not_comparable": {
+      "E01": "Dependency job graph with ParallelFor (TSan-clean), slot maps, PCG32, profiler with Chrome trace, GameTime dilation/hitstop/fixed steps",
+      "E02": "Sparse-set ECS, generational entities, cycle-safe hierarchy, transactional versioned text serialisation; showcase not yet on the ECS",
+      "E03": "PNG codec and procedural textures only; no import or cooking pipeline",
+      "E04": "CPU visibility-buffer rasteriser, mipmapped textures, toon/GGX/unlit/water materials, outlines, translucency, soft particles, sky LUT, presets, dynamic resolution, occlusion dither fade; no GPU backend",
+      "E05": "Sun/point lights, PCF shadow map, SSR water, fog, bloom, neutral tonemap, FXAA; no GI, cascades or AO",
+      "E07": "Skeletons, clips with notifies/root motion, masked/additive blends, state machine, blend spaces, two-bone IK, LBS skinning, procedural humanoid; no import",
+      "E08": "Analytic narrowphase incl. box SAT, AABB tree, sequential impulses with sleeping, triggers, queries, layers, capsule controller, fracture; no convex/mesh colliders or joints",
+      "E09": "Grid A*, behaviour trees with abort semantics, perception; no navmesh; not yet driving encounters",
+      "E10": "Mixer with buses, spatialisation, voice stealing, ducking, limiter, synth, WAV, waveOut stream; no codecs or streaming",
+      "E11": "Runtime canvas UI for the Astral HUD; editor unchanged",
+      "E12": "2D camera, sprite batch, tile maps with collision; no 2D physics",
+      "E14": "Profiler zones, Chrome trace, per-pass renderer stats, F3 overlay; no GPU timing",
+      "E16": "VFX particles/ribbons and input contexts/buffering/rebinding/replay added"
+    },
+    "largest_gaps": ["E04 GPU backend", "E03 asset import/cooking", "E06 streaming/LOD", "E11 editor integration", "E13 multiplayer", "E17 comparative acceptance"]
+  }
 }

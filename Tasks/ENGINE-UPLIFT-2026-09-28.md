@@ -54,3 +54,10 @@ is presented with `StretchDIBits`.
 
 Stop at the first deterministic blocker. Never weaken an existing test, marker or
 smoke to make new work pass. Record the exact commands and exits in the QA record.
+
+## Status (2026-09-28)
+
+Acceptance items 1–3 are met in the portable sandbox and recorded in
+`Docs/QA/ENGINE-UPLIFT-2026-09-28.md`. Item 4 (hosted MSVC via `windows-ci`) and
+item 5 (native and interactive gates) are open. Audit:
+`Docs/Audit/ENGINE-AUDIT-2026-09-28.md`; decision: `Docs/Architecture/ADR-0002-*`.
