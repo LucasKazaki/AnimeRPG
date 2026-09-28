@@ -19,6 +19,11 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/SceneRenderer.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Sprite2D.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Texture.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Physics/BroadPhase.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Physics/CharacterController.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Physics/Collision.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Physics/Destruction.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Physics/PhysicsWorld.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Components.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Registry.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Serialization.cpp"
@@ -34,4 +39,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineGraphicsTests
     Engine2DTests
     EngineWorldTests
+    EnginePhysicsTests
 )
