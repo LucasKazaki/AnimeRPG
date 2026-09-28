@@ -1,0 +1,67 @@
+cmake_minimum_required(VERSION 3.25)
+project(AstralEngineRuntimePortable LANGUAGES CXX)
+
+# Headless portable build of the REAL engine runtime sources and their suites.
+# It is not a build of AstralGame (Win32) and does not replace Windows CTest,
+# native interactive smokes, GPU/performance evidence or the required soak.
+get_filename_component(ASTRAL_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+option(ASTRAL_SANITIZE "Enable address and undefined-behavior sanitizers" OFF)
+option(ASTRAL_TSAN "Enable the thread sanitizer" OFF)
+if(ASTRAL_SANITIZE AND ASTRAL_TSAN)
+    message(FATAL_ERROR "ASTRAL_SANITIZE and ASTRAL_TSAN are mutually exclusive")
+endif()
+
+include("${ASTRAL_ROOT}/cmake/AstralEngineSources.cmake")
+find_package(Threads REQUIRED)
+
+function(astral_portable_options target)
+    target_include_directories(${target} PRIVATE "${ASTRAL_ROOT}")
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /WX /permissive-)
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    endif()
+    if(ASTRAL_SANITIZE)
+        target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer
+            -fno-sanitize-recover=all)
+        target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+    endif()
+    if(ASTRAL_TSAN)
+        target_compile_options(${target} PRIVATE -fsanitize=thread -fno-omit-frame-pointer)
+        target_link_options(${target} PRIVATE -fsanitize=thread)
+    endif()
+endfunction()
+
+add_library(AstralEngineRuntime STATIC ${ASTRAL_ENGINE_RUNTIME_SOURCES})
+astral_portable_options(AstralEngineRuntime)
+target_link_libraries(AstralEngineRuntime PUBLIC Threads::Threads)
+
+if(ASTRAL_SHOWCASE_SOURCES)
+    add_library(AstralShowcase STATIC ${ASTRAL_SHOWCASE_SOURCES})
+    astral_portable_options(AstralShowcase)
+    target_link_libraries(AstralShowcase PUBLIC AstralEngineRuntime)
+else()
+    add_library(AstralShowcase INTERFACE)
+    target_link_libraries(AstralShowcase INTERFACE AstralEngineRuntime)
+endif()
+
+if(EXISTS "${ASTRAL_ROOT}/Tools/AstralCapture.cpp")
+    add_executable(AstralCapture "${ASTRAL_ROOT}/Tools/AstralCapture.cpp")
+    astral_portable_options(AstralCapture)
+    target_link_libraries(AstralCapture PRIVATE AstralShowcase)
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+    foreach(suite IN LISTS ASTRAL_ENGINE_TEST_SUITES)
+        add_executable(${suite} "${ASTRAL_ROOT}/Tests/${suite}.cpp")
+        astral_portable_options(${suite})
+        target_link_libraries(${suite} PRIVATE AstralShowcase)
+        add_test(NAME ${suite} COMMAND ${suite})
+        set_tests_properties(${suite} PROPERTIES TIMEOUT 300)
+    endforeach()
+endif()
