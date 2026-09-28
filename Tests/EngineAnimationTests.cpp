@@ -4,6 +4,7 @@
 #include "Tests/EngineTestSupport.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <string>
 
 using namespace Astral;

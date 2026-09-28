@@ -3,6 +3,7 @@
 #include "Engine/World/Serialization.h"
 #include "Tests/EngineTestSupport.h"
 
+#include <cstddef>
 #include <stdexcept>
 #include <string>
 

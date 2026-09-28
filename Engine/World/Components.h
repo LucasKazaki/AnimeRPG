@@ -5,6 +5,7 @@
 #include "Engine/Math/VectorMath.h"
 #include "Engine/World/Registry.h"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 

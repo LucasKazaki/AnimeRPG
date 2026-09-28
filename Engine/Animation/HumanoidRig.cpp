@@ -1,6 +1,7 @@
 #include "Engine/Animation/HumanoidRig.h"
 
 #include <cmath>
+#include <cstddef>
 
 namespace Astral::Animation {
 

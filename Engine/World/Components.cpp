@@ -1,6 +1,7 @@
 #include "Engine/World/Components.h"
 
 #include <algorithm>
+#include <cstddef>
 
 namespace Astral::World {
 

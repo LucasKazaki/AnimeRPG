@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
+#include <utility>
 
 namespace Astral::Input {
 

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdlib>
 
 namespace Astral::Physics {
 

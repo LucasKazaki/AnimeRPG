@@ -17,6 +17,7 @@
 
 #include "Engine/World/Registry.h"
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <string>

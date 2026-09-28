@@ -7,6 +7,7 @@
 
 #include <array>
 #include <limits>
+#include <utility>
 
 namespace Astral::Math {
 

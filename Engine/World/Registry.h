@@ -9,8 +9,10 @@
 // destroy entities, inside Each(); record them with a CommandBuffer instead.
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <stdexcept>

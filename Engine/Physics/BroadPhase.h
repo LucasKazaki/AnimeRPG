@@ -7,6 +7,7 @@
 
 #include "Engine/Math/Geometry.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <vector>

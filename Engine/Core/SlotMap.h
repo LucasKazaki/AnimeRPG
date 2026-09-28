@@ -4,6 +4,7 @@
 // object that reused the slot (the pattern behind UE's FObjectHandle checks and
 // most modern ECS entity ids).
 
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <vector>

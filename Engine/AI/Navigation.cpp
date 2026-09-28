@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdlib>
 #include <queue>
 
 namespace Astral::AI {

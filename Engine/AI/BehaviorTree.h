@@ -8,10 +8,12 @@
 
 #include "Engine/Math/VectorMath.h"
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace Astral::Physics {

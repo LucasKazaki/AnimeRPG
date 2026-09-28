@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <initializer_list>
 
 using namespace Astral;
 using Math::Vec3;

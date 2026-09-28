@@ -1,5 +1,7 @@
 #include "Engine/Animation/Skinning.h"
 
+#include <cstddef>
+
 namespace Astral::Animation {
 
 using namespace Math;

@@ -14,8 +14,10 @@
 
 #include <array>
 #include <bitset>
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace Astral::Input {

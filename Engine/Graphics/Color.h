@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 
 namespace Astral::Graphics {

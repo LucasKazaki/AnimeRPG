@@ -10,6 +10,7 @@
 
 #include "Engine/Math/VectorMath.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>

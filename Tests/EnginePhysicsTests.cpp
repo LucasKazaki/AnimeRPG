@@ -6,6 +6,7 @@
 #include "Engine/Physics/PhysicsWorld.h"
 #include "Tests/EngineTestSupport.h"
 
+#include <cstddef>
 #include <cstdio>
 #include <set>
 
