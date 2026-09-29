@@ -489,6 +489,11 @@ bool SceneSerializer::ParseComponents(const JsonValue& json, const std::string& 
         rendererMesh = renderer->String("mesh");
         const std::string material = renderer->String("material");
         if (!rendererMesh.empty() && !ResolveMesh(rendererMesh, Join(Join(path, "MeshRenderer"), "mesh"), state)) return false;
+        if (renderer->Bool("autoLod") && !rendererMesh.empty() && !state.document.lodGroups.count(rendererMesh)) {
+            // One LOD chain per mesh, shared by every instance.
+            state.document.lodGroups[rendererMesh] =
+                std::make_shared<const Graphics::LodGroup>(Graphics::BuildLodGroup(state.document.meshes.at(rendererMesh)));
+        }
         if (!material.empty() && !ResolveMaterial(material, Join(Join(path, "MeshRenderer"), "material"), state)) return false;
     }
     if (const JsonValue* collider = spec.components.Find("Collider")) {
@@ -640,6 +645,7 @@ void SceneSerializer::AddComponents(const EntitySpec& spec, const SceneDocument&
         fill("MeshRenderer", &renderer);
         renderer.mesh = Lookup(document.meshes, renderer.meshRef);
         renderer.material = Lookup(document.materials, renderer.materialRef);
+        if (renderer.autoLod) renderer.lods = Lookup(document.lodGroups, renderer.meshRef);
         rendererMesh = renderer.meshRef;
         world.Add<MeshRenderer>(entity, std::move(renderer));
     }

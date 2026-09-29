@@ -796,4 +796,51 @@ ASTRAL_TEST(IdenticalWorldsStayIdentical) {
     ASTRAL_CHECK(Core::WriteJson(serializer.Save(a)) == Core::WriteJson(serializer.Save(b)));
 }
 
+ASTRAL_TEST(RenderExtractionPicksLevelsOfDetail) {
+    GameWorld world;
+    const Entity eye = world.CreateEntity("Eye");
+    world.Add<Camera>(eye);
+    const Entity rock = world.CreateEntity("Rock", {{0, 0, 3}, {}, {1, 1, 1}});
+    auto sphere = std::make_shared<Graphics::MeshData>();
+    Graphics::MeshBuilder(*sphere).AddSphere({0, 0, 0}, 1.0f, 24, 32);
+    sphere->ComputeBounds();
+    MeshRenderer renderer;
+    renderer.mesh = sphere;
+    renderer.lods = std::make_shared<const Graphics::LodGroup>(Graphics::BuildLodGroup(sphere));
+    world.Add<MeshRenderer>(rock, renderer);
+    const auto& levels = renderer.lods->levels;
+    auto drawnMesh = [&] {
+        Graphics::RenderScene scene;
+        Graphics::RenderView view;
+        ASTRAL_CHECK(world.BuildRenderScene(scene, view, 64, 64));
+        ASTRAL_CHECK(scene.draws.size() == 1);
+        return scene.draws[0].mesh;
+    };
+    world.Tick(1.0f / 60.0f);
+    ASTRAL_CHECK(drawnMesh() == levels[0].mesh.get()); // close: full detail
+    world.SetWorldPosition(rock, {0, 0, 400});
+    world.Tick(1.0f / 60.0f);
+    ASTRAL_CHECK(drawnMesh() == levels.back().mesh.get()); // far: coarsest
+    world.Env().lodBias = 1000.0f; // bias keeps detail
+    ASTRAL_CHECK(drawnMesh() == levels[0].mesh.get());
+    world.Env().lodBias = 1.0f;
+    world.Get<MeshRenderer>(rock)->forcedLod = 1;
+    ASTRAL_CHECK(drawnMesh() == levels[1].mesh.get());
+    // Scenes generate one shared LOD chain per mesh with autoLod.
+    SceneSerializer serializer;
+    SceneDocument document;
+    std::string error;
+    const bool parsed = serializer.Parse(ParseText(R"({"entities": [
+        {"name": "A", "components": {"MeshRenderer": {"mesh": "primitive:sphere", "autoLod": true}}},
+        {"name": "B", "components": {"MeshRenderer": {"mesh": "primitive:sphere", "autoLod": true}}},
+        {"name": "C", "components": {"MeshRenderer": {"mesh": "primitive:sphere"}}}]})"), document, error);
+    ASTRAL_CHECK(parsed && document.lodGroups.size() == 1);
+    GameWorld loaded;
+    serializer.Instantiate(document, loaded);
+    const MeshRenderer* a = loaded.Get<MeshRenderer>(loaded.Find("A"));
+    const MeshRenderer* b = loaded.Get<MeshRenderer>(loaded.Find("B"));
+    ASTRAL_CHECK(a->lods && a->lods == b->lods && a->lods->Count() > 1);
+    ASTRAL_CHECK(!loaded.Get<MeshRenderer>(loaded.Find("C"))->lods);
+}
+
 ASTRAL_TEST_MAIN("EngineFrameworkTests")

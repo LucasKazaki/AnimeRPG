@@ -717,9 +717,27 @@ bool GameWorld::BuildRenderScene(Graphics::RenderScene& scene, Graphics::RenderV
     for (Entity entity : renderers) {
         const MeshRenderer& renderer = *registry_.Get<MeshRenderer>(entity);
         const World::WorldTransform* world = registry_.Get<World::WorldTransform>(entity);
-        if (!renderer.visible || !renderer.mesh || !world) continue;
+        if (!renderer.visible || (!renderer.mesh && !renderer.lods) || !world) continue;
         Graphics::DrawItem draw;
         draw.mesh = renderer.mesh.get();
+        if (renderer.lods && renderer.lods->Count() > 0) {
+            int level = renderer.forcedLod;
+            if (level < 0) {
+                // Bounding sphere of the mesh in world space against the view.
+                const Math::AABB bounds = renderer.lods->levels.front().mesh->bounds;
+                const Vec3 center = TransformPoint(world->matrix, bounds.Center());
+                const float scale = std::max(Length(Vec3{world->matrix.m[0][0], world->matrix.m[1][0], world->matrix.m[2][0]}),
+                    std::max(Length(Vec3{world->matrix.m[0][1], world->matrix.m[1][1], world->matrix.m[2][1]}),
+                        Length(Vec3{world->matrix.m[0][2], world->matrix.m[1][2], world->matrix.m[2][2]})));
+                const float size = Graphics::ScreenSize(Length(bounds.Extents()) * scale, Distance(center, eye.translation),
+                    Radians(camera.fieldOfView)) * environment_.lodBias;
+                level = renderer.lods->Select(size, renderer.currentLod);
+            }
+            level = std::min(level, static_cast<int>(renderer.lods->Count()) - 1);
+            renderer.currentLod = level;
+            draw.mesh = renderer.lods->levels[static_cast<std::size_t>(level)].mesh.get();
+        }
+        if (!draw.mesh) continue;
         draw.material = renderer.material ? renderer.material.get() : &DefaultMaterial();
         draw.world = world->matrix;
         draw.objectId = renderer.objectId != 0 ? renderer.objectId : entity.index + 1;

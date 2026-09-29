@@ -14,6 +14,7 @@
 #include "Engine/Core/Reflection.h"
 #include "Engine/Graphics/Material.h"
 #include "Engine/Graphics/Mesh.h"
+#include "Engine/Graphics/MeshSimplify.h"
 #include "Engine/Physics/CharacterController.h"
 #include "Engine/Physics/PhysicsWorld.h"
 #include "Engine/VFX/Particles.h"
@@ -36,9 +37,13 @@ struct MeshRenderer {
     float opacity{1.0f};
     bool visible{true};
     std::uint32_t objectId{}; // 0 = derived from the entity
+    bool autoLod{};           // scenes: generate simplified LODs for `mesh`
+    int forcedLod{-1};        // >= 0 pins a level (debug views, cinematics)
     // Resolved resources (shared, immutable).
     std::shared_ptr<const Graphics::MeshData> mesh;
     std::shared_ptr<const Graphics::Material> material;
+    std::shared_ptr<const Graphics::LodGroup> lods; // optional; level 0 replaces `mesh`
+    mutable int currentLod{-1};                     // runtime, for hysteresis
 };
 
 enum class LightType : std::uint8_t { Directional, Point };
@@ -226,6 +231,7 @@ struct Environment {
     float shadowRadius{60.0f};
     bool outlines{true};
     bool bloom{true};
+    float lodBias{1.0f}; // multiplies screen size for LOD selection (> 1 keeps detail longer)
 };
 
 } // namespace Astral::Framework

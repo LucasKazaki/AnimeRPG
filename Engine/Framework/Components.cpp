@@ -52,7 +52,9 @@ Core::TypeRegistry BuildFrameworkTypes() {
         .Field("tint", &MeshRenderer::tint)
         .Field("opacity", &MeshRenderer::opacity).Range(0.0, 1.0)
         .Field("visible", &MeshRenderer::visible)
-        .Field("objectId", &MeshRenderer::objectId);
+        .Field("objectId", &MeshRenderer::objectId)
+        .Field("autoLod", &MeshRenderer::autoLod, "generate simplified levels of detail")
+        .Field("forcedLod", &MeshRenderer::forcedLod).Range(-1.0, 16.0);
     r.Register<Light>("Light")
         .EnumField("type", &Light::type, {"Directional", "Point"})
         .Field("color", &Light::color)
@@ -171,7 +173,8 @@ Core::TypeRegistry BuildFrameworkTypes() {
         .Field("shadows", &Environment::shadows)
         .Field("shadowRadius", &Environment::shadowRadius).Range(1.0, 1.0e4)
         .Field("outlines", &Environment::outlines)
-        .Field("bloom", &Environment::bloom);
+        .Field("bloom", &Environment::bloom)
+        .Field("lodBias", &Environment::lodBias).Range(0.01, 100.0);
     return r;
 }
 

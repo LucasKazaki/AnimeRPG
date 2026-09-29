@@ -33,6 +33,7 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Canvas.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Image.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Mesh.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/MeshSimplify.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/PostProcess.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/ProceduralTextures.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Rasterizer.cpp"

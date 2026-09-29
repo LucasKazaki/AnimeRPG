@@ -75,6 +75,7 @@ struct SceneDocument {
     std::map<std::string, std::shared_ptr<const Physics::TriangleMesh>> collisionMeshes;
     std::map<std::string, std::shared_ptr<const Graphics::Material>> materials;
     std::map<std::string, std::shared_ptr<const Audio::AudioClip>> clips;
+    std::map<std::string, std::shared_ptr<const Graphics::LodGroup>> lodGroups; // autoLod meshes
     std::map<std::string, Core::JsonValue> materialSources; // library entries as authored
 };
 
