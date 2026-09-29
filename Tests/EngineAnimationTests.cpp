@@ -4,7 +4,9 @@
 #include "Tests/EngineTestSupport.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <limits>
 #include <string>
 
 using namespace Astral;
@@ -73,6 +75,15 @@ ASTRAL_TEST(ClipSamplingLoopsAndClamps) {
     unsorted.AddKey(elbow, 0.5f, {});
     unsorted.AddKey(elbow, 0.2f, {});
     ASTRAL_CHECK(!unsorted.Validate(s, error));
+    for (int component = 0; component < 4; ++component) {
+        AnimationClip nonFinite;
+        nonFinite.duration = 1.0f;
+        Math::TRS key;
+        float* q[4] = {&key.rotation.x, &key.rotation.y, &key.rotation.z, &key.rotation.w};
+        *q[component] = component % 2 ? std::numeric_limits<float>::infinity() : std::nanf("");
+        nonFinite.AddKey(elbow, 0.0f, key);
+        ASTRAL_CHECK(!nonFinite.Validate(s, error));
+    }
 }
 
 ASTRAL_TEST(NotifiesAndRootMotion) {

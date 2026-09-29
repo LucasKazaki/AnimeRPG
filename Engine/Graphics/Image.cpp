@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
@@ -42,12 +43,28 @@ void ImageRgba8::Blend(int x, int y, Rgba8 value, float alpha) {
     if (!Contains(x, y)) return;
     alpha = Math::Saturate(alpha * (value.a / 255.0f));
     const std::size_t i = (static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)) * 4u;
-    auto mix = [alpha](std::uint8_t dst, std::uint8_t src) {
-        return static_cast<std::uint8_t>(std::lround(dst + (src - dst) * alpha));
+    if (pixels[i + 3] == 255) {
+        // Opaque destination (every render target): plain lerp, alpha stays 255.
+        auto mix = [alpha](std::uint8_t dst, std::uint8_t src) {
+            return static_cast<std::uint8_t>(std::lround(dst + (src - dst) * alpha));
+        };
+        pixels[i] = mix(pixels[i], value.r);
+        pixels[i + 1] = mix(pixels[i + 1], value.g);
+        pixels[i + 2] = mix(pixels[i + 2], value.b);
+        return;
+    }
+    // Source-over with straight (non-premultiplied) alpha.
+    const float dstAlpha = pixels[i + 3] / 255.0f;
+    const float outAlpha = alpha + dstAlpha * (1.0f - alpha);
+    if (outAlpha <= 0.0f) return;
+    auto compose = [&](std::uint8_t dst, std::uint8_t src) {
+        const float c = (static_cast<float>(src) * alpha + static_cast<float>(dst) * dstAlpha * (1.0f - alpha)) / outAlpha;
+        return static_cast<std::uint8_t>(std::lround(Math::Clamp(c, 0.0f, 255.0f)));
     };
-    pixels[i] = mix(pixels[i], value.r);
-    pixels[i + 1] = mix(pixels[i + 1], value.g);
-    pixels[i + 2] = mix(pixels[i + 2], value.b);
+    pixels[i] = compose(pixels[i], value.r);
+    pixels[i + 1] = compose(pixels[i + 1], value.g);
+    pixels[i + 2] = compose(pixels[i + 2], value.b);
+    pixels[i + 3] = static_cast<std::uint8_t>(std::lround(outAlpha * 255.0f));
 }
 
 std::uint64_t HashImage(const ImageRgba8& image) {

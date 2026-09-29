@@ -203,7 +203,9 @@ bool AnimationClip::Validate(const Skeleton& skeleton, std::string& error) const
                 error = "keys are not sorted";
                 return false;
             }
-            if (!IsFinite(key.value.translation) || !IsFinite(key.value.scale)) {
+            const Math::Quat& q = key.value.rotation;
+            if (!IsFinite(key.value.translation) || !IsFinite(key.value.scale) || !std::isfinite(q.x)
+                || !std::isfinite(q.y) || !std::isfinite(q.z) || !std::isfinite(q.w)) {
                 error = "non-finite key";
                 return false;
             }

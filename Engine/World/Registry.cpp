@@ -1,5 +1,7 @@
 #include "Engine/World/Registry.h"
 
+#include "Engine/World/Components.h"
+
 namespace Astral::World {
 
 Entity Registry::Create() {
@@ -19,6 +21,7 @@ Entity Registry::Create() {
 
 void Registry::Destroy(Entity entity) {
     if (!Valid(entity)) return;
+    UnlinkHierarchy(*this, entity); // keep parent/sibling/child links consistent
     for (auto& pool : pools_) {
         if (pool) pool->Remove(entity);
     }

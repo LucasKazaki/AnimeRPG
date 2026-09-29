@@ -43,6 +43,10 @@ std::vector<Entity> GetChildren(const Registry& registry, Entity entity);
 bool IsAncestor(const Registry& registry, Entity ancestor, Entity entity);
 // Destroys an entity and all descendants.
 void DestroyRecursive(Registry& registry, Entity entity);
+// Removes an entity from the intrusive hierarchy: detaches it from its parent
+// (repairing sibling links) and orphans its children as roots. Registry::Destroy
+// calls this so single-entity destruction never leaves dangling links.
+void UnlinkHierarchy(Registry& registry, Entity entity);
 
 struct TransformUpdateStats {
     std::size_t updated{};

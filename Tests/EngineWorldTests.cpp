@@ -115,6 +115,42 @@ ASTRAL_TEST(HierarchyRejectsCyclesAndPropagatesTransforms) {
     ASTRAL_CHECK(!registry.Valid(root) && !registry.Valid(arm) && registry.Valid(hand));
 }
 
+ASTRAL_TEST(DestroyingAnEntityRepairsHierarchyLinks) {
+    Registry registry;
+    const Entity parent = registry.Create();
+    Entity children[4];
+    for (Entity& child : children) {
+        child = registry.Create();
+        registry.Add<LocalTransform>(child, LocalTransform{{{1, 0, 0}, {}, {1, 1, 1}}});
+        ASTRAL_CHECK(SetParent(registry, child, parent));
+    }
+    const Entity grandchild = registry.Create();
+    ASTRAL_CHECK(SetParent(registry, grandchild, children[3]));
+    registry.Add<LocalTransform>(parent, LocalTransform{{{0, 5, 0}, {}, {1, 1, 1}}});
+
+    // Middle sibling, directly and through a command buffer.
+    registry.Destroy(children[1]);
+    CommandBuffer commands;
+    commands.Destroy(children[2]);
+    commands.Flush(registry);
+    const std::vector<Entity> remaining = GetChildren(registry, parent);
+    ASTRAL_CHECK(remaining.size() == 2 && remaining[0] == children[0] && remaining[1] == children[3]);
+    ASTRAL_CHECK(registry.Get<Hierarchy>(parent)->childCount == 2);
+    UpdateTransforms(registry);
+    ASTRAL_CHECK_NEAR(registry.Get<WorldTransform>(children[3])->trs.translation.y, 5.0f, 1e-5);
+
+    // Destroying a parent orphans its children as roots that still update.
+    registry.Destroy(children[3]);
+    ASTRAL_CHECK(GetParent(registry, grandchild).IsNull());
+    ASTRAL_CHECK(GetChildren(registry, parent).size() == 1);
+    const TransformUpdateStats stats = UpdateTransforms(registry);
+    ASTRAL_CHECK(stats.updated == 3); // parent, children[0], grandchild
+    // Recycled slots never inherit stale links.
+    const Entity reused = registry.Create();
+    ASTRAL_CHECK(!registry.Has<Hierarchy>(reused));
+    ASTRAL_CHECK(GetChildren(registry, parent).size() == 1);
+}
+
 ASTRAL_TEST(DeepHierarchyIsIterative) {
     Registry registry;
     Entity previous = registry.Create();

@@ -89,6 +89,25 @@ std::vector<Entity> GetChildren(const Registry& registry, Entity entity) {
     return children;
 }
 
+void UnlinkHierarchy(Registry& registry, Entity entity) {
+    if (!registry.Has<Hierarchy>(entity)) return;
+    Detach(registry, entity);
+    Hierarchy* node = registry.Get<Hierarchy>(entity);
+    Entity child = node->firstChild;
+    std::size_t guard = registry.AliveCount() + 1;
+    while (registry.Valid(child) && guard-- > 0) {
+        Hierarchy* childNode = registry.Get<Hierarchy>(child);
+        if (!childNode) break;
+        const Entity next = childNode->nextSibling;
+        childNode->parent = {};
+        childNode->previousSibling = {};
+        childNode->nextSibling = {};
+        child = next;
+    }
+    node->firstChild = {};
+    node->childCount = 0;
+}
+
 void DestroyRecursive(Registry& registry, Entity entity) {
     if (!registry.Valid(entity)) return;
     Detach(registry, entity);

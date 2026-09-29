@@ -173,6 +173,26 @@ ASTRAL_TEST(InputRebindingAndRecordingRoundTrip) {
     ASTRAL_CHECK(!replay.Deserialize("ASTRAL_INPUT 1 1\n0.01 300\n", error));
 }
 
+ASTRAL_TEST(InputRecordingPreservesMouseDeltas) {
+    Input::InputRecording recording;
+    Input::InputSnapshot look = Keys({'W'}, 0.016f);
+    look.mouseDelta = {12.5f, -3.25f};
+    recording.Record(look);
+    Input::InputSnapshot still = Keys({}, 0.02f);
+    recording.Record(still);
+    Input::InputRecording replay;
+    std::string error;
+    ASTRAL_CHECK(replay.Deserialize(recording.Serialize(), error));
+    ASTRAL_CHECK(replay.FrameCount() == 2);
+    ASTRAL_CHECK(replay.Frame(0).mouseDelta.x == 12.5f && replay.Frame(0).mouseDelta.y == -3.25f);
+    ASTRAL_CHECK(replay.Frame(0).Down('W'));
+    ASTRAL_CHECK(replay.Frame(1).mouseDelta.x == 0.0f && replay.Frame(1).mouseDelta.y == 0.0f);
+    // Version 1 recordings (no mouse fields) still load; malformed v2 rows do not.
+    ASTRAL_CHECK(replay.Deserialize("ASTRAL_INPUT 1 1\n0.01 87\n", error) && replay.Frame(0).Down('W'));
+    ASTRAL_CHECK(!replay.Deserialize("ASTRAL_INPUT 2 1\n0.01\n", error));
+    ASTRAL_CHECK(!replay.Deserialize("ASTRAL_INPUT 2 1\n0.01 nan 0\n", error));
+}
+
 // ------------------------------------------------------------------ Audio
 
 ASTRAL_TEST(MixerSpatialisesPansAndLimits) {

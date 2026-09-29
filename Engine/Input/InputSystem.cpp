@@ -188,11 +188,12 @@ bool InputSystem::LoadBindings(const std::string& text, std::string& error) {
 
 std::string InputRecording::Serialize() const {
     std::ostringstream out;
-    out << "ASTRAL_INPUT 1 " << frames_.size() << '\n';
+    out << "ASTRAL_INPUT 2 " << frames_.size() << '\n';
     for (const InputSnapshot& frame : frames_) {
-        char dt[32];
-        std::snprintf(dt, sizeof(dt), "%.9g", static_cast<double>(frame.dt));
-        out << dt;
+        char fields[96];
+        std::snprintf(fields, sizeof(fields), "%.9g %.9g %.9g", static_cast<double>(frame.dt),
+            static_cast<double>(frame.mouseDelta.x), static_cast<double>(frame.mouseDelta.y));
+        out << fields;
         for (int key = 0; key < 256; ++key)
             if (frame.keys.test(static_cast<std::size_t>(key))) out << ' ' << key;
         out << '\n';
@@ -205,8 +206,9 @@ bool InputRecording::Deserialize(const std::string& text, std::string& error) {
     std::string header;
     int version = 0;
     std::size_t count = 0;
-    if (!(in >> header >> version >> count) || header != "ASTRAL_INPUT" || version != 1 || count > 10000000) {
-        error = "missing ASTRAL_INPUT 1 header";
+    if (!(in >> header >> version >> count) || header != "ASTRAL_INPUT" || (version != 1 && version != 2)
+        || count > 10000000) {
+        error = "missing ASTRAL_INPUT 1/2 header";
         return false;
     }
     std::string line;
@@ -226,6 +228,21 @@ bool InputRecording::Deserialize(const std::string& text, std::string& error) {
         if (!end || *end != '\0' || !std::isfinite(snapshot.dt) || snapshot.dt < 0.0f) {
             error = "bad frame delta";
             return false;
+        }
+        if (version >= 2) { // v2 adds the mouse delta after the frame delta
+            std::string mx, my;
+            if (!(row >> mx >> my)) {
+                error = "missing mouse delta";
+                return false;
+            }
+            char* endX = nullptr;
+            char* endY = nullptr;
+            snapshot.mouseDelta = {std::strtof(mx.c_str(), &endX), std::strtof(my.c_str(), &endY)};
+            if (!endX || *endX != '\0' || !endY || *endY != '\0' || !std::isfinite(snapshot.mouseDelta.x)
+                || !std::isfinite(snapshot.mouseDelta.y)) {
+                error = "bad mouse delta";
+                return false;
+            }
         }
         int key = 0;
         while (row >> key) {

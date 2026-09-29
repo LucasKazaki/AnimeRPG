@@ -69,6 +69,23 @@ ASTRAL_TEST(CanvasTextAndHudPrimitives) {
     MaybeCapture(image, "canvas_hud");
 }
 
+ASTRAL_TEST(ImageBlendComposesSourceOverAlpha) {
+    ImageRgba8 image;
+    image.Resize(2, 1, {0, 0, 0, 0});
+    image.Blend(0, 0, {255, 0, 0, 255}, 0.5f);
+    const Rgba8 onTransparent = image.Get(0, 0);
+    ASTRAL_CHECK(onTransparent.r == 255 && onTransparent.g == 0 && onTransparent.a == 128);
+    image.Blend(0, 0, {0, 0, 255, 255}, 0.5f); // 50% blue over 50% red
+    const Rgba8 layered = image.Get(0, 0);
+    ASTRAL_CHECK(layered.a == 191 || layered.a == 192);
+    ASTRAL_CHECK(layered.b > layered.r && layered.r > 60);
+    // Opaque destinations keep the exact lerp every render target relies on.
+    image.Set(1, 0, {100, 100, 100, 255});
+    image.Blend(1, 0, {200, 0, 0, 255}, 0.25f);
+    const Rgba8 opaque = image.Get(1, 0);
+    ASTRAL_CHECK(opaque.r == 125 && opaque.g == 75 && opaque.a == 255);
+}
+
 ASTRAL_TEST(CameraRoundTripsAndBounds) {
     Camera2D camera;
     camera.position = {10.0f, -3.0f};
