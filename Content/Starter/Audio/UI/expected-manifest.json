@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "event": "ui.dialogue.advance",
+  "file": "dialogue_advance_original_v1.wav",
+  "status": "generated_source_not_runtime_integrated",
+  "origin": "original_procedural_no_external_samples",
+  "generator_version": "astral-dialogue-cue-1",
+  "sample_rate_hz": 48000,
+  "channels": 1,
+  "bits_per_sample": 16,
+  "frame_count": 5280,
+  "byte_count": 10604,
+  "sha256": "5e59dc027766133335bfcce8f1625d167631f038d2849ed3304a863866340834"
+}
