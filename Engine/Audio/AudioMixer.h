@@ -108,5 +108,9 @@ AudioClip Footstep(std::uint32_t seed, int sampleRate = 48000);
 
 // 16-bit PCM WAV writer for captures and tests.
 bool WriteWav(const std::string& path, const std::vector<float>& stereo, int sampleRate, std::string& error);
+// WAV reader for sound assets: PCM 8/16/24/32-bit, IEEE float 32/64-bit and
+// WAVE_FORMAT_EXTENSIBLE, any channel count (downmixed to the mono AudioClip).
+bool DecodeWav(const std::uint8_t* data, std::size_t size, AudioClip& out, std::string& error);
+bool ReadWav(const std::string& path, AudioClip& out, std::string& error);
 
 } // namespace Astral::Audio

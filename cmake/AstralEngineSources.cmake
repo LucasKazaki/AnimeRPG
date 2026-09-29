@@ -12,6 +12,9 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/HumanoidRig.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skeleton.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skinning.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Assets/AssetManager.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Assets/Gltf.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Assets/Jpeg.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Audio/AudioMixer.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/Console.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/GameTime.cpp"
@@ -78,4 +81,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineSystemsTests
     EngineShowcaseTests
     EngineServicesTests
+    EngineAssetsTests
 )

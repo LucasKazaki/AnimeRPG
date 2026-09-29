@@ -51,6 +51,10 @@ public:
     // Arrays.
     std::size_t Size() const;
     const JsonValue& operator[](std::size_t index) const;
+    // `value[0]` would otherwise be ambiguous with the key overloads (0 is a null pointer).
+    const JsonValue& operator[](int index) const {
+        return index < 0 ? NullValue() : (*this)[static_cast<std::size_t>(index)];
+    }
     JsonValue& Append(JsonValue value);
     const std::vector<JsonValue>& Items() const { return items_; }
     std::vector<JsonValue>& Items() { return items_; }
