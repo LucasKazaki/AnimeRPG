@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "feature": "localized_damage",
+  "requested_by": "Lucas",
+  "date": "2026-09-24",
+  "repository": "LucasKazaki/AnimeRPG",
+  "observed_base": "2958741188279a0b438dd489ad00cac546012c25",
+  "status": "portable_foundation_not_runtime_integrated",
+  "engine": "Astral Engine",
+  "merge_authorized_by_this_packet": false,
+  "native_acceptance": false,
+  "independent_review": "pending",
+  "tasks": [
+    {"id":"LD-001","owner_lane":"shared","status":"source_tested","depends_on":[],"deliverable":"Research, generic C++17 damage component, original profiles, 32 named portable tests and split handoff."},
+    {"id":"LD-E02","owner_lane":"engine","status":"queued","depends_on":["LD-001"],"deliverable":"Confirmed 3D/2D hit-region mapping, stable part ids and swept melee; no selected-part auto-hit."},
+    {"id":"LD-E03","owner_lane":"engine_and_game","status":"queued","depends_on":["LD-E02"],"deliverable":"Agree and implement ONE production health owner and exactly-once damage/stat/reward commit across all attack paths."},
+    {"id":"LD-E04","owner_lane":"engine","status":"queued","depends_on":["LD-E03"],"deliverable":"Coordinate root CMake test registration and full Windows Debug/Release regression plus independent review."},
+    {"id":"LD-E05","owner_lane":"engine","status":"queued","depends_on":["LD-E03"],"deliverable":"Versioned authoring schema/editor, bone/collider binding validation and read-only damage inspector."},
+    {"id":"LD-E06","owner_lane":"engine","status":"queued","depends_on":["LD-E03"],"deliverable":"Bounded AoE distribution, explicit multi-hit receipts and lifetime/replay fuzzing; no networking in this packet."},
+    {"id":"LD-G02","owner_lane":"game","status":"queued","depends_on":["LD-E03","LD-E04"],"deliverable":"Production training adapter preserving existing attack, defense, posture, scoring, retry and mission ownership."},
+    {"id":"LD-G03","owner_lane":"game","status":"queued","depends_on":["LD-G02"],"deliverable":"One original boss with core/arm/rune routes, leg impairment, real telegraphs and non-softlocking AI fallbacks."},
+    {"id":"LD-G04","owner_lane":"game","status":"queued","depends_on":["LD-G02"],"deliverable":"Enemy/part lock-on, cycle controls, readable state, reachable melee targeting and accessibility."},
+    {"id":"LD-G05","owner_lane":"game","status":"queued","depends_on":["LD-G02"],"deliverable":"Real player/ally impairment consumers and recoverable default policy without a death spiral."},
+    {"id":"LD-G06","owner_lane":"game_qa","status":"queued","depends_on":["LD-G03","LD-G04","LD-G05"],"deliverable":"Native playtests measuring tactical diversity, readability, recovery burden and targeting success."},
+    {"id":"LD-ART02","owner_lane":"art","status":"queued","depends_on":["LD-E02"],"deliverable":"Stable region proxies, plate/core state variants, break cues and compositional damage animation."},
+    {"id":"LD-R02","owner_lane":"research","status":"deferred","depends_on":["LD-G06"],"deliverable":"Temporary wounds, redundant-system quorums, layered penetration, regeneration and optional hardcore persistence."}
+  ]
+}
