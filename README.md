@@ -1,6 +1,7 @@
 # Astral Engine / AnimeRPG
 
 [![Windows build and deterministic tests](https://github.com/LucasKazaki/AnimeRPG/actions/workflows/windows-ci.yml/badge.svg)](https://github.com/LucasKazaki/AnimeRPG/actions/workflows/windows-ci.yml)
+[![Astral engine runtime](https://github.com/LucasKazaki/AnimeRPG/actions/workflows/engine-runtime.yml/badge.svg)](https://github.com/LucasKazaki/AnimeRPG/actions/workflows/engine-runtime.yml)
 
 Custom C++17, Win32, and GDI engine/action-RPG prototype. Unreal Engine and Unity
 are not production dependencies. The separate AnimeRPG-UE5 repository is an experiment.
@@ -29,7 +30,23 @@ engine comparison plan. No recurring scheduler or parity claim is established.
 - Light/heavy training-target combat, range/cooldowns, and terminal target defeat.
 - Shadowblade dash, guard, fatal strike, resources, cooldowns, and regeneration.
 - Five key-driven Thought Commands, landmark discovery, and one Lincoln Memorial training encounter with capped rewards.
-- Fifteen native CTest targets: nine domain tests and six interactive runtime smokes.
+- Thirty-one native CTest targets: sixteen domain/tooling tests, nine portable
+  engine suites and six interactive runtime smokes.
+
+## Astral Engine runtime (September 28 uplift, opt-in)
+
+Portable C++17 subsystems, tested headless on Linux (GCC/Clang, ASan+UBSan, TSan):
+job graph and profiler, time dilation and hitstop, ECS with serialisation, a CPU
+visibility-buffer renderer with anime toon shading, outlines, shadows, water
+reflections and post, rigid-body physics with a character controller and
+destruction, skeletal animation with state machines and IK, particles and
+trails, action input, an audio mixer, navigation and behaviour trees, a UI
+canvas and genuine 2D. Press **F2** in `AstralGame` (or set
+`ASTRAL_RENDER_MODE=astral`) to play the same rules through the Astral National
+Mall showcase; GDI remains the default. This is not UE5 parity: see the
+[engine audit](Docs/Audit/ENGINE-AUDIT-2026-09-28.md),
+[ADR-0002](Docs/Architecture/ADR-0002-portable-runtime-and-astral-renderer.md) and
+[QA record](Docs/QA/ENGINE-UPLIFT-2026-09-28.md).
 
 This is not the complete National Mall, final anime art, a natural-language AI
 command system, three complete classes, multiple dungeons, multiplayer, or a
@@ -43,6 +60,10 @@ features, not completion of the original summon/enemy milestones.
 `Engine/Renderer` provides GDI rendering; `Engine/Scene` contains independently
 testable domains; `Engine/Assets` loads simple text meshes; `Game` hosts the
 entry point and fixtures; `Tests` and `Scripts` contain verification tooling.
+The portable runtime lives in `Engine/{Math,Core,Graphics,World,Physics,
+Animation,VFX,Input,Audio,AI}` (listed in `cmake/AstralEngineSources.cmake`);
+`Game/Showcase` presents the gameplay domains in Astral mode and
+`Tools/AstralCapture.cpp` renders a scripted route headlessly.
 
 ## Controls for the retained prototype
 
@@ -56,6 +77,9 @@ entry point and fixtures; `Tests` and `Scripts` contain verification tooling.
 | 3 / 4 / 5 | Command guard on / guard off / focus |
 | E | Landmark discovery or interaction |
 | Escape | Exit |
+| F2 | Toggle the Astral renderer (GDI is the default) |
+| F3 / F4 | Astral mode: engine statistics / cycle quality preset |
+| Enter | Astral mode: type a Thought Command (Enter submits, Escape closes) |
 
 ## Build and test
 
@@ -74,6 +98,18 @@ python Scripts/verify_milestone1.py
 python Scripts/verify_milestone2.py
 python Scripts/verify_milestone3.py
 ```
+
+Portable engine suites and the headless showcase capture (Linux or any C++17
+toolchain; build output outside the source tree):
+
+```bash
+cmake -S Tests/EngineRuntime -B ../astral-portable -DCMAKE_BUILD_TYPE=Release
+cmake --build ../astral-portable --parallel
+ctest --test-dir ../astral-portable --output-on-failure
+../astral-portable/AstralCapture ../astral-captures 1280 720
+```
+
+Add `-DASTRAL_SANITIZE=ON` (ASan+UBSan) or `-DASTRAL_TSAN=ON` for sanitizer runs.
 
 Record and stop on each nonzero exit; the block is a command reference, not an
 automated acceptance script. CI checks each exit explicitly. The new CMake helper

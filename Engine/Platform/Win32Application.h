@@ -8,6 +8,7 @@
 #include "Engine/Scene/ShadowbladeActions.h"
 #include "Engine/Scene/ThoughtCommands.h"
 #include "Engine/Scene/WorldBlockout.h"
+#include "Game/Showcase/Win32AstralPresenter.h"
 
 #include <windows.h>
 
@@ -36,6 +37,8 @@ private:
     bool fatalStrikePressed_{};
     bool interactPressed_{};
     bool commandPressed_[6]{};
+    // Opt-in Astral renderer (F2 or ASTRAL_RENDER_MODE=astral); GDI stays the default.
+    Showcase::Win32AstralPresenter astral_;
 };
 
 } // namespace Astral::Platform

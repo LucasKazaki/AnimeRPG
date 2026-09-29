@@ -204,6 +204,7 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
         g_logger.Info("CreateWindowExW failed");
         return false;
     }
+    SetWindowLongPtrW(window_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
     if (requestedClientStatus == Astral::Core::BenchmarkRunControlEnvironmentStatus::Enabled) {
         RECT actualClientRect{};
@@ -231,6 +232,11 @@ bool Win32Application::Create(HINSTANCE instance, int showCommand) {
     UpdateTitle(window_, 0.0f, playerController_.TransformState(), combatSandbox_,
         shadowbladeActions_, thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
     g_logger.Info("Window created; M10 landmark encounter active; E discovers and Escape exits");
+    if (Showcase::Win32AstralPresenter::RequestedByEnvironment()) {
+        g_logger.Info(astral_.SetEnabled(true, world_)
+                ? "Astral renderer enabled by ASTRAL_RENDER_MODE; F2 returns to GDI"
+                : "Astral renderer unavailable; staying on GDI");
+    }
     return true;
 }
 
@@ -292,8 +298,9 @@ int Win32Application::Run() {
     const auto toMilliseconds = [](PhaseClock::duration duration) {
         return std::chrono::duration<double, std::milli>(duration).count();
     };
-    const auto keyDown = [&benchmarkRunControl](int virtualKey) {
+    const auto keyDown = [&benchmarkRunControl, this](int virtualKey) {
         return !benchmarkRunControl.SuppressLiveInput()
+            && !astral_.SuppressKey(virtualKey)
             && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
     };
 
@@ -329,6 +336,8 @@ int Win32Application::Run() {
         if (keyDown(VK_ESCAPE)) {
             PostMessageW(window_, WM_CLOSE, 0, 0);
         }
+        astral_.HandleFunctionKeys(keyDown(VK_F2), keyDown(VK_F3), keyDown(VK_F4), world_);
+        astral_.BeginFrame();
 
         const float simulationDelta = thoughtCommands_.ScaleDelta(deltaSeconds);
         const Scene::MovementInput input{
@@ -337,7 +346,9 @@ int Win32Application::Run() {
             keyDown('A'),
             keyDown('D'),
         };
+        const Math::Vec3 positionBeforeMove = playerController_.TransformState().WorldPosition();
         playerController_.Update(input, simulationDelta);
+        astral_.AfterWalk(playerController_, positionBeforeMove);
         camera_.Follow(playerController_.TransformState());
         combatSandbox_.AdvanceTime(simulationDelta);
         shadowbladeActions_.AdvanceTime(simulationDelta);
@@ -366,41 +377,67 @@ int Win32Application::Run() {
         if (!guarding && lightAttackDown && !lightAttackPressed_) {
             combatSandbox_.TryAttack(Scene::AttackType::Light,
                 playerController_.TransformState().WorldPosition());
+            astral_.OnAttack(false, combatSandbox_.LastAttack());
             attacked = true;
         } else if (!guarding && heavyAttackDown && !heavyAttackPressed_) {
             combatSandbox_.TryAttack(Scene::AttackType::Heavy,
                 playerController_.TransformState().WorldPosition());
+            astral_.OnAttack(true, combatSandbox_.LastAttack());
             attacked = true;
         }
         if (dashDown && !dashPressed_) {
+            const Math::Vec3 dashFrom = playerController_.TransformState().WorldPosition();
             const Scene::ShadowActionReport report = shadowbladeActions_.TryDash(
                 playerController_.TransformState().WorldPosition());
             if (report.result == Scene::ShadowActionResult::Activated) {
                 playerController_.SetPosition(report.dashDestination);
+                astral_.OnDash(playerController_, dashFrom, report);
                 camera_.Follow(playerController_.TransformState());
+            } else {
+                astral_.OnDash(playerController_, dashFrom, report);
             }
             shadowAction = true;
         } else if (fatalStrikeDown && !fatalStrikePressed_) {
             shadowbladeActions_.TryFatalStrike(
                 playerController_.TransformState().WorldPosition(), combatSandbox_);
+            astral_.OnFatalStrike(shadowbladeActions_.LastAction());
             shadowAction = true;
         }
         const char* commandInputs[6]{"unsupported", "dash", "fatal", "guard on",
             "guard off", "focus"};
         for (int index = 0; index < 6; ++index) {
             if (commandDown[index] && !commandPressed_[index]) {
+                const Math::Vec3 commandFrom = playerController_.TransformState().WorldPosition();
                 const Scene::ThoughtCommandReport report = thoughtCommands_.Submit(
                     commandInputs[index], playerController_.TransformState().WorldPosition(),
                     shadowbladeActions_, combatSandbox_);
                 if (report.type == Scene::ThoughtCommandType::Dash
                     && report.status == Scene::ThoughtCommandStatus::Accepted) {
                     playerController_.SetPosition(report.shadowAction.dashDestination);
+                    astral_.OnDash(playerController_, commandFrom, report.shadowAction);
                     camera_.Follow(playerController_.TransformState());
                 }
                 thoughtCommands_.ApplyGuardState(physicalGuarding, shadowbladeActions_);
+                astral_.OnThought(report);
                 thoughtCommand = true;
                 break;
             }
+        }
+        // Astral mode: a thought typed at the Enter prompt goes through the same parser.
+        const std::string typedThought = astral_.TakeSubmittedThought();
+        if (!thoughtCommand && !typedThought.empty()) {
+            const Math::Vec3 commandFrom = playerController_.TransformState().WorldPosition();
+            const Scene::ThoughtCommandReport report = thoughtCommands_.Submit(
+                typedThought, commandFrom, shadowbladeActions_, combatSandbox_);
+            if (report.type == Scene::ThoughtCommandType::Dash
+                && report.status == Scene::ThoughtCommandStatus::Accepted) {
+                playerController_.SetPosition(report.shadowAction.dashDestination);
+                astral_.OnDash(playerController_, commandFrom, report.shadowAction);
+                camera_.Follow(playerController_.TransformState());
+            }
+            thoughtCommands_.ApplyGuardState(physicalGuarding, shadowbladeActions_);
+            astral_.OnThought(report);
+            thoughtCommand = true;
         }
         const bool selectionChanged = landmarkInteraction_.UpdateSelection(
             playerController_.TransformState().WorldPosition(), world_);
@@ -412,10 +449,12 @@ int Win32Application::Run() {
                 encounterChanged = landmarkEncounter_.TryActivate(report, combatSandbox_).result
                     == Scene::LandmarkEncounterResult::Activated;
             }
+            astral_.OnInteract(report);
             interacted = true;
         }
         encounterChanged = landmarkEncounter_.Update(combatSandbox_, shadowbladeActions_)
             || encounterChanged;
+        if (encounterChanged) astral_.OnEncounterChanged();
         lightAttackPressed_ = lightAttackDown;
         heavyAttackPressed_ = heavyAttackDown;
         dashPressed_ = dashDown;
@@ -430,6 +469,9 @@ int Win32Application::Run() {
                 playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
                 thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
         }
+        astral_.Update({&world_, &combatSandbox_, &shadowbladeActions_, &thoughtCommands_,
+                           &landmarkInteraction_, &landmarkEncounter_},
+            playerController_.TransformState().WorldPosition(), deltaSeconds);
         if (phaseTimingCapture.Enabled()) {
             afterUpdate = PhaseClock::now();
         }
@@ -437,10 +479,12 @@ int Win32Application::Run() {
         HDC deviceContext = GetDC(window_);
         RECT viewport{};
         GetClientRect(window_, &viewport);
-        g_renderer.Clear(deviceContext, viewport);
-        g_renderer.RenderWorld(deviceContext, viewport, camera_, world_,
-            playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
-            thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
+        if (!astral_.Present(deviceContext, viewport)) {
+            g_renderer.Clear(deviceContext, viewport);
+            g_renderer.RenderWorld(deviceContext, viewport, camera_, world_,
+                playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
+                thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
+        }
         ReleaseDC(window_, deviceContext);
 
         if (benchmarkRunControl.Enabled()) {
@@ -522,6 +566,12 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND window, UINT message, WPARAM 
         BeginPaint(window, &paint);
         EndPaint(window, &paint);
         return 0;
+    }
+    case WM_CHAR: {
+        // Typed Thought prompt (Astral mode only); everything else keeps default handling.
+        auto* application = reinterpret_cast<Win32Application*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+        if (application && application->astral_.HandleChar(static_cast<wchar_t>(wParam))) return 0;
+        return DefWindowProcW(window, message, wParam, lParam);
     }
     case WM_DESTROY:
         PostQuitMessage(0);

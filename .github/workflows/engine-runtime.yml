@@ -1,0 +1,87 @@
+name: Astral engine runtime (portable, sanitizers)
+
+# Headless Linux builds of the REAL engine runtime and showcase sources with
+# warnings as errors, AddressSanitizer + UndefinedBehaviorSanitizer and
+# ThreadSanitizer. Complements (does not replace) windows-ci.yml, which builds
+# AstralGame with MSVC and runs the same suites through the root CMake project.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "cmake/AstralEngineSources.cmake"
+      - "Engine/**"
+      - "Game/Showcase/**"
+      - "Tests/Engine*.cpp"
+      - "Tests/EngineRuntime/**"
+      - "Tests/EngineTestSupport.h"
+      - "Tools/AstralCapture.cpp"
+      - ".github/workflows/engine-runtime.yml"
+  push:
+    branches: [main]
+    paths:
+      - "cmake/AstralEngineSources.cmake"
+      - "Engine/**"
+      - "Game/Showcase/**"
+      - "Tests/Engine*.cpp"
+      - "Tests/EngineRuntime/**"
+      - "Tests/EngineTestSupport.h"
+      - "Tools/AstralCapture.cpp"
+      - ".github/workflows/engine-runtime.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "GCC Debug", cxx: g++, type: Debug, flags: "" }
+          - { name: "GCC Release", cxx: g++, type: Release, flags: "" }
+          - { name: "Clang Release", cxx: clang++, type: Release, flags: "" }
+          - { name: "GCC ASan+UBSan", cxx: g++, type: RelWithDebInfo, flags: "-DASTRAL_SANITIZE=ON" }
+          - { name: "GCC TSan", cxx: g++, type: RelWithDebInfo, flags: "-DASTRAL_TSAN=ON" }
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX=${{ matrix.cxx }} cmake -S Tests/EngineRuntime -B "$RUNNER_TEMP/build" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.type }} ${{ matrix.flags }}
+
+      - name: Build (warnings are errors)
+        run: cmake --build "$RUNNER_TEMP/build" --parallel
+
+      - name: Engine suites
+        env:
+          TSAN_OPTIONS: halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir "$RUNNER_TEMP/build" --output-on-failure --no-tests=error
+
+      - name: Headless National Mall capture route
+        if: matrix.type == 'Release'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/captures"
+          "$RUNNER_TEMP/build/AstralCapture" "$RUNNER_TEMP/captures" 640 360
+          test -s "$RUNNER_TEMP/captures/08_lincoln_discovered.png"
+          test -s "$RUNNER_TEMP/captures/astral_capture.wav"
+          test -s "$RUNNER_TEMP/captures/astral_trace.json"
+
+      - name: Confirm clean tracked tree
+        shell: bash
+        run: |
+          git diff --check
+          test -z "$(git status --porcelain --untracked-files=no)"
