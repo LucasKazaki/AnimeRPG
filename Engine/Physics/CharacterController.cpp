@@ -46,10 +46,12 @@ void CharacterController::Depenetrate() {
             if (id == ignore_) continue;
             const Body* body = world_.GetBody(id);
             if (!body) continue;
-            Vec3 normal, point;
-            const float distance = RoundedDistance(capsule_, pose, body->shape, body->pose, normal, point);
-            if (distance < clearance) {
-                const Vec3 correction = normal * (clearance - distance);
+            // Every nearby feature: a mesh crease needs one push per face.
+            Proximity found[16];
+            const int count = RoundedProximities(capsule_, pose, body->shape, body->pose, clearance, found, 16);
+            for (int i = 0; i < count; ++i) {
+                if (found[i].distance >= clearance) continue;
+                const Vec3 correction = found[i].normalFromB * (clearance - found[i].distance);
                 // Combine pushes per axis so parallel contacts do not double up.
                 push.x = std::fabs(correction.x) > std::fabs(push.x) ? correction.x : push.x;
                 push.y = std::fabs(correction.y) > std::fabs(push.y) ? correction.y : push.y;

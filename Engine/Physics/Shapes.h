@@ -2,8 +2,14 @@
 
 // Collision shapes, rigid poses and the small 3x3 matrix helpers the solver
 // needs. Capsules are Y-aligned in their local frame (core segment +/- halfHeight).
+// Mesh shapes reference shared, immutable triangle geometry and are only valid
+// on static and kinematic bodies (like Unity's non-convex MeshCollider).
 
 #include "Engine/Math/Geometry.h"
+#include "Engine/Physics/TriangleMesh.h"
+
+#include <memory>
+#include <utility>
 
 namespace Astral::Physics {
 
@@ -63,13 +69,14 @@ struct Pose {
     Vec3 InverseTransformVector(Vec3 world) const { return Math::Rotate(Math::Conjugate(rotation), world); }
 };
 
-enum class ShapeType : std::uint8_t { Sphere, Capsule, Box };
+enum class ShapeType : std::uint8_t { Sphere, Capsule, Box, Mesh };
 
 struct Shape {
     ShapeType type{ShapeType::Sphere};
     float radius{0.5f};      // sphere and capsule
     float halfHeight{0.0f};  // capsule core half length
     Vec3 halfExtents{0.5f, 0.5f, 0.5f}; // box
+    std::shared_ptr<const TriangleMesh> mesh; // mesh (vertices in body space)
 
     static Shape Sphere(float r) {
         Shape s;
@@ -91,12 +98,19 @@ struct Shape {
         s.halfExtents = half;
         return s;
     }
+    static Shape Mesh(std::shared_ptr<const TriangleMesh> geometry) {
+        Shape s;
+        s.type = ShapeType::Mesh;
+        s.mesh = std::move(geometry);
+        return s;
+    }
 
     bool IsValid() const {
         switch (type) {
         case ShapeType::Sphere: return Math::IsFinite(radius) && radius > 0.0f;
         case ShapeType::Capsule: return Math::IsFinite(radius) && radius > 0.0f && Math::IsFinite(halfHeight) && halfHeight >= 0.0f;
         case ShapeType::Box: return Math::IsFinite(halfExtents) && halfExtents.x > 0.0f && halfExtents.y > 0.0f && halfExtents.z > 0.0f;
+        case ShapeType::Mesh: return mesh != nullptr && mesh->TriangleCount() > 0;
         }
         return false;
     }
@@ -106,6 +120,7 @@ struct Shape {
         case ShapeType::Capsule:
             return Math::kPi * radius * radius * (2.0f * halfHeight) + 4.0f / 3.0f * Math::kPi * radius * radius * radius;
         case ShapeType::Box: return 8.0f * halfExtents.x * halfExtents.y * halfExtents.z;
+        case ShapeType::Mesh: return 0.0f; // open surfaces have no volume
         }
         return 0.0f;
     }
@@ -129,6 +144,7 @@ struct Shape {
             return {mass * (d.y * d.y + d.z * d.z) / 12.0f, mass * (d.x * d.x + d.z * d.z) / 12.0f,
                 mass * (d.x * d.x + d.y * d.y) / 12.0f};
         }
+        case ShapeType::Mesh: break; // never dynamic
         }
         return {1, 1, 1};
     }
@@ -141,16 +157,24 @@ struct Shape {
             box.Expand(Math::AABB::FromCenterExtents(pose.position - axis, {radius, radius, radius}));
             return box;
         }
-        case ShapeType::Box: {
-            const Mat3 r = Mat3::FromQuat(pose.rotation);
-            const Vec3 e{
-                std::fabs(r.m[0][0]) * halfExtents.x + std::fabs(r.m[0][1]) * halfExtents.y + std::fabs(r.m[0][2]) * halfExtents.z,
-                std::fabs(r.m[1][0]) * halfExtents.x + std::fabs(r.m[1][1]) * halfExtents.y + std::fabs(r.m[1][2]) * halfExtents.z,
-                std::fabs(r.m[2][0]) * halfExtents.x + std::fabs(r.m[2][1]) * halfExtents.y + std::fabs(r.m[2][2]) * halfExtents.z};
-            return Math::AABB::FromCenterExtents(pose.position, e);
+        case ShapeType::Box: return OrientedBounds(pose, {}, halfExtents);
+        case ShapeType::Mesh: {
+            if (!mesh) return {};
+            const Math::AABB& local = mesh->Bounds();
+            return OrientedBounds(pose, local.Center(), local.Extents());
         }
         }
         return {};
+    }
+
+private:
+    // World AABB of a local box (center c, half extents e) under `pose`.
+    static Math::AABB OrientedBounds(const Pose& pose, Vec3 c, Vec3 e) {
+        const Mat3 r = Mat3::FromQuat(pose.rotation);
+        const Vec3 extents{std::fabs(r.m[0][0]) * e.x + std::fabs(r.m[0][1]) * e.y + std::fabs(r.m[0][2]) * e.z,
+            std::fabs(r.m[1][0]) * e.x + std::fabs(r.m[1][1]) * e.y + std::fabs(r.m[1][2]) * e.z,
+            std::fabs(r.m[2][0]) * e.x + std::fabs(r.m[2][1]) * e.y + std::fabs(r.m[2][2]) * e.z};
+        return Math::AABB::FromCenterExtents(pose.TransformPoint(c), extents);
     }
 };
 

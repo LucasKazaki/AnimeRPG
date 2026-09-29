@@ -40,6 +40,7 @@ BodyId PhysicsWorld::CreateBody(const BodyDesc& desc) {
         return {};
     }
     if (desc.type == BodyType::Dynamic && !(desc.mass > 0.0f && std::isfinite(desc.mass))) return {};
+    if (desc.type == BodyType::Dynamic && desc.shape.type == ShapeType::Mesh) return {};
     Body body;
     body.type = desc.type;
     body.shape = desc.shape;
@@ -224,19 +225,21 @@ void PhysicsWorld::Step(float dt) {
     std::map<std::uint64_t, std::pair<BodyId, BodyId>> nowTouchingBodies;
     std::map<std::uint64_t, std::vector<CachedPoint>> newCache;
     stats_.contactPoints = 0;
+    std::size_t solvedPairs = 0;
     for (const auto& pair : pairs) {
         Body* a = bodies_.Get(pair.first);
         Body* b = bodies_.Get(pair.second);
         if (!a || !b) continue;
         if (!a->shape.WorldBounds(a->pose).Overlaps(b->shape.WorldBounds(b->pose))) continue;
-        Manifold manifold;
-        if (!Collide(a->shape, a->pose, b->shape, b->pose, manifold) || manifold.count == 0) continue;
+        Manifold manifolds[kMaxManifolds];
+        const int manifoldCount = CollideAll(a->shape, a->pose, b->shape, b->pose, manifolds, kMaxManifolds);
+        if (manifoldCount == 0) continue;
         const std::uint64_t key = PairKey(a->id, b->id);
         nowTouching.insert(key);
         nowTouchingBodies[key] = {a->id, b->id};
         if (!touching_.count(key)) {
             events_.push_back({ContactEventType::Begin, a->id, b->id, a->isTrigger || b->isTrigger,
-                manifold.points[0].position, manifold.normal});
+                manifolds[0].points[0].position, manifolds[0].normal});
         }
         if (a->isTrigger || b->isTrigger) continue;
         // Wake a sleeping body touched by an awake one.
@@ -248,51 +251,67 @@ void PhysicsWorld::Step(float dt) {
             b->awake = true;
             b->sleepTimer = 0.0f;
         }
-        ContactConstraint c;
-        c.a = a;
-        c.b = b;
-        c.key = key;
-        c.normal = manifold.normal;
-        OrthonormalBasis(c.normal, c.tangent[0], c.tangent[1]);
-        c.friction = std::sqrt(a->friction * b->friction);
-        const float restitution = std::max(a->restitution, b->restitution);
         const auto cached = contactCache_.find(key);
-        c.count = manifold.count;
-        for (int i = 0; i < manifold.count; ++i) {
-            auto& p = c.points[i];
-            p.position = manifold.points[i].position;
-            p.penetration = manifold.points[i].penetration;
-            p.ra = p.position - a->pose.position;
-            p.rb = p.position - b->pose.position;
-            auto effectiveMass = [&](Vec3 axis) {
-                const Vec3 raCross = Cross(p.ra, axis), rbCross = Cross(p.rb, axis);
-                const float k = a->inverseMass + b->inverseMass + Dot(raCross, a->inverseInertiaWorld * raCross)
-                    + Dot(rbCross, b->inverseInertiaWorld * rbCross);
-                return k > 1.0e-12f ? 1.0f / k : 0.0f;
-            };
-            p.normalMass = effectiveMass(c.normal);
-            p.tangentMass[0] = effectiveMass(c.tangent[0]);
-            p.tangentMass[1] = effectiveMass(c.tangent[1]);
-            const Vec3 dv = b->linearVelocity + Cross(b->angularVelocity, p.rb) - a->linearVelocity - Cross(a->angularVelocity, p.ra);
-            const float vn = Dot(dv, c.normal);
-            p.bias = settings_.baumgarte / dt * std::max(0.0f, p.penetration - settings_.penetrationSlop);
-            if (vn < -settings_.restitutionThreshold) p.bias = std::max(p.bias, -restitution * vn);
-            // Warm start from the closest cached point of this pair.
-            if (cached != contactCache_.end()) {
-                float best = 0.02f * 0.02f;
-                for (const CachedPoint& old : cached->second) {
-                    const float d = DistanceSquared(old.position, p.position);
-                    if (d < best) {
-                        best = d;
+        // Each cached impulse seeds at most one new point: two nearby points
+        // (e.g. a face and a seam on a mesh) inheriting the same impulse would
+        // double the push for a step.
+        std::vector<bool> claimed(cached != contactCache_.end() ? cached->second.size() : 0u, false);
+        ++solvedPairs;
+        // One constraint per manifold; a mesh pair can press on several faces.
+        for (int mi = 0; mi < manifoldCount; ++mi) {
+            const Manifold& manifold = manifolds[mi];
+            ContactConstraint c;
+            c.a = a;
+            c.b = b;
+            c.key = key;
+            c.normal = manifold.normal;
+            OrthonormalBasis(c.normal, c.tangent[0], c.tangent[1]);
+            c.friction = std::sqrt(a->friction * b->friction);
+            const float restitution = std::max(a->restitution, b->restitution);
+            c.count = manifold.count;
+            for (int i = 0; i < manifold.count; ++i) {
+                auto& p = c.points[i];
+                p.position = manifold.points[i].position;
+                p.penetration = manifold.points[i].penetration;
+                p.ra = p.position - a->pose.position;
+                p.rb = p.position - b->pose.position;
+                auto effectiveMass = [&](Vec3 axis) {
+                    const Vec3 raCross = Cross(p.ra, axis), rbCross = Cross(p.rb, axis);
+                    const float k = a->inverseMass + b->inverseMass + Dot(raCross, a->inverseInertiaWorld * raCross)
+                        + Dot(rbCross, b->inverseInertiaWorld * rbCross);
+                    return k > 1.0e-12f ? 1.0f / k : 0.0f;
+                };
+                p.normalMass = effectiveMass(c.normal);
+                p.tangentMass[0] = effectiveMass(c.tangent[0]);
+                p.tangentMass[1] = effectiveMass(c.tangent[1]);
+                const Vec3 dv = b->linearVelocity + Cross(b->angularVelocity, p.rb) - a->linearVelocity - Cross(a->angularVelocity, p.ra);
+                const float vn = Dot(dv, c.normal);
+                p.bias = settings_.baumgarte / dt * std::max(0.0f, p.penetration - settings_.penetrationSlop);
+                if (vn < -settings_.restitutionThreshold) p.bias = std::max(p.bias, -restitution * vn);
+                // Warm start from the closest cached point of this pair with the same normal.
+                if (cached != contactCache_.end()) {
+                    float best = 0.02f * 0.02f;
+                    std::size_t match = claimed.size();
+                    for (std::size_t k = 0; k < cached->second.size(); ++k) {
+                        const CachedPoint& old = cached->second[k];
+                        const float d = DistanceSquared(old.position, p.position);
+                        if (!claimed[k] && d < best && Dot(old.normal, c.normal) > 0.95f) {
+                            best = d;
+                            match = k;
+                        }
+                    }
+                    if (match < claimed.size()) {
+                        const CachedPoint& old = cached->second[match];
+                        claimed[match] = true;
                         p.normalImpulse = old.normalImpulse;
                         p.tangentImpulse[0] = old.tangentImpulse[0];
                         p.tangentImpulse[1] = old.tangentImpulse[1];
                     }
                 }
             }
+            constraints_.push_back(c);
+            stats_.contactPoints += static_cast<std::size_t>(manifold.count);
         }
-        constraints_.push_back(c);
-        stats_.contactPoints += static_cast<std::size_t>(manifold.count);
     }
     for (const auto& entry : touchingBodies_) {
         if (nowTouching.count(entry.first)) continue;
@@ -313,7 +332,7 @@ void PhysicsWorld::Step(float dt) {
     }
     touching_.swap(nowTouching);
     touchingBodies_.swap(nowTouchingBodies);
-    stats_.contactPairs = constraints_.size();
+    stats_.contactPairs = solvedPairs;
 
     // 4. Warm start, then iterate.
     for (ContactConstraint& c : constraints_) {
@@ -333,7 +352,7 @@ void PhysicsWorld::Step(float dt) {
         std::vector<CachedPoint>& cache = newCache[c.key];
         for (int i = 0; i < c.count; ++i) {
             const auto& p = c.points[i];
-            cache.push_back({p.position, p.normalImpulse, {p.tangentImpulse[0], p.tangentImpulse[1]}});
+            cache.push_back({p.position, c.normal, p.normalImpulse, {p.tangentImpulse[0], p.tangentImpulse[1]}});
         }
     }
     contactCache_.swap(newCache);
@@ -394,7 +413,10 @@ bool PhysicsWorld::Raycast(const Ray& ray, float maxDistance, RaycastHit& hit, s
 
 bool PhysicsWorld::ShapeCast(const Shape& shape, const Pose& start, Vec3 motion, ShapeCastHit& hit, std::uint32_t mask,
     BodyId ignore, bool includeTriggers) const {
-    if (shape.type == ShapeType::Box || !shape.IsValid() || !IsFinite(motion) || !IsFinite(start.position)) return false;
+    if ((shape.type != ShapeType::Sphere && shape.type != ShapeType::Capsule) || !shape.IsValid() || !IsFinite(motion)
+        || !IsFinite(start.position)) {
+        return false;
+    }
     Math::AABB swept = shape.WorldBounds(start);
     swept.Expand(shape.WorldBounds({start.position + motion, start.rotation}));
     const float length = Length(motion);

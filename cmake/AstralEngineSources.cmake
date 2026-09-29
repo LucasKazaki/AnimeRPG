@@ -38,6 +38,7 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/Collision.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/Destruction.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/PhysicsWorld.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Physics/TriangleMesh.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/VFX/Particles.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Components.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Registry.cpp"
