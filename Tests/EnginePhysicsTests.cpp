@@ -840,6 +840,22 @@ ASTRAL_TEST(MeshCollisionFuzzStaysFinite) {
                         meshPose.rotation.z, meshPose.rotation.w);
                     std::fprintf(stderr, "  motion %a %a %a fraction %.9g depth %.9g normal %.6g %.6g %.6g\n", motion.x,
                         motion.y, motion.z, cast.fraction, depth, cast.normal.x, cast.normal.y, cast.normal.z);
+                    double checksum = 0.0;
+                    for (std::size_t t = 0; t < mesh.mesh->TriangleCount(); ++t) {
+                        const TriangleMesh::Triangle& tri = mesh.mesh->GetTriangle(t);
+                        checksum += static_cast<double>(tri.a.x) + tri.b.y * 2.0 + tri.c.z * 3.0;
+                        if (std::fabs(tri.a.x + 2.55761f) < 0.01f || std::fabs(tri.b.x + 2.55761f) < 0.01f || std::fabs(tri.c.x + 2.55761f) < 0.01f) {
+                            std::fprintf(stderr, "  triangle %zu a %a %a %a b %a %a %a c %a %a %a edges %d\n", t, tri.a.x, tri.a.y,
+                                tri.a.z, tri.b.x, tri.b.y, tri.b.z, tri.c.x, tri.c.y, tri.c.z, tri.activeEdges);
+                        }
+                    }
+                    std::fprintf(stderr, "  triangles %zu checksum %.17g\n", mesh.mesh->TriangleCount(), checksum);
+                    const int near = RoundedProximities(shape, pose, mesh, meshPose, 100.0f, all.data(), static_cast<int>(all.size()));
+                    for (int k = 0; k < 3 && k < near; ++k) {
+                        std::fprintf(stderr, "  nearest %d distance %.9g point %.6g %.6g %.6g\n", k, all[static_cast<std::size_t>(k)].distance,
+                            all[static_cast<std::size_t>(k)].pointOnB.x, all[static_cast<std::size_t>(k)].pointOnB.y,
+                            all[static_cast<std::size_t>(k)].pointOnB.z);
+                    }
                     for (int k = 0; k <= 20; ++k) {
                         const float f = cast.fraction * static_cast<float>(k) / 20.0f;
                         const Pose along{pose.position + motion * f, pose.rotation};
