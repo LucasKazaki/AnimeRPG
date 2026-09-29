@@ -454,9 +454,11 @@ std::vector<std::uint8_t> ZlibCompress(const std::uint8_t* data, std::size_t siz
     BitWriter writer(out);
     writer.Write(1, 1); // final block
     writer.Write(1, 2); // fixed Huffman
-    constexpr int kWindow = 32768;
-    constexpr int kHashSize = 1 << 15;
-    constexpr int kMaxChain = 48;
+    // static: lambdas below use these without capturing them (MSVC rejects
+    // implicit use of a non-static local constexpr in a capture-list lambda).
+    static constexpr int kWindow = 32768;
+    static constexpr int kHashSize = 1 << 15;
+    static constexpr int kMaxChain = 48;
     std::vector<int> head(kHashSize, -1);
     std::vector<int> previous(kWindow, -1);
     auto hashAt = [data](std::size_t i) {
