@@ -12,6 +12,8 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/HumanoidRig.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skeleton.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skinning.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Timeline.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Tween.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Assets/AssetManager.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Assets/Gltf.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Assets/Jpeg.cpp"
@@ -26,6 +28,7 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Components.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Framework/GameWorld.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Scene.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Sequencer.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Timers.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Canvas.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Image.cpp"
@@ -44,6 +47,8 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/Destruction.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/PhysicsWorld.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/TriangleMesh.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/UI/ConsoleOverlay.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/UI/Widgets.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/VFX/Particles.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Components.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Registry.cpp"
@@ -89,4 +94,6 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineServicesTests
     EngineAssetsTests
     EngineFrameworkTests
+    EngineTimelineTests
+    EngineUITests
 )
