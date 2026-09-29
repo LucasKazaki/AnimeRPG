@@ -3,10 +3,12 @@
 #include <charconv>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <limits>
 #include <sstream>
+#include <system_error>
 
 namespace Astral::Core {
 
@@ -567,10 +569,14 @@ bool WriteJsonFile(const std::string& path, const JsonValue& value, std::string&
             return false;
         }
     }
-    // Replace atomically where the platform allows (rename over an existing file).
-    std::remove(path.c_str());
-    if (std::rename(temporary.c_str(), path.c_str()) != 0) {
-        error = "cannot move " + temporary + " into place";
+    // std::filesystem::rename replaces an existing target in one step on every
+    // platform (POSIX rename, MoveFileEx with MOVEFILE_REPLACE_EXISTING), so
+    // readers never observe a missing or half-written file.
+    std::error_code ec;
+    std::filesystem::rename(temporary, path, ec);
+    if (ec) {
+        std::remove(temporary.c_str());
+        error = "cannot move " + temporary + " into place: " + ec.message();
         return false;
     }
     return true;

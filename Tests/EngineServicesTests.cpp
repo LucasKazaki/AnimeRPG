@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <limits>
 #include <string>
 #include <vector>
@@ -102,14 +103,18 @@ ASTRAL_TEST(JsonRoundTripsThroughTheWriter) {
 }
 
 ASTRAL_TEST(JsonFilesWriteAtomicallyAndReload) {
-    const char* directory = std::getenv("TMPDIR");
-    const std::string path = std::string(directory && *directory ? directory : "/tmp") + "/astral_json_test.json";
+    const std::string path = (std::filesystem::temp_directory_path() / "astral_json_test.json").string();
     JsonValue doc = JsonValue::MakeObject();
     doc.Set("scene", "Mall");
     std::string error;
     ASTRAL_CHECK(WriteJsonFile(path, doc, error));
     JsonValue loaded;
     ASTRAL_CHECK(ReadJsonFile(path, loaded, error) && loaded == doc);
+    // A second write replaces the existing file in place.
+    doc.Set("scene", "Reflecting Pool");
+    ASTRAL_CHECK(WriteJsonFile(path, doc, error));
+    ASTRAL_CHECK(ReadJsonFile(path, loaded, error) && loaded == doc);
+    ASTRAL_CHECK(!std::filesystem::exists(path + ".tmp"));
     std::remove(path.c_str());
     ASTRAL_CHECK(!ReadJsonFile(path, loaded, error));
 }
