@@ -828,8 +828,26 @@ ASTRAL_TEST(MeshCollisionFuzzStaysFinite) {
             ASTRAL_CHECK(Math::IsFinite(cast.normal) && Math::IsFinite(cast.point));
             // Nothing is penetrated (beyond the cast tolerance) before the reported fraction.
             const Pose before{pose.position + motion * std::max(0.0f, cast.fraction - 0.02f), pose.rotation};
-            if (!cast.startPenetrating && cast.fraction > 0.02f)
-                ASTRAL_CHECK(RoundedDistance(shape, before, mesh, meshPose, normal, point) >= -1.0e-3f - 1.0e-5f);
+            if (!cast.startPenetrating && cast.fraction > 0.02f) {
+                const float depth = RoundedDistance(shape, before, mesh, meshPose, normal, point);
+                if (!(depth >= -1.0e-3f - 1.0e-5f)) {
+                    // Bit-exact inputs (hex floats), so a platform-specific failure can be replayed.
+                    std::fprintf(stderr, "cast failure at iteration %d: type %d radius %a halfHeight %a\n", i,
+                        static_cast<int>(shape.type), shape.radius, shape.halfHeight);
+                    std::fprintf(stderr, "  pose %a %a %a | %a %a %a %a\n", pose.position.x, pose.position.y, pose.position.z,
+                        pose.rotation.x, pose.rotation.y, pose.rotation.z, pose.rotation.w);
+                    std::fprintf(stderr, "  mesh rotation %a %a %a %a\n", meshPose.rotation.x, meshPose.rotation.y,
+                        meshPose.rotation.z, meshPose.rotation.w);
+                    std::fprintf(stderr, "  motion %a %a %a fraction %.9g depth %.9g normal %.6g %.6g %.6g\n", motion.x,
+                        motion.y, motion.z, cast.fraction, depth, cast.normal.x, cast.normal.y, cast.normal.z);
+                    for (int k = 0; k <= 20; ++k) {
+                        const float f = cast.fraction * static_cast<float>(k) / 20.0f;
+                        const Pose along{pose.position + motion * f, pose.rotation};
+                        std::fprintf(stderr, "  f %.6f distance %.9g\n", f, RoundedDistance(shape, along, mesh, meshPose, normal, point));
+                    }
+                }
+                ASTRAL_CHECK(depth >= -1.0e-3f - 1.0e-5f);
+            }
         }
     }
 }
