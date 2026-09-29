@@ -172,7 +172,14 @@ struct FieldTraits<Math::Quat> {
     static bool Write(Math::Quat& v, const JsonValue& j, const FieldInfo&) {
         float f[4];
         if (ReadFloats(j, f, 4)) {
-            v = Math::Normalize(Math::Quat{f[0], f[1], f[2], f[3]});
+            // A (near) zero quaternion is not a rotation: reject it rather than
+            // silently substituting identity.
+            const float lengthSquared = f[0] * f[0] + f[1] * f[1] + f[2] * f[2] + f[3] * f[3];
+            if (!(lengthSquared > 1.0e-12f)) return false;
+            // Unit input is kept bit-exact (float normalisation is not idempotent,
+            // so re-normalising would drift on every save/load round trip).
+            const Math::Quat q{f[0], f[1], f[2], f[3]};
+            v = std::fabs(lengthSquared - 1.0f) <= 1.0e-5f ? q : Math::Normalize(q);
             return true;
         }
         if (j.IsObject() && ReadFloats(j["euler"], f, 3)) {

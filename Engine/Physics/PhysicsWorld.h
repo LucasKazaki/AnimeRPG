@@ -156,6 +156,7 @@ public:
     const std::vector<ContactEvent>& Events() const { return events_; }
     const PhysicsStats& Stats() const { return stats_; }
     PhysicsSettings& Settings() { return settings_; }
+    const PhysicsSettings& Settings() const { return settings_; }
 
     template <typename Fn>
     void ForEachBody(Fn&& fn) { bodies_.ForEach([&](Core::Handle, Body& body) { fn(body); }); }

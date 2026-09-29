@@ -157,6 +157,14 @@ public:
         return static_cast<ComponentPool<T>&>(*pools_[id]);
     }
 
+    // Entities holding T (pool order); empty when no T was ever added.
+    template <typename T>
+    const std::vector<Entity>& EntitiesWith() const {
+        static const std::vector<Entity> none;
+        const auto* pool = FindPool<T>();
+        return pool ? pool->Entities() : none;
+    }
+
     template <typename T>
     std::size_t Count() const {
         const auto* pool = FindPool<T>();
