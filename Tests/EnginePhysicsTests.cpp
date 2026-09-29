@@ -765,21 +765,38 @@ ASTRAL_TEST(CharacterWalksMeshTerrain) {
 ASTRAL_TEST(MeshCollisionFuzzStaysFinite) {
     Core::Random random(1234);
     MeshBuilder soup;
+    // Random draws are sequenced into locals (never function arguments, whose
+    // evaluation order differs between compilers) so every platform fuzzes the same cases.
+    auto point = [&] {
+        const float x = random.Range(-3.0f, 3.0f);
+        const float y = random.Range(-3.0f, 3.0f);
+        const float z = random.Range(-3.0f, 3.0f);
+        return Vec3{x, y, z};
+    };
     for (int i = 0; i < 200; ++i) {
-        auto point = [&] { return Vec3{random.Range(-3.0f, 3.0f), random.Range(-3.0f, 3.0f), random.Range(-3.0f, 3.0f)}; };
         const Vec3 a = point();
-        soup.Triangle(a, a + (point() - a) * 0.3f, a + (point() - a) * 0.3f, point());
+        const Vec3 b = a + (point() - a) * 0.3f;
+        const Vec3 c = a + (point() - a) * 0.3f;
+        const Vec3 outward = point();
+        soup.Triangle(a, b, c, outward);
     }
     const Shape mesh = Shape::Mesh(soup.Build());
     const Pose meshPose{{0.5f, -0.2f, 0.1f}, Math::QuatFromAxisAngle({0, 1, 0}, 0.3f)};
     std::vector<Proximity> all(256);
     for (int i = 0; i < 300; ++i) {
         const float kind = random.NextFloat();
-        const Shape shape = kind < 0.33f ? Shape::Sphere(random.Range(0.05f, 1.0f))
-            : (kind < 0.66f ? Shape::CapsuleFromHeight(random.Range(0.05f, 0.6f), random.Range(1.3f, 3.0f))
-                            : Shape::Box({random.Range(0.05f, 1.0f), random.Range(0.05f, 1.0f), random.Range(0.05f, 1.0f)}));
-        const Pose pose{{random.Range(-4.0f, 4.0f), random.Range(-4.0f, 4.0f), random.Range(-4.0f, 4.0f)},
-            Math::QuatFromAxisAngle(Math::Normalize(Vec3{random.Range(-1.0f, 1.0f), random.Range(-1.0f, 1.0f), 0.3f}), random.Range(-3.0f, 3.0f))};
+        Shape shape;
+        if (kind < 0.33f) {
+            shape = Shape::Sphere(random.Range(0.05f, 1.0f));
+        } else if (kind < 0.66f) {
+            const float radius = random.Range(0.05f, 0.6f);
+            shape = Shape::CapsuleFromHeight(radius, random.Range(1.3f, 3.0f));
+        } else {
+            shape = Shape::Box({random.Range(0.05f, 1.0f), random.Range(0.05f, 1.0f), random.Range(0.05f, 1.0f)});
+        }
+        const Vec3 position{random.Range(-4.0f, 4.0f), random.Range(-4.0f, 4.0f), random.Range(-4.0f, 4.0f)};
+        const Vec3 axis = Math::Normalize(Vec3{random.Range(-1.0f, 1.0f), random.Range(-1.0f, 1.0f), 0.3f});
+        const Pose pose{position, Math::QuatFromAxisAngle(axis, random.Range(-3.0f, 3.0f))};
         Manifold manifolds[kMaxManifolds];
         const bool meshFirst = random.NextFloat() < 0.5f;
         const int count = meshFirst ? CollideAll(mesh, meshPose, shape, pose, manifolds, kMaxManifolds)
@@ -809,10 +826,38 @@ ASTRAL_TEST(MeshCollisionFuzzStaysFinite) {
         if (ShapeCast(shape, pose, motion, mesh, meshPose, cast)) {
             ASTRAL_CHECK(cast.fraction >= 0.0f && cast.fraction <= 1.0f);
             ASTRAL_CHECK(Math::IsFinite(cast.normal) && Math::IsFinite(cast.point));
-            // Nothing is hit before the reported fraction.
+            // Nothing is penetrated (beyond the cast tolerance) before the reported fraction.
             const Pose before{pose.position + motion * std::max(0.0f, cast.fraction - 0.02f), pose.rotation};
             if (!cast.startPenetrating && cast.fraction > 0.02f)
-                ASTRAL_CHECK(RoundedDistance(shape, before, mesh, meshPose, normal, point) > -1.0e-3f);
+                ASTRAL_CHECK(RoundedDistance(shape, before, mesh, meshPose, normal, point) >= -1.0e-3f - 1.0e-5f);
+        }
+    }
+}
+
+ASTRAL_TEST(ShapeCastsNeverSinkPastTheTolerance) {
+    // Starting in resting contact (within the tolerance) and sliding a long way
+    // with a slight downward slope: either the cast reports a hit, or no pose
+    // along the motion penetrates deeper than the tolerance.
+    constexpr float kTolerance = 1.0e-3f;
+    MeshBuilder floorMesh;
+    floorMesh.Grid(-20.0f, -20.0f, 4, 4, 10.0f, Flat);
+    const Shape targets[] = {Shape::Box({20.0f, 0.5f, 20.0f}), Shape::Mesh(floorMesh.Build())};
+    const Pose targetPoses[] = {{{0.0f, -0.5f, 0.0f}, {}}, {{}, {}}};
+    for (int t = 0; t < 2; ++t) {
+        for (const float start : {-0.0009f, -0.0005f, 0.0f, 0.0005f, 0.0009f}) {
+            for (const float drop : {0.0f, 0.0003f, 0.00063f, 0.0015f}) {
+                const Shape probe = Shape::Sphere(0.5f);
+                const Pose from{{-3.5f, 0.5f + start, 0.3f}, {}};
+                const Vec3 motion{7.0f, -drop, 0.0f};
+                ShapeCastResult result;
+                const bool hit = ShapeCast(probe, from, motion, targets[t], targetPoses[t], result, kTolerance);
+                const float reached = hit ? result.fraction : 1.0f;
+                Vec3 normal, point;
+                for (int k = 0; k <= 20; ++k) {
+                    const Pose along{from.position + motion * (reached * static_cast<float>(k) / 20.0f), {}};
+                    ASTRAL_CHECK(RoundedDistance(probe, along, targets[t], targetPoses[t], normal, point) >= -kTolerance - 1.0e-5f);
+                }
+            }
         }
     }
 }

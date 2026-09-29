@@ -367,9 +367,11 @@ bool ConservativeCast(DistanceFn&& distanceAt, Vec3 motion, float tolerance, Sha
     }
     if (length < 1.0e-9f) return false;
     const Vec3 direction = motion / length;
-    // Already touching: only a motion into the surface is blocked. Sliding along
-    // or leaving a resting contact (e.g. walking on the ground) is not a hit.
-    if (distance <= tolerance && Dot(direction, normal) >= -1.0e-4f) return false;
+    // Already touching: sliding along or leaving a resting contact (e.g. walking
+    // on the ground) is not a hit, as long as the whole motion stays within the
+    // tolerance (by convexity g(t) >= g(0) + slope * t). A motion that would dig
+    // deeper is blocked where it starts, so collide-and-slide can project it.
+    if (distance <= tolerance && distance + std::min(0.0f, Dot(direction, normal)) * length >= -tolerance) return false;
     float travelled = 0.0f;
     for (int iteration = 0; iteration < 64; ++iteration) {
         if (distance <= tolerance) {
