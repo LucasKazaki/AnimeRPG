@@ -88,7 +88,14 @@ set(ASTRAL_SAMPLE_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Game/Samples/Playground/PlaygroundBehaviours.cpp"
 )
 
-# Each suite is Tests/<name>.cpp and links the runtime and showcase libraries.
+# Scene editor core (the model behind AstralEditor): platform independent and
+# tested headless; the Win32 front end is Tools/AstralEditorMain.cpp.
+set(ASTRAL_EDITOR_SOURCES
+    "${ASTRAL_ENGINE_ROOT}/Engine/Editor/EditorCamera.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Editor/SceneEditor.cpp"
+)
+
+# Each suite is Tests/<name>.cpp and links the runtime, showcase and editor libraries.
 set(ASTRAL_ENGINE_TEST_SUITES
     EngineMathTests
     EngineCoreTests
@@ -105,4 +112,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineTimelineTests
     EngineUITests
     EngineSampleTests
+    EngineEditorTests
 )

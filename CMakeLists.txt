@@ -15,6 +15,8 @@ target_include_directories(AstralEngineRuntime PUBLIC .)
 target_link_libraries(AstralEngineRuntime PUBLIC Threads::Threads)
 add_library(AstralShowcase STATIC ${ASTRAL_SHOWCASE_SOURCES} ${ASTRAL_GAMEPLAY_SOURCES} ${ASTRAL_SAMPLE_SOURCES})
 target_link_libraries(AstralShowcase PUBLIC AstralEngineRuntime)
+add_library(AstralEditorCore STATIC ${ASTRAL_EDITOR_SOURCES})
+target_link_libraries(AstralEditorCore PUBLIC AstralEngineRuntime)
 
 add_executable(AstralGame WIN32
     Engine/Assets/StaticMesh.cpp
@@ -57,7 +59,8 @@ add_executable(AstralEditor WIN32
 )
 target_include_directories(AstralEditor PRIVATE .)
 target_compile_definitions(AstralEditor PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_link_libraries(AstralEditor PRIVATE user32 gdi32)
+# The scene editor core plus the sample behaviours, so sample scenes open and play.
+target_link_libraries(AstralEditor PRIVATE AstralEditorCore AstralShowcase user32 gdi32 comdlg32)
 
 # Headless National Mall capture: PNG frames, WAV mix and Chrome trace.
 add_executable(AstralCapture Tools/AstralCapture.cpp)
@@ -250,6 +253,10 @@ if(BUILD_TESTING)
     target_link_libraries(EngineSampleTests PRIVATE AstralShowcase)
     target_compile_definitions(EngineSampleTests PRIVATE ASTRAL_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
     astral_add_test(EngineSampleTests)
+    add_executable(EngineEditorTests Tests/EngineEditorTests.cpp)
+    target_link_libraries(EngineEditorTests PRIVATE AstralShowcase AstralEditorCore)
+    target_compile_definitions(EngineEditorTests PRIVATE ASTRAL_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+    astral_add_test(EngineEditorTests)
     set_tests_properties(${ASTRAL_ENGINE_TEST_SUITES} PROPERTIES TIMEOUT 300)
 
     add_executable(M4RuntimeSmoke Tests/CombatSandboxTests.cpp)

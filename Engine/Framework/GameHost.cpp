@@ -271,6 +271,7 @@ void GameHost::Activate(SceneDocument document, const std::string& path) {
     ResetWorld();
     document_ = std::move(document);
     scenePath_ = path;
+    unnamedScene_ = path.empty();
     SceneSerializer(assets_.get()).Instantiate(document_, *world_);
     ++stats_.sceneLoads;
     lastError_.clear();
@@ -308,6 +309,10 @@ bool GameHost::LoadSceneJson(const JsonValue& json, std::string& error) {
 }
 
 bool GameHost::ApplyProject(const ProjectDesc& project, std::string& error) {
+    return ApplyProjectSettings(project, error) && LoadScene(project.startupScene, error);
+}
+
+bool GameHost::ApplyProjectSettings(const ProjectDesc& project, std::string& error) {
     for (const auto& [name, value] : project.config) {
         std::string setError;
         if (!commands_.Set(name, value, setError)) return Report(error = "config." + name + ": " + setError);
@@ -315,7 +320,7 @@ bool GameHost::ApplyProject(const ProjectDesc& project, std::string& error) {
     input_ = Input::InputSystem();
     for (const Input::InputContext& context : project.input) input_.AddContext(context);
     project_ = project;
-    return LoadScene(project.startupScene, error);
+    return true;
 }
 
 bool GameHost::LoadProject(const std::string& path, std::string& error) {
@@ -374,6 +379,12 @@ void GameHost::ProcessRequests() {
     if (loads.empty()) return;
     const std::string path = loads.back().empty() ? scenePath_ : loads.back(); // the last request wins
     std::string error;
+    if (path.empty() && unnamedScene_) {
+        // A scene loaded from JSON (the editor's Play) reloads from its document.
+        SceneDocument document = document_;
+        Activate(std::move(document), {});
+        return;
+    }
     if (path.empty()) {
         Report("reload requested but no scene file is loaded");
         return;
@@ -428,9 +439,9 @@ void GameHost::RegisterCommands() {
         return "opening " + arguments[0];
     });
     commands_.RegisterCommand("restart", "reload the current scene", [this](const Arguments&) {
-        if (scenePath_.empty()) return std::string("no scene file is loaded");
+        if (scenePath_.empty() && !unnamedScene_) return std::string("no scene file is loaded");
         pendingLoads_.push_back(scenePath_);
-        return "restarting " + scenePath_;
+        return "restarting " + (scenePath_.empty() ? std::string("the unsaved scene") : scenePath_);
     });
     commands_.RegisterCommand("pause", "pause or resume the simulation", [this](const Arguments&) {
         paused_ = !paused_;

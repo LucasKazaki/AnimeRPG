@@ -114,12 +114,16 @@ public:
     // Applies a project (input map, config) and loads its startup scene.
     bool LoadProject(const std::string& path, std::string& error);
     bool ApplyProject(const ProjectDesc& project, std::string& error);
+    // Applies the project's config and input map without loading its startup
+    // scene (the editor plays its own, possibly unsaved, document).
+    bool ApplyProjectSettings(const ProjectDesc& project, std::string& error);
     const ProjectDesc& Project() const { return project_; }
 
     // Replaces the world with a scene (content path). Transactional: on
     // failure the current world keeps running and `error` says why.
     bool LoadScene(const std::string& path, std::string& error);
-    bool LoadSceneJson(const Core::JsonValue& json, std::string& error); // an unnamed scene
+    // An unnamed scene; reload requests (LoadSceneRequest{""}, `restart`) rebuild it from its document.
+    bool LoadSceneJson(const Core::JsonValue& json, std::string& error);
     // Starts an empty world (the HUD is cleared).
     void ResetWorld();
     const std::string& ScenePath() const { return scenePath_; }
@@ -176,6 +180,7 @@ private:
     std::unique_ptr<GameWorld> world_;
     SceneDocument document_;
     std::string scenePath_;
+    bool unnamedScene_{}; // loaded with LoadSceneJson
     ProjectDesc project_;
     std::vector<std::string> pendingLoads_;
     Assets::AssetHandle<Core::JsonValue> sceneHandle_; // hot reload watches its version
