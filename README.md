@@ -155,7 +155,7 @@ ctest --test-dir ../astral-portable --output-on-failure
 
 On Windows, `AstralPlayerWin32.exe Content/Samples/Playground project.json`
 opens the sample in a window. Run it from the repository root, or pass another
-content root.
+content root. Saved edits to the running scene's JSON hot-reload.
 
 Add `-DASTRAL_SANITIZE=ON` (ASan+UBSan) or `-DASTRAL_TSAN=ON` for sanitizer runs.
 

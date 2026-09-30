@@ -11,6 +11,10 @@
 // restarts the scene, F6 halves/restores the render resolution, F9 starts and
 // stops input recording (written to recording.input for
 // `AstralPlayer --replay`), Esc closes the console or quits.
+//
+// Scene files hot-reload: save an edit to the running scene's JSON (or an
+// asset it uses) and the scene reloads within half a second; a broken edit is
+// reported in the console and the running scene is kept.
 
 #include "Engine/Framework/GameHost.h"
 #include "Engine/Input/InputSystem.h"
@@ -205,6 +209,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     Samples::RegisterPlaygroundBehaviours();
     Framework::HostSettings settings;
     settings.contentRoot = contentRoot;
+    settings.hotReload = true; // edit-and-see iteration while the player runs
     auto host = std::make_unique<Framework::GameHost>(settings);
     std::string error;
     const auto probe = host->Assets().Load<Core::JsonValue>(startPath);
