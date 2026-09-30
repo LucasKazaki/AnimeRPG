@@ -49,6 +49,12 @@ public:
 
     LandmarkEncounterReport TryActivate(const LandmarkInteractionReport& interaction,
         CombatSandbox& combatSandbox);
+    // Interaction at the encounter landmark while still Locked: a first discovery,
+    // a revisit or an objective step. A target defeated before the encounter began
+    // is restored first, so the encounter can always start yet never completes
+    // instantly. Reports for other landmarks leave the encounter untouched.
+    LandmarkEncounterReport TryActivateAtLandmark(const LandmarkInteractionReport& interaction,
+        CombatSandbox& combatSandbox);
     bool Update(const CombatSandbox& combatSandbox, ShadowbladeActions& shadowbladeActions);
     LandmarkEncounterReport Retry(CombatSandbox& combatSandbox,
         ShadowbladeActions& shadowbladeActions);

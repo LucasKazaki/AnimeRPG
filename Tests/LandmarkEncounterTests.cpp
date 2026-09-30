@@ -48,6 +48,64 @@ void TestActivationRequiresDesignatedDiscoveryAndLiveTarget() {
         "a pre-defeated target cannot create an instant encounter completion");
 }
 
+void TestDefeatingTheTargetBeforeDiscoveryCannotSoftLockTheEncounter() {
+    using namespace Astral::Scene;
+    const auto report = [](LandmarkInteractionResult result, LandmarkKind landmark) {
+        return LandmarkInteractionReport{result, landmark, 0.0f};
+    };
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    LandmarkEncounter encounter;
+    combat.ApplyDamage(combat.Dummy().maximumHealth);
+
+    Expect(encounter.TryActivateAtLandmark(
+               report(LandmarkInteractionResult::Discovered, LandmarkKind::ReflectingPool), combat).result
+            == LandmarkEncounterResult::None
+            && encounter.State() == LandmarkEncounterState::Locked
+            && combat.Dummy().IsDefeated(),
+        "another landmark leaves the encounter and the defeated target untouched");
+    Expect(encounter.TryActivateAtLandmark(
+               report(LandmarkInteractionResult::OutOfRange, LandmarkKind::LincolnMemorial), combat).result
+            == LandmarkEncounterResult::None
+            && combat.Dummy().IsDefeated(),
+        "an out-of-range press does not restore the target");
+
+    // The player defeated the dummy first, then discovered Lincoln (the order the
+    // controls list reads); the first activation must still start the encounter.
+    const auto activated = encounter.TryActivateAtLandmark(
+        report(LandmarkInteractionResult::Discovered, LandmarkKind::LincolnMemorial), combat);
+    Expect(activated.result == LandmarkEncounterResult::Activated
+            && encounter.State() == LandmarkEncounterState::Active
+            && !combat.Dummy().IsDefeated()
+            && combat.Dummy().health == combat.Dummy().maximumHealth,
+        "discovering Lincoln after defeating the target restores it and starts the encounter");
+    Expect(!encounter.Update(combat, actions) && encounter.State() == LandmarkEncounterState::Active,
+        "the restored target keeps the encounter active: no instant completion");
+    combat.ApplyDamage(combat.Dummy().maximumHealth);
+    Expect(encounter.Update(combat, actions) && encounter.State() == LandmarkEncounterState::Completed,
+        "defeating the restored target completes the encounter");
+    Expect(encounter.TryActivateAtLandmark(
+               report(LandmarkInteractionResult::AlreadyVisited, LandmarkKind::LincolnMemorial), combat).result
+            == LandmarkEncounterResult::None
+            && encounter.State() == LandmarkEncounterState::Completed
+            && combat.Dummy().IsDefeated(),
+        "a completed encounter neither reactivates nor restores the target");
+
+    // A session that already hit TargetUnavailable recovers on the next Lincoln revisit.
+    CombatSandbox lockedCombat;
+    LandmarkEncounter lockedEncounter;
+    lockedCombat.ApplyDamage(lockedCombat.Dummy().maximumHealth);
+    lockedEncounter.TryActivate(Discovery(LandmarkKind::LincolnMemorial), lockedCombat);
+    Expect(lockedEncounter.State() == LandmarkEncounterState::Locked,
+        "setup: the strict activation still refuses a pre-defeated target");
+    Expect(lockedEncounter.TryActivateAtLandmark(
+               report(LandmarkInteractionResult::AlreadyVisited, LandmarkKind::LincolnMemorial),
+               lockedCombat).result
+            == LandmarkEncounterResult::Activated
+            && !lockedCombat.Dummy().IsDefeated(),
+        "revisiting Lincoln while locked restores the target and starts the encounter");
+}
+
 void TestCompletionRewardsOnceThroughExistingCap() {
     using namespace Astral::Scene;
     CombatSandbox combat;
@@ -764,6 +822,7 @@ void TestOrderedLandmarkResonanceBonus() {
 
 int main() {
     TestActivationRequiresDesignatedDiscoveryAndLiveTarget();
+    TestDefeatingTheTargetBeforeDiscoveryCannotSoftLockTheEncounter();
     TestCompletionRewardsOnceThroughExistingCap();
     TestConfiguredChallengeRewardsPersistAcrossRetryAndRespectCap();
     TestSpecialOffensiveScorecardAndCoach();

@@ -70,6 +70,21 @@ LandmarkEncounterReport LandmarkEncounter::TryActivate(
     return lastReport_;
 }
 
+LandmarkEncounterReport LandmarkEncounter::TryActivateAtLandmark(
+    const LandmarkInteractionReport& interaction, CombatSandbox& combatSandbox) {
+    const bool atEncounterLandmark = interaction.landmark == EncounterLandmark
+        && (interaction.result == LandmarkInteractionResult::Discovered
+            || interaction.result == LandmarkInteractionResult::AlreadyVisited
+            || interaction.result == LandmarkInteractionResult::ObjectiveAdvanced);
+    if (state_ != LandmarkEncounterState::Locked || !atEncounterLandmark) {
+        return {LandmarkEncounterResult::None, 0.0f};
+    }
+    if (combatSandbox.Dummy().IsDefeated()) combatSandbox.ResetTrainingSession();
+    LandmarkInteractionReport discovery = interaction;
+    discovery.result = LandmarkInteractionResult::Discovered;
+    return TryActivate(discovery, combatSandbox);
+}
+
 bool LandmarkEncounter::Update(const CombatSandbox& combatSandbox,
     ShadowbladeActions& shadowbladeActions) {
     // This read-only observation is safe in the current Win32 flow, which has
