@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -174,6 +175,16 @@ int main(int argc, char** argv) {
         frames = static_cast<int>(replay.FrameCount());
         for (const ScriptStep& step : script) frames += step.frames;
         if (frames == 0) frames = 300;
+    }
+
+    if (!captureDir.empty()) {
+        std::error_code directoryError;
+        std::filesystem::create_directories(captureDir, directoryError);
+        if (directoryError) {
+            std::fprintf(stderr, "cannot create capture directory '%s': %s\n", captureDir.c_str(),
+                directoryError.message().c_str());
+            return 3;
+        }
     }
 
     Samples::RegisterPlaygroundBehaviours();

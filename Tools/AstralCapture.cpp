@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <functional>
 #include <string>
 #include <vector>
@@ -147,6 +148,13 @@ int main(int argc, char** argv) {
     }
     if (width < 64 || height < 36 || width > 7680 || height > 4320 || settings.quality < 0 || settings.quality > 3) {
         std::fprintf(stderr, "invalid resolution or quality\n");
+        return 2;
+    }
+
+    std::error_code directoryError;
+    std::filesystem::create_directories(argv[1], directoryError);
+    if (directoryError) {
+        std::fprintf(stderr, "cannot create output directory '%s': %s\n", argv[1], directoryError.message().c_str());
         return 2;
     }
 

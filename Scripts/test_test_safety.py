@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -17,6 +18,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def run(*args: str, expected_success: bool = True) -> subprocess.CompletedProcess[str]:
+    if shutil.which(args[0]) is None:
+        raise AssertionError(f"{args[0]} is not on PATH; put CMake 3.25+ (for example the copy "
+                             "bundled with Visual Studio 2022) on PATH before running this script")
     result = subprocess.run(args, text=True, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, timeout=180, check=False)
     if expected_success and result.returncode:
