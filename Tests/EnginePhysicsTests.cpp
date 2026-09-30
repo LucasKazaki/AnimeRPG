@@ -791,8 +791,6 @@ ASTRAL_TEST(CapsuleBesideATriangleMeasuresItsNearestVertex) {
     const Vec3 p1 = meshPose.InverseTransformPoint(pose.position + axis);
     float reference = std::min(Math::Length(Math::ClosestPointOnTriangle(p0, a, b, c) - p0),
         Math::Length(Math::ClosestPointOnTriangle(p1, a, b, c) - p1));
-    // One explicit call per edge (no corner array indexed modulo 3: MSVC x64
-    // Release mis-evaluated that loop form).
     float edgeDistances[3] = {}, edgeS[3] = {}, edgeT[3] = {};
     auto edge = [&](int index, Vec3 from, Vec3 to) {
         Vec3 onSegment, onEdge;

@@ -466,10 +466,9 @@ struct SegmentTriangleResult {
     bool crossing{};
 };
 
-// Closest candidate so far. Kept as plain value code with one call per edge on
-// purpose: MSVC x64 Release builds lost the edge candidates of the previous form
-// (a corner array indexed modulo 3 in a loop, results recorded through a
-// by-reference lambda capture); see CapsuleBesideATriangleMeasuresItsNearestVertex.
+// Closest candidate so far (see CapsuleBesideATriangleMeasuresItsNearestVertex:
+// MSVC x64 Release once lost the edge candidates here, through the segment-
+// segment clamping fixed in Math::ClosestPointsSegmentSegment).
 struct SegmentTriangleCandidate {
     float distanceSquared{std::numeric_limits<float>::infinity()};
     Vec3 onSegment{};
