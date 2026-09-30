@@ -100,6 +100,57 @@ const wchar_t* EncounterStateName(Astral::Scene::LandmarkEncounterState state) {
     return L"Unknown";
 }
 
+// GDI frames are composed off-screen and copied with one blit, so the window never
+// shows the cleared background between Clear and the world draw (visible flicker).
+class GdiBackBuffer {
+public:
+    GdiBackBuffer() = default;
+    GdiBackBuffer(const GdiBackBuffer&) = delete;
+    GdiBackBuffer& operator=(const GdiBackBuffer&) = delete;
+    ~GdiBackBuffer() { Release(); }
+
+    // Returns the off-screen DC sized to the client area, or nullptr (draw direct).
+    HDC Begin(HDC target, int width, int height) {
+        if (width <= 0 || height <= 0) return nullptr;
+        if (memory_ && width == width_ && height == height_) return memory_;
+        Release();
+        memory_ = CreateCompatibleDC(target);
+        bitmap_ = memory_ ? CreateCompatibleBitmap(target, width, height) : nullptr;
+        if (!bitmap_) {
+            Release();
+            return nullptr;
+        }
+        previousBitmap_ = SelectObject(memory_, bitmap_);
+        width_ = width;
+        height_ = height;
+        return memory_;
+    }
+
+    void Present(HDC target) const {
+        if (memory_) BitBlt(target, 0, 0, width_, height_, memory_, 0, 0, SRCCOPY);
+    }
+
+private:
+    void Release() {
+        if (memory_) {
+            if (previousBitmap_) SelectObject(memory_, previousBitmap_);
+            DeleteDC(memory_);
+        }
+        if (bitmap_) DeleteObject(bitmap_);
+        memory_ = nullptr;
+        bitmap_ = nullptr;
+        previousBitmap_ = nullptr;
+        width_ = 0;
+        height_ = 0;
+    }
+
+    HDC memory_{};
+    HBITMAP bitmap_{};
+    HGDIOBJ previousBitmap_{};
+    int width_{};
+    int height_{};
+};
+
 std::wstring WidenAscii(const std::string& text) {
     return std::wstring(text.begin(), text.end());
 }
@@ -289,6 +340,7 @@ int Win32Application::Run() {
     }
 
     MSG message{};
+    GdiBackBuffer backBuffer;
     double fpsAccumulator = 0.0;
     int frameCount = 0;
     std::uint64_t phaseFrameIndex = 0;
@@ -445,10 +497,8 @@ int Win32Application::Run() {
             const Scene::LandmarkInteractionReport report = landmarkInteraction_.TryInteract(
                 playerController_.TransformState().WorldPosition(),
                 world_, shadowbladeActions_);
-            if (report.result == Scene::LandmarkInteractionResult::Discovered) {
-                encounterChanged = landmarkEncounter_.TryActivate(report, combatSandbox_).result
-                    == Scene::LandmarkEncounterResult::Activated;
-            }
+            encounterChanged = landmarkEncounter_.TryActivateAtLandmark(report, combatSandbox_).result
+                == Scene::LandmarkEncounterResult::Activated;
             astral_.OnInteract(report);
             interacted = true;
         }
@@ -480,10 +530,14 @@ int Win32Application::Run() {
         RECT viewport{};
         GetClientRect(window_, &viewport);
         if (!astral_.Present(deviceContext, viewport)) {
-            g_renderer.Clear(deviceContext, viewport);
-            g_renderer.RenderWorld(deviceContext, viewport, camera_, world_,
+            const HDC frame = backBuffer.Begin(deviceContext,
+                viewport.right - viewport.left, viewport.bottom - viewport.top);
+            const HDC target = frame ? frame : deviceContext;
+            g_renderer.Clear(target, viewport);
+            g_renderer.RenderWorld(target, viewport, camera_, world_,
                 playerController_.TransformState(), combatSandbox_, shadowbladeActions_,
                 thoughtCommands_, landmarkInteraction_, landmarkEncounter_);
+            if (frame) backBuffer.Present(deviceContext);
         }
         ReleaseDC(window_, deviceContext);
 
