@@ -791,14 +791,23 @@ ASTRAL_TEST(CapsuleBesideATriangleMeasuresItsNearestVertex) {
     const Vec3 p1 = meshPose.InverseTransformPoint(pose.position + axis);
     float reference = std::min(Math::Length(Math::ClosestPointOnTriangle(p0, a, b, c) - p0),
         Math::Length(Math::ClosestPointOnTriangle(p1, a, b, c) - p1));
-    const Vec3 corners[3] = {a, b, c};
-    float edgeDistances[3] = {};
-    for (int e = 0; e < 3; ++e) {
-        float s = 0.0f, t = 0.0f;
+    // One explicit call per edge (no corner array indexed modulo 3: MSVC x64
+    // Release mis-evaluated that loop form).
+    float edgeDistances[3] = {}, edgeS[3] = {}, edgeT[3] = {};
+    auto edge = [&](int index, Vec3 from, Vec3 to) {
         Vec3 onSegment, onEdge;
-        Math::ClosestPointsSegmentSegment(p0, p1, corners[e], corners[(e + 1) % 3], s, t, onSegment, onEdge);
-        edgeDistances[e] = Math::Length(onSegment - onEdge);
-        reference = std::min(reference, edgeDistances[e]);
+        Math::ClosestPointsSegmentSegment(p0, p1, from, to, edgeS[index], edgeT[index], onSegment, onEdge);
+        edgeDistances[index] = Math::Length(onSegment - onEdge);
+    };
+    edge(0, a, b);
+    edge(1, b, c);
+    edge(2, c, a);
+    reference = std::min(reference, std::min(edgeDistances[0], std::min(edgeDistances[1], edgeDistances[2])));
+    if (!(std::fabs(reference - 0.2254428f) <= 1.0e-4f)) {
+        for (int e = 0; e < 3; ++e) {
+            std::fprintf(stderr, "  edge %d s %.9g t %.9g distance %.9g\n", e, static_cast<double>(edgeS[e]),
+                static_cast<double>(edgeT[e]), static_cast<double>(edgeDistances[e]));
+        }
     }
     ASTRAL_CHECK_NEAR(reference, 0.2254428f, 1.0e-4);
 
