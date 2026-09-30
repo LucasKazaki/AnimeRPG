@@ -80,7 +80,7 @@ struct PhysicsSettings {
     float sleepLinearSpeed{0.05f};
     float sleepAngularSpeed{0.08f};
     float sleepTime{0.5f};
-    float maxLinearSpeed{120.0f};
+    float maxLinearSpeed{120.0f}; // dynamic bodies only; kinematic bodies are never clamped
     float maxAngularSpeed{60.0f};
 };
 

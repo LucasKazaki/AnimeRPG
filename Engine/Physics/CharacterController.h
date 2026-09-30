@@ -34,6 +34,10 @@ public:
     // stops `skin` short of the first obstacle. Returns the reached foot position.
     Vec3 SweepTo(Vec3 targetFoot);
     void Teleport(Vec3 footPosition);
+    // Launches the character (UE's LaunchCharacter; jump pads, knockback): the
+    // next Move replaces its velocity with `velocity` and leaves the ground.
+    // Air control applies from the following step.
+    void Launch(Vec3 velocity);
 
     Vec3 FootPosition() const { return foot_; }
     Vec3 Center() const;
@@ -62,6 +66,8 @@ private:
     Vec3 groundNormal_{0, 1, 0};
     bool grounded_{};
     float timeSinceGrounded_{};
+    Vec3 launch_{};
+    bool launchPending_{};
     float minWalkableY_{};
     BodyId ignore_{};
 };

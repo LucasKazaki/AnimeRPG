@@ -150,7 +150,14 @@ Vec3 CharacterController::Move(Vec3 desiredVelocity, bool jump, float dt) {
     horizontal = MoveTowards(horizontal, Horizontal(desiredVelocity), acceleration * dt);
     float vertical = velocity_.y;
     bool jumped = false;
-    if (jump && (grounded_ || timeSinceGrounded_ <= settings_.coyoteTime) && vertical <= 0.1f) {
+    if (launchPending_) {
+        launchPending_ = false;
+        horizontal = Horizontal(launch_);
+        vertical = launch_.y;
+        grounded_ = false;
+        timeSinceGrounded_ = settings_.coyoteTime + 1.0f;
+        jumped = true; // no step-up or ground snap this step
+    } else if (jump && (grounded_ || timeSinceGrounded_ <= settings_.coyoteTime) && vertical <= 0.1f) {
         vertical = settings_.jumpSpeed;
         grounded_ = false;
         timeSinceGrounded_ = settings_.coyoteTime + 1.0f;
@@ -215,6 +222,12 @@ Vec3 CharacterController::Move(Vec3 desiredVelocity, bool jump, float dt) {
     const Vec3 displacement = foot_ - startFoot;
     velocity_ = {displacement.x / dt, vertical, displacement.z / dt};
     return displacement;
+}
+
+void CharacterController::Launch(Vec3 velocity) {
+    if (!IsFinite(velocity)) return;
+    launch_ = velocity;
+    launchPending_ = true;
 }
 
 Vec3 CharacterController::SweepTo(Vec3 target) {

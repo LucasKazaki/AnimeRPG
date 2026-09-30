@@ -456,11 +456,16 @@ void GameWorld::SyncToPhysics(float dt) {
         EnsureCharacter(entity, mover);
         const TRS world = GetWorld(entity);
         if (DistanceSquared(world.translation, mover.controller->FootPosition()) > 1.0e-10f) {
+            // Moved by gameplay code: teleport the capsule and its body (a
+            // kinematic move would sweep it through everything in between).
             mover.controller->Teleport(world.translation);
+            if (!mover.body.IsNull()) physics_.SetPose(mover.body, {mover.controller->Center(), Quat{}});
         }
         PushBodies(mover, dt);
+        if (mover.launch) mover.controller->Launch(mover.launchVelocity);
         mover.controller->Move(mover.desiredVelocity, mover.jump, dt);
         mover.jump = false;
+        mover.launch = false;
         WriteWorldPose(entity, mover.controller->FootPosition(), world.rotation);
         if (!mover.body.IsNull()) physics_.MoveKinematic(mover.body, {mover.controller->Center(), Quat{}}, dt);
     }

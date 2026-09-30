@@ -122,6 +122,10 @@ struct CharacterMover {
     float maxPushMass{200.0f};
     Math::Vec3 desiredVelocity{};
     bool jump{};
+    // Set launch (with launchVelocity) to launch the character on the next
+    // fixed step (jump pads, knockback); both requests clear after the step.
+    bool launch{};
+    Math::Vec3 launchVelocity{};
     // Runtime: the controller, plus a kinematic capsule body so dynamic bodies
     // are pushed by the character and triggers see it.
     std::shared_ptr<Physics::CharacterController> controller;

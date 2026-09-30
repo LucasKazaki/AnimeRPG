@@ -363,8 +363,12 @@ void PhysicsWorld::Step(float dt) {
     bodies_.ForEach([&](Core::Handle, Body& body) {
         if (body.type == BodyType::Static) return;
         if (body.type == BodyType::Dynamic && !body.awake) return;
-        body.linearVelocity = ClampLength(body.linearVelocity, settings_.maxLinearSpeed);
-        body.angularVelocity = ClampLength(body.angularVelocity, settings_.maxAngularSpeed);
+        // Speed limits keep the solver stable; kinematic bodies follow their
+        // MoveKinematic targets exactly, however fast they are driven.
+        if (body.type == BodyType::Dynamic) {
+            body.linearVelocity = ClampLength(body.linearVelocity, settings_.maxLinearSpeed);
+            body.angularVelocity = ClampLength(body.angularVelocity, settings_.maxAngularSpeed);
+        }
         if (body.lockRotation) body.angularVelocity = {};
         body.pose.position += body.linearVelocity * dt;
         const Vec3 w = body.angularVelocity;

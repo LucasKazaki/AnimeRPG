@@ -390,6 +390,42 @@ ASTRAL_TEST(TriggersAndQueries) {
     ASTRAL_CHECK(!world.DestroyBody(trigger));
 }
 
+ASTRAL_TEST(KinematicBodiesFollowFastMovesExactly) {
+    // A kinematic body reaches its MoveKinematic target in one step however
+    // far it is (teleported characters, fast platforms); the dynamic-body
+    // speed limit must not make it lag behind. Arriving inside a trigger
+    // reports the overlap on the next step.
+    PhysicsWorld world;
+    BodyDesc zone;
+    zone.type = BodyType::Static;
+    zone.isTrigger = true;
+    zone.shape = Shape::Sphere(0.5f);
+    zone.position = {0, 1, 20};
+    const BodyId trigger = world.CreateBody(zone);
+    BodyDesc mover;
+    mover.type = BodyType::Kinematic;
+    mover.shape = Shape::Sphere(0.3f);
+    mover.position = {0, 1, 0};
+    const BodyId kinematic = world.CreateBody(mover);
+    const float dt = 1.0f / 60.0f; // 20 m per step is 1200 m/s, ten times the dynamic limit
+    world.MoveKinematic(kinematic, {{0, 1, 20}, {}}, dt);
+    world.Step(dt);
+    ASTRAL_CHECK(Math::Length(world.GetBody(kinematic)->pose.position - Vec3{0, 1, 20}) < 1.0e-3f);
+    world.MoveKinematic(kinematic, {{0, 1, 20}, {}}, dt);
+    world.Step(dt);
+    bool entered = false;
+    for (const ContactEvent& e : world.Events()) entered |= e.trigger && e.type == ContactEventType::Begin && (e.a == trigger || e.b == trigger);
+    ASTRAL_CHECK(entered);
+    // Dynamic bodies stay limited.
+    BodyDesc ball;
+    ball.shape = Shape::Sphere(0.2f);
+    ball.position = {5, 50, 0};
+    ball.linearVelocity = {1000, 0, 0};
+    const BodyId fast = world.CreateBody(ball);
+    world.Step(dt);
+    ASTRAL_CHECK(Math::Length(world.GetBody(fast)->linearVelocity) <= world.Settings().maxLinearSpeed + 1.0e-3f);
+}
+
 ASTRAL_TEST(CharacterWalksBlocksStepsAndJumps) {
     PhysicsWorld world;
     AddGround(world);
