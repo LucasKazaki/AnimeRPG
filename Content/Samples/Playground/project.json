@@ -1,0 +1,26 @@
+{
+  "format": "astral-project",
+  "version": 1,
+  "name": "Playground",
+  "startupScene": "scenes/playground.scene.json",
+  "config": {"r.Quality": 2},
+  "input": {
+    "contexts": [
+      {
+        "name": "Gameplay",
+        "priority": 0,
+        "actions": [
+          {"name": "Move", "type": "Axis2D", "bindings": [
+            {"key": "W", "axis": [0, 1]}, {"key": "S", "axis": [0, -1]},
+            {"key": "A", "axis": [-1, 0]}, {"key": "D", "axis": [1, 0]},
+            {"key": "Up", "axis": [0, 1]}, {"key": "Down", "axis": [0, -1]},
+            {"key": "Left", "axis": [-1, 0]}, {"key": "Right", "axis": [1, 0]}]},
+          {"name": "Look", "type": "Axis2D", "bindings": [
+            {"key": "Q", "axis": [-1, 0]}, {"key": "E", "axis": [1, 0]}]},
+          {"name": "Jump", "bindings": [{"key": "Space"}], "bufferSeconds": 0.15},
+          {"name": "Sprint", "bindings": [{"key": "Shift"}]}
+        ]
+      }
+    ]
+  }
+}

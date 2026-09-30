@@ -421,5 +421,42 @@ inline TRS Lerp(const TRS& a, const TRS& b, float t) {
     return {Lerp(a.translation, b.translation, t), Slerp(a.rotation, b.rotation, t),
         Lerp(a.scale, b.scale, t)};
 }
+// Rotation part of an orthonormal 3x3 block (inverse of ToMat4(Quat)).
+inline Quat QuatFromMatrix(const Mat4& m) {
+    const float trace = m.m[0][0] + m.m[1][1] + m.m[2][2];
+    Quat q;
+    if (trace > 0.0f) {
+        const float s = std::sqrt(trace + 1.0f) * 2.0f;
+        q = {(m.m[2][1] - m.m[1][2]) / s, (m.m[0][2] - m.m[2][0]) / s, (m.m[1][0] - m.m[0][1]) / s, 0.25f * s};
+    } else if (m.m[0][0] > m.m[1][1] && m.m[0][0] > m.m[2][2]) {
+        const float s = std::sqrt(std::max(0.0f, 1.0f + m.m[0][0] - m.m[1][1] - m.m[2][2])) * 2.0f;
+        q = {0.25f * s, (m.m[0][1] + m.m[1][0]) / s, (m.m[0][2] + m.m[2][0]) / s, (m.m[2][1] - m.m[1][2]) / s};
+    } else if (m.m[1][1] > m.m[2][2]) {
+        const float s = std::sqrt(std::max(0.0f, 1.0f + m.m[1][1] - m.m[0][0] - m.m[2][2])) * 2.0f;
+        q = {(m.m[0][1] + m.m[1][0]) / s, 0.25f * s, (m.m[1][2] + m.m[2][1]) / s, (m.m[0][2] - m.m[2][0]) / s};
+    } else {
+        const float s = std::sqrt(std::max(0.0f, 1.0f + m.m[2][2] - m.m[0][0] - m.m[1][1])) * 2.0f;
+        q = {(m.m[0][2] + m.m[2][0]) / s, (m.m[1][2] + m.m[2][1]) / s, 0.25f * s, (m.m[1][0] - m.m[0][1]) / s};
+    }
+    return Normalize(q);
+}
+// Affine matrix -> TRS (no shear). A negative determinant is folded into -x scale.
+inline TRS Decompose(const Mat4& m) {
+    TRS result;
+    result.translation = GetTranslation(m);
+    Vec3 x = GetAxis(m, 0), y = GetAxis(m, 1), z = GetAxis(m, 2);
+    result.scale = {Length(x), Length(y), Length(z)};
+    if (Dot(Cross(x, y), z) < 0.0f) result.scale.x = -result.scale.x;
+    Mat4 rotation = Mat4::Identity();
+    const Vec3 axes[3] = {x / (result.scale.x != 0.0f ? result.scale.x : 1.0f),
+        y / (result.scale.y != 0.0f ? result.scale.y : 1.0f), z / (result.scale.z != 0.0f ? result.scale.z : 1.0f)};
+    for (int column = 0; column < 3; ++column) {
+        rotation.m[0][column] = axes[column].x;
+        rotation.m[1][column] = axes[column].y;
+        rotation.m[2][column] = axes[column].z;
+    }
+    result.rotation = QuatFromMatrix(rotation);
+    return result;
+}
 
 } // namespace Astral::Math

@@ -159,4 +159,29 @@ ASTRAL_TEST(ClosestPoints) {
     ASTRAL_CHECK_NEAR(transformed.max.x, std::sqrt(2.0f), 1e-4);
 }
 
+ASTRAL_TEST(ClosestPointsClampToTheSharedCorner) {
+    // Both edges meeting at corner C clamp to it (t = 1 on B->C, t = 0 on
+    // C->A); the segment parameter comes from the clamped branch. Exact inputs
+    // from an MSVC x64 Release-only physics failure.
+    const Vec3 p0{-0x1.f01ea8p-1f, 0x1.27c1e2p+1f, -0x1.d5fec2p-2f};
+    const Vec3 p1{-0x1.b63774p+0f, 0x1.75b7b2p+1f, -0x1.2ddfa8p-1f};
+    const Vec3 a{-0x1.476064p+1f, 0x1.67eabp+1f, -0x1.2cffdp+1f};
+    const Vec3 b{-0x1.1f6aecp+1f, 0x1.e3219ap+0f, -0x1.149af4p+1f};
+    const Vec3 c{-0x1.7ccdd8p+0f, 0x1.52029ap+1f, -0x1.839b28p-1f};
+    float s = 0.0f, t = 0.0f;
+    Vec3 c1{}, c2{};
+    const float toC1 = ClosestPointsSegmentSegment(p0, p1, b, c, s, t, c1, c2);
+    if (!(std::fabs(s - 0.665215f) < 1e-4f && t == 1.0f)) std::fprintf(stderr, "  B->C s %.9g t %.9g\n", s, t);
+    ASTRAL_CHECK_NEAR(s, 0.665215f, 1e-4);
+    ASTRAL_CHECK(t == 1.0f);
+    ASTRAL_CHECK_NEAR(std::sqrt(toC1), 0.2254428f, 1e-4);
+    CheckVec(c2, c);
+    const float toC2 = ClosestPointsSegmentSegment(p0, p1, c, a, s, t, c1, c2);
+    if (!(std::fabs(s - 0.665215f) < 1e-4f && t == 0.0f)) std::fprintf(stderr, "  C->A s %.9g t %.9g\n", s, t);
+    ASTRAL_CHECK_NEAR(s, 0.665215f, 1e-4);
+    ASTRAL_CHECK(t == 0.0f);
+    ASTRAL_CHECK_NEAR(std::sqrt(toC2), 0.2254428f, 1e-4);
+    CheckVec(c2, c);
+}
+
 ASTRAL_TEST_MAIN("EngineMathTests")

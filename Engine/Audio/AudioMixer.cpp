@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstring>
 #include <fstream>
+#include <iterator>
 
 namespace Astral::Audio {
 
@@ -298,6 +300,94 @@ bool WriteWav(const std::string& path, const std::vector<float>& stereo, int sam
     }
     if (!file) {
         error = "failed writing " + path;
+        return false;
+    }
+    return true;
+}
+
+bool DecodeWav(const std::uint8_t* data, std::size_t size, AudioClip& out, std::string& error) {
+    auto u16 = [&](std::size_t at) { return static_cast<std::uint32_t>(data[at] | (data[at + 1] << 8)); };
+    auto u32 = [&](std::size_t at) {
+        return static_cast<std::uint32_t>(data[at]) | (static_cast<std::uint32_t>(data[at + 1]) << 8)
+            | (static_cast<std::uint32_t>(data[at + 2]) << 16) | (static_cast<std::uint32_t>(data[at + 3]) << 24);
+    };
+    if (!data || size < 12 || std::memcmp(data, "RIFF", 4) != 0 || std::memcmp(data + 8, "WAVE", 4) != 0) {
+        error = "not a RIFF/WAVE file";
+        return false;
+    }
+    std::uint32_t format = 0, channels = 0, rate = 0, bits = 0, blockAlign = 0;
+    const std::uint8_t* samples = nullptr;
+    std::size_t sampleBytes = 0;
+    std::size_t pos = 12;
+    while (pos + 8 <= size) {
+        const std::uint32_t chunkSize = u32(pos + 4);
+        const std::size_t body = pos + 8;
+        if (chunkSize > size - body) {
+            error = "truncated WAV chunk";
+            return false;
+        }
+        if (std::memcmp(data + pos, "fmt ", 4) == 0 && chunkSize >= 16) {
+            format = u16(body);
+            channels = u16(body + 2);
+            rate = u32(body + 4);
+            blockAlign = u16(body + 12);
+            bits = u16(body + 14);
+            if (format == 0xFFFE && chunkSize >= 26) format = u16(body + 24); // extensible: sub-format GUID head
+        } else if (std::memcmp(data + pos, "data", 4) == 0) {
+            samples = data + body;
+            sampleBytes = chunkSize;
+        }
+        pos = body + chunkSize + (chunkSize & 1u); // chunks are word aligned
+    }
+    const bool pcm = format == 1 && (bits == 8 || bits == 16 || bits == 24 || bits == 32);
+    const bool ieee = format == 3 && (bits == 32 || bits == 64);
+    if (!samples || channels == 0 || channels > 32 || rate < 1000 || rate > 384000 || (!pcm && !ieee)
+        || blockAlign != channels * (bits / 8)) {
+        error = "unsupported WAV format";
+        return false;
+    }
+    const std::size_t frames = sampleBytes / blockAlign;
+    const std::size_t bytesPerSample = bits / 8;
+    out.sampleRate = static_cast<int>(rate);
+    out.samples.assign(frames, 0.0f);
+    for (std::size_t f = 0; f < frames; ++f) {
+        float sum = 0.0f;
+        for (std::uint32_t c = 0; c < channels; ++c) {
+            const std::uint8_t* p = samples + f * blockAlign + c * bytesPerSample;
+            float v = 0.0f;
+            if (ieee && bits == 32) {
+                std::memcpy(&v, p, 4);
+            } else if (ieee) {
+                double d;
+                std::memcpy(&d, p, 8);
+                v = static_cast<float>(d);
+            } else if (bits == 8) {
+                v = (static_cast<float>(p[0]) - 128.0f) / 128.0f;
+            } else if (bits == 16) {
+                v = static_cast<float>(static_cast<std::int16_t>(u16(static_cast<std::size_t>(p - data)))) / 32768.0f;
+            } else if (bits == 24) {
+                std::int32_t s = static_cast<std::int32_t>(p[0] | (p[1] << 8) | (p[2] << 16));
+                if (s & 0x800000) s -= 0x1000000;
+                v = static_cast<float>(s) / 8388608.0f;
+            } else {
+                v = static_cast<float>(static_cast<std::int32_t>(u32(static_cast<std::size_t>(p - data)))) / 2147483648.0f;
+            }
+            sum += std::isfinite(v) ? v : 0.0f;
+        }
+        out.samples[f] = Clamp(sum / static_cast<float>(channels), -1.0f, 1.0f);
+    }
+    return true;
+}
+
+bool ReadWav(const std::string& path, AudioClip& out, std::string& error) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        error = "cannot open " + path;
+        return false;
+    }
+    const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    if (!DecodeWav(bytes.data(), bytes.size(), out, error)) {
+        error = path + ": " + error;
         return false;
     }
     return true;

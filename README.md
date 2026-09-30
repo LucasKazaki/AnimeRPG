@@ -48,6 +48,44 @@ Mall showcase; GDI remains the default. This is not UE5 parity: see the
 [ADR-0002](Docs/Architecture/ADR-0002-portable-runtime-and-astral-renderer.md) and
 [QA record](Docs/QA/ENGINE-UPLIFT-2026-09-28.md).
 
+## Making a game with Astral (September 29 framework)
+
+The engine now has the layer games are built from. Details are in
+[ADR-0003](Docs/Architecture/ADR-0003-gameplay-framework-and-game-host.md) and the
+[QA record](Docs/QA/ENGINE-FRAMEWORK-2026-09-29.md).
+
+- **World and scripting:** a `GameWorld` with reflected components (mesh,
+  light, camera, collider, rigid body, character mover, audio, particles,
+  animator) and native `Behaviour` scripts registered by name.
+- **Scenes:** JSON scenes and prefabs with overrides; glTF 2.0 models; static
+  mesh colliders.
+- **Assets:** an asset manager with async loads and hot reload.
+- **Content tools:** tweens, sequencer timelines, retained UI widgets, an
+  in-game console with CVars, and automatic LODs.
+- **Game host:** `GameHost` runs a project file (startup scene, input map,
+  config).
+  - It routes console, UI and input, ticks the world, and changes or
+    hot-reloads scenes between frames.
+  - Console commands: `open`, `restart`, `pause`, `slomo`, `spawn`, `stat`,
+    `r.Quality`.
+
+The [Playground sample](Content/Samples/Playground) is a small third-person
+collect-a-thon made only from engine features, with behaviours in
+`Game/Samples/Playground`. Play it with either player:
+
+- **`AstralPlayer`** (headless): scripted input or recordings, PNG captures.
+- **`AstralPlayerWin32`** (window): WASD/arrows, Space, Shift, Q/E, and these
+  keys:
+
+  | Key | Action |
+  |---|---|
+  | `` ` `` | console |
+  | F3 | stats |
+  | F5 | restart |
+  | F6 | half resolution |
+  | F9 | record input |
+  | Esc | quit |
+
 This is not the complete National Mall, final anime art, a natural-language AI
 command system, three complete classes, multiple dungeons, multiplayer, or a
 production engine. The original game roadmap is retained in
@@ -64,6 +102,10 @@ The portable runtime lives in `Engine/{Math,Core,Graphics,World,Physics,
 Animation,VFX,Input,Audio,AI}` (listed in `cmake/AstralEngineSources.cmake`);
 `Game/Showcase` presents the gameplay domains in Astral mode and
 `Tools/AstralCapture.cpp` renders a scripted route headlessly.
+`Engine/{Assets,Framework,UI}` hold the asset pipeline, the gameplay
+framework with the game host, and the widget UI.
+`Content/Samples` and `Game/Samples` hold sample projects.
+`Tools/AstralPlayer*.cpp` are the players.
 
 ## Controls for the retained prototype
 
@@ -107,7 +149,13 @@ cmake -S Tests/EngineRuntime -B ../astral-portable -DCMAKE_BUILD_TYPE=Release
 cmake --build ../astral-portable --parallel
 ctest --test-dir ../astral-portable --output-on-failure
 ../astral-portable/AstralCapture ../astral-captures 1280 720
+../astral-portable/AstralPlayer Content/Samples/Playground project.json \
+  --script Content/Samples/Playground/demo.play --capture ../astral-player --every 120
 ```
+
+On Windows, `AstralPlayerWin32.exe Content/Samples/Playground project.json`
+opens the sample in a window. Run it from the repository root, or pass another
+content root. Saved edits to the running scene's JSON hot-reload.
 
 Add `-DASTRAL_SANITIZE=ON` (ASan+UBSan) or `-DASTRAL_TSAN=ON` for sanitizer runs.
 

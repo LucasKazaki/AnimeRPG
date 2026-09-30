@@ -96,5 +96,26 @@
       "E16": "VFX particles/ribbons and input contexts/buffering/rebinding/replay added"
     },
     "largest_gaps": ["E04 GPU backend", "E03 asset import/cooking", "E06 streaming/LOD", "E11 editor integration", "E13 multiplayer", "E17 comparative acceptance"]
+  },
+  "framework_2026_09_29": {
+    "status": "portable_verified_msvc_and_native_pending",
+    "parity_claim": false,
+    "branch": "claude/loving-clarke-el24od",
+    "base": "c644eec",
+    "pull_request": 80,
+    "task": "Tasks/ENGINE-FRAMEWORK-2026-09-29.md",
+    "decision": "Docs/Architecture/ADR-0003-gameplay-framework-and-game-host.md",
+    "evidence": "Docs/QA/ENGINE-FRAMEWORK-2026-09-29.md",
+    "implemented_portable_not_comparable": {
+      "E01": "JSON, console variables and commands, delegates and an event bus, runtime reflection",
+      "E02": "GameWorld with fixed tick phases, reflected components, native Behaviour scripts, timers and deferred destroy; JSON scenes and prefabs with overrides, transactional parsing and a save round-trip",
+      "E03": "glTF 2.0 import/export (meshes, materials, textures, skins, animations), PNG/JPEG/WAV decoding, asset manager with async loads, hot reload and collection; no cooking or packaging pipeline",
+      "E06": "QEM mesh simplification and screen-size LOD groups with hysteresis; no streaming or virtualised geometry",
+      "E08": "Static triangle-mesh colliders with a BVH and internal-edge handling; kinematic bodies follow MoveKinematic exactly; LaunchCharacter; no convex hulls or joints",
+      "E11": "Retained widget UI (layout, focus, navigation, text input) and an in-game console; GameHost with headless and Win32 players; no scene editor",
+      "E16": "Tweens (31 eases), sequencer timelines bound to entities, project input maps, input recording and replay in the players"
+    },
+    "sample": "Content/Samples/Playground with Game/Samples/Playground behaviours, played by EngineSampleTests and the AstralPlayer CI step",
+    "largest_gaps": ["E04 GPU backend", "E11 scene editor and visual scripting", "E06 streaming", "E13 multiplayer", "E15 packaging", "E17 comparative acceptance"]
   }
 }

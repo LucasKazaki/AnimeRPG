@@ -6,9 +6,64 @@
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
+#include <string>
 #include <utility>
 
 namespace Astral::Input {
+
+namespace {
+
+struct NamedKey {
+    const char* name;
+    std::uint16_t key;
+};
+
+constexpr NamedKey kNamedKeys[] = {{"Space", Keys::Space}, {"Enter", Keys::Enter}, {"Escape", Keys::Escape},
+    {"Tab", Keys::Tab}, {"Backspace", Keys::Backspace}, {"Shift", Keys::Shift}, {"LeftShift", Keys::LeftShift},
+    {"Control", Keys::Control}, {"Left", Keys::Left}, {"Right", Keys::Right}, {"Up", Keys::Up}, {"Down", Keys::Down},
+    {"MouseLeft", Keys::MouseLeft}, {"MouseRight", Keys::MouseRight}};
+
+bool EqualsIgnoringCase(std::string_view a, std::string_view b) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        const char x = a[i] >= 'a' && a[i] <= 'z' ? static_cast<char>(a[i] - 32) : a[i];
+        const char y = b[i] >= 'a' && b[i] <= 'z' ? static_cast<char>(b[i] - 32) : b[i];
+        if (x != y) return false;
+    }
+    return true;
+}
+
+} // namespace
+
+std::uint16_t KeyFromName(std::string_view name) {
+    if (name.size() == 1) {
+        const char c = name[0];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) return Keys::Letter(c);
+        if (c >= '0' && c <= '9') return Keys::Digit(c - '0');
+        return 0;
+    }
+    for (const NamedKey& named : kNamedKeys) {
+        if (EqualsIgnoringCase(name, named.name)) return named.key;
+    }
+    if (name.size() >= 2 && name.size() <= 3 && (name[0] == 'F' || name[0] == 'f')) {
+        int number = 0;
+        for (std::size_t i = 1; i < name.size(); ++i) {
+            if (name[i] < '0' || name[i] > '9') return 0;
+            number = number * 10 + (name[i] - '0');
+        }
+        if (number >= 1 && number <= 12) return static_cast<std::uint16_t>(Keys::F1 + number - 1);
+    }
+    return 0;
+}
+
+std::string KeyName(std::uint16_t key) {
+    if ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9')) return std::string(1, static_cast<char>(key));
+    for (const NamedKey& named : kNamedKeys) {
+        if (named.key == key) return named.name;
+    }
+    if (key >= Keys::F1 && key < Keys::F1 + 12) return "F" + std::to_string(key - Keys::F1 + 1);
+    return {};
+}
 
 void InputSystem::AddContext(const InputContext& context) {
     contexts_.push_back(context);

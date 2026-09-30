@@ -38,6 +38,10 @@ public:
     const std::vector<Joint>& Joints() const { return joints_; }
     // Model-space bind matrices and their inverses (for skinning).
     void ComputeBindMatrices();
+    // Authored inverse bind matrices (e.g. from a glTF skin) replace the ones
+    // derived from bindLocal; the rest pose used for unanimated joints stays
+    // bindLocal. Ignored unless there is exactly one matrix per joint.
+    bool SetInverseBindMatrices(std::vector<Mat4> inverseBind);
     const std::vector<Mat4>& InverseBindMatrices() const { return inverseBind_; }
     const std::vector<Mat4>& BindModelMatrices() const { return bindModel_; }
 

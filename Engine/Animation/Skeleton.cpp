@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <utility>
 
 namespace Astral::Animation {
 
@@ -28,6 +29,16 @@ void Skeleton::ComputeBindMatrices() {
         bindModel_[i] = joints_[i].parent < 0 ? local : bindModel_[static_cast<std::size_t>(joints_[i].parent)] * local;
         if (!Inverse(bindModel_[i], inverseBind_[i])) inverseBind_[i] = Mat4::Identity();
     }
+}
+
+bool Skeleton::SetInverseBindMatrices(std::vector<Mat4> inverseBind) {
+    if (inverseBind.size() != joints_.size()) return false;
+    bindModel_.resize(inverseBind.size());
+    for (std::size_t i = 0; i < inverseBind.size(); ++i) {
+        if (!Inverse(inverseBind[i], bindModel_[i])) return false;
+    }
+    inverseBind_ = std::move(inverseBind);
+    return true;
 }
 
 Pose Pose::Bind(const Skeleton& skeleton) {

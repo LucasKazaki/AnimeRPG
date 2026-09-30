@@ -12,13 +12,29 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/HumanoidRig.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skeleton.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Skinning.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Timeline.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Animation/Tween.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Assets/AssetManager.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Assets/Gltf.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Assets/Jpeg.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Audio/AudioMixer.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Core/Console.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/GameTime.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/JobSystem.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Core/Json.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/Profiler.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Core/Reflection.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Behaviour.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Components.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Framework/GameHost.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Framework/GameWorld.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Scene.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Sequencer.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Timers.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Canvas.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Image.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Mesh.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/MeshSimplify.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/PostProcess.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/ProceduralTextures.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Graphics/Rasterizer.cpp"
@@ -32,9 +48,12 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/Collision.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/Destruction.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/PhysicsWorld.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Physics/TriangleMesh.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/UI/ConsoleOverlay.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/UI/Widgets.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/VFX/Particles.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Components.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Registry.cpp"
-    "${ASTRAL_ENGINE_ROOT}/Engine/VFX/Particles.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/World/Serialization.cpp"
 )
 
@@ -63,6 +82,12 @@ set(ASTRAL_GAMEPLAY_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Scene/WorldBlockout.cpp"
 )
 
+# Engine sample projects (behaviours for Content/Samples/*). Built into the
+# AstralShowcase library for the player tools and suites, never into AstralGame.
+set(ASTRAL_SAMPLE_SOURCES
+    "${ASTRAL_ENGINE_ROOT}/Game/Samples/Playground/PlaygroundBehaviours.cpp"
+)
+
 # Each suite is Tests/<name>.cpp and links the runtime and showcase libraries.
 set(ASTRAL_ENGINE_TEST_SUITES
     EngineMathTests
@@ -74,4 +99,10 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineAnimationTests
     EngineSystemsTests
     EngineShowcaseTests
+    EngineServicesTests
+    EngineAssetsTests
+    EngineFrameworkTests
+    EngineTimelineTests
+    EngineUITests
+    EngineSampleTests
 )

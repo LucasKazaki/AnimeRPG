@@ -1,0 +1,11 @@
+{
+  "name": "GateOpen",
+  "duration": 2.5,
+  "tracks": [
+    {"type": "vector", "binding": "Gate", "property": "position",
+     "keys": [{"t": 0, "v": [0, 1.5, 15], "ease": "InOutCubic"}, {"t": 2.5, "v": [0, 4.6, 15]}]},
+    {"type": "float", "binding": "GateLight", "property": "light.intensity",
+     "keys": [{"t": 0, "v": 0}, {"t": 1.5, "v": 6}]},
+    {"type": "event", "binding": "", "events": [{"t": 2.5, "name": "GateOpened"}]}
+  ]
+}

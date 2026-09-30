@@ -27,6 +27,11 @@ struct Registrar {
 
 // Optional argument: run only tests whose name contains the given substring.
 inline int RunAll(int argc, char** argv, const char* suiteName) {
+#if defined(_MSC_VER)
+    // A failed check must fail the run, not wait on the Debug CRT's abort dialog
+    // until ctest's timeout.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#endif
     const char* filter = argc > 1 ? argv[1] : nullptr;
     int ran = 0;
     for (const TestCase& test : Registry()) {
