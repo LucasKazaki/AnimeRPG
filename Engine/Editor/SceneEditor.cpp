@@ -119,7 +119,9 @@ InspectorField MakeField(const std::string& name, FieldKind kind, JsonValue valu
 }
 
 // Liang-Barsky clip of a segment to a rectangle; false when nothing is left.
-bool ClipSegment(Vec2& a, Vec2& b, float minX, float minY, float maxX, float maxY) {
+// On success a and b are the clipped ends and [t0, t1] their parameters on the input.
+bool ClipSegment(Vec2& a, Vec2& b, float minX, float minY, float maxX, float maxY, float* clippedT0 = nullptr,
+    float* clippedT1 = nullptr) {
     float t0 = 0.0f;
     float t1 = 1.0f;
     const float dx = b.x - a.x;
@@ -143,6 +145,8 @@ bool ClipSegment(Vec2& a, Vec2& b, float minX, float minY, float maxX, float max
     const Vec2 start = a;
     a = {start.x + dx * t0, start.y + dy * t0};
     b = {start.x + dx * t1, start.y + dy * t1};
+    if (clippedT0) *clippedT0 = t0;
+    if (clippedT1) *clippedT1 = t1;
     return true;
 }
 
@@ -226,7 +230,7 @@ bool SceneEditor::LoadDocument(JsonValue json, const std::string& path, std::str
     json_ = std::move(json);
     parsed_ = std::move(document);
     scenePath_ = path;
-    dirty_ = false;
+    savedJson_ = json_;
     undo_.clear();
     redo_.clear();
     selectionKind_ = SelectionKind::None;
@@ -288,7 +292,7 @@ bool SceneEditor::SaveAs(const std::string& path, std::string& error) {
     if (full.has_parent_path()) std::filesystem::create_directories(full.parent_path(), directoryError);
     if (!Core::WriteJsonFile(full.string(), json_, error)) return false;
     scenePath_ = path;
-    dirty_ = false;
+    savedJson_ = json_;
     // The asset cache now matches the file, so hot reload does not see our own save.
     assets_->Reload(path);
     diskVersion_ = assets_->Load<JsonValue>(path).Version();
@@ -303,7 +307,7 @@ bool SceneEditor::ReloadIfChangedOnDisk() {
     if (!handle.Ready() || handle.Version() == diskVersion_) return false;
     diskVersion_ = handle.Version();
     if (*handle.Get() == json_) return false;
-    if (dirty_) {
+    if (Dirty()) {
         status_ = scenePath_ + " changed on disk; your unsaved edits are kept";
         return false;
     }
@@ -317,8 +321,8 @@ bool SceneEditor::ReloadIfChangedOnDisk() {
     const NodePath selection = selection_;
     PushUndo(); // the reload itself can be undone
     json_ = *handle.Get();
+    savedJson_ = json_;
     parsed_ = std::move(document);
-    dirty_ = false;
     Rebuild();
     if (kind != SelectionKind::Entity || !Select(selection)) {
         selectionKind_ = kind == SelectionKind::Scene ? SelectionKind::Scene : SelectionKind::None;
@@ -378,7 +382,6 @@ bool SceneEditor::Commit(JsonValue next, SelectionKind kind, NodePath selection,
     PushUndo();
     json_ = std::move(next);
     parsed_ = std::move(document);
-    dirty_ = true;
     selectionKind_ = kind;
     selection_ = std::move(selection);
     Rebuild();
@@ -427,7 +430,7 @@ std::vector<OutlinerRow> SceneEditor::Outliner() const {
     std::vector<OutlinerRow> rows;
     OutlinerRow scene;
     scene.kind = SelectionKind::Scene;
-    scene.label = "Scene: " + (scenePath_.empty() ? std::string("(untitled)") : scenePath_) + (dirty_ ? " *" : "");
+    scene.label = "Scene: " + (scenePath_.empty() ? std::string("(untitled)") : scenePath_) + (Dirty() ? " *" : "");
     rows.push_back(scene);
     NodePath path;
     const std::function<void(const JsonValue&, int)> visit = [&](const JsonValue& array, int depth) {
@@ -575,7 +578,6 @@ bool SceneEditor::SetTransform(Vec3 position, Vec3 euler, Vec3 scale, std::strin
     PushUndo();
     WriteTransform(*Node(json_, selection_), position, euler, scale);
     ApplyPreviewTransform(position, euler, scale);
-    dirty_ = true;
     return true;
 }
 
@@ -855,7 +857,6 @@ bool SceneEditor::Undo() {
     redo_.push_back({json_, selectionKind_, selection_});
     json_ = std::move(previous.json);
     parsed_ = std::move(document);
-    dirty_ = true;
     Rebuild();
     selectionKind_ = previous.kind;
     selection_ = previous.selection;
@@ -878,7 +879,6 @@ bool SceneEditor::Redo() {
     undo_.push_back({json_, selectionKind_, selection_});
     json_ = std::move(next.json);
     parsed_ = std::move(document);
-    dirty_ = true;
     Rebuild();
     selectionKind_ = next.kind;
     selection_ = next.selection;
@@ -1278,7 +1278,6 @@ bool SceneEditor::Drag(float x, float y, int width, int height) {
     drag_.changed = true;
     WriteTransform(*Node(json_, selection_), position, euler, scale);
     ApplyPreviewTransform(position, euler, scale);
-    dirty_ = true;
     return true;
 }
 
@@ -1313,22 +1312,55 @@ const Graphics::ImageRgba8& SceneEditor::Render(int width, int height) {
 }
 
 void SceneEditor::DrawLine3D(Graphics::ImageRgba8& image, Vec3 a, Vec3 b, Graphics::Rgba8 color, int width,
-    int height) const {
+    int height, bool depthTested, float alpha) const {
     // Clip against the near plane first, then to the image.
     const Vec3 eye = camera_.Eye();
     const Vec3 forward = camera_.Forward();
     const float nearDepth = camera_.nearPlane * 1.01f;
-    const float depthA = Math::Dot(a - eye, forward);
-    const float depthB = Math::Dot(b - eye, forward);
+    float depthA = Math::Dot(a - eye, forward);
+    float depthB = Math::Dot(b - eye, forward);
     if (depthA < nearDepth && depthB < nearDepth) return;
-    if (depthA < nearDepth) a = a + (b - a) * ((nearDepth - depthA) / (depthB - depthA));
-    if (depthB < nearDepth) b = b + (a - b) * ((nearDepth - depthB) / (depthA - depthB));
+    if (depthA < nearDepth) {
+        a = a + (b - a) * ((nearDepth - depthA) / (depthB - depthA));
+        depthA = nearDepth;
+    }
+    if (depthB < nearDepth) {
+        b = b + (a - b) * ((nearDepth - depthB) / (depthA - depthB));
+        depthB = nearDepth;
+    }
     Vec2 pa;
     Vec2 pb;
     if (!camera_.Project(a, width, height, pa) || !camera_.Project(b, width, height, pb)) return;
-    if (!ClipSegment(pa, pb, 0.0f, 0.0f, static_cast<float>(width - 1), static_cast<float>(height - 1))) return;
-    Graphics::Canvas(image).Line(static_cast<int>(std::lround(pa.x)), static_cast<int>(std::lround(pa.y)),
-        static_cast<int>(std::lround(pb.x)), static_cast<int>(std::lround(pb.y)), color);
+    float t0 = 0.0f;
+    float t1 = 1.0f;
+    if (!ClipSegment(pa, pb, 0.0f, 0.0f, static_cast<float>(width - 1), static_cast<float>(height - 1), &t0, &t1)) return;
+    const bool haveDepth = depthTested && target_.Width() == width && target_.Height() == height
+        && target_.linearDepth.size() == target_.PixelCount();
+    if (!haveDepth && alpha >= 1.0f) {
+        Graphics::Canvas(image).Line(static_cast<int>(std::lround(pa.x)), static_cast<int>(std::lround(pa.y)),
+            static_cast<int>(std::lround(pb.x)), static_cast<int>(std::lround(pb.y)), color);
+        return;
+    }
+    // Depth varies linearly in 1/z across the screen.
+    const float inverseA = 1.0f / depthA + (1.0f / depthB - 1.0f / depthA) * t0;
+    const float inverseB = 1.0f / depthA + (1.0f / depthB - 1.0f / depthA) * t1;
+    const int steps = std::max(1, static_cast<int>(std::ceil(std::max(std::fabs(pb.x - pa.x), std::fabs(pb.y - pa.y)))));
+    for (int step = 0; step <= steps; ++step) {
+        const float t = static_cast<float>(step) / static_cast<float>(steps);
+        const int x = static_cast<int>(std::lround(pa.x + (pb.x - pa.x) * t));
+        const int y = static_cast<int>(std::lround(pa.y + (pb.y - pa.y) * t));
+        if (x < 0 || y < 0 || x >= width || y >= height) continue;
+        const std::size_t pixel = static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
+        if (haveDepth) {
+            const float depth = 1.0f / (inverseA + (inverseB - inverseA) * t);
+            // A small bias keeps lines lying on a surface (the grid on a floor) visible.
+            if (depth > target_.linearDepth[pixel] * 1.002f + 0.02f) continue;
+        }
+        std::uint8_t* rgba = image.pixels.data() + pixel * 4;
+        rgba[0] = static_cast<std::uint8_t>(rgba[0] + (color.r - rgba[0]) * alpha);
+        rgba[1] = static_cast<std::uint8_t>(rgba[1] + (color.g - rgba[1]) * alpha);
+        rgba[2] = static_cast<std::uint8_t>(rgba[2] + (color.b - rgba[2]) * alpha);
+    }
 }
 
 void SceneEditor::DrawGrid(Graphics::ImageRgba8& image, int width, int height) const {
@@ -1345,10 +1377,12 @@ void SceneEditor::DrawGrid(Graphics::ImageRgba8& image, int width, int height) c
         const bool majorZ = std::fmod(std::fabs(z), step * 5.0f) < 1.0e-3f;
         const Graphics::Rgba8 minor{72, 80, 94, 255};
         const Graphics::Rgba8 major{112, 122, 138, 255};
+        const bool axisX = std::fabs(x) < 1.0e-3f;
+        const bool axisZ = std::fabs(z) < 1.0e-3f;
         DrawLine3D(image, {x, 0.0f, centerZ - extent}, {x, 0.0f, centerZ + extent},
-            std::fabs(x) < 1.0e-3f ? kAxisColors[2] : (majorX ? major : minor), width, height);
+            axisX ? kAxisColors[2] : (majorX ? major : minor), width, height, true, axisX ? 0.8f : (majorX ? 0.55f : 0.3f));
         DrawLine3D(image, {centerX - extent, 0.0f, z}, {centerX + extent, 0.0f, z},
-            std::fabs(z) < 1.0e-3f ? kAxisColors[0] : (majorZ ? major : minor), width, height);
+            axisZ ? kAxisColors[0] : (majorZ ? major : minor), width, height, true, axisZ ? 0.8f : (majorZ ? 0.55f : 0.3f));
     }
 }
 
@@ -1430,9 +1464,11 @@ void SceneEditor::DrawOverlay(Graphics::ImageRgba8& image, int width, int height
     static const char* const kToolNames[] = {"Select (Q)", "Move (W)", "Rotate (E)", "Scale (R)"};
     Graphics::TextStyle style;
     style.color = {225, 230, 240, 255};
-    std::string header = std::string(kToolNames[static_cast<int>(tool)]) + (snap ? "   snap" : "");
-    canvas.FillRect(0, 0, Graphics::Canvas::MeasureText(header, 1) + 16, 20, {16, 18, 24, 255}, 0.7f);
-    canvas.Text(8, 6, header, style);
+    style.scale = 2;
+    const std::string header = std::string(kToolNames[static_cast<int>(tool)]) + (snap ? "   snap" : "");
+    canvas.FillRect(0, 0, Graphics::Canvas::MeasureText(header, style.scale) + 16,
+        Graphics::Canvas::LineHeight(style.scale) + 10, {16, 18, 24, 255}, 0.7f);
+    canvas.Text(8, 5, header, style);
 }
 
 // ================================================================ play in editor

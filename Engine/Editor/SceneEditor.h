@@ -93,7 +93,8 @@ public:
     const std::string& ContentRoot() const { return contentRoot_; }
     const std::string& ScenePath() const { return scenePath_; }
     const std::string& ProjectPath() const { return projectPath_; }
-    bool Dirty() const { return dirty_; }
+    // Differs from the last opened or saved document (undoing back to it is clean again).
+    bool Dirty() const { return json_ != savedJson_; }
     const Core::JsonValue& Document() const { return json_; }
     // Re-reads the scene file when it changed on disk and the document has no
     // unsaved edits (hot reload for scenes edited in a text editor).
@@ -217,8 +218,9 @@ private:
     float GizmoLength(Math::Vec3 pivot, int height) const;
     void DrawOverlay(Graphics::ImageRgba8& image, int width, int height) const;
     void DrawGrid(Graphics::ImageRgba8& image, int width, int height) const;
+    // Depth-tested lines hide behind the rendered scene (the grid); others draw on top.
     void DrawLine3D(Graphics::ImageRgba8& image, Math::Vec3 a, Math::Vec3 b, Graphics::Rgba8 color, int width,
-        int height) const;
+        int height, bool depthTested = false, float alpha = 1.0f) const;
     std::string UniqueName(const std::string& base) const;
 
     std::string contentRoot_;
@@ -232,7 +234,7 @@ private:
     std::string projectPath_;
     Framework::ProjectDesc project_;
     bool hasProject_{};
-    bool dirty_{};
+    Core::JsonValue savedJson_; // as last opened or saved
     std::uint32_t diskVersion_{};
     std::vector<Snapshot> undo_;
     std::vector<Snapshot> redo_;

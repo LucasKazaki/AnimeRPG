@@ -177,9 +177,10 @@ ASTRAL_TEST(TransformEditsMoveThePreviewAndUndo) {
 
     ASTRAL_CHECK(editor->Undo());
     ASTRAL_CHECK(Near(editor->Position(), start) && editor->CanRedo());
+    ASTRAL_CHECK(!editor->Dirty()); // back to the opened document
     ASTRAL_CHECK(Near(editor->Preview().GetWorld(editor->PreviewEntity(editor->Selection())).translation, start));
     ASTRAL_CHECK(editor->Redo());
-    ASTRAL_CHECK(Near(editor->Position(), start + Vec3{2, 0, 1}));
+    ASTRAL_CHECK(Near(editor->Position(), start + Vec3{2, 0, 1}) && editor->Dirty());
 }
 
 ASTRAL_TEST(InvalidEditsAreRejectedAndLeaveTheDocumentAlone) {

@@ -64,7 +64,7 @@ void EditorCamera::Frame(const Math::AABB& bounds) {
     if (!bounds.IsValid()) return;
     target = bounds.Center();
     const float radius = std::max(0.5f, Math::Length(bounds.Extents()));
-    distance = std::clamp(radius / std::sin(Math::Radians(fieldOfView * 0.5f)) * 1.15f, 2.0f, 2000.0f);
+    distance = std::clamp(radius / std::sin(Math::Radians(fieldOfView * 0.5f)) * 0.9f, 2.0f, 2000.0f);
 }
 
 Graphics::RenderView EditorCamera::View(int width, int height) const {

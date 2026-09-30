@@ -201,16 +201,16 @@ int main() {
     ok &= Expect(extremeStatus.x == maxInt && extremeStatus.y == maxInt,
         "status offsets must saturate instead of overflowing");
 
-    ok &= Expect(!IsEditorToolAvailable(EditorTool::Select),
-        "Select toolbar control must remain disabled until viewport selection exists");
-    ok &= Expect(!IsEditorToolAvailable(EditorTool::Move),
-        "Move toolbar control must remain disabled until transform editing exists");
-    ok &= Expect(!IsEditorToolAvailable(EditorTool::Rotate),
-        "Rotate toolbar control must remain disabled until transform editing exists");
-    ok &= Expect(!IsEditorToolAvailable(EditorTool::Scale),
-        "Scale toolbar control must remain disabled until transform editing exists");
-    ok &= Expect(!IsEditorToolAvailable(EditorTool::Play),
-        "Play toolbar control must remain disabled until play-in-editor exists");
+    ok &= Expect(IsEditorToolAvailable(EditorTool::Select),
+        "Select toolbar control is enabled now that viewport picking exists");
+    ok &= Expect(IsEditorToolAvailable(EditorTool::Move),
+        "Move toolbar control is enabled now that the move gizmo exists");
+    ok &= Expect(IsEditorToolAvailable(EditorTool::Rotate),
+        "Rotate toolbar control is enabled now that the rotate gizmo exists");
+    ok &= Expect(IsEditorToolAvailable(EditorTool::Scale),
+        "Scale toolbar control is enabled now that the scale gizmo exists");
+    ok &= Expect(IsEditorToolAvailable(EditorTool::Play),
+        "Play toolbar control is enabled now that play-in-editor exists");
 
     ok &= Expect(ClassifyEditorMessageResult(1) == EditorMessageLoopAction::Dispatch,
         "positive GetMessage result must dispatch");

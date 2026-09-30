@@ -170,13 +170,15 @@ bool Overlaps(const EditorRect& a, const EditorRect& b) {
 }
 
 bool IsEditorToolAvailable(EditorTool tool) {
+    // Viewport selection, the transform gizmos and play-in-editor exist
+    // (Engine/Editor/SceneEditor), so every toolbar tool is enabled.
     switch (tool) {
     case EditorTool::Select:
     case EditorTool::Move:
     case EditorTool::Rotate:
     case EditorTool::Scale:
     case EditorTool::Play:
-        return false;
+        return true;
     }
     return false;
 }
