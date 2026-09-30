@@ -42,6 +42,12 @@
 namespace Astral::Assets {
 class AssetManager;
 }
+namespace Astral::Input {
+class InputSystem;
+}
+namespace Astral::UI {
+class CanvasPanel;
+}
 
 namespace Astral::Framework {
 
@@ -180,6 +186,12 @@ public:
     Core::EventBus& Events() { return events_; }
     Audio::AudioMixer* AudioMixer() const { return audio_; }
     Assets::AssetManager* Assets() const { return assets_; }
+    // Host services (optional, owned by the host, e.g. GameHost): action input
+    // for behaviours, and the HUD layer their widgets go in (cleared with the scene).
+    void SetInput(Input::InputSystem* input) { input_ = input; }
+    Input::InputSystem* Input() const { return input_; }
+    void SetHud(UI::CanvasPanel* hud) { hud_ = hud; }
+    UI::CanvasPanel* Hud() const { return hud_; }
 
     Entity EntityFromBody(Physics::BodyId body) const;
     bool Raycast(const Math::Ray& ray, float maxDistance, EntityRaycastHit& hit, std::uint32_t mask = 0xFFFFFFFFu,
@@ -247,6 +259,8 @@ private:
     Core::EventBus events_;
     Audio::AudioMixer* audio_{};
     Assets::AssetManager* assets_{};
+    Input::InputSystem* input_{};
+    UI::CanvasPanel* hud_{};
     std::vector<std::weak_ptr<Behaviour>> pendingCreate_;
     std::vector<Entity> pendingDestroy_;
     int batchDepth_{};

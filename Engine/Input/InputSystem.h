@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -29,6 +30,14 @@ constexpr std::uint16_t Backspace = 0x08, Tab = 0x09, Enter = 0x0D, Shift = 0x10
 constexpr std::uint16_t Letter(char c) { return static_cast<std::uint16_t>(c >= 'a' && c <= 'z' ? c - 32 : c); }
 constexpr std::uint16_t Digit(int d) { return static_cast<std::uint16_t>('0' + d); }
 } // namespace Keys
+
+// Key names for data files (input maps, recordings): "A".."Z", "0".."9",
+// "Space", "Enter", "Escape", "Tab", "Backspace", "Shift", "LeftShift",
+// "Control", "Left", "Right", "Up", "Down", "F1".."F12", "MouseLeft",
+// "MouseRight" (case-insensitive). Returns 0 for an unknown name.
+std::uint16_t KeyFromName(std::string_view name);
+// The canonical name of a key, or "" when it has none.
+std::string KeyName(std::uint16_t key);
 
 struct InputSnapshot {
     std::bitset<256> keys;

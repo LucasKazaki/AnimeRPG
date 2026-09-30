@@ -26,6 +26,7 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Core/Reflection.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Behaviour.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Components.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Framework/GameHost.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Framework/GameWorld.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Scene.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Framework/Sequencer.cpp"
@@ -81,6 +82,12 @@ set(ASTRAL_GAMEPLAY_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Scene/WorldBlockout.cpp"
 )
 
+# Engine sample projects (behaviours for Content/Samples/*). Built into the
+# AstralShowcase library for the player tools and suites, never into AstralGame.
+set(ASTRAL_SAMPLE_SOURCES
+    "${ASTRAL_ENGINE_ROOT}/Game/Samples/Playground/PlaygroundBehaviours.cpp"
+)
+
 # Each suite is Tests/<name>.cpp and links the runtime and showcase libraries.
 set(ASTRAL_ENGINE_TEST_SUITES
     EngineMathTests
@@ -97,4 +104,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineFrameworkTests
     EngineTimelineTests
     EngineUITests
+    EngineSampleTests
 )
