@@ -1,4 +1,5 @@
 #include "Engine/Core/Random.h"
+#include "Engine/Math/Geometry.h"
 #include "Engine/Physics/BroadPhase.h"
 #include "Engine/Physics/CharacterController.h"
 #include "Engine/Physics/Collision.h"
@@ -760,6 +761,69 @@ ASTRAL_TEST(CharacterWalksMeshTerrain) {
     ASTRAL_CHECK(world.Raycast({{0.0f, 5.0f, 5.0f}, {0, -1, 0}}, 10.0f, hit));
     ASTRAL_CHECK_NEAR(hit.point.y, 3.0f * rise, 1e-3);
     ASTRAL_CHECK_NEAR(hit.normal.y, std::cos(Math::Radians(25.0f)), 1e-3);
+}
+
+ASTRAL_TEST(CapsuleBesideATriangleMeasuresItsNearestVertex) {
+    // Regression for an MSVC x64 Release-only failure found by the fuzz test:
+    // the capsule core passes beside the triangle (not through it) and the
+    // nearest feature is vertex C, reached through the edge candidates. Only
+    // the endpoint candidates survived there, so casts sank into the triangle.
+    const Vec3 a{-0x1.476064p+1f, 0x1.67eabp+1f, -0x1.2cffdp+1f};
+    const Vec3 b{-0x1.1f6aecp+1f, 0x1.e3219ap+0f, -0x1.149af4p+1f};
+    const Vec3 c{-0x1.7ccdd8p+0f, 0x1.52029ap+1f, -0x1.839b28p-1f};
+    std::string error;
+    const auto triangle = TriangleMesh::Create({a, b, c}, {0, 1, 2}, error);
+    ASTRAL_CHECK(triangle && triangle->TriangleCount() == 1);
+    if (!triangle) return;
+    const Shape mesh = Shape::Mesh(triangle);
+    Shape capsule;
+    capsule.type = ShapeType::Capsule;
+    capsule.radius = 0x1.8f984cp-3f;
+    capsule.halfHeight = 0x1.f05792p-2f;
+    const Pose meshPose{{0.5f, -0.2f, 0.1f}, Math::Quat{0.0f, 0x1.320ca0p-3f, 0.0f, 0x1.fa4034p-1f}};
+    const Pose pose{{-0x1.def4p-1f, 0x1.35233p+1f, -0x1.3808p-8f},
+        Math::Quat{-0x1.63ed42p-2f, 0x1.93d7b2p-1f, 0x1.05295ep-2f, 0x1.c0b33p-2f}};
+
+    // Reference: the smallest of the endpoint and per-edge distances from the
+    // core segment (in mesh space), computed here independently.
+    const Vec3 axis = pose.TransformVector({0.0f, capsule.halfHeight, 0.0f});
+    const Vec3 p0 = meshPose.InverseTransformPoint(pose.position - axis);
+    const Vec3 p1 = meshPose.InverseTransformPoint(pose.position + axis);
+    float reference = std::min(Math::Length(Math::ClosestPointOnTriangle(p0, a, b, c) - p0),
+        Math::Length(Math::ClosestPointOnTriangle(p1, a, b, c) - p1));
+    const Vec3 corners[3] = {a, b, c};
+    float edgeDistances[3] = {};
+    for (int e = 0; e < 3; ++e) {
+        float s = 0.0f, t = 0.0f;
+        Vec3 onSegment, onEdge;
+        Math::ClosestPointsSegmentSegment(p0, p1, corners[e], corners[(e + 1) % 3], s, t, onSegment, onEdge);
+        edgeDistances[e] = Math::Length(onSegment - onEdge);
+        reference = std::min(reference, edgeDistances[e]);
+    }
+    ASTRAL_CHECK_NEAR(reference, 0.2254428f, 1.0e-4);
+
+    Vec3 normal, point;
+    const float distance = RoundedDistance(capsule, pose, mesh, meshPose, normal, point);
+    if (!(std::fabs(distance - (reference - capsule.radius)) <= 1.0e-4f)) {
+        std::fprintf(stderr, "  rounded distance %.9g, expected %.9g (edges %.9g %.9g %.9g)\n", distance,
+            reference - capsule.radius, edgeDistances[0], edgeDistances[1], edgeDistances[2]);
+    }
+    ASTRAL_CHECK_NEAR(distance, reference - capsule.radius, 1.0e-4);
+    // The nearest point is vertex C.
+    ASTRAL_CHECK_NEAR(Math::Length(point - meshPose.TransformPoint(c)), 0.0f, 1.0e-4);
+    Proximity nearest;
+    ASTRAL_CHECK(RoundedProximities(capsule, pose, mesh, meshPose, 100.0f, &nearest, 1) == 1);
+    ASTRAL_CHECK_NEAR(nearest.distance, distance, 1.0e-6);
+
+    // The fuzz case's cast stops before the vertex instead of sinking past it.
+    const Vec3 motion{-0x1.cf824cp+1f, 0x1.12994p+0f, -0x1.f2d264p+1f};
+    ShapeCastResult cast;
+    ASTRAL_CHECK(ShapeCast(capsule, pose, motion, mesh, meshPose, cast));
+    ASTRAL_CHECK(cast.fraction < 0.02f);
+    for (int k = 0; k <= 20; ++k) {
+        const Pose along{pose.position + motion * (cast.fraction * static_cast<float>(k) / 20.0f), pose.rotation};
+        ASTRAL_CHECK(RoundedDistance(capsule, along, mesh, meshPose, normal, point) >= -1.0e-3f - 1.0e-5f);
+    }
 }
 
 ASTRAL_TEST(MeshCollisionFuzzStaysFinite) {

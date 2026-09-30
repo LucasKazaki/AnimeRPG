@@ -466,46 +466,67 @@ struct SegmentTriangleResult {
     bool crossing{};
 };
 
+// Closest candidate so far. Kept as plain value code on purpose: MSVC x64
+// Release builds dropped the edge candidates when they were recorded through a
+// by-reference lambda capture of the returned result (see the
+// CapsuleBesideATriangleMeasuresItsNearestVertex regression test).
+struct SegmentTriangleCandidate {
+    float distanceSquared{std::numeric_limits<float>::infinity()};
+    Vec3 onSegment{};
+    Vec3 onTriangle{};
+    int feature{kFace};
+};
+
+void KeepCloser(SegmentTriangleCandidate& best, Vec3 onSegment, Vec3 onTriangle, int feature) {
+    const float distanceSquared = DistanceSquared(onSegment, onTriangle);
+    if (distanceSquared < best.distanceSquared) {
+        best.distanceSquared = distanceSquared;
+        best.onSegment = onSegment;
+        best.onTriangle = onTriangle;
+        best.feature = feature;
+    }
+}
+
+// Segment p0-p1 against the triangle edge from-to (edge index 0 = AB, 1 = BC, 2 = CA).
+void KeepCloserEdge(SegmentTriangleCandidate& best, Vec3 p0, Vec3 p1, Vec3 from, Vec3 to, int edge) {
+    float s = 0.0f, w = 0.0f;
+    Vec3 onSegment, onEdge;
+    ClosestPointsSegmentSegment(p0, p1, from, to, s, w, onSegment, onEdge);
+    const int feature = w <= 0.0f ? kVertexA + edge : (w >= 1.0f ? kVertexA + (edge + 1) % 3 : kEdgeAB + edge);
+    KeepCloser(best, onSegment, onEdge, feature);
+}
+
 SegmentTriangleResult ClosestSegmentTriangle(Vec3 p0, Vec3 p1, const TriangleMesh::Triangle& t) {
-    SegmentTriangleResult r;
     const Vec3 d = p1 - p0;
     const float length = Length(d);
     if (length > 1.0e-7f) {
-        float hit, u, v;
+        float hit = 0.0f, u = 0.0f, v = 0.0f;
         if (IntersectRayTriangle({p0, d / length}, t.a, t.b, t.c, length, hit, u, v)) {
-            r.onSegment = r.onTriangle = p0 + d * (hit / length);
-            r.crossing = true;
-            return r;
+            SegmentTriangleResult crossing;
+            crossing.onSegment = crossing.onTriangle = p0 + d * (hit / length);
+            crossing.crossing = true;
+            return crossing;
         }
     }
-    float best = std::numeric_limits<float>::max();
-    auto consider = [&](Vec3 onSegment, Vec3 onTriangle, int feature) {
-        const float d2 = DistanceSquared(onSegment, onTriangle);
-        if (d2 < best) {
-            best = d2;
-            r.onSegment = onSegment;
-            r.onTriangle = onTriangle;
-            r.feature = feature;
-        }
-    };
     // Endpoints first so ties keep the face region.
-    int feature = kFace;
-    const Vec3 q0 = ClosestOnTriangle(p0, t.a, t.b, t.c, feature);
-    consider(p0, q0, feature);
+    SegmentTriangleCandidate best;
+    int feature0 = kFace;
+    const Vec3 q0 = ClosestOnTriangle(p0, t.a, t.b, t.c, feature0);
+    KeepCloser(best, p0, q0, feature0);
     if (length > 1.0e-7f) {
-        const Vec3 q1 = ClosestOnTriangle(p1, t.a, t.b, t.c, feature);
-        consider(p1, q1, feature);
-        const Vec3 corners[3] = {t.a, t.b, t.c};
-        for (int e = 0; e < 3; ++e) {
-            float s, w;
-            Vec3 c1, c2;
-            ClosestPointsSegmentSegment(p0, p1, corners[e], corners[(e + 1) % 3], s, w, c1, c2);
-            const int f = w <= 0.0f ? kVertexA + e : (w >= 1.0f ? kVertexA + (e + 1) % 3 : kEdgeAB + e);
-            consider(c1, c2, f);
-        }
+        int feature1 = kFace;
+        const Vec3 q1 = ClosestOnTriangle(p1, t.a, t.b, t.c, feature1);
+        KeepCloser(best, p1, q1, feature1);
+        KeepCloserEdge(best, p0, p1, t.a, t.b, 0);
+        KeepCloserEdge(best, p0, p1, t.b, t.c, 1);
+        KeepCloserEdge(best, p0, p1, t.c, t.a, 2);
     }
-    r.distance = std::sqrt(best);
-    return r;
+    SegmentTriangleResult result;
+    result.onSegment = best.onSegment;
+    result.onTriangle = best.onTriangle;
+    result.feature = best.feature;
+    result.distance = std::sqrt(best.distanceSquared);
+    return result;
 }
 
 // Signed distance from a rounded core (segment p0-p1 plus radius) to one
