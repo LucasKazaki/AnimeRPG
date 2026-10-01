@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "task_id": "ART-012",
+  "loop_id": "astral-art-hourly-20260922",
+  "status": "proposed_source_art_direction_contract_not_runtime_accepted",
+  "decision_date": "2026-10-01",
+  "baseline": {
+    "main_commit": "c644eec79752b9dc101aeca6b03141cf26854c96",
+    "engine_evidence": [
+      {
+        "path": "Engine/Animation/HumanoidRig.h",
+        "git_blob_sha1": "e3bd59b5d1b0bdbcb513380d3695f7ab90055523",
+        "observed": "21-joint procedural humanoid plus weapon socket; stylized primitive body; Shadowblade clip set"
+      },
+      {
+        "path": "Engine/Graphics/Material.h",
+        "git_blob_sha1": "ed3af4222af4399e55fc02cb10cc338e55627599",
+        "observed": "Toon/Lit/Unlit/Water shading models; toon shade threshold/softness, hard specular, rim, outline"
+      },
+      {
+        "path": "Game/Showcase/CharacterPresenter.cpp",
+        "git_blob_sha1": "a2cca722dfff1aa3542efd023bb62a8b97297db9",
+        "observed": "procedural character is actually drawn with toon, rim, emissive accents, blade, afterimages, trails and guard bubble"
+      },
+      {
+        "path": "Engine/Graphics/Canvas.h",
+        "git_blob_sha1": "ceda548e40c5e542ba5e5daeb37fd72a08de5562",
+        "observed": "runtime canvas exists, but this task does not add character UI or change engine code"
+      }
+    ],
+    "claim_boundary": "Source/art-direction acceptance only. Current procedural humanoid proves an in-engine fixture path exists; it is not a production protagonist, DCC import pipeline, retargeting solution, or art approval."
+  },
+  "product_identity": {
+    "setting": "original supernatural modern Washington, DC National Mall action RPG",
+    "protagonist_policy": "one persistent customizable protagonist, with masculine/feminine body-presentation variants sharing identity, rig intent and equipment language; no collectible-character roster expansion",
+    "archetypes": [
+      "Shadowblade",
+      "Arc Mage",
+      "Aegis"
+    ],
+    "world_terms": [
+      "Shadow Crypt",
+      "Mana Reactor",
+      "mana/thought commands",
+      "destructible environments"
+    ],
+    "protected_reference_policy": "Genshin Impact and Zenless Zone Zero are quality/readability references only; no protected characters, costumes, logos, maps, textures, music, models or proprietary content may be copied"
+  },
+  "reference_evidence": [
+    {
+      "source": "Unreal Engine 5.8 Creating and Using LODs",
+      "url": "https://dev.epicgames.com/documentation/unreal-engine/creating-and-using-lods-in-unreal-engine",
+      "lesson": "LOD transitions are evaluated by screen size, so silhouette/readability review should use apparent screen size rather than distance alone."
+    },
+    {
+      "source": "Unreal Engine 5.8 Skeletal Mesh LODs",
+      "url": "https://dev.epicgames.com/documentation/en-us/unreal-engine/skeletal-mesh-lods-in-unreal-engine",
+      "lesson": "important structures can be prioritized through reduction; Astral art QA should identify silhouette-critical structures before any future simplification."
+    },
+    {
+      "source": "Unity 6 LOD.screenRelativeTransitionHeight",
+      "url": "https://docs.unity3d.com/6000.0/ScriptReference/LOD-screenRelativeTransitionHeight.html",
+      "lesson": "screen-relative height is an explicit LOD transition input, reinforcing screen-space review fixtures."
+    }
+  ],
+  "review_fixture": {
+    "body_height_px": [
+      64,
+      96,
+      128
+    ],
+    "primary_body_height_px": 96,
+    "views": [
+      {
+        "name": "front",
+        "yaw_deg": 0
+      },
+      {
+        "name": "three_quarter",
+        "yaw_deg": 45
+      },
+      {
+        "name": "profile",
+        "yaw_deg": 90
+      },
+      {
+        "name": "rear",
+        "yaw_deg": 180
+      }
+    ],
+    "background_relative_luminance": [
+      0.12,
+      0.5,
+      0.9
+    ],
+    "lighting": "neutral fixed key/fill/rim; no dramatic fog, bloom or class VFX during base silhouette scoring",
+    "camera": "fixed perspective and framing per review size; record FOV and resolution in runtime receipts",
+    "pose_set": [
+      "neutral_A",
+      "walk_contact",
+      "run_extension",
+      "attack_windup",
+      "guard_or_cast"
+    ],
+    "vfx_for_base_review": "off",
+    "notes": "Pixel thresholds below are proposed authoring QA values. They become approved only after native Astral captures and independent art review."
+  },
+  "silhouette_rules": {
+    "must_read_at_96px": [
+      "head/hair mass separates from shoulders in front and three-quarter views",
+      "both hands remain locatable in action poses unless intentionally occluded by the held equipment",
+      "weapon/focus/guard primary shape does not collapse into the torso silhouette",
+      "at least one negative-space channel separates arm/equipment from torso on each action pose",
+      "lower legs do not merge into one column in neutral, walk-contact and guard/cast poses"
+    ],
+    "proposed_min_negative_space_px_at_96": 2,
+    "failure_rule": "A class read that depends on glow, hue, particles, UI labels or camera motion fails the base silhouette pass.",
+    "lod_priority_regions": [
+      "head/hair profile",
+      "hands",
+      "primary equipment",
+      "coat/hip break",
+      "feet/contact silhouette"
+    ]
+  },
+  "anatomy_and_variant_rules": {
+    "shared_identity": "masculine/feminine variants must be recognizable as the same protagonist rather than separate gacha-style characters",
+    "shared": [
+      "head proportion intent",
+      "eye line",
+      "hand/weapon sockets",
+      "locomotion contact points",
+      "primary costume seams",
+      "archetype equipment anchors"
+    ],
+    "may_vary": [
+      "shoulder/hip proportion within rig-safe limits",
+      "face planes",
+      "hair choices",
+      "fit/drape",
+      "voice/presentation choices outside this art packet"
+    ],
+    "must_not_vary": [
+      "skeleton naming contract once approved",
+      "gameplay reach through art-only changes",
+      "weapon socket semantics",
+      "class readability hierarchy"
+    ],
+    "deformation_gate": "No proportion variant is production-ready until bind/rest pose, shoulder/hip deformation, hands, knees and extreme combat poses are checked in the actual accepted rig."
+  },
+  "costume_material_language": {
+    "global_hierarchy": [
+      "large dark/neutral base masses establish the body silhouette",
+      "one secondary mid-value costume family groups torso/coat structure",
+      "small emissive/mana accents identify supernatural state but never carry class identity alone",
+      "metal/hard-surface highlights are restrained so skin, face and equipment focal areas remain readable"
+    ],
+    "material_identity": "Separate cloth, leather/rubber-like soft hardwear, metal, skin/hair and supernatural emissive response by value/specular/rim behavior as well as hue.",
+    "current_astral_mapping": {
+      "base_cloth": "Toon, opaque, outline on",
+      "skin_hair": "Toon, opaque, outline on; tune shadeColor/threshold independently when supported by actual material ownership",
+      "metal_equipment": "Toon or Lit only after matched in-engine comparison; do not assume PBR parity",
+      "mana_glow": "Unlit/emissive additive only for accents; not a substitute for silhouette/value design"
+    }
+  },
+  "hair_eye_skin_rules": {
+    "hair": "Use 2-4 readable clump masses before strand detail; preserve head profile at 64 px; avoid fringe that erases both eyes in normal gameplay angles.",
+    "eyes": "Eye shape must survive 128 px review without relying on emissive glow; eye color is secondary to shape/value.",
+    "skin": "Keep face/hand value separation from adjacent hair/gloves/collar under both light and dark outdoor conditions; exact palette remains proposed until neutral-light runtime captures exist.",
+    "outline": "Outline must not close critical eye/mouth/hand gaps at the primary review size; no fixed pixel width is approved until native Astral capture measures the current renderer."
+  },
+  "archetype_readability": {
+    "Shadowblade": {
+      "shape_language": "forward diagonal and tapered blade lane; asymmetry around weapon side; coat/scarf motion supports direction without obscuring feet",
+      "primary_equipment": "single dominant blade",
+      "pose_read": "windup and dash direction readable with trail/afterimage disabled"
+    },
+    "Arc Mage": {
+      "shape_language": "open upper-body silhouette and visible casting hand/focus separation; avoid oversized floating ornament clutter",
+      "primary_equipment": "compact focus or catalyst close enough to animate reliably but separated from hand/torso silhouette",
+      "pose_read": "cast direction readable from hands/torso before mana VFX"
+    },
+    "Aegis": {
+      "shape_language": "broader defensive forearm/guard mass and grounded stance; preserve head and weapon-side hand visibility",
+      "primary_equipment": "guard/shield-like protection family, final form pending gameplay/art approval",
+      "pose_read": "defensive orientation readable without shield glow or UI"
+    }
+  },
+  "toon_lighting_and_effect_rules": {
+    "base_value_bands": "Design for at least three perceived value groups in neutral review: lit/focal, local mid, shadow/base. This is an art test, not a demand for exactly three shader bands.",
+    "rim": "Rim is reinforcement, not silhouette ownership; base silhouette must pass with rim disabled.",
+    "outline": "Ink outline is part of the look, but acceptance compares outline-on and outline-off to detect collapsed internal gaps.",
+    "effects": "Trails, afterimages, particles and bloom must clear face, hands, feet and target contact for at least one readable frame around gameplay-critical timing.",
+    "hit_flash": "Hit feedback may temporarily override palette, but it must not destroy pose/target readability."
+  },
+  "acceptance_stages": {
+    "source_contract_validated": false,
+    "representative_runtime_fixture_captured": false,
+    "independent_visual_reviewed": false,
+    "production_topology_uv_rig_validated": false,
+    "art_approved": false,
+    "ue_unity_parity_claim": false
+  },
+  "runtime_capture_requirements": [
+    "use current Astral renderer, not offline Blender or generated stills, for runtime claims",
+    "capture all four review views at 64/96/128 px apparent body height against all three neutral backgrounds",
+    "capture base look with VFX off, rim off/on and outline off/on where the renderer exposes those toggles",
+    "record exact commit, resolution, FOV, camera transform, look/material parameters and capture hash",
+    "repeat neutral, locomotion and one archetype action pose",
+    "independent reviewer scores silhouette, pose, focal hierarchy, internal-gap preservation and class read before art_approved"
+  ],
+  "out_of_scope": [
+    "renderer architecture changes",
+    "DCC importer implementation",
+    "new dependency installation",
+    "production protagonist mesh/texture delivery",
+    "engine acceptance or soak claims",
+    "gameplay tuning",
+    "automatic merge"
+  ]
+}
