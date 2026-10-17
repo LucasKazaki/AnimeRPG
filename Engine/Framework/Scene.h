@@ -113,20 +113,27 @@ public:
     Core::JsonValue Save(const GameWorld& world) const;
     Core::JsonValue SaveEntity(const GameWorld& world, Entity entity) const;
 
+    // Root-zero expanded hierarchy depth; also bounds active prefab-resolution
+    // indirection (the first definition is resolution depth zero).
     std::size_t maxDepth{64};
+    // Independent limits for expanded output nodes and retained cached prefab
+    // nodes. Every instance copy is charged in full in its own domain.
     std::size_t maxEntities{100000};
 
 private:
+    struct SpecExtent;
     struct ParseState;
+    bool Admit(const SpecExtent& extent, std::size_t depth, bool cached, ParseState& state,
+        const std::string& path) const;
     bool ParseEntity(const Core::JsonValue& json, const std::string& path, ParseState& state, EntitySpec& out,
-        std::size_t depth) const;
+        std::size_t depth, bool cached, SpecExtent& extent) const;
     bool ParsePrefab(const std::string& name, const std::string& path, ParseState& state) const;
     bool ParseComponents(const Core::JsonValue& json, const std::string& path, ParseState& state, EntitySpec& out) const;
     bool ResolveMesh(const std::string& ref, const std::string& path, ParseState& state) const;
     bool ResolveMaterial(const std::string& ref, const std::string& path, ParseState& state) const;
     bool ResolveClip(const std::string& ref, const std::string& path, ParseState& state) const;
     bool ExpandModel(const std::string& model, bool colliders, const std::string& path, ParseState& state,
-        EntitySpec& out) const;
+        EntitySpec& out, std::size_t depth, bool cached, SpecExtent& extent) const;
     Entity Spawn(const EntitySpec& spec, const SceneDocument& document, GameWorld& world, Entity parent) const;
     void AddComponents(const EntitySpec& spec, const SceneDocument& document, GameWorld& world, Entity entity) const;
 
