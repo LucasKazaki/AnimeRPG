@@ -25,6 +25,14 @@
 #include <string>
 #include <vector>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <winioctl.h>
+#endif
+
 using namespace Astral;
 using namespace Astral::Assets;
 using Math::Mat4;
@@ -749,6 +757,280 @@ ASTRAL_TEST(GltfMaterialsBecomeEngineMaterials) {
 }
 
 // ---------------------------------------------------------------- Asset manager
+
+namespace {
+
+std::string ExternalGltf(const std::string& bufferUri, const std::string& imageUri = "") {
+    Core::JsonValue json;
+    std::string error;
+    ASTRAL_CHECK(Core::ParseJson(R"({"asset":{"version":"2.0"},
+        "buffers":[{"byteLength":36}],"bufferViews":[{"buffer":0,"byteLength":36}],
+        "accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"}],
+        "meshes":[{"primitives":[{"attributes":{"POSITION":0}}]}]})", json, error));
+    json.Find("buffers")->Items()[0].Set("uri", bufferUri);
+    if (!imageUri.empty()) {
+        Core::JsonValue images = Core::JsonValue::MakeArray();
+        Core::JsonValue image = Core::JsonValue::MakeObject();
+        image.Set("uri", imageUri);
+        images.Append(std::move(image));
+        json.Set("images", std::move(images));
+    }
+    return Core::WriteJson(json);
+}
+
+struct GltfFileFixture {
+    std::string dir;
+    std::string root;
+    std::string models;
+    std::string outside;
+
+    explicit GltfFileFixture(const char* name) : dir(TempDir(name)), root(dir + "/content"),
+        models(root + "/models"), outside(dir + "/content-other") {
+        std::filesystem::create_directories(models);
+        std::filesystem::create_directories(root + "/shared");
+        std::filesystem::create_directories(outside);
+        const float vertices[] = {7, 4, 3, 8, 4, 3, 7, 5, 3};
+        std::vector<std::uint8_t> bytes(sizeof(vertices));
+        std::memcpy(bytes.data(), vertices, sizeof(vertices));
+        WriteBytes(root + "/shared/mesh space.bin", bytes);
+        WriteBytes(models + "/%2e%2e.bin", bytes); // one URI decode, never two
+        WriteBytes(dir + "/outside.bin", bytes);
+        WriteBytes(outside + "/outside.bin", bytes);
+        std::string error;
+        const Graphics::ImageRgba8 image = TestPattern(4, 4);
+        ASTRAL_CHECK(Graphics::WritePng(root + "/shared/texture space.png", image, error));
+        ASTRAL_CHECK(Graphics::WritePng(dir + "/outside.png", image, error));
+        ASTRAL_CHECK(Graphics::WritePng(outside + "/outside.png", image, error));
+        std::ofstream(outside + "/outside.gltf") << R"({"asset":{"version":"2.0"}})";
+    }
+
+    ~GltfFileFixture() { std::filesystem::remove_all(dir); }
+};
+
+bool ImportText(const std::string& json, const std::string& base, GltfDocument& doc, std::string& error,
+    const GltfImportOptions& options = {}) {
+    return ImportGltfFromMemory(reinterpret_cast<const std::uint8_t*>(json.data()), json.size(), base, doc, error, options);
+}
+
+std::vector<std::string> ProhibitedGltfUris(const GltfFileFixture& fixture, const std::string& filename) {
+    return {"../../" + filename, "%2e%2e/%2E%2E/" + filename, "..%2f..%2f" + filename,
+        "..\\../" + filename, "..%5C..%2F" + filename, "../../content-other/" + filename,
+        std::filesystem::path(fixture.dir + "/" + filename).generic_string(), "/" + filename,
+        "\\" + filename, "//host/share/" + filename, "\\\\host\\share\\" + filename,
+        "C:/" + filename, "C:" + filename, "file:" + filename, "https://host/" + filename,
+        "%43%3a/" + filename, "%2f" + filename, "%5c%5chost/share/" + filename,
+        "../shared/" + std::string(filename == "outside.bin" ? "mesh%20space.bin" : "texture%20space.png") + "%00ignored",
+        std::string("../../") + filename + std::string(1, '\0') + "ignored", "%", "%2", "%GG"};
+}
+
+#if defined(_WIN32)
+// Junctions do not require the symbolic-link privilege. Keep this test fixture
+// local and disposable; production import code remains portable C++17.
+bool CreateTestJunction(const std::filesystem::path& target, const std::filesystem::path& link) {
+    struct JunctionData {
+        DWORD tag;
+        WORD length;
+        WORD reserved;
+        WORD substituteOffset;
+        WORD substituteLength;
+        WORD printOffset;
+        WORD printLength;
+        wchar_t paths[4096];
+    } data{};
+    const std::wstring absolute = std::filesystem::absolute(target).make_preferred().wstring();
+    const std::wstring substitute = L"\\??\\" + absolute;
+    if (substitute.size() + absolute.size() + 2 > 4096) return false;
+    data.tag = IO_REPARSE_TAG_MOUNT_POINT;
+    data.substituteLength = static_cast<WORD>(substitute.size() * sizeof(wchar_t));
+    data.printOffset = static_cast<WORD>((substitute.size() + 1) * sizeof(wchar_t));
+    data.printLength = static_cast<WORD>(absolute.size() * sizeof(wchar_t));
+    std::memcpy(data.paths, substitute.c_str(), data.substituteLength + sizeof(wchar_t));
+    std::memcpy(data.paths + substitute.size() + 1, absolute.c_str(), data.printLength + sizeof(wchar_t));
+    data.length = static_cast<WORD>(8 + data.printOffset + data.printLength + sizeof(wchar_t));
+    if (!CreateDirectoryW(link.c_str(), nullptr)) return false;
+    HANDLE handle = CreateFileW(link.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
+        FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return false;
+    DWORD returned = 0;
+    const bool ok = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, &data, data.length + 8,
+        nullptr, 0, &returned, nullptr) != FALSE;
+    CloseHandle(handle);
+    return ok;
+}
+#endif
+
+} // namespace
+
+ASTRAL_TEST(AssetManagerGltfRejectsOutsideDependency) {
+    const std::string dir = TempDir("astral_gltf_containment_reproduction");
+    const std::string root = dir + "/content";
+    std::filesystem::create_directories(root + "/models");
+    // Original disposable bytes only. A successful import proves that the
+    // importer read this fixture beyond the manager's declared content root.
+    WriteBytes(dir + "/outside.bin", {1, 2, 3, 4});
+    std::ofstream(root + "/models/external.gltf") <<
+        R"({"asset":{"version":"2.0"},"buffers":[{"byteLength":4,"uri":"../../outside.bin"}]})";
+    AssetManager assets(root, nullptr);
+    assets.RegisterDefaultLoaders();
+    ASTRAL_CHECK(assets.Load<std::string>("../outside.bin").State() == AssetState::Failed);
+    const AssetHandle<GltfDocument> model = assets.Load<GltfDocument>("models/external.gltf");
+    ASTRAL_CHECK(model.State() == AssetState::Failed && !model.Error().empty());
+    std::filesystem::remove_all(dir);
+}
+
+ASTRAL_TEST(GltfExternalDependenciesHonorApprovedRoot) {
+    const GltfFileFixture fixture("astral_gltf_containment_valid");
+    const std::string json = ExternalGltf("../shared/mesh%20space.bin", "../shared/texture%20space.png");
+    std::ofstream(fixture.models + "/shared.gltf") << json;
+    Core::JobSystem jobs(2);
+    AssetManager assets(fixture.root, &jobs);
+    assets.RegisterDefaultLoaders();
+    const AssetHandle<GltfDocument> model = assets.LoadAsync<GltfDocument>("models/shared.gltf");
+    assets.WaitForAll();
+    ASTRAL_CHECK(model.Ready() && model->meshes.size() == 1 && model->images.size() == 1);
+    ASTRAL_CHECK(model->meshes[0].primitives[0].mesh.vertices[0].position.x == -7.0f);
+    ASTRAL_CHECK(model->images[0].image.width == 4 && model->warnings.empty());
+
+    GltfImportOptions options;
+    options.approvedRoot = fixture.root;
+    std::string error;
+    GltfDocument doc;
+    doc.generator = "last good";
+    ASTRAL_CHECK(!ImportGltf(fixture.models + "/shared.gltf", doc, error)); // source-directory default
+    ASTRAL_CHECK(doc.generator == "last good" && error.find("approved root") != std::string::npos);
+    ASTRAL_CHECK(!ImportText(json, fixture.models, doc, error)); // memory base-directory default
+    ASTRAL_CHECK(!ImportText(json, "", doc, error, options)); // root never enables an absent base
+    ASTRAL_CHECK(ImportGltf(fixture.models + "/shared.gltf", doc, error, options));
+    ASTRAL_CHECK(ImportText(json, fixture.models, doc, error, options));
+    ASTRAL_CHECK(doc.meshes[0].primitives[0].mesh.vertices[0].position.y == 4.0f);
+    ASTRAL_CHECK(ImportText(ExternalGltf("..\\shared/mesh%20space.bin"), fixture.models, doc, error, options));
+    ASTRAL_CHECK(ImportText(ExternalGltf("%252e%252e.bin"), fixture.models, doc, error));
+    const std::filesystem::path unicodeMesh = std::filesystem::u8path(fixture.models + "/mesh-\xC3\xA9.bin");
+    const std::filesystem::path unicodeImage = std::filesystem::u8path(fixture.models + "/image-\xC3\xA9.png");
+    ASTRAL_CHECK(std::filesystem::copy_file(fixture.root + "/shared/mesh space.bin", unicodeMesh));
+    ASTRAL_CHECK(std::filesystem::copy_file(fixture.root + "/shared/texture space.png", unicodeImage));
+    ASTRAL_CHECK(ImportText(ExternalGltf("mesh-%C3%A9.bin", "image-%C3%A9.png"), fixture.models, doc, error, options));
+    ASTRAL_CHECK(doc.images[0].image.width == 4 && doc.warnings.empty());
+    const std::vector<std::uint8_t> embedded = ExportGltfToMemory(MakeFixture(), GltfContainer::Embedded, error);
+    ASTRAL_CHECK(ImportGltfFromMemory(embedded.data(), embedded.size(), "", doc, error));
+    ASTRAL_CHECK(doc.meshes.size() == 1 && !doc.images[0].image.pixels.empty());
+
+    // A rejected reload reports the violation and retains the complete good model.
+    std::ofstream(fixture.models + "/shared.gltf") << ExternalGltf("../../outside.bin");
+    ASTRAL_CHECK(assets.Reload("models/shared.gltf"));
+    ASTRAL_CHECK(model.Ready() && model.Version() == 1 && model.Error().find("approved root") != std::string::npos);
+    ASTRAL_CHECK(model->images[0].image.width == 4);
+    std::ofstream(fixture.models + "/shared.gltf") << json;
+    ASTRAL_CHECK(assets.Reload("models/shared.gltf"));
+    ASTRAL_CHECK(model.Ready() && model.Version() == 2 && model.Error().empty());
+    ASTRAL_CHECK(assets.Load<std::string>(std::string("models/shared.gltf") + '\0' + "ignored").State() == AssetState::Failed);
+}
+
+ASTRAL_TEST(GltfRejectsDecodedOutsideUrisForBuffersAndImages) {
+    const GltfFileFixture fixture("astral_gltf_containment_uris");
+    GltfImportOptions options;
+    options.approvedRoot = fixture.root;
+    GltfDocument doc;
+    std::string error;
+    for (const std::string& uri : ProhibitedGltfUris(fixture, "outside.bin")) {
+        doc.generator = "last good";
+        ASTRAL_CHECK(!ImportText(ExternalGltf(uri), fixture.models, doc, error, options));
+        ASTRAL_CHECK(doc.generator == "last good" && !error.empty());
+    }
+    for (const std::string& uri : ProhibitedGltfUris(fixture, "outside.png")) {
+        ASTRAL_CHECK(ImportText(ExternalGltf("../shared/mesh%20space.bin", uri), fixture.models, doc, error, options));
+        ASTRAL_CHECK(doc.images.size() == 1 && doc.images[0].image.pixels.empty() && doc.warnings.size() == 1);
+        ASTRAL_CHECK(doc.warnings[0].find("unsupported image format") == std::string::npos);
+    }
+    options.decodeImages = false;
+    ASTRAL_CHECK(ImportText(ExternalGltf("../shared/mesh%20space.bin", "../../outside.png"), fixture.models, doc, error, options));
+    ASTRAL_CHECK(doc.images[0].image.pixels.empty() && doc.warnings.empty());
+}
+
+ASTRAL_TEST(GltfMalformedUtf8BufferUrisReturnDiagnostics) {
+    const GltfFileFixture fixture("astral_gltf_containment_utf8_buffers");
+    GltfImportOptions options;
+    options.approvedRoot = fixture.root;
+    const char* malformed[] = {"%FF.bin", "%C0%AF.bin", "%E2%82.bin", "%ED%A0%80.bin", "%F4%90%80%80.bin"};
+    for (const char* uri : malformed) {
+        GltfDocument doc;
+        doc.generator = "last good";
+        std::string error;
+        bool threw = false;
+        bool imported = false;
+        try { imported = ImportText(ExternalGltf(uri), fixture.models, doc, error, options); }
+        catch (const std::exception& e) { threw = true; std::fprintf(stderr, "[ EXCEPTION ] %s: %s\n", uri, e.what()); }
+        ASTRAL_CHECK(!threw && !imported && !error.empty() && doc.generator == "last good");
+        std::ofstream(fixture.models + "/malformed.gltf") << ExternalGltf(uri);
+        ASTRAL_CHECK(!ImportGltf(fixture.models + "/malformed.gltf", doc, error, options));
+        ASTRAL_CHECK(doc.generator == "last good" && !error.empty());
+    }
+}
+
+ASTRAL_TEST(GltfMalformedUtf8ImageUrisKeepWarningSemantics) {
+    const GltfFileFixture fixture("astral_gltf_containment_utf8_images");
+    GltfImportOptions options;
+    options.approvedRoot = fixture.root;
+    for (const char* uri : {"%FF.png", "%C0%AF.png"}) {
+        GltfDocument doc;
+        std::string error;
+        bool threw = false;
+        bool imported = false;
+        const std::string json = ExternalGltf("../shared/mesh%20space.bin", uri);
+        try { imported = ImportText(json, fixture.models, doc, error, options); }
+        catch (const std::exception& e) { threw = true; std::fprintf(stderr, "[ EXCEPTION ] %s: %s\n", uri, e.what()); }
+        ASTRAL_CHECK(!threw && imported && doc.images.size() == 1 && doc.images[0].image.pixels.empty());
+        ASTRAL_CHECK(doc.warnings.size() == 1 && !doc.warnings[0].empty());
+        std::ofstream(fixture.models + "/malformed.gltf") << json;
+        ASTRAL_CHECK(ImportGltf(fixture.models + "/malformed.gltf", doc, error, options));
+        ASTRAL_CHECK(doc.images[0].image.pixels.empty() && doc.warnings.size() == 1);
+    }
+    // Source/base/root strings use native filesystem encoding, not URI percent
+    // decoding. Invalid or missing native paths must still return diagnostics.
+    GltfDocument doc;
+    doc.generator = "last good";
+    std::string error;
+    const std::string invalidNativePath = fixture.models + "/" + static_cast<char>(0xFF) + "-missing";
+    ASTRAL_CHECK(!ImportGltf(invalidNativePath, doc, error, options) && !error.empty());
+    ASTRAL_CHECK(!ImportText(ExternalGltf("../shared/mesh%20space.bin"), invalidNativePath, doc, error, options));
+    options.approvedRoot = invalidNativePath;
+    ASTRAL_CHECK(!ImportGltf(fixture.models + "/malformed.gltf", doc, error, options) && !error.empty());
+    ASTRAL_CHECK(doc.generator == "last good");
+}
+
+ASTRAL_TEST(GltfRejectsSourceAndDependencyLinksOutsideApprovedRoot) {
+    const GltfFileFixture fixture("astral_gltf_containment_links");
+    AssetManager assets(fixture.root, nullptr);
+    assets.RegisterDefaultLoaders();
+    const auto checkDirectoryLink = [&](const std::string& name) {
+        std::ofstream(fixture.models + "/" + name + ".gltf") << ExternalGltf(name + "/outside.bin");
+        const AssetHandle<GltfDocument> buffer = assets.Load<GltfDocument>("models/" + name + ".gltf");
+        ASTRAL_CHECK(buffer.State() == AssetState::Failed && buffer.Error().find("approved root") != std::string::npos);
+        std::ofstream(fixture.models + "/" + name + "-image.gltf") <<
+            ExternalGltf("../shared/mesh%20space.bin", name + "/outside.png");
+        const AssetHandle<GltfDocument> image = assets.Load<GltfDocument>("models/" + name + "-image.gltf");
+        ASTRAL_CHECK(image.Ready() && image->images[0].image.pixels.empty());
+        ASTRAL_CHECK(image->warnings[0].find("approved root") != std::string::npos);
+        const AssetHandle<GltfDocument> source = assets.Load<GltfDocument>("models/" + name + "/outside.gltf");
+        ASTRAL_CHECK(source.State() == AssetState::Failed && source.Error().find("approved root") != std::string::npos);
+    };
+    std::error_code ec;
+    std::filesystem::create_directory_symlink(fixture.outside, fixture.models + "/symlink", ec);
+    if (!ec) checkDirectoryLink("symlink");
+    else std::printf("[ SKIP ] directory symlink fixture unavailable: %s\n", ec.message().c_str());
+    ec.clear();
+    std::filesystem::create_symlink(fixture.outside + "/outside.gltf", fixture.models + "/source-link.gltf", ec);
+    if (!ec) {
+        const AssetHandle<GltfDocument> source = assets.Load<GltfDocument>("models/source-link.gltf");
+        ASTRAL_CHECK(source.State() == AssetState::Failed && source.Error().find("approved root") != std::string::npos);
+    } else std::printf("[ SKIP ] file symlink fixture unavailable: %s\n", ec.message().c_str());
+#if defined(_WIN32)
+    ASTRAL_CHECK(CreateTestJunction(fixture.outside, fixture.models + "/junction"));
+    checkDirectoryLink("junction");
+#else
+    std::printf("[ SKIP ] Windows junction fixture is not applicable on this platform\n");
+#endif
+}
 
 ASTRAL_TEST(AssetManagerCachesLoadsAsyncAndHotReloads) {
     const std::string dir = TempDir("astral_asset_manager");

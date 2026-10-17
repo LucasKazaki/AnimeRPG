@@ -7,11 +7,13 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <map>
+#include <system_error>
 #include <utility>
 
 namespace Astral::Assets {
@@ -78,35 +80,68 @@ void WriteU32(std::vector<std::uint8_t>& out, std::uint32_t v) {
     for (int i = 0; i < 4; ++i) out.push_back(static_cast<std::uint8_t>(v >> (8 * i)));
 }
 
-std::string PercentDecode(const std::string& text) {
-    std::string out;
+bool PercentDecode(const std::string& text, std::string& out) {
+    out.clear();
     for (std::size_t i = 0; i < text.size(); ++i) {
-        if (text[i] == '%' && i + 2 < text.size() && std::isxdigit(static_cast<unsigned char>(text[i + 1]))
-            && std::isxdigit(static_cast<unsigned char>(text[i + 2]))) {
+        if (text[i] == '%') {
+            if (i + 2 >= text.size() || !std::isxdigit(static_cast<unsigned char>(text[i + 1]))
+                || !std::isxdigit(static_cast<unsigned char>(text[i + 2]))) return false;
             out.push_back(static_cast<char>(std::stoi(text.substr(i + 1, 2), nullptr, 16)));
             i += 2;
         } else {
             out.push_back(text[i]);
         }
     }
-    return out;
+    return true;
 }
 
-bool ReadFile(const std::string& path, std::size_t maxBytes, std::vector<std::uint8_t>& out, std::string& error) {
+bool ResolveApprovedFile(const std::filesystem::path& candidate, const std::string& approvedRoot,
+    std::filesystem::path& resolved, std::string& error) {
+    if (approvedRoot.find('\0') != std::string::npos) {
+        error = "NUL in approved glTF root";
+        return false;
+    }
+    std::error_code ec;
+    const std::filesystem::path root = std::filesystem::canonical(approvedRoot, ec);
+    if (ec || !std::filesystem::is_directory(root, ec) || ec) {
+        error = "cannot resolve approved glTF root '" + approvedRoot + "'";
+        return false;
+    }
+    resolved = std::filesystem::canonical(candidate, ec);
+    if (ec) {
+        error = "cannot resolve glTF file '" + candidate.string() + "': " + ec.message();
+        return false;
+    }
+    // Compare a whole directory prefix, not a string prefix (content-other is
+    // outside content). Filesystem equivalence also handles Windows casing.
+    auto part = resolved.begin();
+    std::filesystem::path prefix;
+    for (auto rootPart = root.begin(); rootPart != root.end(); ++rootPart) {
+        if (part == resolved.end()) break;
+        prefix /= *part++;
+    }
+    if (!std::filesystem::equivalent(root, prefix, ec) || ec) {
+        error = "glTF file '" + candidate.string() + "' escapes approved root '" + approvedRoot + "'";
+        return false;
+    }
+    return true;
+}
+
+bool ReadFile(const std::filesystem::path& path, std::size_t maxBytes, std::vector<std::uint8_t>& out, std::string& error) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) {
-        error = "cannot open " + path;
+        error = "cannot open " + path.string();
         return false;
     }
     const std::streamoff size = file.tellg();
     if (size < 0 || static_cast<std::uint64_t>(size) > maxBytes) {
-        error = path + " exceeds the size limit";
+        error = path.string() + " exceeds the size limit";
         return false;
     }
     out.resize(static_cast<std::size_t>(size));
     file.seekg(0);
     if (size > 0 && !file.read(reinterpret_cast<char*>(out.data()), size)) {
-        error = "cannot read " + path;
+        error = "cannot read " + path.string();
         return false;
     }
     return true;
@@ -138,12 +173,32 @@ struct Importer {
             error = "external URI '" + uri + "' with no base directory";
             return false;
         }
-        const std::string relative = PercentDecode(uri);
-        if (relative.empty() || relative[0] == '/' || relative[0] == '\\' || relative.find(':') != std::string::npos) {
+        std::string relative;
+        if (!PercentDecode(uri, relative)) {
+            error = "malformed percent escape in URI '" + uri + "'";
+            return false;
+        }
+        if (relative.find('\0') != std::string::npos || baseDirectory.find('\0') != std::string::npos) {
+            error = "NUL in external glTF URI or base directory";
+            return false;
+        }
+        std::replace(relative.begin(), relative.end(), '\\', '/');
+        if (relative.empty() || relative[0] == '/' || relative.find(':') != std::string::npos) {
             error = "absolute or scheme URI '" + uri + "' is not allowed";
             return false;
         }
-        return ReadFile(baseDirectory + "/" + relative, options.maxFileBytes, out, error);
+        try {
+            std::filesystem::path resolved;
+            const std::string& root = options.approvedRoot.empty() ? baseDirectory : options.approvedRoot;
+            if (!ResolveApprovedFile(std::filesystem::path(baseDirectory) / std::filesystem::u8path(relative), root,
+                    resolved, error)) return false;
+            return ReadFile(resolved, options.maxFileBytes, out, error);
+        } catch (const std::system_error& e) {
+            // Path conversion may throw even when canonical uses error_code.
+            // Returning here also preserves nonfatal image warning behavior.
+            error = "cannot convert or resolve external glTF path: " + e.code().message();
+            return false;
+        }
     }
 
     bool LoadBuffers(const std::vector<std::uint8_t>* glbBin, std::string& error) {
@@ -1001,15 +1056,27 @@ bool ImportGltfFromMemory(const std::uint8_t* data, std::size_t size, const std:
 }
 
 bool ImportGltf(const std::string& path, GltfDocument& out, std::string& error, const GltfImportOptions& options) {
-    std::vector<std::uint8_t> bytes;
-    if (!ReadFile(path, options.maxFileBytes, bytes, error)) return false;
-    const std::size_t slash = path.find_last_of("/\\");
-    const std::string base = slash == std::string::npos ? "." : path.substr(0, slash);
-    if (!ImportGltfFromMemory(bytes.data(), bytes.size(), base, out, error, options)) {
-        error = path + ": " + error;
+    if (path.find('\0') != std::string::npos) {
+        error = "NUL in glTF source path";
         return false;
     }
-    return true;
+    try {
+        const std::filesystem::path source(path);
+        const std::string base = source.has_parent_path() ? source.parent_path().string() : ".";
+        std::filesystem::path resolved;
+        if (!ResolveApprovedFile(source, options.approvedRoot.empty() ? base : options.approvedRoot, resolved, error))
+            return false;
+        std::vector<std::uint8_t> bytes;
+        if (!ReadFile(resolved, options.maxFileBytes, bytes, error)) return false;
+        if (!ImportGltfFromMemory(bytes.data(), bytes.size(), base, out, error, options)) {
+            error = path + ": " + error;
+            return false;
+        }
+        return true;
+    } catch (const std::system_error& e) {
+        error = "cannot convert or resolve glTF source/root path: " + e.code().message();
+        return false;
+    }
 }
 
 // ---------------------------------------------------------------- Export

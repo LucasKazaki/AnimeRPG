@@ -42,7 +42,8 @@ AssetManager::~AssetManager() {
 }
 
 bool AssetManager::ValidPath(const std::string& path) {
-    if (path.empty() || path[0] == '/' || path[0] == '\\' || path.find(':') != std::string::npos) return false;
+    if (path.empty() || path[0] == '/' || path[0] == '\\' || path.find(':') != std::string::npos
+        || path.find('\0') != std::string::npos) return false;
     std::size_t start = 0;
     while (start <= path.size()) {
         const std::size_t end = path.find_first_of("/\\", start);
@@ -228,8 +229,10 @@ void AssetManager::RegisterDefaultLoaders() {
         out.name = path;
         return true;
     });
-    RegisterLoader<GltfDocument>([](const std::string& path, GltfDocument& out, std::string& error) {
-        return ImportGltf(path, out, error);
+    GltfImportOptions gltfOptions;
+    gltfOptions.approvedRoot = root_.empty() ? "." : root_;
+    RegisterLoader<GltfDocument>([gltfOptions](const std::string& path, GltfDocument& out, std::string& error) {
+        return ImportGltf(path, out, error, gltfOptions);
     });
     RegisterLoader<Audio::AudioClip>([](const std::string& path, Audio::AudioClip& out, std::string& error) {
         return Audio::ReadWav(path, out, error);
