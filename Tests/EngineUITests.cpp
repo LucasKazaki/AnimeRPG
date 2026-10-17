@@ -1,5 +1,6 @@
 #include "Engine/Core/Console.h"
 #include "Engine/Graphics/Canvas.h"
+#include "Engine/Framework/GameHost.h"
 #include "Engine/Input/InputSystem.h"
 #include "Engine/UI/ConsoleOverlay.h"
 #include "Engine/UI/Widgets.h"
@@ -54,7 +55,230 @@ T& Placed(T& widget, float x, float y, float w, float h) {
 
 const Vec2 kViewport{400.0f, 300.0f};
 
+std::unique_ptr<Framework::GameHost> OwnershipHost() {
+    Framework::HostSettings settings;
+    settings.workerThreads = 0;
+    settings.audio = false;
+    auto host = std::make_unique<Framework::GameHost>(settings);
+    Input::InputContext context;
+    context.name = "Neutral ownership fixture";
+    context.actions = {
+        Input::ActionDesc{"Attack", Input::ActionType::Button, {{Keys::MouseLeft, {}}}},
+        Input::ActionDesc{"Jump", Input::ActionType::Button, {{Keys::Space, {}}}},
+        Input::ActionDesc{"Move", Input::ActionType::Axis2D, {{'W', {0, 1}}}},
+        Input::ActionDesc{"Cancel", Input::ActionType::Button, {{Keys::Escape, {}}}},
+    };
+    ASTRAL_CHECK(host->Input().AddContext(context));
+    return host;
+}
+
+Framework::HostInput HostPointer(float x, float y, bool down = false) {
+    Framework::HostInput input;
+    input.ui = At(x, y, down);
+    input.keys.keys.set(Keys::MouseLeft, down);
+    return input;
+}
+
+Framework::HostInput HostKey(std::uint16_t key) {
+    Framework::HostInput input;
+    input.ui = Key(key);
+    input.keys.keys.set(key);
+    return input;
+}
+
+constexpr float kHostFrame = 1.0f / 60.0f;
+
 } // namespace
+
+ASTRAL_TEST(UIHostButtonPointerDoesNotReachGameplay) {
+    auto host = OwnershipHost();
+    Button& button = Placed(host->Hud().Add<Button>("Neutral action"), 50, 50, 100, 40);
+    int clicks = 0;
+    button.Clicked.Add([&] { ++clicks; });
+    host->Update(kHostFrame, HostPointer(60, 60, true));
+    ASTRAL_CHECK(button.Pressed() && !host->Input().Down("Attack"));
+    host->Update(kHostFrame, HostPointer(60, 60));
+    ASTRAL_CHECK(clicks == 1 && !host->Input().Pressed("Attack"));
+    host->Update(kHostFrame, HostPointer(60, 60, true));
+    Framework::HostInput held = HostPointer(800, 650, true);
+    held.keys.keys.set('W');
+    for (int i = 0; i < 3; ++i) {
+        host->Update(kHostFrame, held);
+        ASTRAL_CHECK(!host->Input().Down("Attack") && host->Input().Down("Move"));
+    }
+    host->Update(kHostFrame, HostPointer(800, 650));
+    ASTRAL_CHECK(clicks == 1 && !host->Input().Released("Attack")); // outside release cancels UI click
+    host->Update(kHostFrame, HostPointer(800, 650, true));
+    ASTRAL_CHECK(host->Input().Pressed("Attack")); // fresh unhandled press is available
+}
+
+ASTRAL_TEST(UIHostButtonKeyboardDoesNotReachGameplay) {
+    auto host = OwnershipHost();
+    Button& button = Placed(host->Hud().Add<Button>("Neutral action"), 50, 50, 100, 40);
+    int clicks = 0;
+    button.Clicked.Add([&] { ++clicks; });
+    host->UI().SetFocus(&button);
+    host->Update(kHostFrame, HostKey(Keys::Space));
+    ASTRAL_CHECK(clicks == 1 && !host->Input().Down("Jump"));
+    Framework::HostInput held = HostKey(Keys::Space);
+    held.ui.keysPressed.clear();
+    host->UI().SetFocus(nullptr);
+    for (int i = 0; i < 3; ++i) {
+        host->Update(kHostFrame, held);
+        ASTRAL_CHECK(!host->Input().Down("Jump") && clicks == 1);
+    }
+    host->Update(kHostFrame, {});
+    ASTRAL_CHECK(!host->Input().Released("Jump"));
+    host->Update(kHostFrame, HostKey(Keys::Space));
+    ASTRAL_CHECK(host->Input().Pressed("Jump") && clicks == 1);
+}
+
+ASTRAL_TEST(UIHostConsoleOutsidePointerKeepsModalInput) {
+    auto host = OwnershipHost();
+    Button& behind = Placed(host->Hud().Add<Button>("Behind console"), 750, 600, 200, 80);
+    int clicks = 0;
+    behind.Clicked.Add([&] { ++clicks; });
+    host->Update(kHostFrame, HostKey(host->Console().toggleKey));
+    ASTRAL_CHECK(host->Console().IsOpen());
+    Framework::HostInput outside = HostPointer(800, 650, true);
+    outside.keys.keys.set('W');
+    host->Update(kHostFrame, outside);
+    ASTRAL_CHECK(host->Console().IsOpen() && !host->Input().Down("Move") && !host->Input().Down("Attack"));
+    ASTRAL_CHECK(!behind.Pressed() && host->UI().Focused() == &host->Console().InputBox());
+    host->Update(kHostFrame, HostPointer(800, 650));
+    ASTRAL_CHECK(clicks == 0);
+}
+
+ASTRAL_TEST(UIHostConsoleEscapeClosesWithoutTextFocus) {
+    auto host = OwnershipHost();
+    host->Update(kHostFrame, HostKey(host->Console().toggleKey));
+    host->Update(kHostFrame, HostPointer(800, 650, true));
+    host->Update(kHostFrame, HostPointer(800, 650));
+    host->UI().SetFocus(nullptr); // Escape routing must not rely on the TextBox
+    host->Update(kHostFrame, HostKey(Keys::Escape));
+    ASTRAL_CHECK(!host->Console().IsOpen() && !host->Input().Down("Cancel"));
+    Framework::HostInput held = HostKey(Keys::Escape);
+    held.ui.keysPressed.clear();
+    host->Update(kHostFrame, held);
+    ASTRAL_CHECK(!host->Input().Down("Cancel"));
+    host->Update(kHostFrame, {});
+    host->Update(kHostFrame, HostKey(Keys::Escape));
+    ASTRAL_CHECK(host->Input().Pressed("Cancel"));
+}
+
+ASTRAL_TEST(UIHostPointerCancellationRetainsOwnershipUntilRelease) {
+    for (int cancellation = 0; cancellation < 3; ++cancellation) {
+        auto host = OwnershipHost();
+        Button& button = Placed(host->Hud().Add<Button>("Cancel fixture", "fixture"), 50, 50, 100, 40);
+        int clicks = 0;
+        button.Clicked.Add([&] { ++clicks; });
+        host->Update(kHostFrame, HostPointer(60, 60, true));
+        if (cancellation == 0) button.RemoveFromParent();
+        if (cancellation == 1) button.enabled = false;
+        if (cancellation == 2) button.visible = false;
+        host->Update(kHostFrame, HostPointer(60, 60, true));
+        ASTRAL_CHECK(!host->Input().Down("Attack") && host->UI().Focused() == nullptr);
+        if (cancellation != 0) ASTRAL_CHECK(!button.Pressed());
+        host->Update(kHostFrame, HostPointer(60, 60));
+        ASTRAL_CHECK(clicks == 0 && !host->Input().Down("Attack"));
+        host->Update(kHostFrame, HostPointer(800, 650, true));
+        ASTRAL_CHECK(host->Input().Pressed("Attack"));
+    }
+}
+
+ASTRAL_TEST(UIHostKeyboardCancellationRetainsOwnershipUntilRelease) {
+    for (int cancellation = 0; cancellation < 3; ++cancellation) {
+        auto host = OwnershipHost();
+        Button& button = Placed(host->Hud().Add<Button>("Cancel fixture"), 50, 50, 100, 40);
+        button.Clicked.Add([&] {
+            if (cancellation == 0) button.RemoveFromParent();
+            if (cancellation == 1) button.enabled = false;
+            if (cancellation == 2) host->UI().SetFocus(nullptr);
+        });
+        host->UI().SetFocus(&button);
+        host->Update(kHostFrame, HostKey(Keys::Space));
+        ASTRAL_CHECK(!host->Input().Down("Jump") && host->UI().Focused() == nullptr);
+        Framework::HostInput held = HostKey(Keys::Space);
+        held.ui.keysPressed.clear();
+        host->Update(kHostFrame, held);
+        ASTRAL_CHECK(!host->Input().Down("Jump"));
+        host->Update(kHostFrame, {});
+        host->Update(kHostFrame, HostKey(Keys::Space));
+        ASTRAL_CHECK(host->Input().Pressed("Jump"));
+    }
+}
+
+ASTRAL_TEST(UIHostModalClosingFrameCannotActivateHudOrGameplay) {
+    auto host = OwnershipHost();
+    Button& behind = Placed(host->Hud().Add<Button>("Behind console"), 750, 600, 200, 80);
+    int clicks = 0;
+    behind.Clicked.Add([&] { ++clicks; });
+    host->Update(kHostFrame, HostKey(host->Console().toggleKey));
+    Framework::HostInput closing = HostPointer(800, 650, true);
+    closing.ui.keysPressed = {Keys::Escape, Keys::Space};
+    closing.ui.text = "ignored on close";
+    closing.keys.keys.set(Keys::Escape);
+    closing.keys.keys.set(Keys::Space);
+    closing.keys.keys.set('W');
+    host->Update(kHostFrame, closing);
+    ASTRAL_CHECK(!host->Console().IsOpen() && !behind.Pressed() && clicks == 0);
+    closing.ui.keysPressed.clear();
+    closing.ui.text.clear();
+    for (int i = 0; i < 3; ++i) {
+        host->Update(kHostFrame, closing);
+        for (const char* action : {"Attack", "Jump", "Move", "Cancel"}) ASTRAL_CHECK(!host->Input().Down(action));
+    }
+    host->Update(kHostFrame, HostPointer(1100, 680));
+    Framework::HostInput fresh = HostPointer(1100, 680, true);
+    fresh.keys.keys.set('W');
+    fresh.keys.keys.set(Keys::Space);
+    fresh.ui.keysPressed = {Keys::Space};
+    host->Update(kHostFrame, fresh);
+    ASTRAL_CHECK(host->Input().Pressed("Attack") && host->Input().Pressed("Jump") && host->Input().Pressed("Move"));
+    ASTRAL_CHECK(clicks == 0);
+}
+
+ASTRAL_TEST(UIHostTextEntryAndUnhandledInputsRemainDistinct) {
+    auto host = OwnershipHost();
+    Button& button = Placed(host->Hud().Add<Button>("Ordinary button"), 50, 50, 100, 40);
+    host->UI().SetFocus(&button);
+    host->Update(kHostFrame, HostKey('W'));
+    ASTRAL_CHECK(host->Input().Pressed("Move")); // unhandled key on a button reaches the game
+    host->Update(kHostFrame, {});
+    TextBox& box = Placed(host->Hud().Add<TextBox>(), 50, 120, 200, 30);
+    host->UI().SetFocus(&box);
+    Framework::HostInput typing = HostKey('W');
+    typing.ui.text = "w";
+    host->Update(kHostFrame, typing);
+    ASTRAL_CHECK(box.text == "w" && !host->Input().Down("Move"));
+    box.enabled = false;
+    typing.ui.keysPressed.clear();
+    typing.ui.text.clear();
+    host->Update(kHostFrame, typing);
+    ASTRAL_CHECK(host->UI().Focused() == nullptr && !host->Input().Down("Move"));
+    host->Update(kHostFrame, {});
+    host->Update(kHostFrame, HostKey('W'));
+    ASTRAL_CHECK(host->Input().Pressed("Move"));
+}
+
+ASTRAL_TEST(UIConsumptionReportsActualHandlersAndCapture) {
+    UIRoot ui;
+    Button& button = Placed(ui.Root().Add<Button>("Button"), 50, 50, 100, 40);
+    ui.SetFocus(&button);
+    UIInputResult result = ui.Update(Key(Keys::Space), kViewport);
+    ASTRAL_CHECK(result.consumedKeys.test(Keys::Space) && !result.keyboardCaptured && !result.modal);
+    result = ui.Update(Key('W'), kViewport);
+    ASTRAL_CHECK(!result.consumedKeys.test('W'));
+    result = ui.Update(At(60, 60, true), kViewport);
+    ASTRAL_CHECK(result.pointerConsumed);
+    button.enabled = false;
+    result = ui.Update(At(300, 280, true), kViewport);
+    ASTRAL_CHECK(result.pointerConsumed && !button.Pressed());
+    result = ui.Update(At(300, 280), kViewport);
+    ASTRAL_CHECK(result.pointerConsumed);
+    result = ui.Update(At(300, 280), kViewport);
+    ASTRAL_CHECK(!result.pointerConsumed);
+}
 
 ASTRAL_TEST(LayoutMeasuresAndArrangesPanels) {
     UIRoot ui;

@@ -26,8 +26,9 @@ public:
     bool IsOpen() const { return panel_->visible; }
 
     // Call before UIRoot::Update: handles the toggle key and strips it (and
-    // its typed character) from the input.
-    void PreprocessInput(UIInput& input);
+    // its typed character) from the input. Escape closes regardless of focus.
+    // Opening/closing frames remain modal in the returned ownership result.
+    UIInputResult PreprocessInput(UIInput& input);
 
     // Appends text to the log (split into lines).
     void Print(const std::string& text);
