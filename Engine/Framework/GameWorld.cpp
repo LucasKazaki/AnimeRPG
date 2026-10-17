@@ -114,16 +114,7 @@ void GameWorld::DestroyImmediate(Entity entity) {
 
 void GameWorld::DestroyNow(Entity entity) {
     if (!registry_.Valid(entity)) return;
-    if (Behaviours* behaviours = registry_.Get<Behaviours>(entity)) {
-        const std::vector<std::shared_ptr<Behaviour>> list = behaviours->list;
-        for (const auto& behaviour : list) {
-            if (behaviour->created_ && !behaviour->destroyed_) {
-                behaviour->destroyed_ = true;
-                behaviour->OnDestroy();
-            }
-            behaviour->destroyed_ = true;
-        }
-    }
+    RemoveBehaviours(entity);
     if (!registry_.Valid(entity)) return; // an OnDestroy destroyed it already
     if (Collider* collider = registry_.Get<Collider>(entity)) Release(entity, *collider);
     if (CharacterMover* mover = registry_.Get<CharacterMover>(entity)) Release(entity, *mover);
@@ -180,10 +171,40 @@ bool GameWorld::SetParent(Entity child, Entity parent) {
 
 // ------------------------------------------------------------------ behaviours
 
+bool GameWorld::ReleasingBehaviours(Entity entity) const {
+    return std::find(releasingBehaviours_.begin(), releasingBehaviours_.end(), entity) != releasingBehaviours_.end();
+}
+
+void GameWorld::RemoveBehaviours(Entity entity) {
+    if (ReleasingBehaviours(entity)) return;
+    Behaviours* component = registry_.Get<Behaviours>(entity);
+    if (!component) return;
+    // Detach before user callbacks: removing/destroying this entity can move or
+    // erase its component pool. Shared ownership also keeps frame snapshots safe.
+    std::vector<std::shared_ptr<Behaviour>> list;
+    list.swap(component->list);
+    registry_.Remove<Behaviours>(entity);
+    releasingBehaviours_.push_back(entity);
+    struct TeardownGuard {
+        std::vector<Entity>& entities;
+        ~TeardownGuard() { entities.pop_back(); }
+    } guard{releasingBehaviours_};
+    std::vector<std::shared_ptr<Behaviour>> created;
+    for (const auto& behaviour : list) {
+        if (!behaviour || behaviour->destroyed_) continue;
+        if (behaviour->created_) created.push_back(behaviour);
+        // Mark every entry before the first callback so recursive teardown and
+        // earlier frame/contact snapshots cannot run another released behaviour.
+        behaviour->destroyed_ = true;
+    }
+    timers_.ClearOwner(entity);
+    for (const auto& behaviour : created) behaviour->OnDestroy();
+}
+
 Behaviour* GameWorld::AddBehaviour(Entity entity, const std::string& type, const Core::JsonValue& properties,
     std::string& error, const BehaviourRegistry& registry) {
-    if (!IsAlive(entity)) {
-        error = "AddBehaviour on a destroyed entity";
+    if (!IsAlive(entity) || ReleasingBehaviours(entity)) {
+        error = "AddBehaviour on a destroyed entity or during teardown";
         return nullptr;
     }
     std::shared_ptr<Behaviour> behaviour = registry.Create(type, properties, error);
