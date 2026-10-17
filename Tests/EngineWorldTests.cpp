@@ -79,6 +79,25 @@ struct DestroyDuringTeardown final : Framework::Behaviour {
     std::shared_ptr<LifecycleCounts> counts_;
 };
 
+struct OneShotWitness {
+    Audio::VoiceId voice;
+    std::weak_ptr<const Audio::AudioClip> clip;
+};
+
+struct OneShotOnCreate final : Framework::Behaviour {
+    explicit OneShotOnCreate(OneShotWitness& witness, bool owned = false, bool onDestroy = false) : witness_(witness),
+        clip_(std::make_shared<Audio::AudioClip>(Audio::Synth::Tone(440, 0.25f))), owned_(owned), onDestroy_(onDestroy) {}
+    void OnCreate() override { if (!onDestroy_) Play(); }
+    void OnDestroy() override { if (onDestroy_) Play(); }
+    void Play() {
+        witness_.clip = clip_;
+        witness_.voice = owned_ ? World().PlaySoundAt(clip_, {}) : World().PlaySoundAt(clip_.get(), {});
+    }
+    OneShotWitness& witness_;
+    std::shared_ptr<Audio::AudioClip> clip_;
+    bool owned_, onDestroy_;
+};
+
 Framework::GameWorldSettings RigidSyncSettings() {
     Framework::GameWorldSettings settings;
     settings.physics.gravity = {};
@@ -615,6 +634,111 @@ ASTRAL_TEST(RigidBodyChangesPreserveDynamicMeshRestriction) {
     world.Tick(step);
     body = world.Physics().GetBody(world.Get<Framework::Collider>(entity)->body);
     ASTRAL_CHECK(body && body->type == Physics::BodyType::Static && world.Physics().BodyCount() == 1);
+}
+
+ASTRAL_TEST(WorldTeardownStopsOwnedOneShots) {
+    Audio::AudioMixer mixer;
+    OneShotWitness witness;
+    {
+        Framework::GameWorld world({}, &mixer);
+        world.AddBehaviour<OneShotOnCreate>(world.CreateEntity("SoundOwner"), witness);
+        ASTRAL_CHECK(mixer.IsPlaying(witness.voice) && !witness.clip.expired());
+    }
+    // Never Mix after old teardown: this detects the still-active borrowed
+    // pointer safely, without dereferencing storage released with the behavior.
+    ASTRAL_CHECK(witness.clip.expired());
+    ASTRAL_CHECK(!mixer.IsPlaying(witness.voice));
+}
+
+ASTRAL_TEST(WorldSharedOneShotsSurviveBehaviourRemoval) {
+    Audio::AudioMixer mixer;
+    OneShotWitness witness;
+    Framework::GameWorld world({}, &mixer);
+    const Entity entity = world.CreateEntity("SharedSoundOwner");
+    world.AddBehaviour<OneShotOnCreate>(entity, witness, true);
+    world.Remove<Framework::Behaviours>(entity);
+    ASTRAL_CHECK(mixer.IsPlaying(witness.voice) && !witness.clip.expired());
+    std::vector<float> stereo(256 * 2);
+    mixer.Mix(stereo.data(), 256);
+    float energy = 0;
+    for (float sample : stereo) energy += sample * sample;
+    ASTRAL_CHECK(energy > 0 && mixer.IsPlaying(witness.voice));
+    mixer.Stop(witness.voice);
+    ASTRAL_CHECK(witness.clip.expired());
+}
+
+ASTRAL_TEST(WorldLegacyRawOneShotUsesAnIndependentSnapshot) {
+    Audio::AudioMixer mixer;
+    Framework::GameWorld world({}, &mixer);
+    auto source = std::make_shared<Audio::AudioClip>();
+    source->samples.assign(32, 0.25f);
+    std::weak_ptr<Audio::AudioClip> original = source;
+    const Audio::VoiceId voice = world.PlaySoundAt(source.get(), {});
+    source->samples.assign(32, -0.25f);
+    source.reset();
+    ASTRAL_CHECK(original.expired() && mixer.IsPlaying(voice));
+    float stereo[16]{};
+    mixer.Mix(stereo, 8);
+    for (float sample : stereo) ASTRAL_CHECK(sample > 0.1f && sample < 0.3f);
+}
+
+ASTRAL_TEST(WorldTeardownStopsCallbackSoundsWithoutStoppingOtherWorlds) {
+    Audio::AudioMixer mixer(48000, 2);
+    OneShotWitness callback;
+    auto otherClip = std::make_shared<Audio::AudioClip>(Audio::Synth::Tone(220, 0.25f));
+    std::weak_ptr<Audio::AudioClip> otherWeak = otherClip;
+    Audio::VoiceId otherVoice;
+    {
+        Framework::GameWorld other({}, &mixer);
+        otherVoice = other.PlaySoundAt(otherClip, {});
+        otherClip.reset();
+        {
+            Framework::GameWorld departing({}, &mixer);
+            departing.AddBehaviour<OneShotOnCreate>(departing.CreateEntity("FinalSound"), callback, true, true);
+            ASTRAL_CHECK(callback.voice.IsNull());
+        }
+        ASTRAL_CHECK(!callback.voice.IsNull() && !mixer.IsPlaying(callback.voice) && callback.clip.expired());
+        ASTRAL_CHECK(mixer.IsPlaying(otherVoice) && !otherWeak.expired());
+        float stereo[32]{};
+        mixer.Mix(stereo, 16);
+        ASTRAL_CHECK(mixer.IsPlaying(otherVoice));
+    }
+    ASTRAL_CHECK(!mixer.IsPlaying(otherVoice) && otherWeak.expired());
+}
+
+ASTRAL_TEST(WorldOneShotCleanupIgnoresStolenVoiceGenerations) {
+    Audio::AudioMixer mixer(48000, 1);
+    auto clip = std::make_shared<Audio::AudioClip>(Audio::Synth::Tone(220, 0.25f));
+    Audio::VoiceId replacement;
+    {
+        Framework::GameWorld departing({}, &mixer);
+        const Audio::VoiceId old = departing.PlaySoundAt(clip, {});
+        Audio::PlayParams params;
+        replacement = mixer.Play(clip, params); // external replacement in the same slot
+        ASTRAL_CHECK(old.index == replacement.index && old.generation != replacement.generation);
+        ASTRAL_CHECK(!mixer.IsPlaying(old) && mixer.IsPlaying(replacement));
+    }
+    ASTRAL_CHECK(mixer.IsPlaying(replacement));
+    mixer.Stop(replacement);
+}
+
+ASTRAL_TEST(WorldAudioSourceRetainsThePlayingClipUntilRelease) {
+    Audio::AudioMixer mixer;
+    Framework::GameWorld world({}, &mixer);
+    const Entity entity = world.CreateEntity("AudioSource");
+    Framework::AudioSource source;
+    source.clip = std::make_shared<Audio::AudioClip>(Audio::Synth::Tone(220, 0.25f));
+    std::weak_ptr<const Audio::AudioClip> weak = source.clip;
+    world.Add<Framework::AudioSource>(entity, std::move(source));
+    ASTRAL_CHECK(world.PlayAudio(entity));
+    auto* component = world.Get<Framework::AudioSource>(entity);
+    const Audio::VoiceId voice = component->voice;
+    component->clip.reset();
+    ASTRAL_CHECK(mixer.IsPlaying(voice) && !weak.expired());
+    float stereo[32]{};
+    mixer.Mix(stereo, 16);
+    world.Remove<Framework::AudioSource>(entity);
+    ASTRAL_CHECK(!mixer.IsPlaying(voice) && weak.expired());
 }
 
 ASTRAL_TEST_MAIN("EngineWorldTests")

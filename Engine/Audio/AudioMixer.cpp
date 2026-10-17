@@ -8,6 +8,7 @@
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <utility>
 
 namespace Astral::Audio {
 
@@ -17,6 +18,15 @@ AudioMixer::AudioMixer(int sampleRate, int maxVoices)
     : sampleRate_(std::clamp(sampleRate, 8000, 192000)), voices_(static_cast<std::size_t>(std::clamp(maxVoices, 1, 256))) {}
 
 VoiceId AudioMixer::Play(const AudioClip* clip, const PlayParams& params) {
+    return PlayInternal(clip, {}, params);
+}
+
+VoiceId AudioMixer::Play(std::shared_ptr<const AudioClip> clip, const PlayParams& params) {
+    const AudioClip* raw = clip.get();
+    return PlayInternal(raw, std::move(clip), params);
+}
+
+VoiceId AudioMixer::PlayInternal(const AudioClip* clip, std::shared_ptr<const AudioClip> owner, const PlayParams& params) {
     if (!clip || clip->samples.empty() || clip->sampleRate <= 0) return {};
     std::lock_guard<std::mutex> lock(mutex_);
     std::size_t slot = voices_.size();
@@ -40,6 +50,7 @@ VoiceId AudioMixer::Play(const AudioClip* clip, const PlayParams& params) {
         ++stats_.stolenVoices;
     }
     Voice& voice = voices_[slot];
+    voice.owner = std::move(owner);
     voice.clip = clip;
     voice.params = params;
     voice.params.volume = std::isfinite(params.volume) ? std::max(0.0f, params.volume) : 0.0f;
@@ -54,7 +65,12 @@ VoiceId AudioMixer::Play(const AudioClip* clip, const PlayParams& params) {
 
 void AudioMixer::Stop(VoiceId id) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (id.index < voices_.size() && voices_[id.index].generation == id.generation) voices_[id.index].active = false;
+    if (id.index < voices_.size() && voices_[id.index].generation == id.generation) {
+        Voice& voice = voices_[id.index];
+        voice.active = false;
+        voice.clip = nullptr;
+        voice.owner.reset();
+    }
 }
 
 bool AudioMixer::IsPlaying(VoiceId id) const {
@@ -144,6 +160,11 @@ void AudioMixer::Mix(float* stereo, int frames) {
             stereo[f * 2] += sample * left;
             stereo[f * 2 + 1] += sample * right;
             voice.cursor += step;
+        }
+        if (!voice.params.loop && voice.cursor >= length) voice.active = false;
+        if (!voice.active) {
+            voice.clip = nullptr;
+            voice.owner.reset();
         }
     }
     // Soft limiter (tanh-like knee above 0.8) keeps the master bus out of clipping.
