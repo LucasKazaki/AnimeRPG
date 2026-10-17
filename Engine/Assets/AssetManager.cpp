@@ -14,10 +14,36 @@ namespace Astral::Assets {
 
 namespace {
 
-std::filesystem::file_time_type Stamp(const std::string& path) {
-    std::error_code ec;
-    const auto time = std::filesystem::last_write_time(path, ec);
-    return ec ? std::filesystem::file_time_type{} : time;
+Detail::FileState Observe(const std::string& path, const std::string& contentRoot) {
+    Detail::FileState state;
+    try {
+        std::error_code ec;
+        const auto root = std::filesystem::canonical(contentRoot.empty() ? "." : contentRoot, ec);
+        if (ec) { state.error = ec.value(); return state; }
+        const auto target = std::filesystem::weakly_canonical(path, ec);
+        if (ec) { state.error = ec.value(); return state; }
+        auto part = target.begin();
+        std::filesystem::path prefix;
+        for (auto rootPart = root.begin(); rootPart != root.end() && part != target.end(); ++rootPart) prefix /= *part++;
+        if (!std::filesystem::equivalent(root, prefix, ec) || ec) {
+            // Canonical validation may consult metadata, but never collect an
+            // outside target's size/time or retain it as a watch. The logical
+            // in-root path can transition from this denied state after repair.
+            state.error = static_cast<int>(std::errc::permission_denied);
+            return state;
+        }
+        state.target = target.string();
+        state.exists = std::filesystem::exists(target, ec);
+        if (ec) { state.error = ec.value(); return state; }
+        if (!state.exists) return state;
+        state.stamp = std::filesystem::last_write_time(target, ec);
+        if (ec) { state.error = ec.value(); return state; }
+        state.size = std::filesystem::file_size(target, ec);
+        state.error = ec.value();
+    } catch (const std::system_error& e) {
+        state.error = e.code().value();
+    }
+    return state;
 }
 
 bool ReadBytes(const std::string& path, std::vector<std::uint8_t>& out, std::string& error) {
@@ -73,11 +99,13 @@ std::shared_ptr<Detail::AssetSlot> AssetManager::LoadSlot(std::type_index type, 
     if (!ValidPath(path)) {
         slot->state = AssetState::Failed;
         slot->error = "invalid content path '" + path + "' (relative paths without '..' only)";
+        ++slot->attempt;
         return slot;
     }
     if (!loaders_.count(type)) {
         slot->state = AssetState::Failed;
         slot->error = "no loader registered for this asset type";
+        ++slot->attempt;
         return slot;
     }
     RunLoad(slot, async);
@@ -90,13 +118,16 @@ void AssetManager::RunLoad(const std::shared_ptr<Detail::AssetSlot>& slot, bool 
     auto work = [this, slot, loader, absolute] {
         Finished finished;
         finished.slot = slot;
-        finished.stamp = Stamp(absolute);
+        finished.source = Observe(absolute, root_);
+        LoadInfo info;
         try {
-            finished.ok = loader(absolute, finished.data, finished.error);
+            finished.ok = loader(absolute, finished.data, finished.error, info);
         } catch (const std::exception& e) {
             finished.ok = false;
             finished.error = e.what();
         }
+        finished.files = std::move(info.files);
+        finished.issues = std::move(info.issues);
         std::lock_guard<std::mutex> lock(finishedMutex_);
         finished_.push_back(std::move(finished));
     };
@@ -113,11 +144,25 @@ void AssetManager::RunLoad(const std::shared_ptr<Detail::AssetSlot>& slot, bool 
 void AssetManager::Publish(Finished finished) {
     Detail::AssetSlot& slot = *finished.slot;
     slot.pending = false;
-    slot.stamp = finished.stamp;
+    slot.source = std::move(finished.source);
+    slot.attemptFiles = std::move(finished.files);
+    slot.issues = std::move(finished.issues);
+    ++slot.attempt;
+    // Retain the last-good manifest if this attempt stopped before rediscovering
+    // it, but acknowledge each file's current observation once per attempt.
+    for (auto& file : slot.goodFiles) file.state = Observe(file.path, root_);
+    // Initial import remains compatible with glTF's documented image warnings.
+    // A corrupt replacement must not erase an existing model's good images.
+    if (finished.ok && slot.version != 0 && !slot.issues.empty()) {
+        finished.ok = false;
+        finished.error = slot.issues.front();
+    }
+    if (!finished.ok && finished.error.empty()) finished.error = "asset load failed";
     if (finished.ok) {
         slot.data = std::move(finished.data);
         slot.error.clear();
         slot.state = AssetState::Ready;
+        slot.goodFiles = slot.attemptFiles;
         ++slot.version;
     } else if (slot.state == AssetState::Ready) {
         // A failed hot reload keeps the last good data and reports the error.
@@ -178,8 +223,22 @@ std::size_t AssetManager::PollChanges() {
     for (const auto& entry : cache_) {
         const Detail::AssetSlot& slot = *entry.second;
         if (slot.pending || !ValidPath(slot.path) || !loaders_.count(slot.type)) continue;
-        const auto stamp = Stamp(Resolve(slot.path));
-        if (stamp != std::filesystem::file_time_type{} && stamp != slot.stamp) changed.push_back(slot.path);
+        bool different = Observe(Resolve(slot.path), root_) != slot.source;
+        const auto check = [&](const std::vector<Detail::FileObservation>& files) {
+            for (const auto& file : files) if (Observe(file.path, root_) != file.state) return true;
+            return false;
+        };
+        if (!different) different = check(slot.attemptFiles);
+        // Compare old good dependencies against their most recent observation,
+        // not their successful stamp, otherwise an unchanged failed edit loops.
+        if (!different) {
+            for (const auto& file : slot.goodFiles) {
+                const auto latest = std::find_if(slot.attemptFiles.begin(), slot.attemptFiles.end(),
+                    [&](const auto& attempted) { return attempted.path == file.path; });
+                if (latest == slot.attemptFiles.end() && Observe(file.path, root_) != file.state) { different = true; break; }
+            }
+        }
+        if (different) changed.push_back(slot.path);
     }
     std::sort(changed.begin(), changed.end());
     changed.erase(std::unique(changed.begin(), changed.end()), changed.end());
@@ -231,9 +290,21 @@ void AssetManager::RegisterDefaultLoaders() {
     });
     GltfImportOptions gltfOptions;
     gltfOptions.approvedRoot = root_.empty() ? "." : root_;
-    RegisterLoader<GltfDocument>([gltfOptions](const std::string& path, GltfDocument& out, std::string& error) {
-        return ImportGltf(path, out, error, gltfOptions);
-    });
+    loaders_[std::type_index(typeid(GltfDocument))] = [gltfOptions](const std::string& path,
+        std::shared_ptr<void>& out, std::string& error, LoadInfo& info) {
+        auto object = std::make_shared<GltfDocument>();
+        GltfImportReport report;
+        GltfImportOptions options = gltfOptions;
+        options.report = &report;
+        options.observeFile = [&](const std::string& file) {
+            if (std::none_of(info.files.begin(), info.files.end(), [&](const auto& observed) { return observed.path == file; }))
+                info.files.push_back({file, Observe(file, gltfOptions.approvedRoot)});
+        };
+        const bool ok = ImportGltf(path, *object, error, options);
+        info.issues = std::move(report.imageErrors);
+        if (ok) out = std::move(object);
+        return ok;
+    };
     RegisterLoader<Audio::AudioClip>([](const std::string& path, Audio::AudioClip& out, std::string& error) {
         return Audio::ReadWav(path, out, error);
     });

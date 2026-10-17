@@ -159,6 +159,7 @@ private:
     void RegisterCommands();
     std::unique_ptr<GameWorld> MakeWorld();
     void Activate(SceneDocument document, const std::string& path);
+    void WatchReloadAttempt(const std::vector<Assets::AssetDependency>& attempted);
     bool Report(const std::string& error); // logs a load error, returns false
     void ProcessRequests();
     void DrawStats(Graphics::ImageRgba8& image) const;
@@ -180,8 +181,8 @@ private:
     std::string scenePath_;
     ProjectDesc project_;
     std::vector<std::string> pendingLoads_;
-    Assets::AssetHandle<Core::JsonValue> sceneHandle_; // hot reload watches its version
-    std::uint32_t sceneVersion_{};
+    std::vector<Assets::AssetDependency> sceneWatches_; // last good + latest failed candidate
+    bool hasScene_{}; // initial imports preserve documented nonfatal image warnings
     Math::Vec2 viewport_{1280.0f, 720.0f};
     float sinceReloadCheck_{};
     bool paused_{};

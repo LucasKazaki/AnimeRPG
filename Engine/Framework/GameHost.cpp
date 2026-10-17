@@ -272,8 +272,8 @@ void GameHost::ResetWorld() {
     quitSubscription_ = world_->Events().SubscribeScoped<QuitRequest>([this](const QuitRequest&) { quitRequested_ = true; });
     document_ = {};
     scenePath_.clear();
-    sceneHandle_ = {};
-    sceneVersion_ = 0;
+    sceneWatches_.clear();
+    hasScene_ = false;
 }
 
 void GameHost::Activate(SceneDocument document, const std::string& path) {
@@ -281,6 +281,7 @@ void GameHost::Activate(SceneDocument document, const std::string& path) {
     document_ = std::move(document);
     scenePath_ = path;
     SceneSerializer(assets_.get()).Instantiate(document_, *world_);
+    hasScene_ = true;
     ++stats_.sceneLoads;
     lastError_.clear();
 }
@@ -291,19 +292,35 @@ bool GameHost::Report(const std::string& error) {
     return false;
 }
 
+void GameHost::WatchReloadAttempt(const std::vector<Assets::AssetDependency>& attempted) {
+    sceneWatches_ = document_.dependencies;
+    for (const auto& dependency : attempted) {
+        if (std::find(sceneWatches_.begin(), sceneWatches_.end(), dependency) == sceneWatches_.end())
+            sceneWatches_.push_back(dependency);
+    }
+    // Acknowledge failures independently of successful asset/world versions.
+    // Retain failed new dependencies, but never report an unchanged poll twice.
+    for (auto& dependency : sceneWatches_) dependency.Refresh();
+}
+
 bool GameHost::LoadScene(const std::string& requested, std::string& error) {
     const std::string path = requested; // may alias scenePath_, which activation resets
     if (path.empty()) return Report(error = "no scene path");
     const auto handle = assets_->Load<JsonValue>(path);
-    if (!handle.Ready()) return Report(error = path + ": " + handle.Error());
+    std::vector<Assets::AssetDependency> attempted{handle.Dependency()};
+    const auto reject = [&](const std::string& message) {
+        // A failed open of another scene does not schedule an automatic switch.
+        if (path == scenePath_) WatchReloadAttempt(attempted);
+        return Report(error = path + ": " + message);
+    };
+    if (!handle.Ready() || !handle.Error().empty()) return reject(handle.Error());
     SceneDocument document;
     std::string parseError;
-    if (!SceneSerializer(assets_.get()).Parse(*handle.Get(), document, parseError)) {
-        return Report(error = path + ": " + parseError);
+    if (!SceneSerializer(assets_.get()).Parse(*handle.Get(), document, parseError, &attempted, hasScene_)) {
+        return reject(parseError);
     }
     Activate(std::move(document), path);
-    sceneHandle_ = handle;
-    sceneVersion_ = handle.Version();
+    sceneWatches_ = document_.dependencies;
     console_->Print("loaded " + path);
     return true;
 }
@@ -311,7 +328,7 @@ bool GameHost::LoadScene(const std::string& requested, std::string& error) {
 bool GameHost::LoadSceneJson(const JsonValue& json, std::string& error) {
     SceneDocument document;
     std::string parseError;
-    if (!SceneSerializer(assets_.get()).Parse(json, document, parseError)) return Report(error = parseError);
+    if (!SceneSerializer(assets_.get()).Parse(json, document, parseError, nullptr, hasScene_)) return Report(error = parseError);
     Activate(std::move(document), {});
     return true;
 }
@@ -382,8 +399,7 @@ void GameHost::Update(float dt, const HostInput& input) {
         if (sinceReloadCheck_ >= settings_.hotReloadInterval) {
             sinceReloadCheck_ = 0.0f;
             assets_->PollChanges();
-            if (sceneHandle_.Valid() && sceneHandle_.Version() != sceneVersion_) {
-                sceneVersion_ = sceneHandle_.Version(); // a broken edit is reported once, not every check
+            if (std::any_of(sceneWatches_.begin(), sceneWatches_.end(), [](const auto& dependency) { return dependency.Changed(); })) {
                 std::string error;
                 if (LoadScene(scenePath_, error)) {
                     ++stats_.hotReloads;

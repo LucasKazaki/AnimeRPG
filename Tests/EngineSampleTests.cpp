@@ -3,6 +3,8 @@
 // rendering, and the sample's gameplay played through the real host.
 
 #include "Engine/Framework/Components.h"
+#include "Engine/Assets/Gltf.h"
+#include "Engine/Core/Base64.h"
 #include "Engine/Framework/GameHost.h"
 #include "Engine/Framework/Sequencer.h"
 #include "Engine/Graphics/Image.h"
@@ -11,6 +13,7 @@
 #include "Game/Samples/Playground/PlaygroundBehaviours.h"
 #include "Tests/EngineTestSupport.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -98,6 +101,71 @@ void WriteText(const std::string& path, const std::string& text) {
 // file systems with coarse timestamps.
 void Touch(const std::string& path, int seconds) {
     std::filesystem::last_write_time(path, std::filesystem::last_write_time(path) + std::chrono::seconds(seconds));
+}
+
+void WriteReloadBytes(const std::string& path, const std::vector<std::uint8_t>& bytes) {
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+}
+
+Assets::GltfDocument ReloadModel(float extent = 1.0f) {
+    Assets::GltfDocument model;
+    Assets::GltfPrimitive primitive;
+    Graphics::MeshBuilder(primitive.mesh).AddBox({}, {extent, 0.5f, 0.5f});
+    primitive.mesh.ComputeBounds();
+    primitive.material = 0;
+    model.meshes.push_back({"Fixture", {primitive}});
+    Assets::GltfNode node;
+    node.name = "Imported";
+    node.mesh = 0;
+    model.nodes.push_back(node);
+    model.scenes.push_back({"Fixture", {0}});
+    model.scene = 0;
+    Assets::GltfImage image;
+    image.image.Resize(2, 2, {255, 0, 0, 255});
+    model.images.push_back(image);
+    model.textures.push_back({"Texture", 0, false});
+    Assets::GltfMaterial material;
+    material.baseColorTexture = 0;
+    material.unlit = true;
+    model.materials.push_back(material);
+    return model;
+}
+
+struct ReloadExternalModel {
+    Core::JsonValue json;
+    std::vector<std::uint8_t> buffer;
+    std::vector<std::uint8_t> image;
+};
+
+ReloadExternalModel ExternalReloadModel(float extent = 1.0f) {
+    std::string error;
+    const auto bytes = Assets::ExportGltfToMemory(ReloadModel(extent), Assets::GltfContainer::Embedded, error);
+    ASTRAL_CHECK(!bytes.empty());
+    ReloadExternalModel out;
+    ASTRAL_CHECK(Core::ParseJson(std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()), out.json, error));
+    auto& buffer = out.json.Find("buffers")->Items()[0];
+    auto& image = out.json.Find("images")->Items()[0];
+    const std::string bufferUri = buffer.String("uri"), imageUri = image.String("uri");
+    ASTRAL_CHECK(Core::Base64Decode(std::string_view(bufferUri).substr(bufferUri.find(',') + 1), out.buffer));
+    ASTRAL_CHECK(Core::Base64Decode(std::string_view(imageUri).substr(imageUri.find(',') + 1), out.image));
+    buffer.Set("uri", "mesh.bin");
+    image.Set("uri", "image.png");
+    return out;
+}
+
+const Framework::MeshRenderer* ReloadMesh(GameHost& host) {
+    const auto entity = host.World().Find("Imported");
+    ASTRAL_CHECK(!entity.IsNull());
+    const auto* mesh = host.World().Get<Framework::MeshRenderer>(entity);
+    ASTRAL_CHECK(mesh && mesh->mesh && mesh->material);
+    return mesh;
+}
+
+float ReloadMeshExtent(GameHost& host) {
+    float extent = 0;
+    for (const auto& vertex : ReloadMesh(host)->mesh->vertices) extent = std::max(extent, std::fabs(vertex.position.x));
+    return extent;
 }
 
 Core::JsonValue NumericInputMap(double x = 1.0, double y = 0.0) {
@@ -455,6 +523,263 @@ ASTRAL_TEST(RenderedFramesShowTheWorldAndHud) {
     ASTRAL_CHECK(empty->LoadSceneJson(Parse(R"({"entities": [{"name": "Lonely"}]})"), error));
     const Graphics::ImageRgba8& placeholder = empty->Render(64, 32);
     ASTRAL_CHECK(placeholder.width == 64 && placeholder.height == 32);
+}
+
+ASTRAL_TEST(HotReloadUpdatesReferencedPrefab) {
+    const std::string root = TempDir("astral_host_reload_prefab");
+    WriteText(root + "/prefab.json", R"({"entity":{"name":"PrefabBefore","transform":{"position":[1,2,3]}}})");
+    WriteText(root + "/scene.json", R"({"entities":[{"prefab":"prefab.json"}]})");
+    auto host = MakeHost(root, true);
+    std::string error;
+    ASTRAL_CHECK(host->LoadScene("scene.json", error));
+    ASTRAL_CHECK(!host->World().Find("PrefabBefore").IsNull());
+    const auto prefab = host->Assets().Load<Core::JsonValue>("prefab.json");
+    const auto scene = host->Assets().Load<Core::JsonValue>("scene.json");
+    const std::uint32_t sceneVersion = scene.Version();
+
+    WriteText(root + "/prefab.json", R"({"entity":{"name":"PrefabAfter","transform":{"position":[4,5,6]}}})");
+    Touch(root + "/prefab.json", 5);
+    Run(*host, 15);
+    ASTRAL_CHECK(prefab.Version() == 2 && prefab->operator[]("entity").String("name") == "PrefabAfter");
+    ASTRAL_CHECK(scene.Version() == sceneVersion); // only the dependency changed
+    ASTRAL_CHECK(!host->World().Find("PrefabAfter").IsNull());
+    ASTRAL_CHECK(host->World().Find("PrefabBefore").IsNull());
+    ASTRAL_CHECK_NEAR(PositionOf(*host, "PrefabAfter").x, 4.0f, 1.0e-6f);
+    ASTRAL_CHECK(host->Stats().hotReloads == 1 && host->LastError().empty());
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(HotReloadReportsMalformedSceneJson) {
+    const std::string root = TempDir("astral_host_reload_syntax");
+    WriteText(root + "/scene.json", R"({"entities":[{"name":"LastGood"}]})");
+    auto host = MakeHost(root, true);
+    std::string error;
+    ASTRAL_CHECK(host->LoadScene("scene.json", error));
+    const auto scene = host->Assets().Load<Core::JsonValue>("scene.json");
+    const std::uint32_t version = scene.Version();
+    const std::size_t lines = host->Log().size();
+
+    WriteText(root + "/scene.json", "{\"entities\":[");
+    Touch(root + "/scene.json", 5);
+    Run(*host, 15);
+    ASTRAL_CHECK(scene.Ready() && scene.Version() == version && !scene.Error().empty());
+    ASTRAL_CHECK(!host->World().Find("LastGood").IsNull() && host->Stats().hotReloads == 0);
+    ASTRAL_CHECK(!host->LastError().empty());
+    ASTRAL_CHECK(host->Log().size() == lines + 1 && host->Log().back().find("error:") == 0);
+    const std::string diagnostic = host->LastError();
+    Run(*host, 30);
+    ASTRAL_CHECK(host->LastError() == diagnostic && host->Log().size() == lines + 1);
+
+    WriteText(root + "/scene.json", R"({"entities":[{"name":"Recovered"}]})");
+    Touch(root + "/scene.json", 10);
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && host->Stats().hotReloads == 1);
+    ASTRAL_CHECK(host->World().Find("LastGood").IsNull() && !host->World().Find("Recovered").IsNull());
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(HotReloadUpdatesNestedPrefabAndIgnoresUnrelatedErrors) {
+    const std::string root = TempDir("astral_host_reload_nested");
+    WriteText(root + "/inner.json", R"({"entity":{"name":"NestedBefore"}})");
+    WriteText(root + "/outer.json", R"({"entity":{"prefab":"inner.json"}})");
+    WriteText(root + "/scene.json", R"({"entities":[{"prefab":"outer.json"}]})");
+    auto host = MakeHost(root, true);
+    std::string error;
+    ASTRAL_CHECK(host->LoadScene("scene.json", error));
+    ASTRAL_CHECK(!host->World().Find("NestedBefore").IsNull());
+    const std::size_t lines = host->Log().size();
+    host->Assets().Load<Core::JsonValue>("unrelated.json");
+    WriteText(root + "/unrelated.json", "{");
+    Run(*host, 15);
+    ASTRAL_CHECK(host->Stats().hotReloads == 0 && host->LastError().empty() && host->Log().size() == lines);
+    WriteText(root + "/inner.json", R"({"entity":{"name":"NestedAfter"}})");
+    Touch(root + "/inner.json", 5);
+    Run(*host, 15);
+    ASTRAL_CHECK(host->Stats().hotReloads == 1 && !host->World().Find("NestedAfter").IsNull());
+    auto* world = &host->World();
+    WriteText(root + "/inner.json", R"({"entity":{"components":{"Unknown":{}}}})");
+    Touch(root + "/inner.json", 10);
+    Run(*host, 15);
+    ASTRAL_CHECK(&host->World() == world && !host->LastError().empty() && host->Stats().hotReloads == 1);
+    const auto diagnostics = host->Log().size();
+    Run(*host, 30);
+    ASTRAL_CHECK(host->Log().size() == diagnostics);
+    WriteText(root + "/inner.json", R"({"entity":{"name":"NestedRecovered"}})");
+    Touch(root + "/inner.json", 15);
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && host->Stats().hotReloads == 2);
+    ASTRAL_CHECK(!host->World().Find("NestedRecovered").IsNull());
+    world = &host->World();
+    std::filesystem::remove(root + "/inner.json");
+    Run(*host, 15);
+    ASTRAL_CHECK(&host->World() == world && !host->LastError().empty());
+    WriteText(root + "/inner.json", R"({"entity":{"name":"NestedRecreated"}})");
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && host->Stats().hotReloads == 3);
+    ASTRAL_CHECK(!host->World().Find("NestedRecreated").IsNull());
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(HotReloadPreservesWorldWhenSceneFileIsDeletedAndRecreated) {
+    const std::string root = TempDir("astral_host_reload_deleted_scene");
+    WriteText(root + "/scene.json", R"({"entities":[{"name":"BeforeDelete"}]})");
+    auto host = MakeHost(root, true);
+    std::string error;
+    ASTRAL_CHECK(host->LoadScene("scene.json", error));
+    auto* world = &host->World();
+    const auto scene = host->Assets().Load<Core::JsonValue>("scene.json");
+    std::filesystem::remove(root + "/scene.json");
+    Run(*host, 15);
+    ASTRAL_CHECK(&host->World() == world && scene.Version() == 1 && !host->LastError().empty());
+    const auto lines = host->Log().size();
+    Run(*host, 30);
+    ASTRAL_CHECK(host->Log().size() == lines);
+    WriteText(root + "/scene.json", R"({"entities":[{"name":"AfterCreate"}]})");
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && scene.Version() == 2 && host->Stats().hotReloads == 1);
+    ASTRAL_CHECK(!host->World().Find("AfterCreate").IsNull());
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(HotReloadUpdatesDirectTextureAndWavConsumersTransactionally) {
+    const std::string root = TempDir("astral_host_reload_texture_audio");
+    std::string error;
+    Graphics::ImageRgba8 image;
+    image.Resize(2, 2, {255, 0, 0, 255});
+    ASTRAL_CHECK(Graphics::WritePng(root + "/texture.png", image, error));
+    ASTRAL_CHECK(Audio::WriteWav(root + "/tone.wav", std::vector<float>(400, 0.1f), 48000, error));
+    WriteText(root + "/scene.json", R"({"materials":{"M":{"texture":"texture.png"}},"entities":[
+        {"name":"Surface","components":{"MeshRenderer":{"mesh":"primitive:cube","material":"M"}}},
+        {"name":"Sound","components":{"AudioSource":{"clip":"tone.wav","loop":true,"spatial":false}}}]})");
+    auto host = MakeHost(root, true);
+    ASTRAL_CHECK(host->LoadScene("scene.json", error));
+    Run(*host, 2);
+    const auto surface = [&] { return host->World().Get<Framework::MeshRenderer>(host->World().Find("Surface")); };
+    const auto sound = [&] { return host->World().Get<Framework::AudioSource>(host->World().Find("Sound")); };
+    ASTRAL_CHECK(surface()->material->baseTexture->Fetch(0, 0, 0).x > 0.99f);
+    ASTRAL_CHECK(sound()->clip->samples.size() == 200 && host->Audio()->IsPlaying(sound()->voice));
+    const auto oldVoice = sound()->voice;
+    const auto oldMaterial = surface()->material;
+    image.Resize(3, 3, {0, 255, 0, 255});
+    ASTRAL_CHECK(Graphics::WritePng(root + "/texture.png", image, error));
+    Touch(root + "/texture.png", 5);
+    Run(*host, 15);
+    ASTRAL_CHECK(host->Stats().hotReloads == 1 && surface()->material->baseTexture->Width() == 3);
+    ASTRAL_CHECK(surface()->material->baseTexture->Fetch(0, 0, 0).y > 0.99f);
+    ASTRAL_CHECK(oldMaterial->baseTexture->Fetch(0, 0, 0).x > 0.99f); // old resource lifetime survives replacement
+    ASTRAL_CHECK(!host->Audio()->IsPlaying(oldVoice) && host->Audio()->IsPlaying(sound()->voice));
+    ASTRAL_CHECK(Audio::WriteWav(root + "/tone.wav", std::vector<float>(800, 0.6f), 48000, error));
+    Touch(root + "/tone.wav", 5);
+    Run(*host, 15);
+    ASTRAL_CHECK(host->Stats().hotReloads == 2 && sound()->clip->samples.size() == 400);
+    ASTRAL_CHECK_NEAR(sound()->clip->samples[0], 0.6f, 0.001f);
+    auto* goodWorld = &host->World();
+    WriteText(root + "/tone.wav", "not a WAV");
+    Touch(root + "/tone.wav", 10);
+    Run(*host, 15);
+    ASTRAL_CHECK(&host->World() == goodWorld && !host->LastError().empty() && sound()->clip->samples.size() == 400);
+    const auto failures = host->Log().size();
+    Run(*host, 30);
+    ASTRAL_CHECK(host->Log().size() == failures);
+    ASTRAL_CHECK(Audio::WriteWav(root + "/tone.wav", std::vector<float>(1000, 0.3f), 48000, error));
+    Touch(root + "/tone.wav", 15);
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && sound()->clip->samples.size() == 500);
+    goodWorld = &host->World();
+    std::filesystem::remove(root + "/texture.png");
+    Run(*host, 15);
+    ASTRAL_CHECK(&host->World() == goodWorld && !host->LastError().empty());
+    ASTRAL_CHECK(Graphics::WritePng(root + "/texture.png", image, error));
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && host->Stats().hotReloads == 4);
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(HotReloadUpdatesModelAndExternalBufferImageConsumers) {
+    const std::string root = TempDir("astral_host_reload_models");
+    std::string error;
+    ASTRAL_CHECK(Assets::ExportGltf(ReloadModel(), root + "/model.glb", Assets::GltfContainer::Binary, error));
+    WriteText(root + "/scene.json", R"({"entities":[{"model":"model.glb"}]})");
+    auto host = MakeHost(root, true);
+    ASTRAL_CHECK(host->LoadScene("scene.json", error));
+    ASTRAL_CHECK_NEAR(ReloadMeshExtent(*host), 1.0f, 1.0e-6f);
+    ASTRAL_CHECK(Assets::ExportGltf(ReloadModel(2), root + "/model.glb", Assets::GltfContainer::Binary, error));
+    Touch(root + "/model.glb", 5);
+    Run(*host, 15);
+    ASTRAL_CHECK_NEAR(ReloadMeshExtent(*host), 2.0f, 1.0e-6f);
+    const auto model = host->Assets().Load<Assets::GltfDocument>("model.glb");
+    const auto modelVersion = model.Version();
+    auto* goodWorld = &host->World();
+    WriteText(root + "/model.glb", "{");
+    Run(*host, 15);
+    ASTRAL_CHECK(&host->World() == goodWorld && model.Version() == modelVersion && !host->LastError().empty());
+    ASTRAL_CHECK(Assets::ExportGltf(ReloadModel(3), root + "/model.glb", Assets::GltfContainer::Binary, error));
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && model.Version() == modelVersion + 1);
+    ASTRAL_CHECK_NEAR(ReloadMeshExtent(*host), 3.0f, 1.0e-6f);
+
+    auto external = ExternalReloadModel();
+    WriteReloadBytes(root + "/mesh.bin", external.buffer);
+    WriteReloadBytes(root + "/image.png", external.image);
+    WriteText(root + "/external.gltf", Core::WriteJson(external.json));
+    WriteText(root + "/scene.json", R"({"entities":[{"model":"external.gltf"}]})");
+    Touch(root + "/scene.json", 5);
+    Run(*host, 15);
+    const auto scene = host->Assets().Load<Core::JsonValue>("scene.json");
+    const auto sceneVersion = scene.Version();
+    const auto gltf = host->Assets().Load<Assets::GltfDocument>("external.gltf");
+    const auto enlarged = ExternalReloadModel(4);
+    WriteReloadBytes(root + "/mesh.bin", enlarged.buffer);
+    Touch(root + "/mesh.bin", 5);
+    Run(*host, 15);
+    ASTRAL_CHECK_NEAR(ReloadMeshExtent(*host), 4.0f, 1.0e-6f);
+    const auto bufferVersion = gltf.Version();
+    goodWorld = &host->World();
+    std::filesystem::remove(root + "/mesh.bin");
+    Run(*host, 15);
+    ASTRAL_CHECK(&host->World() == goodWorld && gltf.Version() == bufferVersion && !host->LastError().empty());
+    const auto bufferMessages = host->Log().size();
+    Run(*host, 30);
+    ASTRAL_CHECK(host->Log().size() == bufferMessages);
+    WriteReloadBytes(root + "/mesh.bin", enlarged.buffer);
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && gltf.Version() == bufferVersion + 1);
+    ASTRAL_CHECK_NEAR(ReloadMeshExtent(*host), 4.0f, 1.0e-6f);
+    Graphics::ImageRgba8 green;
+    green.Resize(3, 3, {0, 255, 0, 255});
+    ASTRAL_CHECK(Graphics::WritePng(root + "/image.png", green, error));
+    Touch(root + "/image.png", 5);
+    Run(*host, 15);
+    ASTRAL_CHECK(ReloadMesh(*host)->material->baseTexture->Width() == 3);
+    ASTRAL_CHECK(ReloadMesh(*host)->material->baseTexture->Fetch(0, 0, 0).y > 0.99f);
+    ASTRAL_CHECK(scene.Version() == sceneVersion);
+    const auto goodVersion = gltf.Version();
+    goodWorld = &host->World();
+    WriteText(root + "/image.png", "corrupt PNG replacement");
+    Run(*host, 15);
+    ASTRAL_CHECK(&host->World() == goodWorld && gltf.Version() == goodVersion && !host->LastError().empty());
+    ASTRAL_CHECK(ReloadMesh(*host)->material->baseTexture->Width() == 3);
+    ASTRAL_CHECK(Graphics::WritePng(root + "/image.png", green, error));
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && gltf.Version() == goodVersion + 1);
+
+    // Failed candidate introduces a model/image absent from the good manifest.
+    // Fixing only that new image must recover, even after asset collection.
+    external.json.Find("images")->Items()[0].Set("uri", "future.png");
+    WriteText(root + "/new.gltf", Core::WriteJson(external.json));
+    WriteText(root + "/scene.json", R"({"entities":[{"name":"RecoveredNewModel","model":"new.gltf"}]})");
+    Touch(root + "/scene.json", 10);
+    goodWorld = &host->World();
+    Run(*host, 15);
+    ASTRAL_CHECK(&host->World() == goodWorld && !host->LastError().empty());
+    const auto messages = host->Log().size();
+    host->Assets().Collect();
+    Run(*host, 30);
+    ASTRAL_CHECK(host->Log().size() == messages);
+    ASTRAL_CHECK(Graphics::WritePng(root + "/future.png", green, error));
+    Run(*host, 15);
+    ASTRAL_CHECK(host->LastError().empty() && !host->World().Find("RecoveredNewModel").IsNull());
+    std::filesystem::remove_all(root);
 }
 
 ASTRAL_TEST(HotReloadPicksUpSceneEdits) {

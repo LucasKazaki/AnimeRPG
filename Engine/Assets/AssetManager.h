@@ -36,6 +36,22 @@ namespace Astral::Assets {
 enum class AssetState : std::uint8_t { Loading, Ready, Failed };
 
 namespace Detail {
+struct FileState {
+    bool exists{};
+    std::filesystem::file_time_type stamp{};
+    std::uintmax_t size{};
+    std::string target; // detects an in-root link retarget even with equal size/time
+    int error{};
+    bool operator==(const FileState& other) const {
+        return exists == other.exists && stamp == other.stamp && size == other.size && target == other.target
+            && error == other.error;
+    }
+    bool operator!=(const FileState& other) const { return !(*this == other); }
+};
+struct FileObservation {
+    std::string path;
+    FileState state;
+};
 struct AssetSlot {
     std::string path;     // relative content path
     std::type_index type{typeid(void)};
@@ -43,11 +59,31 @@ struct AssetSlot {
     std::shared_ptr<void> data;
     std::string error;
     std::uint32_t version{};
-    std::filesystem::file_time_type stamp{};
+    std::uint64_t attempt{};
+    FileState source;
+    std::vector<FileObservation> goodFiles;
+    std::vector<FileObservation> attemptFiles;
+    std::vector<std::string> issues;
     bool pending{}; // an async load is in flight
     std::vector<std::function<void()>> onReady;
 };
 } // namespace Detail
+
+// A typed load's identity and completed-attempt snapshot. Retaining it keeps
+// failed/missing assets in the cache until their scene candidate no longer needs
+// them. Refresh after handling an attempt to avoid repeated-poll diagnostics.
+class AssetDependency {
+public:
+    bool Changed() const { return slot_ && slot_->attempt != attempt_; }
+    void Refresh() { if (slot_) attempt_ = slot_->attempt; }
+    bool operator==(const AssetDependency& other) const { return slot_ == other.slot_; }
+
+private:
+    template <typename T> friend class AssetHandle;
+    explicit AssetDependency(std::shared_ptr<Detail::AssetSlot> slot) : slot_(std::move(slot)) { Refresh(); }
+    std::shared_ptr<Detail::AssetSlot> slot_;
+    std::uint64_t attempt_{};
+};
 
 template <typename T>
 class AssetHandle {
@@ -62,8 +98,16 @@ public:
     const T* operator->() const { return Get(); }
     const std::string& Path() const { return slot_ ? slot_->path : Empty(); }
     const std::string& Error() const { return slot_ ? slot_->error : Empty(); }
-    // Increments every time the asset is (re)loaded; compare to rebuild derived data.
+    // Successful publications only; a failed edit preserves the last good version.
     std::uint32_t Version() const { return slot_ ? slot_->version : 0u; }
+    // Every completed load, including failure. Ready can still expose last-good
+    // data after failure; Error describes the current attempt, not that data.
+    std::uint64_t Attempt() const { return slot_ ? slot_->attempt : 0u; }
+    AssetDependency Dependency() const { return AssetDependency(slot_); }
+    const std::vector<std::string>& Issues() const {
+        static const std::vector<std::string> empty;
+        return slot_ ? slot_->issues : empty;
+    }
     bool operator==(const AssetHandle& other) const { return slot_ == other.slot_; }
 
 private:
@@ -84,6 +128,10 @@ struct AssetManagerStats {
 };
 
 class AssetManager {
+    struct LoadInfo {
+        std::vector<Detail::FileObservation> files;
+        std::vector<std::string> issues;
+    };
 public:
     // Loaders run on worker threads for async loads: absolute path in, object out.
     template <typename T>
@@ -98,7 +146,7 @@ public:
     template <typename T>
     void RegisterLoader(Loader<T> loader) {
         loaders_[std::type_index(typeid(T))] = [loader = std::move(loader)](const std::string& path,
-                                                   std::shared_ptr<void>& out, std::string& error) {
+                                                   std::shared_ptr<void>& out, std::string& error, LoadInfo&) {
             auto object = std::make_shared<T>();
             if (!loader(path, *object, error)) return false;
             out = std::move(object);
@@ -126,7 +174,7 @@ public:
     std::size_t Update();
     // Blocks until every in-flight load has finished, then publishes them.
     void WaitForAll();
-    // Re-imports assets whose source file timestamp changed. Returns the count.
+    // Re-imports changed sources/dependencies, including deletion and recovery.
     std::size_t PollChanges();
     // Forces a reload of one asset (e.g. from a console command).
     bool Reload(const std::string& path);
@@ -138,13 +186,15 @@ public:
     AssetManagerStats Stats() const;
 
 private:
-    using ErasedLoader = std::function<bool(const std::string&, std::shared_ptr<void>&, std::string&)>;
+    using ErasedLoader = std::function<bool(const std::string&, std::shared_ptr<void>&, std::string&, LoadInfo&)>;
     struct Finished {
         std::shared_ptr<Detail::AssetSlot> slot;
         std::shared_ptr<void> data;
         std::string error;
         bool ok{};
-        std::filesystem::file_time_type stamp{};
+        Detail::FileState source;
+        std::vector<Detail::FileObservation> files;
+        std::vector<std::string> issues;
     };
 
     std::shared_ptr<Detail::AssetSlot> LoadSlot(std::type_index type, const std::string& path, bool async);
