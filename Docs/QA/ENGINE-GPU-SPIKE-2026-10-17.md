@@ -9,7 +9,9 @@ Base `5245a3dd079083a534b4afd16924a6a5496d1a0d`, dedicated
 No local configure, compilation, GPU device creation, rendering, native UI,
 performance result or image inspection has run for this packet. Production and
 workflow source pre-reviews are clean. The first hosted compile attempt failed
-in a test fixture; exact receipts and the bounded correction are recorded below.
+in a test fixture; a reviewed correction passed the next hosted compile and
+diagnostic-only run. Actual production HLSL compilation coverage is being added
+without device creation; exact receipt boundaries are recorded below.
 The coordinator currently holds hardware execution pending desktop/GPU ownership
 and RAM headroom. Other applications/processes are untouched.
 
@@ -120,5 +122,45 @@ attempt. It does not establish even complete hosted compile acceptance.
 Actual run metadata and complete head/merge logs are retained externally in
 `work/d3d11-evidence/hosted-39063303365.json`, `hosted-first-head.log`,
 `hosted-first-merge.log` and `hosted-39063303365-watch.log`. No identical rerun was
-requested. Correction source review/new commit and a new hosted attempt are
-pending. Human desktop/GPU hold and local RAM/build/test hold remain in force.
+requested. The reviewed correction was committed as
+`5c94667c0456cc5e7ad79f5866527ff630f3458a`; its exact two-file delta SHA256 was
+`0BBCD2C3D0577D9C05239939DD336A8B56D5521255169C77A41830F9F3A2021A`.
+The coordinator bound/published it for the new immutable run below. Human
+desktop/GPU hold and local RAM/build/test hold remain in force.
+
+## Second hosted attempt: C++ compile and existing diagnostics pass
+
+[Run 39063541722](https://github.com/LucasKazaki/AnimeRPG/actions/runs/39063541722)
+completed successfully on October 17, 2026, before the next test edit.
+
+| Job | Exact checkout | Start / finish UTC | Actual result |
+| --- | --- | --- | --- |
+| [Head 117486326133](https://github.com/LucasKazaki/AnimeRPG/actions/runs/39063541722/job/117486326133) | `5c94667c0456cc5e7ad79f5866527ff630f3458a` | 19:41:29 / 19:43:47 | Debug/Release target builds; one CPU diagnostic case passes each |
+| [Merge 117486326033](https://github.com/LucasKazaki/AnimeRPG/actions/runs/39063541722/job/117486326033) | `db2aa0beedb094f38e3f4334b3cd11bfc1302a18` | 19:41:29 / 19:43:29 | Debug/Release target builds; one CPU diagnostic case passes each |
+
+Both exact-checkout provenance steps passed. The merge's ordered parents were
+`2c69888774c074a69ec12c5f659e3632280db420` and
+`5c94667c0456cc5e7ad79f5866527ff630f3458a`. Clean tracked-tree steps passed.
+Complete logs/metadata: `work/d3d11-evidence/hosted-second-head.log`,
+`hosted-second-merge.log`, `hosted-39063541722-final.json` and its watch log.
+These runs compiled all Windows backend/test C++ in both configurations and
+executed the deliberately invalid plus trivial valid shader compiler fixtures.
+They did not call Initialize or compile the actual built-in VS/PS, which was
+previously compiled only inside device initialization. Thus they establish C++
+and diagnostic-helper coverage, not production HLSL or hardware acceptance.
+
+## Production HLSL coverage extension: source prepared, execution pending
+
+After that immutable run completed, the coordinator requested the same unique
+CPU-only filter additionally compile the exact production
+`Detail::kOpaqueUnlitShader` through the existing production CompileShader helper:
+VSMain/vs_5_0 and PSMain/ps_5_0, each with debug and optimized flags. The test
+includes the existing BuiltinShaders header, asserts successful/nonempty bytecode
+and prints full diagnostics on failure. It keeps the existing invalid/valid
+diagnostic assertions, duplicates no HLSL, and creates no device. No production,
+CMake, workflow, hardware assertion, budget or tolerance changes.
+
+This extension has not run. Its bounded test/QA diff requires independent review,
+a new commit and new hosted head/merge execution. All local hardware, visual,
+performance, device-failure and live-object validation remains pending under the
+persistent user/RAM holds. Hosted compilation cannot satisfy those gates.

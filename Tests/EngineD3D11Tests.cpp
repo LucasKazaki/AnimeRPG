@@ -1,4 +1,5 @@
 #include "Engine/Framework/GameWorld.h"
+#include "Engine/Graphics/D3D11/BuiltinShaders.h"
 #include "Engine/Graphics/D3D11/D3D11Renderer.h"
 #include "Engine/Graphics/D3D11/ShaderCompiler.h"
 #include "Engine/Graphics/Image.h"
@@ -205,6 +206,20 @@ ASTRAL_TEST(ShaderCompilerReturnsRealDiagnosticsAndRecovers) {
     std::printf("Expected shader error: %s\n", broken.diagnostics.c_str());
     const auto fixed = GPU::CompileShader("float4 Main() : SV_Target { return float4(1,0,0,1); }", "valid-neutral-fixture", "Main", "ps_5_0");
     ASTRAL_CHECK(fixed.Succeeded() && fixed.bytecode.size() > 16);
+    // Compile the exact production source without Initialize/device creation.
+    // Cover both helper flag paths independently of the executable build mode.
+    for (bool debug : {true, false}) {
+        const auto vertex = GPU::CompileShader(GPU::Detail::kOpaqueUnlitShader,
+            "AstralOpaqueUnlit", "VSMain", "vs_5_0", debug);
+        Require(vertex.Succeeded(), vertex.diagnostics);
+        ASTRAL_CHECK(!vertex.bytecode.empty());
+        const auto pixel = GPU::CompileShader(GPU::Detail::kOpaqueUnlitShader,
+            "AstralOpaqueUnlit", "PSMain", "ps_5_0", debug);
+        Require(pixel.Succeeded(), pixel.diagnostics);
+        ASTRAL_CHECK(!pixel.bytecode.empty());
+        std::printf("Production opaque Unlit shaders debug=%d VSbytes=%zu PSbytes=%zu\n",
+            debug, vertex.bytecode.size(), pixel.bytecode.size());
+    }
 }
 
 ASTRAL_TEST(WorldRenderSceneMatchesHardwareUnlitAndLinearTextures) {
