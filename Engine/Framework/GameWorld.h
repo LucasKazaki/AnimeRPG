@@ -35,7 +35,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -118,8 +120,15 @@ public:
     // Adds or replaces a component (a replaced component's runtime object is released).
     template <typename T, typename... Args>
     T& Add(Entity entity, Args&&... args) {
-        if (T* existing = registry_.Get<T>(entity)) Release(entity, *existing);
-        return registry_.Add<T>(entity, std::forward<Args>(args)...);
+        if constexpr (std::is_same_v<T, Behaviours>) {
+            if (ReleasingBehaviours(entity)) throw std::invalid_argument("behaviour attachment during teardown");
+            T replacement(std::forward<Args>(args)...);
+            RemoveBehaviours(entity);
+            return registry_.Add<T>(entity, std::move(replacement));
+        } else {
+            if (T* existing = registry_.Get<T>(entity)) Release(entity, *existing);
+            return registry_.Add<T>(entity, std::forward<Args>(args)...);
+        }
     }
     template <typename T>
     T* Get(Entity entity) { return registry_.Get<T>(entity); }
@@ -128,19 +137,27 @@ public:
     // Removes a component and releases its runtime object (body, voice, emitter...).
     template <typename T>
     void Remove(Entity entity) {
-        if (T* component = registry_.Get<T>(entity)) Release(entity, *component);
-        registry_.Remove<T>(entity);
+        if constexpr (std::is_same_v<T, Behaviours>) {
+            RemoveBehaviours(entity);
+        } else {
+            if (T* component = registry_.Get<T>(entity)) Release(entity, *component);
+            registry_.Remove<T>(entity);
+        }
     }
 
     // ---------------------------------------------------------------- behaviours
     template <typename T, typename... Args>
     T& AddBehaviour(Entity entity, Args&&... args) {
+        if (!IsAlive(entity) || ReleasingBehaviours(entity))
+            throw std::invalid_argument("behaviour attachment on a destroyed entity or during teardown");
         auto behaviour = std::make_shared<T>(std::forward<Args>(args)...);
         T& reference = *behaviour;
         Attach(entity, std::move(behaviour), {});
         return reference;
     }
     // By registered name with reflected properties. Null with `error` on failure.
+    // OnDestroy may remove/destroy recursively or attach to other entities.
+    // Attaching a behaviour to the entity currently being torn down is rejected.
     Behaviour* AddBehaviour(Entity entity, const std::string& type, const Core::JsonValue& properties, std::string& error,
         const BehaviourRegistry& registry = BehaviourRegistry::Global());
     template <typename T>
@@ -211,6 +228,8 @@ public:
     bool BuildRenderScene(Graphics::RenderScene& scene, Graphics::RenderView& view, int width, int height) const;
 
 private:
+    bool ReleasingBehaviours(Entity entity) const;
+    void RemoveBehaviours(Entity entity);
     void Attach(Entity entity, std::shared_ptr<Behaviour> behaviour, const std::string& typeName);
     void Create(Behaviour& behaviour);
     std::vector<std::pair<Entity, std::shared_ptr<Behaviour>>> SnapshotBehaviours();
@@ -263,6 +282,7 @@ private:
     UI::CanvasPanel* hud_{};
     std::vector<std::weak_ptr<Behaviour>> pendingCreate_;
     std::vector<Entity> pendingDestroy_;
+    std::vector<Entity> releasingBehaviours_;
     int batchDepth_{};
     float accumulator_{};
     float time_{};
