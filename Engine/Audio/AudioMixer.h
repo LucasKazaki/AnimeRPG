@@ -10,6 +10,7 @@
 #include "Engine/Math/VectorMath.h"
 
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -54,7 +55,10 @@ class AudioMixer {
 public:
     explicit AudioMixer(int sampleRate = 48000, int maxVoices = 32);
 
+    // Borrowed low-level path: the caller keeps an immutable clip alive until
+    // this voice stops. Prefer the owning overload for independently lived SFX.
     VoiceId Play(const AudioClip* clip, const PlayParams& params);
+    VoiceId Play(std::shared_ptr<const AudioClip> clip, const PlayParams& params);
     void Stop(VoiceId id);
     bool IsPlaying(VoiceId id) const;
     void SetVoicePosition(VoiceId id, Math::Vec3 position);
@@ -72,12 +76,14 @@ public:
 private:
     struct Voice {
         const AudioClip* clip{};
+        std::shared_ptr<const AudioClip> owner;
         PlayParams params;
         double cursor{};
         std::uint32_t generation{1};
         bool active{};
         std::uint64_t startOrder{};
     };
+    VoiceId PlayInternal(const AudioClip* clip, std::shared_ptr<const AudioClip> owner, const PlayParams& params);
     void ComputeGains(const Voice& voice, float& left, float& right) const;
 
     int sampleRate_;
