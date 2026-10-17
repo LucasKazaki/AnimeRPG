@@ -5,10 +5,11 @@ Base: `c644eec79752b9dc101aeca6b03141cf26854c96`.
 Owned branch: `engine/numeric-repair-20261017`.
 Worktree: `C:/Users/lucas/Documents/Codex/2026-10-17/files-pasted-by-the-user-you/work/astral-numeric`.
 
-Status: implementation and focused native Debug/Release verification complete;
-independent review, full repaired-build matrix, native smokes and integration
-remain coordinator gates. This record does not establish engine workflow,
-performance, GPU or 24-hour soak acceptance.
+Status: implementation, independent review, full native Debug/Release builds,
+deterministic tests and native smokes complete. The bounded CPU cost check passes
+its declared relative guard. Hosted source/merge-result checks, remote merge and
+integrated-main verification remain pending. This is not complete engine workflow,
+general performance, GPU or 24-hour soak acceptance.
 
 ## Environment and ownership
 
@@ -132,11 +133,12 @@ are atomic; compatibility wrappers use documented `{0,0}`/NaN sentinels.
 The signed 32-bit raster limit is tied to actual `lround`/GDI/HUD consumers and
 does not reject ordinary finite offscreen points.
 
-Independent substantive diff/commit review, complete repaired Debug/Release
-builds and deterministic CTest, serialized repaired native smokes, representative
-performance comparison, proposed-integration/current-main verification and any
-portable sanitizer evidence remain pending with the coordinator. GPU rendering
-and the 24-hour soak are outside this bounded numeric packet and remain open.
+At the implementation-owner checkpoint, independent review, the full native
+matrix, representative cost comparison and integration checks were pending.
+The coordinator results below supersede that checkpoint: review, full native
+matrix and bounded cost comparison are complete. Hosted source/merge-result
+checks, remote merge, integrated-main verification and local portable sanitizer
+evidence remain pending. GPU rendering and the 24-hour soak remain open.
 
 ## Coordinator verification and independent review
 
