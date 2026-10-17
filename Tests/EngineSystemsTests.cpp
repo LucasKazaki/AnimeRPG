@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <fstream>
 #include <initializer_list>
+#include <limits>
 
 using namespace Astral;
 using Math::Vec3;
@@ -92,7 +93,7 @@ Input::InputSystem MakeCombatInput() {
     input.AddContext(thought);
     return input;
 }
-Input::InputSnapshot Keys(std::initializer_list<std::uint16_t> down, float dt = 1.0f / 60.0f) {
+Input::InputSnapshot KeySnapshot(std::initializer_list<std::uint16_t> down, float dt = 1.0f / 60.0f) {
     Input::InputSnapshot s;
     for (std::uint16_t k : down) s.keys.set(k);
     s.dt = dt;
@@ -102,42 +103,223 @@ Input::InputSnapshot Keys(std::initializer_list<std::uint16_t> down, float dt = 
 
 ASTRAL_TEST(InputActionsAxesAndEdges) {
     Input::InputSystem input = MakeCombatInput();
-    input.Update(Keys({'W', 'D'}));
+    input.Update(KeySnapshot({'W', 'D'}));
     const Math::Vec2 axis = input.Axis("Move");
     ASTRAL_CHECK_NEAR(Math::Length(axis), 1.0f, 1e-5); // diagonal normalised
     ASTRAL_CHECK(input.Down("Move"));
-    input.Update(Keys({'J'}));
+    input.Update(KeySnapshot({'J'}));
     ASTRAL_CHECK(input.Pressed("LightAttack"));
-    input.Update(Keys({'J'}));
+    input.Update(KeySnapshot({'J'}));
     ASTRAL_CHECK(!input.Pressed("LightAttack") && input.Down("LightAttack"));
-    input.Update(Keys({}));
+    input.Update(KeySnapshot({}));
     ASTRAL_CHECK(input.Released("LightAttack") && input.Tapped("LightAttack"));
     // Double tap within the window.
-    input.Update(Keys({'Q'}));
-    input.Update(Keys({}));
-    input.Update(Keys({'Q'}));
+    input.Update(KeySnapshot({'Q'}));
+    input.Update(KeySnapshot({}));
+    input.Update(KeySnapshot({'Q'}));
     ASTRAL_CHECK(input.DoubleTapped("Dash"));
 }
 
 ASTRAL_TEST(InputBufferAndContextsPriority) {
     Input::InputSystem input = MakeCombatInput();
     // Pressed during an attack recovery, consumed 8 frames later: still fires once.
-    input.Update(Keys({'J'}));
-    for (int i = 0; i < 8; ++i) input.Update(Keys({}));
+    input.Update(KeySnapshot({'J'}));
+    for (int i = 0; i < 8; ++i) input.Update(KeySnapshot({}));
     ASTRAL_CHECK(input.ConsumeBuffered("LightAttack"));
     ASTRAL_CHECK(!input.ConsumeBuffered("LightAttack"));
     // Too late: the 0.25 s buffer has expired.
-    input.Update(Keys({'J'}));
-    for (int i = 0; i < 20; ++i) input.Update(Keys({}));
+    input.Update(KeySnapshot({'J'}));
+    for (int i = 0; i < 20; ++i) input.Update(KeySnapshot({}));
     ASTRAL_CHECK(!input.ConsumeBuffered("LightAttack"));
     // The Thought prompt context captures J while open (typing does not attack).
     ASTRAL_CHECK(input.SetContextEnabled("ThoughtPrompt", true));
-    input.Update(Keys({'J'}));
+    input.Update(KeySnapshot({'J'}));
     ASTRAL_CHECK(input.Pressed("TypeJ"));
     ASTRAL_CHECK(!input.Pressed("LightAttack"));
     input.SetContextEnabled("ThoughtPrompt", false);
-    input.Update(Keys({}));
+    input.Update(KeySnapshot({}));
     ASTRAL_CHECK(!input.Down("TypeJ"));
+}
+
+ASTRAL_TEST(InputExtremeFiniteAxesPreserveDirectionAndCancellation) {
+    using namespace Input;
+    const float largest = std::numeric_limits<float>::max();
+    const float smallest = std::numeric_limits<float>::denorm_min();
+    struct AxisCase { std::vector<Binding> bindings; Math::Vec2 expected; };
+    const std::vector<AxisCase> cases = {
+        {{{'W', {largest, largest}}, {'D', {largest, largest}}}, {0.70710678f, 0.70710678f}},
+        {{{'W', {largest, largest}}, {'D', {-largest, -largest}}}, {}},
+        {{{'W', {largest, 0}}, {'D', {1, 0}}, {'A', {-largest, 0}}}, {1, 0}},
+        {{{'W', {smallest, 0}}}, {smallest, 0}},
+        {{{'W', {0.25f, -0.5f}}}, {0.25f, -0.5f}},
+    };
+    for (const AxisCase& axisCase : cases) {
+        InputSystem input;
+        InputContext context;
+        context.name = "Finite axes";
+        context.actions = {ActionDesc{"Move", ActionType::Axis2D, axisCase.bindings}};
+        ASTRAL_CHECK(input.AddContext(context));
+        input.Update(KeySnapshot({'W', 'D', 'A'}));
+        const Math::Vec2 axis = input.Axis("Move");
+        ASTRAL_CHECK(std::isfinite(axis.x) && std::isfinite(axis.y));
+        if (axisCase.expected.x == smallest) ASTRAL_CHECK(axis.x == smallest);
+        else ASTRAL_CHECK_NEAR(axis.x, axisCase.expected.x, 1e-6);
+        ASTRAL_CHECK_NEAR(axis.y, axisCase.expected.y, 1e-6);
+        ASTRAL_CHECK(input.Down("Move") == (axisCase.expected.x != 0 || axisCase.expected.y != 0));
+    }
+}
+
+ASTRAL_TEST(InputElapsedTimersStayFiniteAndExpireBeyondLargestWindow) {
+    using namespace Input;
+    const float largest = std::numeric_limits<float>::max();
+    InputContext context;
+    context.name = "Finite time";
+    context.actions = {ActionDesc{"Held", ActionType::Button, {{'W', {}}}, largest, largest, largest}};
+    InputSystem input;
+    ASTRAL_CHECK(input.AddContext(context));
+    input.Update(KeySnapshot({'W'}, 0));
+    ASTRAL_CHECK(input.Pressed("Held") && !input.DoubleTapped("Held"));
+    input.Update(KeySnapshot({'W'}, largest));
+    ASTRAL_CHECK(input.HeldSeconds("Held") == largest && !input.ConsumeBuffered("Held"));
+    input.Update(KeySnapshot({'W'}, largest));
+    ASTRAL_CHECK(input.HeldSeconds("Held") == largest);
+    input.Update(KeySnapshot({}, 0));
+    ASTRAL_CHECK(input.Released("Held") && !input.Tapped("Held"));
+    input.Update(KeySnapshot({'W'}, 0));
+    ASTRAL_CHECK(input.Pressed("Held") && !input.DoubleTapped("Held"));
+    for (float dt : {std::numeric_limits<float>::infinity(), -largest,
+             std::numeric_limits<float>::quiet_NaN(), 0.0f}) {
+        input.Update(KeySnapshot({'W'}, dt));
+        ASTRAL_CHECK(input.HeldSeconds("Held") == 0 && !input.Pressed("Held"));
+        ASTRAL_CHECK(std::isfinite(input.Axis("Held").x) && std::isfinite(input.Axis("Held").y));
+    }
+    input.Update(KeySnapshot({}, 0));
+    ASTRAL_CHECK(input.Tapped("Held"));
+    input.Update(KeySnapshot({'W'}, 0));
+    ASTRAL_CHECK(input.DoubleTapped("Held"));
+}
+
+ASTRAL_TEST(InputDisabledContextsStillAgePriorPressHistory) {
+    using namespace Input;
+    const float largest = std::numeric_limits<float>::max();
+    InputContext context;
+    context.name = "History";
+    context.actions = {ActionDesc{"Tap", ActionType::Button, {{'W', {}}}, 0, largest, largest}};
+    InputSystem input;
+    ASTRAL_CHECK(input.AddContext(context));
+    input.Update(KeySnapshot({'W'}, 0));
+    input.Update(KeySnapshot({}, 0));
+    ASTRAL_CHECK(input.SetContextEnabled("History", false));
+    input.Update(KeySnapshot({}, largest));
+    input.Update(KeySnapshot({}, largest));
+    ASTRAL_CHECK(input.SetContextEnabled("History", true));
+    input.Update(KeySnapshot({'W'}, 0));
+    if (input.DoubleTapped("Tap")) std::fprintf(stderr, "expired disabled-context history still double-taps\n");
+    ASTRAL_CHECK(input.Pressed("Tap") && !input.DoubleTapped("Tap"));
+
+    // A short disabled interval preserves history, and enabled frames age it
+    // exactly once (the accumulated 0.2 seconds remains inside 0.3 seconds).
+    InputSystem ordinary;
+    context.actions[0].doubleTapSeconds = 0.3f;
+    ASTRAL_CHECK(ordinary.AddContext(context));
+    ordinary.Update(KeySnapshot({'W'}, 0));
+    ordinary.Update(KeySnapshot({}, 0.1f));
+    ASTRAL_CHECK(ordinary.SetContextEnabled("History", false));
+    ordinary.Update(KeySnapshot({}, 0.1f));
+    ASTRAL_CHECK(ordinary.SetContextEnabled("History", true));
+    ordinary.Update(KeySnapshot({'W'}, 0));
+    ASTRAL_CHECK(ordinary.DoubleTapped("Tap"));
+    ordinary.Update(KeySnapshot({}, 0));
+    ASTRAL_CHECK(ordinary.SetContextEnabled("History", false));
+    ordinary.Update(KeySnapshot({}, 0.31f));
+    ASTRAL_CHECK(ordinary.SetContextEnabled("History", true));
+    ordinary.Update(KeySnapshot({'W'}, 0));
+    ASTRAL_CHECK(!ordinary.DoubleTapped("Tap"));
+}
+
+ASTRAL_TEST(InputTimerSaturationDetectsLargestDeltaAfterSmallInterval) {
+    using namespace Input;
+    const float largest = std::numeric_limits<float>::max();
+    InputContext context;
+    context.name = "Residual time";
+    context.actions = {ActionDesc{"Tap", ActionType::Button, {{'W', {}}}, 0, largest, largest}};
+    InputSystem input;
+    ASTRAL_CHECK(input.AddContext(context));
+    input.Update(KeySnapshot({'W'}, 0));
+    input.Update(KeySnapshot({'W'}, 1));
+    input.Update(KeySnapshot({'W'}, largest));
+    ASTRAL_CHECK(input.HeldSeconds("Tap") == largest);
+    input.Update(KeySnapshot({}, 0));
+    const bool tapped = input.Tapped("Tap");
+    input.Update(KeySnapshot({'W'}, 0));
+    const bool doubleTapped = input.DoubleTapped("Tap");
+    if (tapped || doubleTapped) std::fprintf(stderr, "FLT_MAX plus small interval: tapped=%d doubleTapped=%d\n", tapped, doubleTapped);
+    ASTRAL_CHECK(!tapped && !doubleTapped);
+    InputSystem exact;
+    ASTRAL_CHECK(exact.AddContext(context));
+    exact.Update(KeySnapshot({'W'}, 0));
+    exact.Update(KeySnapshot({'W'}, largest));
+    exact.Update(KeySnapshot({}, 0));
+    ASTRAL_CHECK(exact.Tapped("Tap"));
+    exact.Update(KeySnapshot({'W'}, 0));
+    ASTRAL_CHECK(exact.DoubleTapped("Tap")); // exactly FLT_MAX remains inside the window
+}
+
+ASTRAL_TEST(InputContextRejectsInvalidNumbersBeforeMutation) {
+    using namespace Input;
+    InputContext good;
+    good.name = "Original";
+    good.actions = {ActionDesc{"Keep", ActionType::Button, {{'W', {}}}, 0.5f}};
+    InputSystem input;
+    ASTRAL_CHECK(input.AddContext(good));
+    input.Update(KeySnapshot({'W'}));
+    const std::string originalBindings = input.SaveBindings();
+    const float invalid[] = {std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::infinity(),
+        -std::numeric_limits<float>::infinity(), -1.0f};
+    for (int field = 0; field < 5; ++field) {
+        for (float value : invalid) {
+            if (field < 2 && value == -1.0f) continue; // finite negative axes are valid
+            InputContext rejected;
+            rejected.name = "Rejected";
+            rejected.priority = 100;
+            rejected.consumesKeys = true;
+            rejected.actions = {ActionDesc{"Partial", ActionType::Button, {{'W', {}}}}, good.actions[0]};
+            ActionDesc& bad = rejected.actions[1];
+            if (field == 0) bad.bindings[0].axisContribution.x = value;
+            if (field == 1) bad.bindings[0].axisContribution.y = value;
+            if (field == 2) bad.bufferSeconds = value;
+            if (field == 3) bad.doubleTapSeconds = value;
+            if (field == 4) bad.tapMaxSeconds = value;
+            std::string error;
+            ASTRAL_CHECK(!input.AddContext(rejected, &error) && error.find("actions[1]") != std::string::npos);
+            ASTRAL_CHECK(input.SaveBindings() == originalBindings && !input.SetContextEnabled("Rejected", false));
+            input.Update(KeySnapshot({'W'}));
+            ASTRAL_CHECK(input.Down("Keep") && !input.Pressed("Keep") && !input.Down("Partial"));
+        }
+    }
+    ASTRAL_CHECK(input.HeldSeconds("Keep") > 0.0f && input.ConsumeBuffered("Keep"));
+}
+
+ASTRAL_TEST(InputFiniteAxisRepairPreservesPriorityAndKeyConsumption) {
+    using namespace Input;
+    InputContext high;
+    high.name = "High";
+    high.priority = 10;
+    high.consumesKeys = true;
+    const float largest = std::numeric_limits<float>::max();
+    high.actions = {ActionDesc{"Move", ActionType::Axis2D, {{'W', {largest, 0}}, {'D', {-largest, 0}}}}};
+    InputContext low;
+    low.name = "Low";
+    low.actions = {ActionDesc{"Other", ActionType::Button, {{'W', {}}}}};
+    InputSystem input;
+    ASTRAL_CHECK(input.AddContext(low) && input.AddContext(high));
+    input.Update(KeySnapshot({'W'}));
+    ASTRAL_CHECK(input.Axis("Move").x == 1 && input.Pressed("Move") && !input.Down("Other"));
+    input.Update(KeySnapshot({'W', 'D'}));
+    ASTRAL_CHECK(input.Axis("Move").x == 0 && input.Released("Move") && !input.Down("Other"));
+    ASTRAL_CHECK(input.SetContextEnabled("High", false));
+    input.Update(KeySnapshot({'W'}));
+    ASTRAL_CHECK(input.Axis("Move").x == 0 && input.Pressed("Other"));
 }
 
 ASTRAL_TEST(InputRebindingAndRecordingRoundTrip) {
@@ -148,15 +330,17 @@ ASTRAL_TEST(InputRebindingAndRecordingRoundTrip) {
     Input::InputSystem restored = MakeCombatInput();
     std::string error;
     ASTRAL_CHECK(restored.LoadBindings(saved, error));
-    restored.Update(Keys({'U'}));
+    restored.Update(KeySnapshot({'U'}));
     ASTRAL_CHECK(restored.Pressed("LightAttack"));
     ASTRAL_CHECK(!restored.LoadBindings("ASTRAL_BINDINGS 1\nGameplay LightAttack 0 999\n", error));
+    ASTRAL_CHECK(!restored.LoadBindings("ASTRAL_BINDINGS 1\nGameplay LightAttack 0 75\nGameplay Move 0 999\n", error));
+    ASTRAL_CHECK(restored.SaveBindings() == saved);
     ASTRAL_CHECK(!restored.LoadBindings("junk", error));
 
     Input::InputRecording recording;
-    recording.Record(Keys({'W'}, 0.016f));
-    recording.Record(Keys({'W', 'J'}, 0.017f));
-    recording.Record(Keys({}, 0.016f));
+    recording.Record(KeySnapshot({'W'}, 0.016f));
+    recording.Record(KeySnapshot({'W', 'J'}, 0.017f));
+    recording.Record(KeySnapshot({}, 0.016f));
     Input::InputRecording replay;
     ASTRAL_CHECK(replay.Deserialize(recording.Serialize(), error));
     ASTRAL_CHECK(replay.FrameCount() == 3);
@@ -175,10 +359,10 @@ ASTRAL_TEST(InputRebindingAndRecordingRoundTrip) {
 
 ASTRAL_TEST(InputRecordingPreservesMouseDeltas) {
     Input::InputRecording recording;
-    Input::InputSnapshot look = Keys({'W'}, 0.016f);
+    Input::InputSnapshot look = KeySnapshot({'W'}, 0.016f);
     look.mouseDelta = {12.5f, -3.25f};
     recording.Record(look);
-    Input::InputSnapshot still = Keys({}, 0.02f);
+    Input::InputSnapshot still = KeySnapshot({}, 0.02f);
     recording.Record(still);
     Input::InputRecording replay;
     std::string error;
@@ -191,6 +375,12 @@ ASTRAL_TEST(InputRecordingPreservesMouseDeltas) {
     ASTRAL_CHECK(replay.Deserialize("ASTRAL_INPUT 1 1\n0.01 87\n", error) && replay.Frame(0).Down('W'));
     ASTRAL_CHECK(!replay.Deserialize("ASTRAL_INPUT 2 1\n0.01\n", error));
     ASTRAL_CHECK(!replay.Deserialize("ASTRAL_INPUT 2 1\n0.01 nan 0\n", error));
+    const std::string previous = replay.Serialize();
+    ASTRAL_CHECK(!replay.Deserialize("ASTRAL_INPUT 2 1\n1e100 0 0\n", error));
+    ASTRAL_CHECK(!replay.Deserialize("ASTRAL_INPUT 2 1\n0.01 1e100 0\n", error));
+    ASTRAL_CHECK(replay.Serialize() == previous);
+    ASTRAL_CHECK(replay.Deserialize("ASTRAL_INPUT 2 1\n3.40282347e38 3.40282347e38 -3.40282347e38 87\n", error));
+    ASTRAL_CHECK(std::isfinite(replay.Frame(0).dt) && std::isfinite(replay.Frame(0).mouseDelta.x));
 }
 
 // ------------------------------------------------------------------ Audio

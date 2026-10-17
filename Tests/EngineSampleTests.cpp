@@ -12,10 +12,12 @@
 #include "Tests/EngineTestSupport.h"
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -98,6 +100,15 @@ void Touch(const std::string& path, int seconds) {
     std::filesystem::last_write_time(path, std::filesystem::last_write_time(path) + std::chrono::seconds(seconds));
 }
 
+Core::JsonValue NumericInputMap(double x = 1.0, double y = 0.0) {
+    Core::JsonValue json = Parse(R"({"contexts":[{"name":"Numeric","actions":[
+        {"name":"Move","type":"Axis2D","bindings":[{"key":"W","axis":[1,0]}]}]}]})");
+    auto& axis = json.Find("contexts")->Items()[0].Find("actions")->Items()[0].Find("bindings")->Items()[0].Find("axis")->Items();
+    axis[0] = Core::JsonValue(x);
+    axis[1] = Core::JsonValue(y);
+    return json;
+}
+
 } // namespace
 
 ASTRAL_TEST(KeyNamesRoundTrip) {
@@ -151,6 +162,100 @@ ASTRAL_TEST(ProjectFilesParseAndReportErrors) {
         if (ok || error.find(expected) == std::string::npos) std::fprintf(stderr, "  expected '%s' in '%s'\n", expected, error.c_str());
         ASTRAL_CHECK(!ok && error.find(expected) != std::string::npos);
     }
+}
+
+ASTRAL_TEST(HostExtremeFiniteAxisBindingsRemainDirectional) {
+    const std::string root = TempDir("astral_host_finite_axis");
+    WriteText(root + "/empty.scene.json", R"({"entities": []})");
+    WriteText(root + "/project.json", R"({"format":"astral-project","name":"Finite input fixture",
+        "startupScene":"empty.scene.json","input":{"contexts":[{"name":"Neutral","actions":[
+        {"name":"Move","type":"Axis2D","bindings":[{"key":"W","axis":[3e38,0]},
+        {"key":"D","axis":[3e38,0]}]}]}]}})");
+    Framework::HostSettings settings;
+    settings.contentRoot = root;
+    settings.workerThreads = 0;
+    settings.audio = false;
+    GameHost host(settings);
+    std::string error;
+    ASTRAL_CHECK(host.LoadProject("project.json", error));
+    ASTRAL_CHECK(host.Project().input[0].actions[0].bindings[0].axisContribution.x == 3.0e38f);
+    host.Update(kFrame, Hold({"W", "D"}));
+    const Math::Vec2 axis = host.Input().Axis("Move");
+    if (!std::isfinite(axis.x) || !std::isfinite(axis.y))
+        std::fprintf(stderr, "host axis after simultaneous finite bindings: [%.9g, %.9g]\n", axis.x, axis.y);
+    ASTRAL_CHECK(std::isfinite(axis.x) && std::isfinite(axis.y));
+    ASTRAL_CHECK_NEAR(axis.x, 1.0f, 1e-6);
+    ASTRAL_CHECK(axis.y == 0.0f && host.Input().Pressed("Move"));
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(InputJsonRejectsInvalidFloatNumbersTransactionally) {
+    std::vector<Input::InputContext> contexts;
+    std::string error;
+    ASTRAL_CHECK(Framework::ParseInputMap(NumericInputMap(), contexts, error));
+    Framework::ProjectDesc previous;
+    previous.name = "Previous";
+    previous.startupScene = "previous.scene.json";
+    previous.input = contexts;
+    const double invalid[] = {1e100, -1e100, std::numeric_limits<double>::infinity(),
+        -std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()};
+    for (int component = 0; component < 2; ++component) {
+        for (double number : invalid) {
+            const Core::JsonValue input = component == 0 ? NumericInputMap(number, 0) : NumericInputMap(1, number);
+            ASTRAL_CHECK(!Framework::ParseInputMap(input, contexts, error));
+            ASTRAL_CHECK(error.find("input.contexts[0].actions[0].bindings[0].axis[" + std::to_string(component) + "]") != std::string::npos);
+            ASTRAL_CHECK(contexts.size() == 1 && contexts[0].name == "Numeric");
+            ASTRAL_CHECK(contexts[0].actions[0].bindings[0].axisContribution.x == 1);
+            Core::JsonValue project = Parse(R"({"format":"astral-project","name":"Rejected","startupScene":"new.scene.json"})");
+            project.Set("input", input);
+            ASTRAL_CHECK(!Framework::ParseProject(project, previous, error));
+            ASTRAL_CHECK(previous.name == "Previous" && previous.startupScene == "previous.scene.json");
+            ASTRAL_CHECK(previous.input[0].actions[0].bindings[0].axisContribution.x == 1);
+        }
+    }
+    for (const char* timer : {"bufferSeconds", "doubleTapSeconds", "tapMaxSeconds"}) {
+        for (double number : {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(), -1.0, 11.0}) {
+            Core::JsonValue input = NumericInputMap();
+            input.Find("contexts")->Items()[0].Find("actions")->Items()[0].Set(timer, number);
+            ASTRAL_CHECK(!Framework::ParseInputMap(input, contexts, error));
+            ASTRAL_CHECK(error.find(timer) != std::string::npos && contexts[0].name == "Numeric");
+        }
+    }
+    ASTRAL_CHECK(Framework::ParseInputMap(NumericInputMap(std::numeric_limits<float>::max(), 1e-40), contexts, error));
+    ASTRAL_CHECK(contexts[0].actions[0].bindings[0].axisContribution.x == std::numeric_limits<float>::max());
+    ASTRAL_CHECK(contexts[0].actions[0].bindings[0].axisContribution.y > 0);
+}
+
+ASTRAL_TEST(HostRejectsInvalidNumericInputWithoutReplacingProject) {
+    const std::string root = TempDir("astral_host_reject_nonfinite_input");
+    WriteText(root + "/neutral.scene.json", R"({"entities":[{"name":"Sentinel"}]})");
+    Core::JsonValue json = Parse(R"({"format":"astral-project","name":"Current","startupScene":"neutral.scene.json"})");
+    json.Set("input", NumericInputMap());
+    Framework::ProjectDesc project;
+    std::string error;
+    ASTRAL_CHECK(Framework::ParseProject(json, project, error));
+    Framework::HostSettings settings;
+    settings.contentRoot = root;
+    settings.workerThreads = 0;
+    settings.audio = false;
+    GameHost host(settings);
+    ASTRAL_CHECK(host.ApplyProject(project, error));
+    host.Update(kFrame, Hold({"W"}));
+    const std::string bindings = host.Input().SaveBindings();
+    Framework::ProjectDesc rejected = project;
+    rejected.name = "Rejected";
+    rejected.config = {{"host.showStats", "true"}};
+    rejected.input[0].actions[0].bindings[0].axisContribution.x = std::numeric_limits<float>::quiet_NaN();
+    ASTRAL_CHECK(!host.ApplyProject(rejected, error) && error.find("input.contexts[0]") != std::string::npos);
+    ASTRAL_CHECK(host.Project().name == "Current" && host.Input().SaveBindings() == bindings);
+    ASTRAL_CHECK(!host.Commands().Find("host.showStats")->GetBool() && !host.World().Find("Sentinel").IsNull());
+    json.Set("input", NumericInputMap(1e100));
+    WriteText(root + "/invalid.json", Core::WriteJson(json));
+    ASTRAL_CHECK(!host.LoadProject("invalid.json", error) && error.find("axis[0]") != std::string::npos);
+    ASTRAL_CHECK(host.Project().name == "Current" && host.Input().SaveBindings() == bindings);
+    host.Update(kFrame, Hold({"W"}));
+    ASTRAL_CHECK(host.Input().Axis("Move").x == 1 && !host.Input().Pressed("Move"));
+    std::filesystem::remove_all(root);
 }
 
 ASTRAL_TEST(PlaygroundLoadsWithInputHudAndStars) {

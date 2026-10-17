@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -31,6 +32,31 @@ bool EqualsIgnoringCase(std::string_view a, std::string_view b) {
         if (x != y) return false;
     }
     return true;
+}
+
+// Widen before addition; compensation retains a small residual when large
+// opposing finite contributions cancel. In-memory float binding sums fit double.
+struct AxisSum {
+    double sum{};
+    double correction{};
+    void Add(float component) {
+        const double value = component;
+        const double next = sum + value;
+        correction += std::fabs(sum) >= std::fabs(value) ? (sum - next) + value : (value - next) + sum;
+        sum = next;
+    }
+    double Value() const { return sum + correction; }
+};
+
+bool AdvanceElapsed(float& seconds, float dt) {
+    constexpr double limit = std::numeric_limits<float>::max();
+    const double larger = std::max(static_cast<double>(seconds), static_cast<double>(dt));
+    const double smaller = std::min(static_cast<double>(seconds), static_cast<double>(dt));
+    // Subtract the larger operand near the limit so FLT_MAX + a small positive
+    // interval is recognized even when their rounded double sum is FLT_MAX.
+    const bool exceeded = larger > limit / 2 && smaller > limit - larger;
+    seconds = static_cast<float>(std::min(limit, static_cast<double>(seconds) + dt));
+    return exceeded;
 }
 
 } // namespace
@@ -65,13 +91,33 @@ std::string KeyName(std::uint16_t key) {
     return {};
 }
 
-void InputSystem::AddContext(const InputContext& context) {
+bool InputSystem::AddContext(const InputContext& context, std::string* error) {
+    for (std::size_t i = 0; i < context.actions.size(); ++i) {
+        const ActionDesc& action = context.actions[i];
+        const std::string path = "context '" + context.name + "'.actions[" + std::to_string(i) + "]";
+        const std::pair<const char*, float> timers[] = {{"bufferSeconds", action.bufferSeconds},
+            {"doubleTapSeconds", action.doubleTapSeconds}, {"tapMaxSeconds", action.tapMaxSeconds}};
+        for (const auto& timer : timers) {
+            if (!std::isfinite(timer.second) || timer.second < 0.0f) {
+                if (error) *error = path + "." + timer.first + ": must be finite and nonnegative";
+                return false;
+            }
+        }
+        for (std::size_t b = 0; b < action.bindings.size(); ++b) {
+            const Math::Vec2 axis = action.bindings[b].axisContribution;
+            if (!std::isfinite(axis.x) || !std::isfinite(axis.y)) {
+                if (error) *error = path + ".bindings[" + std::to_string(b) + "].axis: must be finite";
+                return false;
+            }
+        }
+    }
     contexts_.push_back(context);
     std::stable_sort(contexts_.begin(), contexts_.end(),
         [](const InputContext& a, const InputContext& b) { return a.priority > b.priority; });
     for (const ActionDesc& action : context.actions) {
         if (!Find(action.name)) states_.push_back({action.name, ActionState{}});
     }
+    return true;
 }
 
 bool InputSystem::SetContextEnabled(const std::string& name, bool enabled) {
@@ -86,13 +132,13 @@ bool InputSystem::SetContextEnabled(const std::string& name, bool enabled) {
 
 const ActionState* InputSystem::Find(const std::string& action) const {
     for (const auto& entry : states_)
-        if (entry.first == action) return &entry.second;
+        if (entry.name == action) return &entry.value;
     return nullptr;
 }
 
-ActionState* InputSystem::FindMutable(const std::string& action) {
+InputSystem::StoredState* InputSystem::FindMutable(const std::string& action) {
     for (auto& entry : states_)
-        if (entry.first == action) return &entry.second;
+        if (entry.name == action) return &entry;
     return nullptr;
 }
 
@@ -102,8 +148,11 @@ void InputSystem::Update(const InputSnapshot& snapshot) {
     // Resolve each action once, from the highest-priority enabled context that defines it.
     std::vector<std::string> resolved;
     for (auto& entry : states_) {
-        ActionState& state = entry.second;
+        ActionState& state = entry.value;
         state.pressed = state.released = state.tapped = state.doubleTapped = false;
+        // Per-action history ages once per snapshot, including disabled or
+        // shadowed contexts. Resolution below must not age it a second time.
+        if (AdvanceElapsed(state.sinceLastPress, dt)) entry.hasPreviousPress = false;
     }
     for (const InputContext& context : contexts_) {
         if (!context.enabled) continue;
@@ -111,45 +160,50 @@ void InputSystem::Update(const InputSnapshot& snapshot) {
         for (const ActionDesc& action : context.actions) {
             if (std::find(resolved.begin(), resolved.end(), action.name) != resolved.end()) continue;
             resolved.push_back(action.name);
-            ActionState* state = FindMutable(action.name);
-            if (!state) continue;
+            StoredState* stored = FindMutable(action.name);
+            if (!stored) continue;
+            ActionState* state = &stored->value;
             bool down = false;
-            Math::Vec2 axis{};
+            AxisSum axisX, axisY;
             for (const Binding& binding : action.bindings) {
                 if (binding.key >= 256 || !available.test(binding.key)) continue;
                 down = true;
-                axis += binding.axisContribution;
+                axisX.Add(binding.axisContribution.x);
+                axisY.Add(binding.axisContribution.y);
                 consumed.set(binding.key);
             }
             if (action.type == ActionType::Axis2D) {
-                const float length = Math::Length(axis);
-                state->axis = length > 1.0f ? axis / length : axis;
-                down = length > 0.0f;
+                const double x = axisX.Value(), y = axisY.Value();
+                const double length = std::hypot(x, y);
+                const double divisor = std::max(1.0, length);
+                state->axis = {static_cast<float>(x / divisor), static_cast<float>(y / divisor)};
+                down = length > 0.0;
             }
             const bool wasDown = state->down;
             state->down = down;
-            state->sinceLastPress += dt;
             state->bufferRemaining = std::max(0.0f, state->bufferRemaining - dt);
             if (down && !wasDown) {
                 state->pressed = true;
-                state->doubleTapped = state->sinceLastPress <= action.doubleTapSeconds;
+                state->doubleTapped = stored->hasPreviousPress && state->sinceLastPress <= action.doubleTapSeconds;
+                stored->hasPreviousPress = true;
                 state->sinceLastPress = 0.0f;
                 state->heldSeconds = 0.0f;
+                stored->heldBeyondRange = false;
                 state->bufferRemaining = std::max(action.bufferSeconds, 1.0e-4f);
             } else if (down) {
-                state->heldSeconds += dt;
+                if (AdvanceElapsed(state->heldSeconds, dt)) stored->heldBeyondRange = true;
             }
             if (!down && wasDown) {
                 state->released = true;
-                state->tapped = state->heldSeconds <= action.tapMaxSeconds;
+                state->tapped = !stored->heldBeyondRange && state->heldSeconds <= action.tapMaxSeconds;
             }
         }
         if (context.consumesKeys) available &= ~consumed;
     }
     // Actions not defined by any enabled context read as released.
     for (auto& entry : states_) {
-        if (std::find(resolved.begin(), resolved.end(), entry.first) != resolved.end()) continue;
-        ActionState& state = entry.second;
+        if (std::find(resolved.begin(), resolved.end(), entry.name) != resolved.end()) continue;
+        ActionState& state = entry.value;
         state.released = state.down;
         state.down = false;
         state.axis = {};
@@ -166,9 +220,9 @@ float InputSystem::HeldSeconds(const std::string& a) const { const ActionState* 
 Math::Vec2 InputSystem::Axis(const std::string& a) const { const ActionState* s = Find(a); return s ? s->axis : Math::Vec2{}; }
 
 bool InputSystem::ConsumeBuffered(const std::string& action) {
-    ActionState* state = FindMutable(action);
-    if (!state || state->bufferRemaining <= 0.0f) return false;
-    state->bufferRemaining = 0.0f;
+    StoredState* state = FindMutable(action);
+    if (!state || state->value.bufferRemaining <= 0.0f) return false;
+    state->value.bufferRemaining = 0.0f;
     return true;
 }
 

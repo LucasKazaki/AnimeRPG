@@ -50,13 +50,14 @@ enum class ActionType : std::uint8_t { Button, Axis2D };
 
 struct Binding {
     std::uint16_t key{};
-    Math::Vec2 axisContribution{}; // Axis2D: e.g. W = (0, 1), A = (-1, 0)
+    Math::Vec2 axisContribution{}; // finite; Axis2D: e.g. W = (0, 1), A = (-1, 0)
 };
 
 struct ActionDesc {
     std::string name;
     ActionType type{ActionType::Button};
     std::vector<Binding> bindings;
+    // Direct contexts accept all nonnegative finite float timing values.
     float bufferSeconds{0.0f};  // keep a press available this long for ConsumeBuffered
     float doubleTapSeconds{0.3f};
     float tapMaxSeconds{0.2f};
@@ -84,7 +85,10 @@ struct ActionState {
 
 class InputSystem {
 public:
-    void AddContext(const InputContext& context);
+    // Rejects the entire context before mutation when any contribution is
+    // nonfinite or any timer is nonfinite/negative. Existing callers may ignore
+    // the result. Finite contributions retain their full float range.
+    bool AddContext(const InputContext& context, std::string* error = nullptr);
     bool SetContextEnabled(const std::string& name, bool enabled);
     void Update(const InputSnapshot& snapshot);
 
@@ -93,6 +97,9 @@ public:
     bool Released(const std::string& action) const;
     bool Tapped(const std::string& action) const;
     bool DoubleTapped(const std::string& action) const;
+    // Elapsed counters saturate at FLT_MAX; intervals beyond that range never
+    // qualify as taps/double taps. First-ever presses are not double taps.
+    // Prior-press history ages once per Update even while its contexts are disabled.
     float HeldSeconds(const std::string& action) const;
     Math::Vec2 Axis(const std::string& action) const;
     // True once per buffered press, even if the press happened a few frames ago.
@@ -104,11 +111,17 @@ public:
     bool LoadBindings(const std::string& text, std::string& error);
 
 private:
+    struct StoredState {
+        std::string name;
+        ActionState value;
+        bool hasPreviousPress{};
+        bool heldBeyondRange{};
+    };
     const ActionState* Find(const std::string& action) const;
-    ActionState* FindMutable(const std::string& action);
+    StoredState* FindMutable(const std::string& action);
 
     std::vector<InputContext> contexts_;
-    std::vector<std::pair<std::string, ActionState>> states_;
+    std::vector<StoredState> states_;
 };
 
 // Frame-exact capture and playback of snapshots.
