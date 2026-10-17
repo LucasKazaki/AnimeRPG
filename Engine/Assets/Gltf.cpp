@@ -76,6 +76,12 @@ std::uint32_t ReadU32(const std::uint8_t* p) {
         | (static_cast<std::uint32_t>(p[2]) << 16) | (static_cast<std::uint32_t>(p[3]) << 24);
 }
 
+std::uint32_t ReadUnsignedComponent(const std::uint8_t* p, int type) {
+    if (type == kUnsignedInt) return ReadU32(p);
+    if (type == kUnsignedShort) return static_cast<std::uint32_t>(p[0]) | (static_cast<std::uint32_t>(p[1]) << 8);
+    return static_cast<std::uint32_t>(p[0]);
+}
+
 void WriteU32(std::vector<std::uint8_t>& out, std::uint32_t v) {
     for (int i = 0; i < 4; ++i) out.push_back(static_cast<std::uint8_t>(v >> (8 * i)));
 }
@@ -367,11 +373,7 @@ struct Importer {
                     const std::uint8_t* p = element + c * componentSize;
                     const std::size_t slot = e * static_cast<std::size_t>(components) + static_cast<std::size_t>(c);
                     out[slot] = Decode(p, componentType, normalized);
-                    if (integers) {
-                        integers->at(slot) = componentType == kUnsignedInt ? ReadU32(p)
-                            : componentType == kUnsignedShort ? static_cast<std::uint32_t>(p[0] | (p[1] << 8))
-                                                              : static_cast<std::uint32_t>(p[0]);
-                    }
+                    if (integers) integers->at(slot) = ReadUnsignedComponent(p, componentType);
                 }
             }
         }
@@ -379,7 +381,7 @@ struct Importer {
         const JsonValue& sparse = accessor["sparse"];
         if (sparse.IsObject()) {
             const std::int64_t sparseCount = sparse.Int("count", -1);
-            if (sparseCount < 0 || static_cast<std::uint64_t>(sparseCount) > count) {
+            if (sparseCount <= 0 || static_cast<std::uint64_t>(sparseCount) > count) {
                 error = "accessor " + std::to_string(index) + " has a bad sparse count";
                 return false;
             }
@@ -396,26 +398,32 @@ struct Importer {
             const std::int64_t valueOffset = values.Int("byteOffset", 0);
             const std::size_t elementSize = static_cast<std::size_t>(components * componentSize);
             const std::size_t n = static_cast<std::size_t>(sparseCount);
-            if (indexSize == 0 || indexType == kFloat || indexOffset < 0 || valueOffset < 0
+            if ((indexType != kUnsignedByte && indexType != kUnsignedShort && indexType != kUnsignedInt)
+                || indexOffset < 0 || valueOffset < 0
                 || static_cast<std::uint64_t>(indexOffset) + n * static_cast<std::uint64_t>(indexSize) > indexView.length
                 || static_cast<std::uint64_t>(valueOffset) + n * elementSize > valueView.length) {
                 error = "accessor " + std::to_string(index) + " has out-of-range sparse data";
                 return false;
             }
+            std::uint32_t previous = 0;
             for (std::size_t s = 0; s < n; ++s) {
                 const std::uint8_t* ip = indexView.data + indexOffset + s * static_cast<std::size_t>(indexSize);
-                const std::uint32_t target = indexType == kUnsignedInt ? ReadU32(ip)
-                    : indexType == kUnsignedShort ? static_cast<std::uint32_t>(ip[0] | (ip[1] << 8))
-                                                  : static_cast<std::uint32_t>(ip[0]);
+                const std::uint32_t target = ReadUnsignedComponent(ip, indexType);
                 if (target >= count) {
                     error = "sparse index out of range";
                     return false;
                 }
+                if (s > 0 && target <= previous) {
+                    error = "sparse indices must be strictly increasing";
+                    return false;
+                }
+                previous = target;
                 for (int c = 0; c < components; ++c) {
                     const std::uint8_t* vp = valueView.data + valueOffset + s * elementSize
                         + static_cast<std::size_t>(c * componentSize);
-                    out[target * static_cast<std::size_t>(components) + static_cast<std::size_t>(c)]
-                        = Decode(vp, componentType, normalized);
+                    const std::size_t slot = target * static_cast<std::size_t>(components) + static_cast<std::size_t>(c);
+                    out[slot] = Decode(vp, componentType, normalized);
+                    if (integers) integers->at(slot) = ReadUnsignedComponent(vp, componentType);
                 }
             }
         }
