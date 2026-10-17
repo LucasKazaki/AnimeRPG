@@ -22,6 +22,7 @@
 #include "Engine/Math/VectorMath.h"
 
 #include <cstddef>
+#include <bitset>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -59,6 +60,22 @@ struct UIInput {
     std::vector<std::uint16_t> keysPressed; // virtual keys pressed this frame (Input::Keys)
     bool shift{};
     std::string text;                       // printable characters typed this frame
+};
+
+// Ownership of this frame's input, independent of where focus ends the frame.
+// Hosts must retain consumed held keys until physical release. Pointer ownership
+// includes an owned gesture's release/cancellation, not just a hovered widget.
+struct UIInputResult {
+    std::bitset<256> consumedKeys;
+    bool keyboardCaptured{};
+    bool pointerConsumed{};
+    bool modal{};
+    void Merge(const UIInputResult& other) {
+        consumedKeys |= other.consumedKeys;
+        keyboardCaptured = keyboardCaptured || other.keyboardCaptured;
+        pointerConsumed = pointerConsumed || other.pointerConsumed;
+        modal = modal || other.modal;
+    }
 };
 
 struct Theme {
@@ -317,12 +334,18 @@ public:
     Theme theme;
 
     // Lays out for `viewport`, dispatches input, then applies deferred removals.
-    void Update(const UIInput& input, Vec2 viewport);
+    // Suppressed dispatch consumes a modal closing frame, cancels callbacks and
+    // still observes the physical pointer state so held presses cannot restart.
+    UIInputResult Update(const UIInput& input, Vec2 viewport, bool suppressDispatch = false);
     void Draw(Graphics::Canvas& canvas) const;
 
     Widget* Focused() const { return focused_; }
     Widget* Hovered() const { return hovered_; }
     void SetFocus(Widget* widget);
+    // A single modal subtree limits hit testing and focus navigation; outside
+    // presses remain owned by it. Null removes the modal scope.
+    void SetModal(Widget* widget);
+    Widget* Modal() const { return modal_; }
     // Moves focus to the next/previous focusable widget in tree order.
     void FocusNext(bool backwards = false);
     // True while typing into a TextBox: the game should ignore keyboard input.
@@ -336,6 +359,7 @@ private:
     Widget* HitTest(Widget& widget, Vec2 point);
     void Collect(Widget& widget, std::vector<Widget*>& out) const;
     bool Contains(const Widget* widget) const;
+    bool InModalScope(const Widget* widget) const;
     void Validate();
     bool Navigate(std::uint16_t key);
     void PurgeRemoved(Widget& widget);
@@ -344,7 +368,9 @@ private:
     Widget* hovered_{};
     Widget* focused_{};
     Widget* captured_{};
+    Widget* modal_{};
     bool pointerWasDown_{};
+    bool pointerOwned_{};
 };
 
 } // namespace Astral::UI

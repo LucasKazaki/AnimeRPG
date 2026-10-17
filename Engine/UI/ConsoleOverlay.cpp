@@ -41,6 +41,7 @@ ConsoleOverlay::ConsoleOverlay(UIRoot& ui, Core::ConsoleRegistry& console, int v
 
 void ConsoleOverlay::Open() {
     panel_->visible = true;
+    ui_.SetModal(panel_);
     historyIndex_ = -1;
     Refresh();
     // Focus lands once the panel is laid out; SetFocus checks visibility only.
@@ -49,16 +50,31 @@ void ConsoleOverlay::Open() {
 
 void ConsoleOverlay::Close() {
     panel_->visible = false;
+    if (ui_.Modal() == panel_) ui_.SetModal(nullptr);
     if (ui_.Focused() == input_) ui_.SetFocus(nullptr);
 }
 
-void ConsoleOverlay::PreprocessInput(UIInput& input) {
+UIInputResult ConsoleOverlay::PreprocessInput(UIInput& input) {
+    const bool wasOpen = IsOpen();
+    UIInputResult result;
     const auto toggle = std::find(input.keysPressed.begin(), input.keysPressed.end(), toggleKey);
-    if (toggle == input.keysPressed.end()) return;
-    input.keysPressed.erase(toggle);
-    input.text.erase(std::remove_if(input.text.begin(), input.text.end(), [](char c) { return c == '`' || c == '~'; }),
-        input.text.end());
-    Toggle();
+    if (toggle != input.keysPressed.end()) {
+        input.keysPressed.erase(std::remove(input.keysPressed.begin(), input.keysPressed.end(), toggleKey), input.keysPressed.end());
+        input.text.erase(std::remove_if(input.text.begin(), input.text.end(), [](char c) { return c == '`' || c == '~'; }),
+            input.text.end());
+        if (toggleKey < result.consumedKeys.size()) result.consumedKeys.set(toggleKey);
+        Toggle();
+        result.modal = true;
+    }
+    if (IsOpen() && std::find(input.keysPressed.begin(), input.keysPressed.end(), Keys::Escape) != input.keysPressed.end()) {
+        input.keysPressed.erase(std::remove(input.keysPressed.begin(), input.keysPressed.end(), Keys::Escape), input.keysPressed.end());
+        result.consumedKeys.set(Keys::Escape);
+        Close();
+        result.modal = true;
+    }
+    result.modal = result.modal || wasOpen || IsOpen();
+    result.keyboardCaptured = result.pointerConsumed = result.modal;
+    return result;
 }
 
 void ConsoleOverlay::Print(const std::string& text) {
