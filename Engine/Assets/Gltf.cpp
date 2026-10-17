@@ -13,6 +13,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <system_error>
 #include <utility>
 
 namespace Astral::Assets {
@@ -186,11 +187,18 @@ struct Importer {
             error = "absolute or scheme URI '" + uri + "' is not allowed";
             return false;
         }
-        std::filesystem::path resolved;
-        const std::string& root = options.approvedRoot.empty() ? baseDirectory : options.approvedRoot;
-        if (!ResolveApprovedFile(std::filesystem::path(baseDirectory) / std::filesystem::u8path(relative), root,
-                resolved, error)) return false;
-        return ReadFile(resolved, options.maxFileBytes, out, error);
+        try {
+            std::filesystem::path resolved;
+            const std::string& root = options.approvedRoot.empty() ? baseDirectory : options.approvedRoot;
+            if (!ResolveApprovedFile(std::filesystem::path(baseDirectory) / std::filesystem::u8path(relative), root,
+                    resolved, error)) return false;
+            return ReadFile(resolved, options.maxFileBytes, out, error);
+        } catch (const std::system_error& e) {
+            // Path conversion may throw even when canonical uses error_code.
+            // Returning here also preserves nonfatal image warning behavior.
+            error = "cannot convert or resolve external glTF path: " + e.code().message();
+            return false;
+        }
     }
 
     bool LoadBuffers(const std::vector<std::uint8_t>* glbBin, std::string& error) {
@@ -1052,18 +1060,23 @@ bool ImportGltf(const std::string& path, GltfDocument& out, std::string& error, 
         error = "NUL in glTF source path";
         return false;
     }
-    const std::filesystem::path source(path);
-    const std::string base = source.has_parent_path() ? source.parent_path().string() : ".";
-    std::filesystem::path resolved;
-    if (!ResolveApprovedFile(source, options.approvedRoot.empty() ? base : options.approvedRoot, resolved, error))
-        return false;
-    std::vector<std::uint8_t> bytes;
-    if (!ReadFile(resolved, options.maxFileBytes, bytes, error)) return false;
-    if (!ImportGltfFromMemory(bytes.data(), bytes.size(), base, out, error, options)) {
-        error = path + ": " + error;
+    try {
+        const std::filesystem::path source(path);
+        const std::string base = source.has_parent_path() ? source.parent_path().string() : ".";
+        std::filesystem::path resolved;
+        if (!ResolveApprovedFile(source, options.approvedRoot.empty() ? base : options.approvedRoot, resolved, error))
+            return false;
+        std::vector<std::uint8_t> bytes;
+        if (!ReadFile(resolved, options.maxFileBytes, bytes, error)) return false;
+        if (!ImportGltfFromMemory(bytes.data(), bytes.size(), base, out, error, options)) {
+            error = path + ": " + error;
+            return false;
+        }
+        return true;
+    } catch (const std::system_error& e) {
+        error = "cannot convert or resolve glTF source/root path: " + e.code().message();
         return false;
     }
-    return true;
 }
 
 // ---------------------------------------------------------------- Export

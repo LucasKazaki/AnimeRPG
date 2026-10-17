@@ -905,6 +905,12 @@ ASTRAL_TEST(GltfExternalDependenciesHonorApprovedRoot) {
     ASTRAL_CHECK(doc.meshes[0].primitives[0].mesh.vertices[0].position.y == 4.0f);
     ASTRAL_CHECK(ImportText(ExternalGltf("..\\shared/mesh%20space.bin"), fixture.models, doc, error, options));
     ASTRAL_CHECK(ImportText(ExternalGltf("%252e%252e.bin"), fixture.models, doc, error));
+    const std::filesystem::path unicodeMesh = std::filesystem::u8path(fixture.models + "/mesh-\xC3\xA9.bin");
+    const std::filesystem::path unicodeImage = std::filesystem::u8path(fixture.models + "/image-\xC3\xA9.png");
+    ASTRAL_CHECK(std::filesystem::copy_file(fixture.root + "/shared/mesh space.bin", unicodeMesh));
+    ASTRAL_CHECK(std::filesystem::copy_file(fixture.root + "/shared/texture space.png", unicodeImage));
+    ASTRAL_CHECK(ImportText(ExternalGltf("mesh-%C3%A9.bin", "image-%C3%A9.png"), fixture.models, doc, error, options));
+    ASTRAL_CHECK(doc.images[0].image.width == 4 && doc.warnings.empty());
     const std::vector<std::uint8_t> embedded = ExportGltfToMemory(MakeFixture(), GltfContainer::Embedded, error);
     ASTRAL_CHECK(ImportGltfFromMemory(embedded.data(), embedded.size(), "", doc, error));
     ASTRAL_CHECK(doc.meshes.size() == 1 && !doc.images[0].image.pixels.empty());
@@ -939,6 +945,57 @@ ASTRAL_TEST(GltfRejectsDecodedOutsideUrisForBuffersAndImages) {
     options.decodeImages = false;
     ASTRAL_CHECK(ImportText(ExternalGltf("../shared/mesh%20space.bin", "../../outside.png"), fixture.models, doc, error, options));
     ASTRAL_CHECK(doc.images[0].image.pixels.empty() && doc.warnings.empty());
+}
+
+ASTRAL_TEST(GltfMalformedUtf8BufferUrisReturnDiagnostics) {
+    const GltfFileFixture fixture("astral_gltf_containment_utf8_buffers");
+    GltfImportOptions options;
+    options.approvedRoot = fixture.root;
+    const char* malformed[] = {"%FF.bin", "%C0%AF.bin", "%E2%82.bin", "%ED%A0%80.bin", "%F4%90%80%80.bin"};
+    for (const char* uri : malformed) {
+        GltfDocument doc;
+        doc.generator = "last good";
+        std::string error;
+        bool threw = false;
+        bool imported = false;
+        try { imported = ImportText(ExternalGltf(uri), fixture.models, doc, error, options); }
+        catch (const std::exception& e) { threw = true; std::fprintf(stderr, "[ EXCEPTION ] %s: %s\n", uri, e.what()); }
+        ASTRAL_CHECK(!threw && !imported && !error.empty() && doc.generator == "last good");
+        std::ofstream(fixture.models + "/malformed.gltf") << ExternalGltf(uri);
+        ASTRAL_CHECK(!ImportGltf(fixture.models + "/malformed.gltf", doc, error, options));
+        ASTRAL_CHECK(doc.generator == "last good" && !error.empty());
+    }
+}
+
+ASTRAL_TEST(GltfMalformedUtf8ImageUrisKeepWarningSemantics) {
+    const GltfFileFixture fixture("astral_gltf_containment_utf8_images");
+    GltfImportOptions options;
+    options.approvedRoot = fixture.root;
+    for (const char* uri : {"%FF.png", "%C0%AF.png"}) {
+        GltfDocument doc;
+        std::string error;
+        bool threw = false;
+        bool imported = false;
+        const std::string json = ExternalGltf("../shared/mesh%20space.bin", uri);
+        try { imported = ImportText(json, fixture.models, doc, error, options); }
+        catch (const std::exception& e) { threw = true; std::fprintf(stderr, "[ EXCEPTION ] %s: %s\n", uri, e.what()); }
+        ASTRAL_CHECK(!threw && imported && doc.images.size() == 1 && doc.images[0].image.pixels.empty());
+        ASTRAL_CHECK(doc.warnings.size() == 1 && !doc.warnings[0].empty());
+        std::ofstream(fixture.models + "/malformed.gltf") << json;
+        ASTRAL_CHECK(ImportGltf(fixture.models + "/malformed.gltf", doc, error, options));
+        ASTRAL_CHECK(doc.images[0].image.pixels.empty() && doc.warnings.size() == 1);
+    }
+    // Source/base/root strings use native filesystem encoding, not URI percent
+    // decoding. Invalid or missing native paths must still return diagnostics.
+    GltfDocument doc;
+    doc.generator = "last good";
+    std::string error;
+    const std::string invalidNativePath = fixture.models + "/" + static_cast<char>(0xFF) + "-missing";
+    ASTRAL_CHECK(!ImportGltf(invalidNativePath, doc, error, options) && !error.empty());
+    ASTRAL_CHECK(!ImportText(ExternalGltf("../shared/mesh%20space.bin"), invalidNativePath, doc, error, options));
+    options.approvedRoot = invalidNativePath;
+    ASTRAL_CHECK(!ImportGltf(fixture.models + "/malformed.gltf", doc, error, options) && !error.empty());
+    ASTRAL_CHECK(doc.generator == "last good");
 }
 
 ASTRAL_TEST(GltfRejectsSourceAndDependencyLinksOutsideApprovedRoot) {

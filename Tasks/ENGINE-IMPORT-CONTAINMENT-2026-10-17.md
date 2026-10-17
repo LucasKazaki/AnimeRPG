@@ -50,6 +50,14 @@ that root. Preserve data URIs and GLB buffers. Missing or prohibited images
 retain the current nonfatal warning/empty-image behavior, with no outside bytes
 read; prohibited buffer dependencies fail transactionally.
 
+Review follow-up: filesystem path conversion may throw `std::system_error`
+before an `error_code` operation is reached. Contain those errors at external
+URI resolution and the direct file entrypoint, retaining buffer failure/image
+warning semantics. External URI paths use UTF-8; source/base/root strings use
+native filesystem encoding and are not percent-decoded. Allocation failures
+are not swallowed. Test malformed UTF-8 URI conversions and valid Unicode
+filenames alongside invalid/missing native source/base/root paths.
+
 Primary references reviewed October 17:
 - [Khronos glTF URI contract](https://github.com/KhronosGroup/glTF/blob/main/specification/2.0/Specification.adoc#uris): data URIs and relative resource paths, with optional additional URI forms left to clients.
 - [C++ canonical operation](https://eel.is/c++draft/fs.op.canonical) and [MSVC filesystem functions](https://learn.microsoft.com/en-us/cpp/standard-library/filesystem-functions?view=msvc-170#canonical): canonicalization resolves existing symbolic links and dot segments.

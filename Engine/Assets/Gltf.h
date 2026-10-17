@@ -137,6 +137,9 @@ bool ImportGltf(const std::string& path, GltfDocument& out, std::string& error, 
 // `baseDirectory` resolves relative buffer/image URIs ("" disallows external
 // files even with approvedRoot). External URIs are decoded once; malformed
 // escapes, NUL and absolute/drive/UNC/scheme references are rejected.
+// Filesystem/path conversion errors return a diagnostic; image failures retain
+// their nonfatal warning behavior. Source/root/base strings use native path
+// encoding, while external URI paths are UTF-8.
 bool ImportGltfFromMemory(const std::uint8_t* data, std::size_t size, const std::string& baseDirectory,
     GltfDocument& out, std::string& error, const GltfImportOptions& options = {});
 

@@ -4,7 +4,8 @@ Status: focused implementation verified locally in native Debug and Release;
 independent review and coordinator integration gates remain separate.
 Branch: `engine/framework-containment-20261017`.
 Base: **unmerged PR #80** at `efac9db54e8f2781c20fbb1bb9be9a0ab85f4f5c`,
-not current main. Test source is that base plus this commit's engine/test diff.
+not current main. Test source is that base plus the committed implementation
+and review-follow-up engine/test diffs on this branch.
 Owner: sole containment implementation agent; the coordinator serialized all
 compile and native test slots. No GUI, GPU, or competing build was started.
 
@@ -75,6 +76,43 @@ Four added behavioral cases cover:
   this Windows host; no link test was skipped.** Junction creation is test-only
   through Windows filesystem APIs and requires no added dependency.
 
+## Independent review follow-up: invalid UTF-8 paths
+
+The independent reviewer identified an error-path gap in initial commit
+`275b61ee31598df6899f9507cfdbec6ff5043048`: `std::filesystem::u8path` can throw
+before the canonical operation's `error_code` is reached. Before changing
+production source, added two direct-import regressions and rebuilt Debug.
+Both failed with exit **3**: `%FF.bin` escaped the buffer API's bool/diagnostic
+contract, and `%FF.png` escaped the image warning contract. Both recorded
+the exception text `No mapping for the Unicode character exists in the target
+multi-byte code page.` The initial containment test matrix had missed this.
+
+The follow-up catches only `std::system_error` at external path resolution
+and the direct file entrypoint. This includes filesystem/conversion errors,
+without swallowing allocation failures. On this MSVC implementation the
+UTF-8 converter throws `std::system_error`, as confirmed in its local standard
+library header. Source/base/root strings retain native filesystem encoding;
+they are not interpreted as percent-encoded URIs.
+
+Added behavior coverage for invalid byte, overlong, truncated, surrogate and
+out-of-range UTF-8 buffer references; invalid/overlong image references through
+both direct import APIs; invalid/missing native source/base/root paths; and
+successful percent-encoded accented mesh/image filenames. Buffer failures
+retain the last good document; images retain their warning and empty pixels.
+
+| Follow-up step | Exit/result |
+|---|---|
+| Initial implementation plus new Debug reproduction tests | 0 |
+| Filtered malformed UTF-8 buffer regression | **3**, expected reproduction |
+| Filtered malformed UTF-8 image regression | **3**, expected reproduction |
+| Corrected Debug target and full assets CTest | 0; **16/16 cases**, 0.66 seconds |
+| Corrected Release target and full assets CTest | 0; **16/16 cases**, 0.15 seconds |
+
+The follow-up slot started at `2026-10-17T13:44:15.3085462-04:00`; code/tests
+were frozen and the slot released at `2026-10-17T13:45:25.6703161-04:00`.
+All link fixtures again executed without skips. Independent re-review is
+pending; fixing a finding does not itself establish review approval.
+
 ## Retained commands and logs
 
 All paths below are literal PowerShell values. Logs remain outside Git source
@@ -98,6 +136,15 @@ $ctest = 'C:/Program Files/Microsoft Visual Studio/2022/Community/Common7/IDE/Co
 & $ctest --test-dir $build -C Release --output-on-failure -V -R '^EngineAssetsTests$' --no-tests=error *> "$evidence/fixed-tests-release.log"
 git diff --check
 git diff --name-only
+
+# Review regression against initial 275b61e engine source, then corrected source.
+& $cmake --build $build --config Debug --target EngineAssetsTests --parallel 2 *> "$evidence/review-reproduction-build-debug.log"
+& "$build/Debug/EngineAssetsTests.exe" GltfMalformedUtf8BufferUris *> "$evidence/review-reproduction-buffer.log"
+& "$build/Debug/EngineAssetsTests.exe" GltfMalformedUtf8ImageUris *> "$evidence/review-reproduction-image.log"
+& $cmake --build $build --config Debug --target EngineAssetsTests --parallel 2 *> "$evidence/review-fixed-build-debug.log"
+& $ctest --test-dir $build -C Debug --output-on-failure -V -R '^EngineAssetsTests$' --no-tests=error *> "$evidence/review-fixed-tests-debug.log"
+& $cmake --build $build --config Release --target EngineAssetsTests --parallel 2 *> "$evidence/review-fixed-build-release.log"
+& $ctest --test-dir $build -C Release --output-on-failure -V -R '^EngineAssetsTests$' --no-tests=error *> "$evidence/review-fixed-tests-release.log"
 ```
 
 The original coordinator baseline logs are untouched. The coordinator reported
@@ -111,8 +158,9 @@ Changed paths are exactly `Engine/Assets/AssetManager.{h,cpp}`,
 `Engine/Assets/Gltf.{h,cpp}`, `Tests/EngineAssetsTests.cpp`, the task packet and
 this evidence record. No CMake, workflow, numeric, game-content or R0 edits.
 
-Independent review is pending coordinator assignment; no review approval is
-inferred from these tests. No push/PR/merge was performed by this owner.
+Independent review found the conversion error above; substantive re-review is
+pending after its repair. No review approval is inferred from these tests.
+No push/PR/merge was performed by this owner.
 Post-fix full-all engine/editor/player builds, broad deterministic suites,
 portable sanitizers, native GUI, performance, GPU, packaging and soak gates
 were not executed by this focused packet. The coordinator owns applicable
