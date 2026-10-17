@@ -35,6 +35,7 @@
 // and resolves every asset it references; Instantiate then cannot fail, so a
 // bad scene never leaves a half-built world. Errors name the JSON path.
 
+#include "Engine/Assets/AssetManager.h"
 #include "Engine/Core/Json.h"
 #include "Engine/Framework/GameWorld.h"
 #include "Engine/Graphics/Texture.h"
@@ -77,6 +78,7 @@ struct SceneDocument {
     std::map<std::string, std::shared_ptr<const Audio::AudioClip>> clips;
     std::map<std::string, std::shared_ptr<const Graphics::LodGroup>> lodGroups; // autoLod meshes
     std::map<std::string, Core::JsonValue> materialSources; // library entries as authored
+    std::vector<Assets::AssetDependency> dependencies; // reached typed slots, including nested prefabs
 };
 
 // Unit-size primitive meshes: cube (1 m), sphere (d = 1 m), plane (1 x 1 m,
@@ -90,9 +92,13 @@ public:
     explicit SceneSerializer(Assets::AssetManager* assets = nullptr,
         const BehaviourRegistry& behaviours = BehaviourRegistry::Global());
 
-    bool Parse(const Core::JsonValue& json, SceneDocument& out, std::string& error) const;
+    // Optional collector is appended even on failure. strictReload rejects
+    // degraded glTF images while initial/standalone imports retain warnings.
+    bool Parse(const Core::JsonValue& json, SceneDocument& out, std::string& error,
+        std::vector<Assets::AssetDependency>* attempted = nullptr, bool strictReload = false) const;
     // Reads a scene file through the asset manager (or directly without one).
-    bool ParseFile(const std::string& path, SceneDocument& out, std::string& error) const;
+    bool ParseFile(const std::string& path, SceneDocument& out, std::string& error,
+        std::vector<Assets::AssetDependency>* attempted = nullptr, bool strictReload = false) const;
 
     // Adds the document's entities (under `parent`) and returns the new roots.
     // With applySettings, gravity/time/environment are applied to the world.

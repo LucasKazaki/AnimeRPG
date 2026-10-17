@@ -96,7 +96,7 @@ bool PercentDecode(const std::string& text, std::string& out) {
 }
 
 bool ResolveApprovedFile(const std::filesystem::path& candidate, const std::string& approvedRoot,
-    std::filesystem::path& resolved, std::string& error) {
+    std::filesystem::path& resolved, std::string& error, bool allowMissing = false) {
     if (approvedRoot.find('\0') != std::string::npos) {
         error = "NUL in approved glTF root";
         return false;
@@ -107,7 +107,7 @@ bool ResolveApprovedFile(const std::filesystem::path& candidate, const std::stri
         error = "cannot resolve approved glTF root '" + approvedRoot + "'";
         return false;
     }
-    resolved = std::filesystem::canonical(candidate, ec);
+    resolved = allowMissing ? std::filesystem::weakly_canonical(candidate, ec) : std::filesystem::canonical(candidate, ec);
     if (ec) {
         error = "cannot resolve glTF file '" + candidate.string() + "': " + ec.message();
         return false;
@@ -156,6 +156,12 @@ struct Importer {
     std::vector<std::vector<std::uint8_t>> buffers;
     GltfDocument& doc;
 
+    void ObserveFile(const std::filesystem::path& path) {
+        const std::string watch = std::filesystem::absolute(path).string();
+        if (options.report) options.report->files.push_back(watch);
+        if (options.observeFile) options.observeFile(watch);
+    }
+
     bool LoadUri(const std::string& uri, std::vector<std::uint8_t>& out, std::string& error) {
         if (uri.compare(0, 5, "data:") == 0) {
             const std::size_t comma = uri.find(',');
@@ -190,8 +196,37 @@ struct Importer {
         try {
             std::filesystem::path resolved;
             const std::string& root = options.approvedRoot.empty() ? baseDirectory : options.approvedRoot;
-            if (!ResolveApprovedFile(std::filesystem::path(baseDirectory) / std::filesystem::u8path(relative), root,
-                    resolved, error)) return false;
+            const auto candidate = std::filesystem::path(baseDirectory) / std::filesystem::u8path(relative);
+            if (options.report || options.observeFile) {
+                // Prove containment even for a missing target before adding a
+                // watch. Existing ancestors/links are resolved, never approved
+                // by a lexical string prefix. The actual read stays canonical.
+                if (!ResolveApprovedFile(candidate, root, resolved, error, true)) {
+                    // A new logical in-root link can be denied now and repaired
+                    // later. Admit by normalized whole-root containment, allowing
+                    // legitimate ../shared references but no lexical escape.
+                    const auto child = std::filesystem::u8path(relative);
+                    std::filesystem::path approvedBase;
+                    std::string watchError;
+                    if (!child.has_root_path() && ResolveApprovedFile(baseDirectory, root, approvedBase, watchError)) {
+                        std::error_code ec;
+                        const auto approved = std::filesystem::canonical(root, ec);
+                        if (!ec) {
+                            const auto logical = approvedBase / child;
+                            const auto normalized = logical.lexically_normal();
+                            auto part = normalized.begin();
+                            std::filesystem::path prefix;
+                            for (auto rootPart = approved.begin(); rootPart != approved.end() && part != normalized.end(); ++rootPart)
+                                prefix /= *part++;
+                            if (prefix == approved)
+                                ObserveFile(logical); // preserve original link/.. filesystem semantics
+                        }
+                    }
+                    return false;
+                }
+                ObserveFile(candidate);
+            }
+            if (!ResolveApprovedFile(candidate, root, resolved, error)) return false;
             return ReadFile(resolved, options.maxFileBytes, out, error);
         } catch (const std::system_error& e) {
             // Path conversion may throw even when canonical uses error_code.
@@ -426,7 +461,9 @@ struct Importer {
                 }
                 if (!loaded) {
                     out.image = {};
-                    doc.warnings.push_back("image " + std::to_string(i) + ": " + imageError);
+                    const std::string diagnostic = "image " + std::to_string(i) + ": " + imageError;
+                    doc.warnings.push_back(diagnostic);
+                    if (options.report) options.report->imageErrors.push_back(diagnostic);
                 }
             }
             doc.images.push_back(std::move(out));

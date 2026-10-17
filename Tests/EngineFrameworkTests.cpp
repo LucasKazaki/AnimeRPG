@@ -843,4 +843,62 @@ ASTRAL_TEST(RenderExtractionPicksLevelsOfDetail) {
     ASTRAL_CHECK(!loaded.Get<MeshRenderer>(loaded.Find("C"))->lods);
 }
 
+ASTRAL_TEST(SceneDependencyCollectorRetainsFailedNestedCandidate) {
+    const std::string root = TempDir("astral_scene_dependency_collector");
+    std::string error;
+    Graphics::ImageRgba8 image;
+    image.Resize(2, 2, {255, 255, 255, 255});
+    ASTRAL_CHECK(Graphics::WritePng(root + "/material.png", image, error));
+    WriteText(root + "/outer.json", R"({"materials":{"M":{"texture":"material.png"}},
+        "entity":{"prefab":"inner.json","components":{"MeshRenderer":{"mesh":"primitive:cube","material":"M"}}}})");
+    Assets::AssetManager assets(root, nullptr);
+    assets.RegisterDefaultLoaders();
+    SceneSerializer serializer(&assets);
+    SceneDocument document;
+    ASTRAL_CHECK(serializer.Parse(ParseText(R"({"entities":[{"name":"LastGood"}]})"), document, error));
+    std::vector<Assets::AssetDependency> attempted;
+    const auto json = ParseText(R"({"entities":[{"prefab":"outer.json"}]})");
+    ASTRAL_CHECK(!serializer.Parse(json, document, error, &attempted, true));
+    ASTRAL_CHECK(error.find("inner.json") != std::string::npos && attempted.size() == 3);
+    ASTRAL_CHECK(document.entities.size() == 1 && document.entities[0].name == "LastGood");
+    assets.Collect(); // failed watch identities keep the missing slot alive
+    WriteText(root + "/inner.json", R"({"entity":{"name":"Recovered"}})");
+    ASTRAL_CHECK(assets.PollChanges() == 1);
+    ASTRAL_CHECK(std::any_of(attempted.begin(), attempted.end(), [](const auto& watch) { return watch.Changed(); }));
+    attempted.clear();
+    ASTRAL_CHECK(serializer.Parse(json, document, error, &attempted, true));
+    ASTRAL_CHECK(document.entities[0].name == "Recovered" && document.dependencies.size() == 3);
+    assets.Load<Core::JsonValue>("unrelated.json");
+    attempted.clear();
+    ASTRAL_CHECK(serializer.Parse(json, document, error, &attempted, true));
+    ASTRAL_CHECK(attempted.size() == 3); // unrelated cache errors are not dependencies
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(SceneStrictReloadRejectsNewDegradedImageWithoutChangingInitialImport) {
+    const std::string root = TempDir("astral_scene_strict_image_reload");
+    std::string error;
+    WriteText(root + "/model.gltf", R"({"asset":{"version":"2.0"},"images":[{"uri":"later.png"}],
+        "textures":[{"source":0}],"materials":[{"pbrMetallicRoughness":{"baseColorTexture":{"index":0}}}]})");
+    Assets::AssetManager assets(root, nullptr);
+    assets.RegisterDefaultLoaders();
+    SceneSerializer serializer(&assets);
+    SceneDocument document;
+    const auto json = ParseText(R"({"entities":[{"name":"Surface","components":{
+        "MeshRenderer":{"mesh":"primitive:cube","material":"model.gltf#material0"}}}]})");
+    ASTRAL_CHECK(serializer.Parse(json, document, error));
+    ASTRAL_CHECK(document.entities[0].name == "Surface");
+    std::vector<Assets::AssetDependency> attempted;
+    ASTRAL_CHECK(!serializer.Parse(json, document, error, &attempted, true));
+    ASTRAL_CHECK(document.entities[0].name == "Surface" && attempted.size() == 1 && error.find("image 0") != std::string::npos);
+    Graphics::ImageRgba8 image;
+    image.Resize(2, 2, {255, 255, 255, 255});
+    ASTRAL_CHECK(Graphics::WritePng(root + "/later.png", image, error));
+    ASTRAL_CHECK(assets.PollChanges() == 1);
+    attempted.clear();
+    ASTRAL_CHECK(serializer.Parse(json, document, error, &attempted, true));
+    ASTRAL_CHECK(document.materials.at("model.gltf#material0")->baseTexture != nullptr);
+    std::filesystem::remove_all(root);
+}
+
 ASTRAL_TEST_MAIN("EngineFrameworkTests")
