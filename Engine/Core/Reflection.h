@@ -41,7 +41,8 @@ struct FieldInfo {
     double maximum{std::numeric_limits<double>::infinity()};
     std::vector<std::string> enumNames;
     std::function<JsonValue(const void*)> read;
-    // Returns false (object unchanged for this field) on a type mismatch or bad enum name.
+    // Returns false (this field unchanged) for invalid types/enums or a floating
+    // result outside its member type's finite range after declared Range clamping.
     std::function<bool(void*, const JsonValue&, const FieldInfo&, std::string&)> write;
 };
 
@@ -112,7 +113,13 @@ struct FieldTraits<M, std::enable_if_t<std::is_floating_point_v<M>>> {
     static JsonValue Read(const M& v) { return JsonValue(static_cast<double>(v)); }
     static bool Write(M& v, const JsonValue& j, const FieldInfo& field) {
         if (!j.IsNumber() || !std::isfinite(j.AsNumber())) return false;
-        v = static_cast<M>(std::fmin(std::fmax(j.AsNumber(), field.minimum), field.maximum));
+        const double clamped = std::fmin(std::fmax(j.AsNumber(), field.minimum), field.maximum);
+        // Widen the comparison, not the member limits: long double may have a
+        // greater range than JSON's double on supported non-MSVC toolchains.
+        const long double checked = static_cast<long double>(clamped);
+        if (!std::isfinite(clamped) || checked < std::numeric_limits<M>::lowest()
+            || checked > std::numeric_limits<M>::max()) return false;
+        v = static_cast<M>(clamped);
         return true;
     }
 };

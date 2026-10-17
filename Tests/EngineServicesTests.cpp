@@ -5,6 +5,7 @@
 #include "Engine/Core/Delegate.h"
 #include "Engine/Core/Json.h"
 #include "Engine/Core/Reflection.h"
+#include "Engine/Framework/Scene.h"
 #include "Tests/EngineTestSupport.h"
 
 #include <cmath>
@@ -324,6 +325,81 @@ ASTRAL_TEST(ReflectionSerialisesValidatesAndEdits) {
     // Re-registering replaces the definition without dangling lookups.
     registry.Register<TestLight>("TestLight").Field("intensity", &TestLight::intensity);
     ASTRAL_CHECK(registry.Get<TestLight>()->fields.size() == 1 && registry.Names().size() == 1);
+}
+
+ASTRAL_TEST(ReflectionRejectsUnrepresentableScalarWithoutMutation) {
+    struct Scalars { float finite{7}; float ranged{3}; double wide{11}; };
+    TypeRegistry registry;
+    registry.Register<Scalars>("Scalars")
+        .Field("finite", &Scalars::finite)
+        .Field("ranged", &Scalars::ranged).Range(-10, 10)
+        .Field("wide", &Scalars::wide);
+    const TypeInfo* info = registry.Get<Scalars>();
+    Scalars target;
+    std::string error;
+    const double largest = static_cast<double>(std::numeric_limits<float>::max());
+    const double outside = std::nextafter(largest, std::numeric_limits<double>::infinity());
+    for (double value : {1e100, -1e100, outside, -outside}) {
+        ASTRAL_CHECK(!info->SetField(&target, "finite", JsonValue(value), error));
+        ASTRAL_CHECK(target.finite == 7 && !error.empty());
+    }
+    JsonValue update = JsonValue::MakeObject();
+    update.Set("ranged", 9);
+    update.Set("wide", 15);
+    update.Set("finite", 1e100);
+    ASTRAL_CHECK(!info->FromJson(&target, update, error));
+    ASTRAL_CHECK(target.finite == 7 && target.ranged == 3 && target.wide == 11);
+    for (double value : {largest, -largest, static_cast<double>(std::numeric_limits<float>::denorm_min()), 0.0}) {
+        ASTRAL_CHECK(info->SetField(&target, "finite", JsonValue(value), error));
+        ASTRAL_CHECK(std::isfinite(target.finite) && target.finite == static_cast<float>(value));
+    }
+    ASTRAL_CHECK(info->SetField(&target, "ranged", JsonValue(1e100), error) && target.ranged == 10);
+    ASTRAL_CHECK(info->SetField(&target, "ranged", JsonValue(-1e100), error) && target.ranged == -10);
+    const double doubleLimit = std::numeric_limits<double>::max();
+    ASTRAL_CHECK(info->SetField(&target, "wide", JsonValue(doubleLimit), error));
+    ASTRAL_CHECK(std::isfinite(target.wide) && target.wide == doubleLimit);
+}
+
+ASTRAL_TEST(ReflectedBehaviourRejectsUnrepresentableScalarBeforeAttachment) {
+    struct ScalarBehaviour final : Framework::Behaviour { float speed{2}; };
+    Framework::BehaviourRegistry types;
+    types.Register<ScalarBehaviour>("ScalarBehaviour").Field("speed", &ScalarBehaviour::speed);
+    Framework::GameWorld world;
+    const World::Entity entity = world.CreateEntity("ReflectedScalar");
+    JsonValue properties = JsonValue::MakeObject();
+    properties.Set("speed", 1e100);
+    std::string error;
+    ASTRAL_CHECK(!world.AddBehaviour(entity, "ScalarBehaviour", properties, error, types));
+    ASTRAL_CHECK(error.find("speed") != std::string::npos);
+    ASTRAL_CHECK(!world.Get<Framework::Behaviours>(entity));
+    properties.Set("speed", 12);
+    ASTRAL_CHECK(world.AddBehaviour(entity, "ScalarBehaviour", properties, error, types));
+    ASTRAL_CHECK(world.GetBehaviour<ScalarBehaviour>(entity)->speed == 12);
+}
+
+ASTRAL_TEST(SceneRejectsUnrepresentableReflectedRuntimeScalars) {
+    Framework::SceneSerializer serializer;
+    Framework::SceneDocument document;
+    document.entities.push_back(Framework::EntitySpec{});
+    document.entities.front().name = "Retained";
+    for (const char* component : {"RigidBody", "CharacterMover"}) {
+        const char* field = std::strcmp(component, "RigidBody") == 0 ? "gravityScale" : "gravity";
+        JsonValue json = JsonValue::MakeObject();
+        json.Set("format", "astral-scene");
+        json.Set("version", 1);
+        JsonValue entities = JsonValue::MakeArray();
+        JsonValue entity = JsonValue::MakeObject(), components = JsonValue::MakeObject(), values = JsonValue::MakeObject();
+        entity.Set("name", "Rejected");
+        values.Set(field, 1e100);
+        components.Set(component, values);
+        entity.Set("components", components);
+        entities.Append(entity);
+        json.Set("entities", entities);
+        std::string error;
+        ASTRAL_CHECK(!serializer.Parse(json, document, error));
+        ASTRAL_CHECK(error.find(field) != std::string::npos);
+        ASTRAL_CHECK(document.entities.size() == 1 && document.entities.front().name == "Retained");
+    }
 }
 
 ASTRAL_TEST_MAIN("EngineServicesTests")
