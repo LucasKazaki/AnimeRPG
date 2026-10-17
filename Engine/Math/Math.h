@@ -14,8 +14,14 @@ struct Vec3 {
     float y{};
     float z{};
 
-    float Length() const { return std::sqrt(x * x + y * y + z * z); }
+    // Avoid intermediate square overflow/underflow for representable norms.
+    float Length() const { return std::hypot(x, y, z); }
 };
+
+// One by-value contract shared by Math.h and VectorMath.h consumers.
+inline bool IsFinite(Vec3 value) {
+    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+}
 
 struct Vec4 {
     float x{};
