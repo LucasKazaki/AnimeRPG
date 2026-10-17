@@ -368,6 +368,15 @@ void GameWorld::FixedStep(float dt) {
 
 // ------------------------------------------------------------------ physics sync
 
+void GameWorld::InvalidateColliderBody(Entity entity) {
+    if (Collider* collider = registry_.Get<Collider>(entity)) {
+        Release(entity, *collider);
+        // A failed creation may have been caused by the previous RigidBody
+        // description (for example invalid mass). Retry with the new one.
+        collider->failed = false;
+    }
+}
+
 void GameWorld::EnsureBody(Entity entity, Collider& collider) {
     if (collider.failed || (!collider.body.IsNull() && physics_.GetBody(collider.body))) return;
     collider.body = {};

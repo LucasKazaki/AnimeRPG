@@ -118,6 +118,9 @@ public:
     const World::Registry& Registry() const { return registry_; }
 
     // Adds or replaces a component (a replaced component's runtime object is released).
+    // RigidBody changes release this entity's Collider body and retry failed
+    // creation at the next executed fixed sync, using the current configuration.
+    // Body handles/contact caches are not preserved across reconfiguration.
     template <typename T, typename... Args>
     T& Add(Entity entity, Args&&... args) {
         if constexpr (std::is_same_v<T, Behaviours>) {
@@ -125,6 +128,10 @@ public:
             T replacement(std::forward<Args>(args)...);
             RemoveBehaviours(entity);
             return registry_.Add<T>(entity, std::move(replacement));
+        } else if constexpr (std::is_same_v<T, RigidBody>) {
+            T& component = registry_.Add<T>(entity, std::forward<Args>(args)...);
+            InvalidateColliderBody(entity); // only after successful insertion
+            return component;
         } else {
             if (T* existing = registry_.Get<T>(entity)) Release(entity, *existing);
             return registry_.Add<T>(entity, std::forward<Args>(args)...);
@@ -135,10 +142,17 @@ public:
     template <typename T>
     const T* Get(Entity entity) const { return registry_.Get<T>(entity); }
     // Removes a component and releases its runtime object (body, voice, emitter...).
+    // Actual RigidBody removal recreates the Collider as Static at the next
+    // fixed sync. Removing an absent component does not invalidate its body.
     template <typename T>
     void Remove(Entity entity) {
         if constexpr (std::is_same_v<T, Behaviours>) {
             RemoveBehaviours(entity);
+        } else if constexpr (std::is_same_v<T, RigidBody>) {
+            if (registry_.Get<T>(entity)) {
+                registry_.Remove<T>(entity);
+                InvalidateColliderBody(entity);
+            }
         } else {
             if (T* component = registry_.Get<T>(entity)) Release(entity, *component);
             registry_.Remove<T>(entity);
@@ -243,6 +257,7 @@ private:
     void FlushDestroyed();
     void DestroyNow(Entity entity);
     void EnsureBody(Entity entity, Collider& collider);
+    void InvalidateColliderBody(Entity entity);
     void EnsureCharacter(Entity entity, CharacterMover& mover);
     void PushBodies(CharacterMover& mover, float dt);
     void WriteWorldPose(Entity entity, Math::Vec3 position, Math::Quat rotation);
