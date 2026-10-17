@@ -3,6 +3,7 @@
 #include "Engine/Assets/AssetManager.h"
 #include "Engine/Assets/Gltf.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <functional>
@@ -152,12 +153,28 @@ std::shared_ptr<const Graphics::MeshData> MakePrimitiveMesh(const std::string& k
 }
 
 struct SceneSerializer::ParseState {
-    ParseState(SceneDocument& documentIn, std::string& errorIn) : document(documentIn), error(errorIn) {}
+    ParseState(SceneDocument& documentIn, std::string& errorIn, std::vector<Assets::AssetDependency>& dependenciesIn,
+        bool strictIn) : document(documentIn), error(errorIn), dependencies(dependenciesIn), strictReload(strictIn) {}
     SceneDocument& document;
     std::string& error;
+    std::vector<Assets::AssetDependency>& dependencies;
+    bool strictReload{};
     const JsonValue* prefabSources{};
     std::set<std::string> resolving;
     std::size_t entities{};
+
+    template <typename T>
+    bool Current(const Assets::AssetHandle<T>& handle) {
+        const auto dependency = handle.Dependency();
+        if (std::find(dependencies.begin(), dependencies.end(), dependency) == dependencies.end())
+            dependencies.push_back(dependency);
+        return handle.Ready() && handle.Error().empty() && (!strictReload || handle.Issues().empty());
+    }
+    template <typename T>
+    std::string Diagnostic(const Assets::AssetHandle<T>& handle) const {
+        if (!handle.Error().empty()) return handle.Error();
+        return handle.Issues().empty() ? "asset is not ready" : handle.Issues().front();
+    }
 };
 
 SceneSerializer::SceneSerializer(Assets::AssetManager* assets, const BehaviourRegistry& behaviours)
@@ -178,7 +195,7 @@ bool SceneSerializer::ResolveMesh(const std::string& ref, const std::string& pat
     SplitRef(ref, file, fragment);
     if (!assets_) return Fail(state.error, path, "mesh '" + ref + "' needs an asset manager");
     const auto handle = assets_->Load<Assets::GltfDocument>(file);
-    if (!handle.Ready()) return Fail(state.error, path, "cannot load model '" + file + "': " + handle.Error());
+    if (!state.Current(handle)) return Fail(state.error, path, "cannot load model '" + file + "': " + state.Diagnostic(handle));
     std::size_t meshIndex = 0, primitiveIndex = 0;
     if (!fragment.empty()) {
         const std::size_t dot = fragment.find('.');
@@ -204,7 +221,7 @@ bool SceneSerializer::ResolveMaterial(const std::string& ref, const std::string&
     if (ref.find('#') == std::string::npos) return Fail(state.error, path, "unknown material '" + ref + "'");
     if (!assets_) return Fail(state.error, path, "material '" + ref + "' needs an asset manager");
     const auto handle = assets_->Load<Assets::GltfDocument>(file);
-    if (!handle.Ready()) return Fail(state.error, path, "cannot load model '" + file + "': " + handle.Error());
+    if (!state.Current(handle)) return Fail(state.error, path, "cannot load model '" + file + "': " + state.Diagnostic(handle));
     std::size_t index = 0;
     if (fragment.rfind("material", 0) != 0 || !ParseIndex(fragment.substr(8), index)) {
         return Fail(state.error, path, "material reference '" + ref + "' is not model#materialN");
@@ -233,16 +250,18 @@ bool SceneSerializer::ResolveClip(const std::string& ref, const std::string& pat
     if (document.clips.count(ref)) return true;
     if (!assets_) return Fail(state.error, path, "sound '" + ref + "' needs an asset manager");
     const auto handle = assets_->Load<Audio::AudioClip>(ref);
-    if (!handle.Ready()) return Fail(state.error, path, "cannot load sound '" + ref + "': " + handle.Error());
+    if (!state.Current(handle)) return Fail(state.error, path, "cannot load sound '" + ref + "': " + state.Diagnostic(handle));
     document.clips[ref] = std::make_shared<Audio::AudioClip>(*handle.Get());
     return true;
 }
 
 // ------------------------------------------------------------------ parsing
 
-bool SceneSerializer::Parse(const JsonValue& json, SceneDocument& out, std::string& error) const {
+bool SceneSerializer::Parse(const JsonValue& json, SceneDocument& out, std::string& error,
+    std::vector<Assets::AssetDependency>* attempted, bool strictReload) const {
     SceneDocument document;
-    ParseState state(document, error);
+    std::vector<Assets::AssetDependency> local;
+    ParseState state(document, error, attempted ? *attempted : local, strictReload);
     if (!json.IsObject()) return Fail(error, "", "a scene must be a JSON object");
     for (const std::string& key : json.Keys()) {
         if (key != "format" && key != "version" && key != "settings" && key != "environment" && key != "materials"
@@ -306,8 +325,8 @@ bool SceneSerializer::Parse(const JsonValue& json, SceneDocument& out, std::stri
             if (!material.baseTexturePath.empty()) {
                 if (!assets_) return Fail(error, Join(path, "texture"), "textures need an asset manager");
                 const auto handle = assets_->Load<Graphics::Texture2D>(material.baseTexturePath);
-                if (!handle.Ready()) {
-                    return Fail(error, Join(path, "texture"), "cannot load '" + material.baseTexturePath + "': " + handle.Error());
+                if (!state.Current(handle)) {
+                    return Fail(error, Join(path, "texture"), "cannot load '" + material.baseTexturePath + "': " + state.Diagnostic(handle));
                 }
                 texture = std::make_shared<Graphics::Texture2D>(*handle.Get());
             }
@@ -330,20 +349,27 @@ bool SceneSerializer::Parse(const JsonValue& json, SceneDocument& out, std::stri
             document.entities.push_back(std::move(spec));
         }
     }
+    document.dependencies = state.dependencies;
     out = std::move(document);
     return true;
 }
 
-bool SceneSerializer::ParseFile(const std::string& path, SceneDocument& out, std::string& error) const {
+bool SceneSerializer::ParseFile(const std::string& path, SceneDocument& out, std::string& error,
+    std::vector<Assets::AssetDependency>* attempted, bool strictReload) const {
     JsonValue json;
+    std::vector<Assets::AssetDependency> local;
+    auto& dependencies = attempted ? *attempted : local;
     if (assets_) {
         const auto handle = assets_->Load<JsonValue>(path);
-        if (!handle.Ready()) return Fail(error, path, handle.Error());
+        const auto dependency = handle.Dependency();
+        if (std::find(dependencies.begin(), dependencies.end(), dependency) == dependencies.end())
+            dependencies.push_back(dependency);
+        if (!handle.Ready() || !handle.Error().empty()) return Fail(error, path, handle.Error());
         json = *handle.Get();
     } else if (!Core::ReadJsonFile(path, json, error)) {
         return Fail(error, path, error);
     }
-    return Parse(json, out, error);
+    return Parse(json, out, error, &dependencies, strictReload);
 }
 
 bool SceneSerializer::ParsePrefab(const std::string& name, const std::string& path, ParseState& state) const {
@@ -357,7 +383,7 @@ bool SceneSerializer::ParsePrefab(const std::string& name, const std::string& pa
         if (!isFile) return Fail(state.error, path, "unknown prefab '" + name + "'");
         if (!assets_) return Fail(state.error, path, "prefab file '" + name + "' needs an asset manager");
         const auto handle = assets_->Load<JsonValue>(name);
-        if (!handle.Ready()) return Fail(state.error, path, "cannot load prefab '" + name + "': " + handle.Error());
+        if (!state.Current(handle)) return Fail(state.error, path, "cannot load prefab '" + name + "': " + state.Diagnostic(handle));
         file = *handle.Get();
         if (!file.IsObject() || !file.Find("entity")) {
             return Fail(state.error, path, "prefab file '" + name + "' must hold {\"entity\": {...}}");
@@ -371,7 +397,8 @@ bool SceneSerializer::ParsePrefab(const std::string& name, const std::string& pa
             scene.Set("materials", *materials);
             SceneDocument prefabDocument;
             std::string materialError;
-            if (!Parse(scene, prefabDocument, materialError)) return Fail(state.error, name, materialError);
+            if (!Parse(scene, prefabDocument, materialError, &state.dependencies, state.strictReload))
+                return Fail(state.error, name, materialError);
             for (auto& entry : prefabDocument.materials) document.materials.emplace(entry.first, entry.second);
             for (auto& entry : prefabDocument.materialSources) document.materialSources.emplace(entry.first, entry.second);
         }
@@ -522,7 +549,7 @@ bool SceneSerializer::ExpandModel(const std::string& model, bool colliders, cons
     std::string& error = state.error;
     if (!assets_) return Fail(error, path, "model '" + model + "' needs an asset manager");
     const auto handle = assets_->Load<Assets::GltfDocument>(model);
-    if (!handle.Ready()) return Fail(error, path, "cannot load model '" + model + "': " + handle.Error());
+    if (!state.Current(handle)) return Fail(error, path, "cannot load model '" + model + "': " + state.Diagnostic(handle));
     const Assets::GltfDocument& gltf = *handle.Get();
     if (out.name.empty()) out.name = Stem(model);
 

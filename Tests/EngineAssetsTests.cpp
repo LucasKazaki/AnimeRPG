@@ -9,6 +9,7 @@
 #include "Engine/Core/JobSystem.h"
 #include "Engine/Core/Json.h"
 #include "Engine/Core/Random.h"
+#include "Engine/Framework/GameHost.h"
 #include "Engine/Graphics/SceneRenderer.h"
 #include "Engine/Graphics/Texture.h"
 #include "Tests/EngineTestSupport.h"
@@ -1098,6 +1099,197 @@ ASTRAL_TEST(AssetManagerCachesLoadsAsyncAndHotReloads) {
     ASTRAL_CHECK(assets.Stats().cached < before.cached);
     ASTRAL_CHECK(config.Ready()); // still referenced, still cached
     std::filesystem::remove_all(dir);
+}
+
+ASTRAL_TEST(AssetAttemptsTrackFailureDeletionAndRecovery) {
+    const std::string root = TempDir("astral_asset_attempts");
+    std::ofstream(root + "/value.json") << R"({"value":1})";
+    AssetManager assets(root, nullptr);
+    assets.RegisterDefaultLoaders();
+    const auto value = assets.Load<Core::JsonValue>("value.json");
+    ASTRAL_CHECK(value.Version() == 1 && value.Attempt() == 1);
+    auto watch = value.Dependency();
+    std::filesystem::remove(root + "/value.json");
+    ASTRAL_CHECK(assets.PollChanges() == 1);
+    ASTRAL_CHECK(value.Ready() && value.Version() == 1 && value.Attempt() == 2 && !value.Error().empty());
+    ASTRAL_CHECK(value->Int("value") == 1 && watch.Changed());
+    watch.Refresh();
+    ASTRAL_CHECK(!watch.Changed() && assets.PollChanges() == 0 && value.Attempt() == 2);
+    std::ofstream(root + "/value.json") << R"({"value":2})";
+    ASTRAL_CHECK(assets.PollChanges() == 1);
+    ASTRAL_CHECK(value.Version() == 2 && value.Attempt() == 3 && value.Error().empty() && value->Int("value") == 2);
+    const auto missing = assets.Load<Core::JsonValue>("created-later.json");
+    ASTRAL_CHECK(!missing.Ready() && missing.Version() == 0 && missing.Attempt() == 1);
+    ASTRAL_CHECK(assets.PollChanges() == 0);
+    std::ofstream(root + "/created-later.json") << "{}";
+    ASTRAL_CHECK(assets.PollChanges() == 1 && missing.Ready() && missing.Version() == 1 && missing.Attempt() == 2);
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(GltfDependencyAttemptsKeepGoodDataAndDoNotRepeatFailure) {
+    const GltfFileFixture fixture("astral_gltf_dependency_attempts");
+    std::ofstream(fixture.models + "/model.gltf") << ExternalGltf("../shared/mesh%20space.bin", "../shared/texture%20space.png");
+    Core::JobSystem jobs(2);
+    AssetManager assets(fixture.root, &jobs);
+    assets.RegisterDefaultLoaders();
+    const auto model = assets.LoadAsync<GltfDocument>("models/model.gltf");
+    ASTRAL_CHECK(model.Attempt() == 0 && !model.Ready()); // worker output is staged until publication
+    assets.WaitForAll();
+    ASTRAL_CHECK(model.Attempt() == 1 && model.Version() == 1 && model.Issues().empty());
+    std::filesystem::remove(fixture.root + "/shared/mesh space.bin");
+    ASTRAL_CHECK(assets.PollChanges() == 1);
+    ASTRAL_CHECK(model.Attempt() == 2 && model.Version() == 1 && !model.Error().empty());
+    ASTRAL_CHECK(model->meshes[0].primitives[0].mesh.vertices[0].position.x == -7.0f);
+    ASTRAL_CHECK(assets.PollChanges() == 0 && model.Attempt() == 2);
+    const float changed[] = {9, 4, 3, 10, 4, 3, 9, 5, 3};
+    std::vector<std::uint8_t> bytes(sizeof(changed));
+    std::memcpy(bytes.data(), changed, sizeof(changed));
+    WriteBytes(fixture.root + "/shared/mesh space.bin", bytes);
+    ASTRAL_CHECK(assets.PollChanges() == 1 && model.Version() == 2 && model.Error().empty());
+    ASTRAL_CHECK(model->meshes[0].primitives[0].mesh.vertices[0].position.x == -9.0f);
+
+    std::filesystem::remove(fixture.root + "/shared/texture space.png");
+    ASTRAL_CHECK(assets.PollChanges() == 1);
+    ASTRAL_CHECK(model.Version() == 2 && model.Attempt() == 4 && !model.Error().empty() && model.Issues().size() == 1);
+    ASTRAL_CHECK(model->images[0].image.width == 4 && assets.PollChanges() == 0);
+    std::string error;
+    Graphics::ImageRgba8 replacement;
+    replacement.Resize(2, 2, {255, 0, 0, 255});
+    ASTRAL_CHECK(Graphics::WritePng(fixture.root + "/shared/texture space.png", replacement, error));
+    ASTRAL_CHECK(assets.PollChanges() == 1 && model.Version() == 3 && model.Attempt() == 5 && model.Error().empty());
+    ASTRAL_CHECK(model->images[0].image.width == 2 && model.Issues().empty());
+
+    // A source syntax error stops before dependencies are rediscovered. A
+    // changed last-good dependency is still watched and acknowledged only once.
+    std::ofstream(fixture.models + "/model.gltf") << "{";
+    ASTRAL_CHECK(assets.PollChanges() == 1);
+    WriteBytes(fixture.root + "/shared/mesh space.bin", {0});
+    ASTRAL_CHECK(assets.PollChanges() == 1);
+    const auto attempts = model.Attempt();
+    ASTRAL_CHECK(assets.PollChanges() == 0 && model.Attempt() == attempts && model.Version() == 3);
+}
+
+ASTRAL_TEST(GltfReportsMissingApprovedFilesWithoutChangingWarningPolicy) {
+    const GltfFileFixture fixture("astral_gltf_dependency_reports");
+    GltfImportReport report;
+    GltfImportOptions options;
+    options.approvedRoot = fixture.root;
+    options.report = &report;
+    GltfDocument document;
+    std::string error;
+    ASTRAL_CHECK(!ImportText(ExternalGltf("../shared/new/missing.bin"), fixture.models, document, error, options));
+    ASTRAL_CHECK(report.files.size() == 1 && report.imageErrors.empty());
+    ASTRAL_CHECK(std::filesystem::path(report.files[0]).is_absolute());
+    report = {};
+    ASTRAL_CHECK(!ImportText(ExternalGltf("../../outside.bin"), fixture.models, document, error, options));
+    ASTRAL_CHECK(report.files.empty()); // no outside-root watch is admitted
+    report = {};
+    ASTRAL_CHECK(ImportText(ExternalGltf("../shared/mesh%20space.bin", "../shared/new/missing.png"),
+        fixture.models, document, error, options));
+    ASTRAL_CHECK(report.files.size() == 2 && report.imageErrors.size() == 1 && document.warnings.size() == 1);
+
+    const std::string source = fixture.models + "/warning.gltf";
+    std::ofstream(source) << ExternalGltf("../shared/mesh%20space.bin", "../shared/new/missing.png");
+    AssetManager assets(fixture.root, nullptr);
+    assets.RegisterDefaultLoaders();
+    const auto model = assets.Load<GltfDocument>("models/warning.gltf");
+    ASTRAL_CHECK(model.Ready() && model.Version() == 1 && model.Error().empty() && model.Issues().size() == 1);
+    ASTRAL_CHECK(assets.Reload("models/warning.gltf"));
+    ASTRAL_CHECK(model.Ready() && model.Version() == 1 && model.Attempt() == 2 && !model.Error().empty());
+    std::filesystem::create_directories(fixture.root + "/shared/new");
+    ASTRAL_CHECK(Graphics::WritePng(fixture.root + "/shared/new/missing.png", TestPattern(2, 2), error));
+    ASTRAL_CHECK(assets.PollChanges() == 1 && model.Version() == 2 && model.Error().empty() && model.Issues().empty());
+
+    // Existing unsupported primitive skips remain nonfatal, not image failures.
+    Core::JsonValue lines;
+    ASTRAL_CHECK(Core::ParseJson(ExternalGltf("../shared/mesh%20space.bin"), lines, error));
+    lines.Find("meshes")->Items()[0].Find("primitives")->Items()[0].Set("mode", 1);
+    report = {};
+    ASTRAL_CHECK(ImportText(Core::WriteJson(lines), fixture.models, document, error, options));
+    ASTRAL_CHECK(document.warnings.size() == 1 && report.imageErrors.empty());
+}
+
+ASTRAL_TEST(CustomLoaderPolicyAndAsyncAttemptPublicationStayCompatible) {
+    const std::string root = TempDir("astral_custom_loader_attempts");
+    std::ofstream(root + "/custom.gltf") << "original disposable custom data";
+    Core::JobSystem jobs(1);
+    AssetManager assets(root, &jobs);
+    assets.RegisterDefaultLoaders();
+    assets.RegisterLoader<GltfDocument>([](const std::string&, GltfDocument& out, std::string&) {
+        out.generator = "custom policy";
+        out.warnings.push_back("custom warning");
+        return true;
+    });
+    const auto model = assets.LoadAsync<GltfDocument>("custom.gltf");
+    ASTRAL_CHECK(model.Attempt() == 0 && model.Version() == 0);
+    int callbacks = 0;
+    assets.OnReady(model, [&] { ++callbacks; });
+    assets.WaitForAll();
+    ASTRAL_CHECK(callbacks == 1 && model.Ready() && model.Attempt() == 1 && model.Version() == 1);
+    ASTRAL_CHECK(model->generator == "custom policy" && model.Issues().empty());
+    ASTRAL_CHECK(assets.Reload("custom.gltf") && model.Version() == 2 && model.Attempt() == 2 && model.Error().empty());
+    std::filesystem::remove_all(root);
+}
+
+namespace {
+void CheckHostDeniedDependencyLink(const char* fixtureName, bool parentUri) {
+    const GltfFileFixture fixture(fixtureName);
+    const std::filesystem::path link = parentUri ? fixture.root + "/shared/link" : fixture.models + "/reload-link";
+#if defined(_WIN32)
+    ASTRAL_CHECK(CreateTestJunction(fixture.outside, link));
+#else
+    std::filesystem::create_directory_symlink(fixture.outside, link);
+#endif
+    const std::string repaired = fixture.root + "/shared/repaired";
+    std::filesystem::create_directory(repaired);
+    ASTRAL_CHECK(std::filesystem::copy_file(fixture.root + "/shared/mesh space.bin", repaired + "/mesh.bin"));
+    ASTRAL_CHECK(std::filesystem::copy_file(fixture.root + "/shared/mesh space.bin", fixture.outside + "/mesh.bin"));
+    std::string error;
+    ASTRAL_CHECK(ExportGltf(MakeFixture(), fixture.root + "/good.glb", GltfContainer::Binary, error));
+    std::ofstream(fixture.root + "/scene.json") << R"({"entities":[{"name":"LastGood","components":{
+        "MeshRenderer":{"mesh":"good.glb#0.0"}}}]})";
+    Framework::HostSettings settings;
+    settings.contentRoot = fixture.root;
+    settings.workerThreads = 0;
+    settings.audio = false;
+    settings.hotReload = true;
+    settings.hotReloadInterval = 0.01f;
+    Framework::GameHost host(settings);
+    ASTRAL_CHECK(host.LoadScene("scene.json", error));
+    auto* world = &host.World();
+    std::ofstream(fixture.models + "/new.gltf") << ExternalGltf(parentUri ? "../shared/link/mesh.bin" : "reload-link/mesh.bin");
+    std::ofstream(fixture.root + "/scene.json") << R"({"entities":[{"name":"RecoveredLink","components":{
+        "MeshRenderer":{"mesh":"models/new.gltf#0.0"}}}]})";
+    std::filesystem::last_write_time(fixture.root + "/scene.json",
+        std::filesystem::last_write_time(fixture.root + "/scene.json") + std::chrono::seconds(5));
+    host.Update(0.02f, {});
+    ASTRAL_CHECK(&host.World() == world && !host.LastError().empty());
+    ASTRAL_CHECK(host.LastError().find("approved root") != std::string::npos);
+    const auto messages = host.Log().size();
+    host.Update(0.02f, {});
+    ASTRAL_CHECK(host.Log().size() == messages);
+    ASTRAL_CHECK(std::filesystem::remove(link)); // remove only this owned link, never its target
+#if defined(_WIN32)
+    ASTRAL_CHECK(CreateTestJunction(repaired, link));
+#else
+    std::filesystem::create_directory_symlink(repaired, link);
+#endif
+    host.Update(0.02f, {}); // only the link changed; scene/model/bytes did not
+    ASTRAL_CHECK(host.LastError().empty());
+    const auto entity = host.World().Find("RecoveredLink");
+    ASTRAL_CHECK(!entity.IsNull());
+    ASTRAL_CHECK(host.World().Get<Framework::MeshRenderer>(entity)->mesh->vertices[0].position.x == -7.0f);
+    ASTRAL_CHECK(host.Stats().hotReloads == 1);
+    ASTRAL_CHECK(std::filesystem::remove(link));
+}
+} // namespace
+
+ASTRAL_TEST(HostReloadRecoversWhenNewDeniedDependencyLinkIsRetargetedInside) {
+    CheckHostDeniedDependencyLink("astral_host_reload_denied_link", false);
+}
+
+ASTRAL_TEST(HostReloadRecoversWhenNewDeniedParentDependencyLinkIsRetargetedInside) {
+    CheckHostDeniedDependencyLink("astral_host_reload_denied_parent_link", true);
 }
 
 ASTRAL_TEST_MAIN("EngineAssetsTests")

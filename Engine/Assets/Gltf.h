@@ -20,6 +20,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -122,6 +123,15 @@ struct GltfDocument {
     Math::TRS WorldTrs(int node) const;
 };
 
+// Optional per-call observations. Appended even when import fails, so a caller
+// can watch an approved missing dependency and retry when only it is repaired.
+// A denied relative URI may retain only its bounded logical in-root path, never
+// its outside target. Paths use native encoding and retain logical locations.
+struct GltfImportReport {
+    std::vector<std::string> files;
+    std::vector<std::string> imageErrors; // structured separately from supported nonfatal skips
+};
+
 struct GltfImportOptions {
     std::size_t maxFileBytes{512u * 1024u * 1024u};
     std::size_t maxElements{64u * 1024u * 1024u}; // per accessor
@@ -131,6 +141,10 @@ struct GltfImportOptions {
     // file's directory (or baseDirectory for a memory import). A project may
     // approve a larger content root to allow in-root ../shared dependencies.
     std::string approvedRoot;
+    GltfImportReport* report{}; // caller-owned; never shared between concurrent imports
+    // Called on the importing thread before a contained external read. An asset
+    // loader can stage a pre-read observation without mutating its live cache.
+    std::function<void(const std::string&)> observeFile;
 };
 
 bool ImportGltf(const std::string& path, GltfDocument& out, std::string& error, const GltfImportOptions& options = {});
