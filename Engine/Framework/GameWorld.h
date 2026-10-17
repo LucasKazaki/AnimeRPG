@@ -227,7 +227,10 @@ public:
     Entity EntityFromBody(Physics::BodyId body) const;
     bool Raycast(const Math::Ray& ray, float maxDistance, EntityRaycastHit& hit, std::uint32_t mask = 0xFFFFFFFFu,
         Entity ignore = {}) const;
-    // Plays a one-shot clip at a world position (fire and forget).
+    // Plays a one-shot retained by the mixer until completion/Stop/world teardown.
+    // Clips passed by shared ownership must remain immutable during playback.
+    Audio::VoiceId PlaySoundAt(std::shared_ptr<const Audio::AudioClip> clip, Math::Vec3 position, float volume = 1.0f);
+    // Legacy raw-pointer callers receive an owned snapshot before playback.
     Audio::VoiceId PlaySoundAt(const Audio::AudioClip* clip, Math::Vec3 position, float volume = 1.0f);
     // AudioSource / ParticleSystem control (restarts when already playing).
     bool PlayAudio(Entity entity);
@@ -298,6 +301,7 @@ private:
     std::vector<std::weak_ptr<Behaviour>> pendingCreate_;
     std::vector<Entity> pendingDestroy_;
     std::vector<Entity> releasingBehaviours_;
+    std::vector<Audio::VoiceId> oneShots_;
     int batchDepth_{};
     float accumulator_{};
     float time_{};

@@ -213,7 +213,7 @@ void GameMode::Collect(int points, Vec3 position) {
     if (won_) return;
     score_ += points;
     ++collected_;
-    World().PlaySoundAt(chime_.get(), position, 0.8f);
+    World().PlaySoundAt(chime_, position, 0.8f);
     if (collected_ < total_) return;
     won_ = true;
     if (banner_) {

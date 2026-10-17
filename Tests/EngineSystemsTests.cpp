@@ -6,11 +6,13 @@
 #include "Engine/VFX/Particles.h"
 #include "Tests/EngineTestSupport.h"
 
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <initializer_list>
 #include <limits>
+#include <thread>
 
 using namespace Astral;
 using Math::Vec3;
@@ -422,6 +424,101 @@ ASTRAL_TEST(MixerSpatialisesPansAndLimits) {
     const Audio::MixerStats stats = mixer.Stats();
     ASTRAL_CHECK(stats.activeVoices == 4 && stats.stolenVoices == 2 && stats.limitedSamples > 0);
     ASTRAL_CHECK(mixer.Play(nullptr, loud).IsNull());
+}
+
+ASTRAL_TEST(MixerOwnedClipsReleaseAtCompletionAndStop) {
+    Audio::AudioMixer mixer(48000, 1);
+    auto clip = std::make_shared<Audio::AudioClip>();
+    clip->samples.assign(8, 0.25f);
+    std::weak_ptr<const Audio::AudioClip> weak = clip;
+    Audio::PlayParams params;
+    const Audio::VoiceId voice = mixer.Play(clip, params);
+    clip.reset();
+    ASTRAL_CHECK(mixer.IsPlaying(voice) && !weak.expired());
+    float stereo[16]{};
+    mixer.Mix(stereo, 8);
+    for (float sample : stereo) ASTRAL_CHECK(sample > 0.1f && sample < 0.3f);
+    ASTRAL_CHECK(!mixer.IsPlaying(voice) && weak.expired());
+
+    clip = std::make_shared<Audio::AudioClip>(Audio::Synth::Tone(220, 0.05f));
+    weak = clip;
+    params.loop = true;
+    const Audio::VoiceId looping = mixer.Play(clip, params);
+    clip.reset();
+    mixer.Stop(voice); // prior generation must not stop the reused slot
+    ASTRAL_CHECK(mixer.IsPlaying(looping) && !weak.expired());
+    mixer.Stop(looping);
+    ASTRAL_CHECK(!mixer.IsPlaying(looping) && weak.expired());
+}
+
+ASTRAL_TEST(MixerOwnedClipStealingAndRejectedPlaybackReleaseOwners) {
+    Audio::AudioMixer mixer(48000, 1);
+    Audio::PlayParams params;
+    params.loop = true;
+    params.priority = 2;
+    auto first = std::make_shared<Audio::AudioClip>(Audio::Synth::Tone(220, 0.05f));
+    std::weak_ptr<const Audio::AudioClip> firstWeak = first;
+    const Audio::VoiceId firstVoice = mixer.Play(first, params);
+    first.reset();
+
+    auto rejected = std::make_shared<Audio::AudioClip>(Audio::Synth::Tone(330, 0.05f));
+    std::weak_ptr<const Audio::AudioClip> rejectedWeak = rejected;
+    Audio::PlayParams lower = params;
+    lower.priority = 1;
+    ASTRAL_CHECK(mixer.Play(rejected, lower).IsNull());
+    rejected.reset();
+    ASTRAL_CHECK(rejectedWeak.expired() && !firstWeak.expired() && mixer.IsPlaying(firstVoice));
+
+    Audio::AudioClip borrowed = Audio::Synth::Tone(440, 0.05f);
+    const Audio::VoiceId replacement = mixer.Play(&borrowed, params);
+    ASTRAL_CHECK(firstWeak.expired() && !mixer.IsPlaying(firstVoice) && mixer.IsPlaying(replacement));
+    mixer.Stop(firstVoice);
+    ASTRAL_CHECK(mixer.IsPlaying(replacement));
+    float stereo[32]{};
+    mixer.Mix(stereo, 16); // explicit borrowed clip remains alive in this scope
+    mixer.Stop(replacement);
+
+    auto empty = std::make_shared<Audio::AudioClip>();
+    std::weak_ptr<const Audio::AudioClip> emptyWeak = empty;
+    ASTRAL_CHECK(mixer.Play(empty, params).IsNull());
+    empty.reset();
+    ASTRAL_CHECK(emptyWeak.expired());
+}
+
+ASTRAL_TEST(MixerOwnedPlaybackAndControlShareTheMixLock) {
+    Audio::AudioMixer mixer(48000, 4);
+    std::atomic<bool> done{false}, finite{true}, audible{true};
+    std::atomic<int> published{0}, mixed{0}, mixCalls{0};
+    std::thread audio([&] {
+        float stereo[128]{};
+        while (!done.load()) {
+            const int phase = published.load();
+            mixer.Mix(stereo, 64);
+            ++mixCalls;
+            bool positive = false;
+            for (float sample : stereo) if (!std::isfinite(sample)) finite.store(false);
+            for (float sample : stereo) if (sample > 0.1f) positive = true;
+            if (phase > mixed.load()) {
+                if (!positive) audible.store(false);
+                mixed.store(phase);
+            }
+        }
+    });
+    Audio::PlayParams params;
+    params.loop = true;
+    for (int n = 0; n != 128; ++n) {
+        auto clip = std::make_shared<Audio::AudioClip>();
+        clip->samples.assign(64, 0.25f);
+        const Audio::VoiceId voice = mixer.Play(std::move(clip), params);
+        published.store(n + 1);
+        // The audio worker must actually read this owned voice before Stop.
+        // It keeps mixing while control releases/replaces voices between phases.
+        while (mixed.load() < n + 1) std::this_thread::yield();
+        mixer.Stop(voice);
+    }
+    done.store(true);
+    audio.join();
+    ASTRAL_CHECK(finite.load() && audible.load() && mixed.load() == 128 && mixCalls.load() >= 128);
 }
 
 ASTRAL_TEST(ProceduralSfxAndWavOutput) {

@@ -58,6 +58,9 @@ GameWorld::~GameWorld() {
     registry_.ForEachEntity([&](Entity entity) { rest.push_back(entity); });
     for (Entity entity : rest) DestroyNow(entity);
     pendingCreate_.clear();
+    // OnDestroy callbacks may themselves enqueue a final sound. Stop only this
+    // world's generation-bearing voices after all callbacks have completed.
+    if (audio_) for (Audio::VoiceId voice : oneShots_) audio_->Stop(voice);
 }
 
 // ------------------------------------------------------------------ entities
@@ -668,7 +671,7 @@ bool GameWorld::PlayAudio(Entity entity) {
     params.minDistance = source->minDistance;
     params.maxDistance = source->maxDistance;
     params.priority = source->priority;
-    source->voice = audio_->Play(source->clip.get(), params);
+    source->voice = audio_->Play(source->clip, params);
     return !source->voice.IsNull();
 }
 
@@ -691,11 +694,23 @@ void GameWorld::StopParticles(Entity entity) {
 
 Audio::VoiceId GameWorld::PlaySoundAt(const Audio::AudioClip* clip, Vec3 position, float volume) {
     if (!audio_ || !clip) return {};
+    return PlaySoundAt(std::make_shared<Audio::AudioClip>(*clip), position, volume);
+}
+
+Audio::VoiceId GameWorld::PlaySoundAt(std::shared_ptr<const Audio::AudioClip> clip, Vec3 position, float volume) {
+    if (!audio_ || !clip) return {};
+    oneShots_.erase(std::remove_if(oneShots_.begin(), oneShots_.end(),
+        [&](Audio::VoiceId voice) { return !audio_->IsPlaying(voice); }), oneShots_.end());
+    // Reserve before Play so an allocation failure cannot leave an untracked
+    // active voice. Inactive/stolen IDs are removed on every subsequent call.
+    oneShots_.reserve(oneShots_.size() + 1);
     Audio::PlayParams params;
     params.volume = volume;
     params.spatial = true;
     params.position = position;
-    return audio_->Play(clip, params);
+    const Audio::VoiceId voice = audio_->Play(std::move(clip), params);
+    if (!voice.IsNull()) oneShots_.push_back(voice);
+    return voice;
 }
 
 // ------------------------------------------------------------------ release
