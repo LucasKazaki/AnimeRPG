@@ -17,7 +17,8 @@
 // fixed step OnFixedUpdate -> physics -> OnCollision*/OnTrigger*, then timers,
 // OnUpdate, animation, OnLateUpdate. OnCreate runs when a behaviour is added
 // (after the whole scene or prefab it belongs to exists); OnDestroy runs when
-// its entity is destroyed at the end of the frame.
+// its entity is destroyed at the end of the frame, or its Behaviours component
+// is removed/replaced through GameWorld. Teardown cancels entity-owned timers.
 
 #include "Engine/Core/Json.h"
 #include "Engine/Core/Reflection.h"
@@ -68,7 +69,8 @@ public:
     const std::string& TypeName() const { return typeName_; }
     bool Started() const { return started_; }
 
-    // Timers owned by this entity: cancelled automatically when it is destroyed.
+    // Timers owned by this entity: cancelled on entity/behaviour-component
+    // teardown. Destroyed behaviours cannot schedule new timers (null handle).
     TimerHandle Invoke(float delay, std::function<void()> callback);
     TimerHandle InvokeRepeating(float delay, float interval, std::function<void()> callback);
 

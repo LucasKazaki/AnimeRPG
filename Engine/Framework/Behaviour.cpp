@@ -7,11 +7,11 @@
 namespace Astral::Framework {
 
 TimerHandle Behaviour::Invoke(float delay, std::function<void()> callback) {
-    return world_ ? world_->Timers().Set(delay, std::move(callback), 0.0f, entity_) : TimerHandle{};
+    return world_ && !destroyed_ ? world_->Timers().Set(delay, std::move(callback), 0.0f, entity_) : TimerHandle{};
 }
 
 TimerHandle Behaviour::InvokeRepeating(float delay, float interval, std::function<void()> callback) {
-    if (!world_ || !(interval > 0.0f)) return {};
+    if (!world_ || destroyed_ || !(interval > 0.0f)) return {};
     return world_->Timers().Set(delay, std::move(callback), interval, entity_);
 }
 

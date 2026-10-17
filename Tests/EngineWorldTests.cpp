@@ -1,6 +1,7 @@
 #include "Engine/World/Components.h"
 #include "Engine/World/Registry.h"
 #include "Engine/World/Serialization.h"
+#include "Engine/Framework/GameWorld.h"
 #include "Tests/EngineTestSupport.h"
 
 #include <cstddef>
@@ -18,6 +19,65 @@ struct Velocity {
     Math::Vec3 value{};
 };
 struct Tag {};
+
+struct LifecycleCounts {
+    int destroyed{};
+    int disposed{};
+    int fired{};
+    int updated{};
+};
+
+struct LifecycleProbe final : Framework::Behaviour {
+    explicit LifecycleProbe(std::shared_ptr<LifecycleCounts> counts) : counts_(std::move(counts)) {}
+    ~LifecycleProbe() override { ++counts_->disposed; }
+    void OnCreate() override {
+        const auto counts = counts_;
+        Invoke(0.01f, [counts] { ++counts->fired; });
+    }
+    void OnUpdate(float) override { ++counts_->updated; }
+    void OnDestroy() override { ++counts_->destroyed; }
+    std::shared_ptr<LifecycleCounts> counts_;
+};
+
+struct RemoveOtherBehaviours final : Framework::Behaviour {
+    explicit RemoveOtherBehaviours(Entity target) : target_(target) {}
+    void OnUpdate(float) override { World().Remove<Framework::Behaviours>(target_); }
+    Entity target_;
+};
+
+struct ReentrantLifecycleProbe final : Framework::Behaviour {
+    explicit ReentrantLifecycleProbe(std::shared_ptr<LifecycleCounts> counts) : counts_(std::move(counts)) {}
+    void OnDestroy() override {
+        ++counts_->destroyed;
+        World().Remove<Framework::Behaviours>(Self());
+        bool typedRejected = false, componentRejected = false;
+        try { World().AddBehaviour<LifecycleProbe>(Self(), counts_); }
+        catch (const std::invalid_argument&) { typedRejected = true; }
+        try { World().Add<Framework::Behaviours>(Self(), Framework::Behaviours{}); }
+        catch (const std::invalid_argument&) { componentRejected = true; }
+        Framework::BehaviourRegistry types;
+        types.Register<Framework::Behaviour>("Plain");
+        std::string error;
+        ASTRAL_CHECK(!World().AddBehaviour(Self(), "Plain", {}, error, types));
+        ASTRAL_CHECK(error.find("teardown") != std::string::npos);
+        ASTRAL_CHECK(typedRejected && componentRejected);
+        ASTRAL_CHECK(Invoke(0, [] {}).IsNull());
+        ASTRAL_CHECK(InvokeRepeating(0, 0.01f, [] {}).IsNull());
+        // Teardown is scoped to this entity, not a global attachment ban.
+        const Entity other = World().CreateEntity("CreatedDuringOtherTeardown");
+        World().AddBehaviour<Framework::Behaviour>(other);
+    }
+    std::shared_ptr<LifecycleCounts> counts_;
+};
+
+struct DestroyDuringTeardown final : Framework::Behaviour {
+    explicit DestroyDuringTeardown(std::shared_ptr<LifecycleCounts> counts) : counts_(std::move(counts)) {}
+    void OnDestroy() override {
+        ++counts_->destroyed;
+        World().DestroyImmediate(Self());
+    }
+    std::shared_ptr<LifecycleCounts> counts_;
+};
 } // namespace
 
 ASTRAL_TEST(EntitiesAreGenerational) {
@@ -242,6 +302,95 @@ ASTRAL_TEST(CorruptWorldsAreRejectedWithoutSideEffects) {
     serializer.strictUnknownComponents = false;
     ASTRAL_CHECK(serializer.Load("ASTRAL_WORLD 1\n# comment\nentity 0\nMystery 1\nend\n", target, error));
     ASTRAL_CHECK(target.AliveCount() == 1 && target.Get<Name>(keep) == nullptr);
+}
+
+ASTRAL_TEST(RemovingBehaviourComponentReleasesLifecycleAndTimers) {
+    const auto counts = std::make_shared<LifecycleCounts>();
+    Framework::GameWorld world;
+    const Entity entity = world.CreateEntity("LifecycleProbe");
+    world.AddBehaviour<LifecycleProbe>(entity, counts);
+    world.Remove<Framework::Behaviours>(entity);
+    world.Tick(0.02f);
+    std::printf("remove: destroyed=%d disposed=%d fired=%d\n", counts->destroyed, counts->disposed, counts->fired);
+    ASTRAL_CHECK(world.IsAlive(entity));
+    ASTRAL_CHECK(counts->fired == 0);
+    ASTRAL_CHECK(counts->destroyed == 1 && counts->disposed == 1);
+    ASTRAL_CHECK(world.Get<Framework::Behaviours>(entity) == nullptr);
+}
+
+ASTRAL_TEST(ReplacingBehaviourComponentReleasesLifecycleAndTimers) {
+    const auto counts = std::make_shared<LifecycleCounts>();
+    Framework::GameWorld world;
+    const Entity entity = world.CreateEntity("LifecycleProbe");
+    world.AddBehaviour<LifecycleProbe>(entity, counts);
+    world.Add<Framework::Behaviours>(entity, Framework::Behaviours{});
+    world.Tick(0.02f);
+    std::printf("replace: destroyed=%d disposed=%d fired=%d\n", counts->destroyed, counts->disposed, counts->fired);
+    ASTRAL_CHECK(world.IsAlive(entity));
+    ASTRAL_CHECK(counts->fired == 0);
+    ASTRAL_CHECK(counts->destroyed == 1 && counts->disposed == 1);
+    ASTRAL_CHECK(world.Get<Framework::Behaviours>(entity)->list.empty());
+}
+
+ASTRAL_TEST(RemovedBehavioursCannotRunFromAnEarlierFrameSnapshot) {
+    const auto counts = std::make_shared<LifecycleCounts>();
+    Framework::GameWorld world;
+    const Entity remover = world.CreateEntity("Remover");
+    const Entity removed = world.CreateEntity("Removed");
+    world.AddBehaviour<RemoveOtherBehaviours>(remover, removed);
+    world.AddBehaviour<LifecycleProbe>(removed, counts);
+    world.Tick(0.0f);
+    std::printf("snapshot: destroyed=%d disposed=%d updated=%d\n", counts->destroyed, counts->disposed, counts->updated);
+    ASTRAL_CHECK(counts->updated == 0);
+    ASTRAL_CHECK(counts->destroyed == 1 && counts->disposed == 1);
+    ASTRAL_CHECK(world.IsAlive(removed));
+}
+
+ASTRAL_TEST(BehaviourTeardownRejectsSameEntityReattachmentAndNewTimers) {
+    const auto counts = std::make_shared<LifecycleCounts>();
+    Framework::GameWorld world;
+    const Entity entity = world.CreateEntity("Reentrant");
+    world.AddBehaviour<ReentrantLifecycleProbe>(entity, counts);
+    world.Remove<Framework::Behaviours>(entity);
+    ASTRAL_CHECK(counts->destroyed == 1);
+    ASTRAL_CHECK(world.Timers().Count() == 0);
+    ASTRAL_CHECK(world.IsAlive(entity) && !world.Get<Framework::Behaviours>(entity));
+    const Entity other = world.Find("CreatedDuringOtherTeardown");
+    ASTRAL_CHECK(world.GetBehaviour<Framework::Behaviour>(other));
+    // The guard is released; ordinary replacement attachment works afterward.
+    world.AddBehaviour<Framework::Behaviour>(entity);
+    world.Tick(0.0f);
+    ASTRAL_CHECK(world.GetBehaviour<Framework::Behaviour>(entity)->Started());
+}
+
+ASTRAL_TEST(BehaviourReplacementHandlesRecursiveEntityDestruction) {
+    const auto counts = std::make_shared<LifecycleCounts>();
+    Framework::GameWorld world;
+    const Entity entity = world.CreateEntity("DestroyDuringTeardown");
+    world.AddBehaviour<DestroyDuringTeardown>(entity, counts);
+    world.AddBehaviour<LifecycleProbe>(entity, counts);
+    bool rejected = false;
+    try { world.Add<Framework::Behaviours>(entity, Framework::Behaviours{}); }
+    catch (const std::invalid_argument&) { rejected = true; }
+    ASTRAL_CHECK(rejected && !world.IsAlive(entity));
+    ASTRAL_CHECK(counts->destroyed == 2 && counts->disposed == 1);
+    world.Tick(0.02f);
+    ASTRAL_CHECK(counts->fired == 0);
+}
+
+ASTRAL_TEST(RemovedPendingBehavioursNeverCreateOrStart) {
+    const auto counts = std::make_shared<LifecycleCounts>();
+    Framework::GameWorld world;
+    const Entity entity = world.CreateEntity("Pending");
+    world.BeginCreateBatch();
+    world.AddBehaviour<LifecycleProbe>(entity, counts);
+    const auto retained = world.Get<Framework::Behaviours>(entity)->list.front();
+    world.Remove<Framework::Behaviours>(entity);
+    world.EndCreateBatch();
+    world.Tick(0.02f);
+    ASTRAL_CHECK(!retained->Started());
+    ASTRAL_CHECK(counts->destroyed == 0 && counts->updated == 0 && counts->fired == 0);
+    ASTRAL_CHECK(world.Timers().Count() == 0);
 }
 
 ASTRAL_TEST_MAIN("EngineWorldTests")
