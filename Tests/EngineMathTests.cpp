@@ -2,6 +2,8 @@
 #include "Engine/Math/VectorMath.h"
 #include "Tests/EngineTestSupport.h"
 
+#include <limits>
+
 using namespace Astral::Math;
 
 namespace {
@@ -28,6 +30,40 @@ ASTRAL_TEST(VectorBasics) {
     ASTRAL_CHECK_NEAR(WrapAngle(kPi * 2.5f), kHalfPi, 1e-4);
     ASTRAL_CHECK_NEAR(WrapAngle(-kPi * 2.5f), -kHalfPi, 1e-4);
     ASTRAL_CHECK_NEAR(SmoothStep(0.0f, 1.0f, 0.5f), 0.5f, 1e-6);
+}
+
+ASTRAL_TEST(Vec3NormAvoidsIntermediateOverflowAndUnderflow) {
+    for (int exponent = -100; exponent <= 100; exponent += 5) {
+        const float value = std::ldexp(1.0f, exponent);
+        const Vec3 v{value, -value * 0.5f, value * 0.25f};
+        const double reference = std::sqrt(static_cast<double>(v.x) * v.x
+            + static_cast<double>(v.y) * v.y + static_cast<double>(v.z) * v.z);
+        ASTRAL_CHECK(IsFinite(Length(v)) && Length(v) > 0.0f);
+        ASTRAL_CHECK_NEAR(Length(v) / reference, 1.0, 2e-6);
+        ASTRAL_CHECK(Length(v) == v.Length());
+    }
+    const Vec3 huge{1e20f, 1e20f, 0.0f};
+    ASTRAL_CHECK_NEAR(Length(huge) / 1e20f, std::sqrt(2.0f), 1e-6);
+    ASTRAL_CHECK(Length(Vec3{1e-30f, 0.0f, 0.0f}) == 1e-30f);
+}
+
+ASTRAL_TEST(Vec3NormalizeRetainsLargeFiniteDirectionsAndFallbackContract) {
+    const float limit = std::numeric_limits<float>::max();
+    CheckVec(Normalize(Vec3{1e20f, 1e20f, 0.0f}),
+        {std::sqrt(0.5f), std::sqrt(0.5f), 0.0f}, 1e-6f);
+    // The float norm cannot represent this vector, but its direction is valid.
+    CheckVec(Normalize(Vec3{limit, -limit, limit}),
+        {1.0f / std::sqrt(3.0f), -1.0f / std::sqrt(3.0f), 1.0f / std::sqrt(3.0f)}, 1e-6f);
+    const Vec3 fallback{0.0f, 1.0f, 0.0f};
+    CheckVec(Normalize(Vec3{}, fallback), fallback);
+    CheckVec(Normalize(Vec3{1e-30f, 0.0f, 0.0f}, fallback), fallback);
+    CheckVec(Normalize(Vec3{kEpsilon, 0.0f, 0.0f}, fallback), fallback);
+    for (float invalid : {std::numeric_limits<float>::quiet_NaN(),
+        std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()}) {
+        CheckVec(Normalize(Vec3{invalid, 1.0f, 0.0f}, fallback), fallback);
+        CheckVec(Normalize(Vec3{1.0f, invalid, 0.0f}, fallback), fallback);
+        CheckVec(Normalize(Vec3{1.0f, 0.0f, invalid}, fallback), fallback);
+    }
 }
 
 ASTRAL_TEST(OrthonormalBasisIsOrthonormal) {
