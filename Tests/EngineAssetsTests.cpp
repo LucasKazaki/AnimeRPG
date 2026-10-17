@@ -1292,4 +1292,291 @@ ASTRAL_TEST(HostReloadRecoversWhenNewDeniedParentDependencyLinkIsRetargetedInsid
     CheckHostDeniedDependencyLink("astral_host_reload_denied_parent_link", true);
 }
 
+namespace {
+
+// Original three-vertex fixtures. Every view starts at a four-byte boundary;
+// sparse views include a four-byte prefix to exercise nonzero local offsets.
+struct SparseFixture {
+    Core::JsonValue json;
+    std::vector<std::uint8_t> bytes;
+
+    SparseFixture() {
+        std::string error;
+        ASTRAL_CHECK(Core::ParseJson(R"({"asset":{"version":"2.0"},
+            "scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],
+            "meshes":[{"primitives":[{"attributes":{"POSITION":0}}]}],
+            "accessors":[{"componentType":5126,"count":3,"type":"VEC3",
+                "min":[0,0,0],"max":[1,1,0]}],"bufferViews":[]})", json, error));
+        json.Find("accessors")->Items()[0].Set("bufferView", FloatView({0, 0, 0, 1, 0, 0, 0, 1, 0}));
+    }
+
+    int View(const std::vector<std::uint8_t>& data) {
+        while (bytes.size() % 4 != 0) bytes.push_back(0);
+        Core::JsonValue view = Core::JsonValue::MakeObject();
+        view.Set("buffer", 0);
+        view.Set("byteOffset", bytes.size());
+        view.Set("byteLength", data.size());
+        auto* views = json.Find("bufferViews");
+        const int index = static_cast<int>(views->Size());
+        views->Append(std::move(view));
+        bytes.insert(bytes.end(), data.begin(), data.end());
+        return index;
+    }
+
+    int FloatView(const std::vector<float>& values) {
+        std::vector<std::uint8_t> data(values.size() * sizeof(float));
+        std::memcpy(data.data(), values.data(), data.size());
+        return View(data);
+    }
+
+    int UnsignedView(const std::vector<std::uint32_t>& values, int type, bool prefix = false) {
+        const int width = type == 5125 ? 4 : type == 5123 ? 2 : 1;
+        std::vector<std::uint8_t> data(prefix ? 4 : 0, 0);
+        for (std::uint32_t value : values) {
+            for (int b = 0; b < width; ++b) data.push_back(static_cast<std::uint8_t>(value >> (8 * b)));
+        }
+        return View(data);
+    }
+
+    void Sparse(Core::JsonValue& accessor, int selectorType, int valueType,
+        const std::vector<std::uint32_t>& selectors, const std::vector<std::uint32_t>& values) {
+        Core::JsonValue sparse = Core::JsonValue::MakeObject();
+        sparse.Set("count", selectors.size());
+        Core::JsonValue indices = Core::JsonValue::MakeObject();
+        indices.Set("bufferView", UnsignedView(selectors, selectorType, true));
+        indices.Set("byteOffset", 4);
+        indices.Set("componentType", selectorType);
+        sparse.Set("indices", std::move(indices));
+        Core::JsonValue replacements = Core::JsonValue::MakeObject();
+        replacements.Set("bufferView", UnsignedView(values, valueType, true));
+        replacements.Set("byteOffset", 4);
+        sparse.Set("values", std::move(replacements));
+        accessor.Set("sparse", std::move(sparse));
+    }
+
+    Core::JsonValue Finish() {
+        Core::JsonValue buffers = Core::JsonValue::MakeArray();
+        Core::JsonValue buffer = Core::JsonValue::MakeObject();
+        buffer.Set("byteLength", bytes.size());
+        buffer.Set("uri", "data:application/octet-stream;base64," + Core::Base64Encode(bytes.data(), bytes.size()));
+        buffers.Append(std::move(buffer));
+        json.Set("buffers", std::move(buffers));
+        return json;
+    }
+};
+
+Core::JsonValue SparseIndexFixture(int valueType, int selectorType, bool denseBase) {
+    SparseFixture fixture;
+    Core::JsonValue accessor = Core::JsonValue::MakeObject();
+    accessor.Set("componentType", valueType);
+    accessor.Set("count", 3);
+    accessor.Set("type", "SCALAR");
+    if (denseBase) accessor.Set("bufferView", fixture.UnsignedView({0, 0, 2}, valueType));
+    fixture.Sparse(accessor, selectorType, valueType, denseBase ? std::vector<std::uint32_t>{1}
+        : std::vector<std::uint32_t>{0, 1, 2}, denseBase ? std::vector<std::uint32_t>{1}
+        : std::vector<std::uint32_t>{0, 1, 2});
+    fixture.json.Find("accessors")->Append(std::move(accessor));
+    fixture.json.Find("meshes")->Items()[0].Find("primitives")->Items()[0].Set("indices", 1);
+    return fixture.Finish();
+}
+
+Core::JsonValue SparseJointFixture(int valueType, int selectorType, bool denseBase) {
+    SparseFixture fixture;
+    Core::JsonValue accessor = Core::JsonValue::MakeObject();
+    accessor.Set("componentType", valueType);
+    accessor.Set("count", 3);
+    accessor.Set("type", "VEC4");
+    if (denseBase) accessor.Set("bufferView", fixture.UnsignedView({1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, valueType));
+    fixture.Sparse(accessor, selectorType, valueType, {1}, {1, 0, 0, 0});
+    fixture.json.Find("accessors")->Append(std::move(accessor));
+    Core::JsonValue weights = Core::JsonValue::MakeObject();
+    weights.Set("bufferView", fixture.FloatView({1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}));
+    weights.Set("componentType", 5126);
+    weights.Set("count", 3);
+    weights.Set("type", "VEC4");
+    fixture.json.Find("accessors")->Append(std::move(weights));
+    auto* attributes = fixture.json.Find("meshes")->Items()[0].Find("primitives")->Items()[0].Find("attributes");
+    attributes->Set("JOINTS_0", 1);
+    attributes->Set("WEIGHTS_0", 2);
+    Core::JsonValue skeleton;
+    std::string error;
+    ASTRAL_CHECK(Core::ParseJson(R"({"nodes":[{"mesh":0,"skin":0},{"children":[2]},{}],
+        "scenes":[{"nodes":[0,1]}],"skins":[{"joints":[1,2],"skeleton":1}]})", skeleton, error));
+    fixture.json.Set("nodes", skeleton["nodes"]);
+    fixture.json.Set("scenes", skeleton["scenes"]);
+    fixture.json.Set("skins", skeleton["skins"]);
+    return fixture.Finish();
+}
+
+void RewriteSparseUnsigned(Core::JsonValue& json, const char* field, int type,
+    const std::vector<std::uint32_t>& values) {
+    const auto& data = json["accessors"][1]["sparse"][field];
+    const auto& view = json["bufferViews"][static_cast<int>(data.Int("bufferView"))];
+    const std::size_t offset = static_cast<std::size_t>(view.Int("byteOffset") + data.Int("byteOffset"));
+    const int width = type == 5125 ? 4 : type == 5123 ? 2 : 1;
+    auto& buffer = json.Find("buffers")->Items()[0];
+    const std::string uri = buffer.String("uri");
+    std::vector<std::uint8_t> bytes;
+    ASTRAL_CHECK(Core::Base64Decode(uri.substr(uri.find(',') + 1), bytes));
+    ASTRAL_CHECK(offset + values.size() * static_cast<std::size_t>(width) <= bytes.size());
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        for (int b = 0; b < width; ++b) bytes[offset + i * width + b] = static_cast<std::uint8_t>(values[i] >> (8 * b));
+    }
+    buffer.Set("uri", "data:application/octet-stream;base64," + Core::Base64Encode(bytes.data(), bytes.size()));
+}
+
+void CheckSparseRejected(const Core::JsonValue& json) {
+    GltfDocument doc;
+    doc.generator = "last good document";
+    std::string error;
+    ASTRAL_CHECK(!ImportText(Core::WriteJson(json), "", doc, error));
+    ASTRAL_CHECK(!error.empty() && doc.generator == "last good document" && doc.meshes.empty());
+}
+
+} // namespace
+
+ASTRAL_TEST(GltfSparsePrimitiveIndicesReachRenderer) {
+    for (int valueType : {5121, 5123, 5125}) {
+        for (int selectorType : {5121, 5123, 5125}) {
+            for (bool denseBase : {false, true}) {
+                GltfDocument doc;
+                std::string error;
+                ASTRAL_CHECK(ImportText(Core::WriteJson(SparseIndexFixture(valueType, selectorType, denseBase)), "", doc, error));
+                const auto& mesh = doc.meshes[0].primitives[0].mesh;
+                ASTRAL_CHECK(mesh.indices == std::vector<std::uint32_t>({0, 2, 1}));
+                ASTRAL_CHECK(doc.warnings.empty());
+                Graphics::Material material;
+                Graphics::RenderScene scene;
+                scene.draws.push_back({&mesh, &material, Mat4::Identity(), 7});
+                Graphics::SceneRenderer renderer(nullptr);
+                Graphics::RenderTarget target;
+                renderer.Render(scene, Graphics::RenderView::Perspective({-0.3f, 0.3f, 3.0f},
+                    {-0.3f, 0.3f, 0.0f}, 40.0f, 64, 64), target);
+                ASTRAL_CHECK(target.objectId[target.Index(32, 32)] == 7);
+            }
+        }
+    }
+}
+
+ASTRAL_TEST(GltfSparseJointsReachSkinMesh) {
+    for (int valueType : {5121, 5123}) { // JOINTS_0 components allowed by glTF.
+        for (int selectorType : {5121, 5123, 5125}) {
+            for (bool denseBase : {false, true}) {
+                GltfDocument doc;
+                std::string error;
+                ASTRAL_CHECK(ImportText(Core::WriteJson(SparseJointFixture(valueType, selectorType, denseBase)), "", doc, error));
+                const auto& mesh = doc.meshes[0].primitives[0].mesh;
+                ASTRAL_CHECK(mesh.skin.size() == 3 && mesh.skin[1].joints[0] == 1);
+                ASTRAL_CHECK(mesh.skin[0].joints[0] == (denseBase ? 1 : 0) && mesh.skin[2].joints[0] == 0);
+                ASTRAL_CHECK(doc.warnings.empty());
+                Math::TRS translated;
+                translated.translation = {3, 0, 0};
+                Graphics::MeshData skinned;
+                Animation::SkinMesh(mesh, {Mat4::Identity(), Math::ToMat4(translated)}, skinned);
+                ASTRAL_CHECK(Near(skinned.vertices[1].position, mesh.vertices[1].position + Vec3{3, 0, 0}));
+                ASTRAL_CHECK(Near(skinned.vertices[0].position,
+                    mesh.vertices[0].position + Vec3{denseBase ? 3.0f : 0.0f, 0, 0}));
+                ASTRAL_CHECK(Near(skinned.vertices[2].position, mesh.vertices[2].position));
+            }
+        }
+    }
+}
+
+ASTRAL_TEST(GltfSparseSelectorTypesAndCountsAreValidated) {
+    for (int type : {5120, 5122, 5126, 0}) {
+        auto json = SparseIndexFixture(5123, 5121, false);
+        json.Find("accessors")->Items()[1].Find("sparse")->Find("indices")->Set("componentType", type);
+        CheckSparseRejected(json);
+    }
+    for (double count : {0.0, -1.0, 4.0, 1.5}) {
+        auto json = SparseIndexFixture(5123, 5121, false);
+        json.Find("accessors")->Items()[1].Find("sparse")->Set("count", count);
+        CheckSparseRejected(json);
+    }
+}
+
+ASTRAL_TEST(GltfSparseSelectorsMustIncreaseWithinAccessor) {
+    for (const auto& selectors : {std::vector<std::uint32_t>{0, 0, 2}, {0, 2, 1}, {0, 1, 3}, {0, 1, 0xffffffffu}}) {
+        auto json = SparseIndexFixture(5125, 5125, false);
+        RewriteSparseUnsigned(json, "indices", 5125, selectors);
+        CheckSparseRejected(json);
+    }
+    // The raw uint32 replacement must reach the mesh's index range check.
+    // A float round-trip would lose precision and can make this conversion undefined.
+    auto json = SparseIndexFixture(5125, 5125, false);
+    RewriteSparseUnsigned(json, "values", 5125, {0, 1, 0xffffffffu});
+    CheckSparseRejected(json);
+}
+
+ASTRAL_TEST(GltfSparseOffsetsAndViewsStayBounded) {
+    for (const char* field : {"indices", "values"}) {
+        for (std::int64_t offset : {std::int64_t{-1}, std::int64_t{1} << 40}) {
+            auto json = SparseIndexFixture(5123, 5123, false);
+            json.Find("accessors")->Items()[1].Find("sparse")->Find(field)->Set("byteOffset", offset);
+            CheckSparseRejected(json);
+        }
+        auto json = SparseIndexFixture(5123, 5123, false);
+        const int view = static_cast<int>(json["accessors"][1]["sparse"][field].Int("bufferView"));
+        auto& bufferView = json.Find("bufferViews")->Items()[static_cast<std::size_t>(view)];
+        bufferView.Set("byteLength", bufferView.Int("byteLength") - 1);
+        CheckSparseRejected(json);
+    }
+}
+
+ASTRAL_TEST(GltfSparseFloatAndNormalizedColorsRemainSupported) {
+    for (int selectorType : {5121, 5123, 5125}) {
+        SparseFixture fixture;
+        Core::JsonValue sparse = Core::JsonValue::MakeObject();
+        Core::JsonValue indices = Core::JsonValue::MakeObject();
+        indices.Set("bufferView", fixture.UnsignedView({1}, selectorType, true));
+        indices.Set("byteOffset", 4);
+        indices.Set("componentType", selectorType);
+        Core::JsonValue values = Core::JsonValue::MakeObject();
+        values.Set("bufferView", fixture.FloatView({0, 0, 0, 0, 2, 0, 0}));
+        values.Set("byteOffset", 16); // four float prefix, then one VEC3
+        sparse.Set("count", 1);
+        sparse.Set("indices", std::move(indices));
+        sparse.Set("values", std::move(values));
+        auto& position = fixture.json.Find("accessors")->Items()[0];
+        position.Set("sparse", std::move(sparse));
+        position.Find("max")->Items()[0] = 2;
+        Core::JsonValue colors = Core::JsonValue::MakeObject();
+        colors.Set("componentType", 5121);
+        colors.Set("count", 3);
+        colors.Set("type", "VEC4");
+        colors.Set("normalized", true);
+        fixture.Sparse(colors, selectorType, 5121, {0, 1, 2}, {64, 128, 255, 255, 64, 128, 255, 255, 64, 128, 255, 255});
+        fixture.json.Find("accessors")->Append(std::move(colors));
+        fixture.json.Find("meshes")->Items()[0].Find("primitives")->Items()[0].Find("attributes")->Set("COLOR_0", 1);
+        GltfDocument doc;
+        std::string error;
+        ASTRAL_CHECK(ImportText(Core::WriteJson(fixture.Finish()), "", doc, error));
+        const auto& mesh = doc.meshes[0].primitives[0].mesh;
+        ASTRAL_CHECK(mesh.vertices[1].position.x == -2.0f);
+        ASTRAL_CHECK(mesh.indices == std::vector<std::uint32_t>({0, 2, 1}));
+        for (const auto& vertex : mesh.vertices) {
+            ASTRAL_CHECK_NEAR(vertex.color.x, 64.0f / 255.0f, 1e-6);
+            ASTRAL_CHECK_NEAR(vertex.color.y, 128.0f / 255.0f, 1e-6);
+            ASTRAL_CHECK(vertex.color.z == 1.0f && vertex.color.w == 1.0f);
+        }
+    }
+}
+
+ASTRAL_TEST(GltfDenseUnsignedIndicesRemainSupported) {
+    for (int type : {5121, 5123, 5125}) {
+        SparseFixture fixture;
+        Core::JsonValue accessor = Core::JsonValue::MakeObject();
+        accessor.Set("bufferView", fixture.UnsignedView({0, 1, 2}, type));
+        accessor.Set("componentType", type);
+        accessor.Set("type", "SCALAR");
+        accessor.Set("count", 3);
+        fixture.json.Find("accessors")->Append(std::move(accessor));
+        fixture.json.Find("meshes")->Items()[0].Find("primitives")->Items()[0].Set("indices", 1);
+        GltfDocument doc;
+        std::string error;
+        ASTRAL_CHECK(ImportText(Core::WriteJson(fixture.Finish()), "", doc, error));
+        ASTRAL_CHECK(doc.meshes[0].primitives[0].mesh.indices == std::vector<std::uint32_t>({0, 2, 1}));
+    }
+}
+
 ASTRAL_TEST_MAIN("EngineAssetsTests")
