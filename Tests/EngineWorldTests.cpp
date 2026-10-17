@@ -78,6 +78,22 @@ struct DestroyDuringTeardown final : Framework::Behaviour {
     }
     std::shared_ptr<LifecycleCounts> counts_;
 };
+
+Framework::GameWorldSettings RigidSyncSettings() {
+    Framework::GameWorldSettings settings;
+    settings.physics.gravity = {};
+    settings.physics.allowSleep = false;
+    return settings;
+}
+
+Framework::RigidBody MovingBody(float mass, Math::Vec3 velocity = {}) {
+    Framework::RigidBody body;
+    body.mass = mass;
+    body.velocity = velocity;
+    body.linearDamping = 0;
+    body.angularDamping = 0;
+    return body;
+}
 } // namespace
 
 ASTRAL_TEST(EntitiesAreGenerational) {
@@ -391,6 +407,214 @@ ASTRAL_TEST(RemovedPendingBehavioursNeverCreateOrStart) {
     ASTRAL_CHECK(!retained->Started());
     ASTRAL_CHECK(counts->destroyed == 0 && counts->updated == 0 && counts->fired == 0);
     ASTRAL_CHECK(world.Timers().Count() == 0);
+}
+
+ASTRAL_TEST(AddingRigidBodyRebuildsExistingStaticCollider) {
+    Framework::GameWorld world(RigidSyncSettings());
+    const Entity entity = world.CreateEntity("neutral box", {{3, 4, 5}, {}, {1, 1, 1}});
+    world.Add<Framework::Collider>(entity);
+    const float step = world.Settings().fixedDelta;
+    world.Tick(step);
+    const Physics::BodyId previous = world.Get<Framework::Collider>(entity)->body;
+    ASTRAL_CHECK(world.Physics().GetBody(previous)->type == Physics::BodyType::Static);
+    world.Add<Framework::RigidBody>(entity, MovingBody(4, {3, 0, 0}));
+    world.Tick(step);
+    const Physics::BodyId current = world.Get<Framework::Collider>(entity)->body;
+    const Physics::Body* body = world.Physics().GetBody(current);
+    ASTRAL_CHECK(body);
+    std::printf("add: type=%d inverseMass=%.6f\n", static_cast<int>(body->type), body->inverseMass);
+    ASTRAL_CHECK(body->type == Physics::BodyType::Dynamic);
+    ASTRAL_CHECK_NEAR(body->inverseMass, 0.25f, 1e-6f);
+    ASTRAL_CHECK_NEAR(body->linearVelocity.x, 3, 1e-6f);
+    ASTRAL_CHECK_NEAR(world.GetWorld(entity).translation.x, 3 + 3 * step, 1e-5f);
+    ASTRAL_CHECK(current != previous && !world.Physics().GetBody(previous));
+    ASTRAL_CHECK(world.EntityFromBody(previous).IsNull() && world.EntityFromBody(current) == entity);
+    ASTRAL_CHECK(world.Physics().BodyCount() == 1);
+}
+
+ASTRAL_TEST(RemovingRigidBodyRestoresStaticCollider) {
+    Framework::GameWorld world(RigidSyncSettings());
+    const Entity entity = world.CreateEntity("neutral box", {{3, 4, 5}, {}, {1, 1, 1}});
+    world.Add<Framework::Collider>(entity);
+    world.Add<Framework::RigidBody>(entity, MovingBody(2, {2, 0, 0}));
+    const float step = world.Settings().fixedDelta;
+    world.Tick(step);
+    const Physics::BodyId previous = world.Get<Framework::Collider>(entity)->body;
+    const Math::Vec3 position = world.GetWorld(entity).translation;
+    world.Remove<Framework::RigidBody>(entity);
+    world.Tick(step);
+    const Physics::BodyId current = world.Get<Framework::Collider>(entity)->body;
+    const Physics::Body* body = world.Physics().GetBody(current);
+    ASTRAL_CHECK(body);
+    std::printf("remove: type=%d inverseMass=%.6f\n", static_cast<int>(body->type), body->inverseMass);
+    ASTRAL_CHECK(body->type == Physics::BodyType::Static && body->inverseMass == 0);
+    ASTRAL_CHECK_NEAR(Math::Length(body->linearVelocity), 0, 1e-6f);
+    ASTRAL_CHECK_NEAR(Math::Distance(world.GetWorld(entity).translation, position), 0, 1e-6f);
+    ASTRAL_CHECK(current != previous && !world.Physics().GetBody(previous));
+    ASTRAL_CHECK(world.EntityFromBody(current) == entity && world.Physics().BodyCount() == 1);
+}
+
+ASTRAL_TEST(ReplacingRigidBodyAppliesNewPhysicsDescription) {
+    Framework::GameWorld world(RigidSyncSettings());
+    const Entity entity = world.CreateEntity("neutral box", {{3, 4, 5}, {}, {1, 1, 1}});
+    world.Add<Framework::Collider>(entity);
+    world.Add<Framework::RigidBody>(entity, MovingBody(2));
+    const float step = world.Settings().fixedDelta;
+    world.Tick(step);
+    const Physics::BodyId previous = world.Get<Framework::Collider>(entity)->body;
+    Framework::RigidBody replacement = MovingBody(8, {6, -1, 2});
+    replacement.linearDamping = 0.3f;
+    replacement.angularDamping = 0.4f;
+    replacement.gravityScale = 0.2f;
+    replacement.lockRotation = true;
+    world.Add<Framework::RigidBody>(entity, replacement);
+    world.Tick(step);
+    const Physics::BodyId current = world.Get<Framework::Collider>(entity)->body;
+    const Physics::Body* body = world.Physics().GetBody(current);
+    ASTRAL_CHECK(body);
+    std::printf("replace: type=%d inverseMass=%.6f\n", static_cast<int>(body->type), body->inverseMass);
+    ASTRAL_CHECK_NEAR(body->inverseMass, 0.125f, 1e-6f);
+    ASTRAL_CHECK(body->type == Physics::BodyType::Dynamic && body->lockRotation);
+    ASTRAL_CHECK_NEAR(body->linearDamping, replacement.linearDamping, 1e-6f);
+    ASTRAL_CHECK_NEAR(body->angularDamping, replacement.angularDamping, 1e-6f);
+    ASTRAL_CHECK_NEAR(body->gravityScale, replacement.gravityScale, 1e-6f);
+    const Math::Vec3 expectedVelocity = replacement.velocity / (1 + step * replacement.linearDamping);
+    ASTRAL_CHECK_NEAR(Math::Distance(body->linearVelocity, expectedVelocity), 0, 1e-5f);
+    ASTRAL_CHECK_NEAR(Math::Length(body->inverseInertiaLocal), 0, 1e-6f);
+    ASTRAL_CHECK(current != previous && !world.Physics().GetBody(previous));
+    ASTRAL_CHECK(world.Physics().BodyCount() == 1);
+}
+
+ASTRAL_TEST(RigidBodyChangesWaitForFixedSyncAndRespectComponentOrder) {
+    Framework::GameWorld world(RigidSyncSettings());
+    const Entity entity = world.CreateEntity("ordered components");
+    world.Add<Framework::RigidBody>(entity, MovingBody(2));
+    const float step = world.Settings().fixedDelta;
+    world.Tick(step);
+    ASTRAL_CHECK(world.Physics().BodyCount() == 0);
+    world.Add<Framework::Collider>(entity);
+    world.Tick(0);
+    ASTRAL_CHECK(world.Get<Framework::Collider>(entity)->body.IsNull());
+    world.Tick(step);
+    const Physics::BodyId dynamic = world.Get<Framework::Collider>(entity)->body;
+    ASTRAL_CHECK(world.Physics().GetBody(dynamic)->type == Physics::BodyType::Dynamic);
+    Framework::RigidBody kinematic = MovingBody(5);
+    kinematic.type = Physics::BodyType::Kinematic;
+    world.Add<Framework::RigidBody>(entity, kinematic);
+    ASTRAL_CHECK(!world.Physics().GetBody(dynamic));
+    world.Tick(0);
+    ASTRAL_CHECK(world.Physics().BodyCount() == 0);
+    world.SetWorldPosition(entity, {9, 2, 3});
+    world.Tick(step);
+    const Physics::Body* body = world.Physics().GetBody(world.Get<Framework::Collider>(entity)->body);
+    ASTRAL_CHECK(body && body->type == Physics::BodyType::Kinematic);
+    ASTRAL_CHECK_NEAR(Math::Distance(body->pose.position, {9, 2, 3}), 0, 1e-6f);
+    world.Remove<Framework::RigidBody>(entity);
+    world.Tick(step);
+    const Physics::BodyId staticBody = world.Get<Framework::Collider>(entity)->body;
+    world.Remove<Framework::RigidBody>(entity); // absent: no runtime churn
+    world.Tick(step);
+    ASTRAL_CHECK(world.Get<Framework::Collider>(entity)->body == staticBody);
+    world.Remove<Framework::Collider>(entity);
+    ASTRAL_CHECK(world.Physics().BodyCount() == 0 && !world.Physics().GetBody(staticBody));
+}
+
+ASTRAL_TEST(RigidBodyChangesRetryFailedCreationWithoutAcceptingInvalidShapes) {
+    Framework::GameWorld world(RigidSyncSettings());
+    const Entity entity = world.CreateEntity("retry physics");
+    world.Add<Framework::Collider>(entity);
+    world.Add<Framework::RigidBody>(entity, MovingBody(0)); // invalid dynamic mass
+    const float step = world.Settings().fixedDelta;
+    world.Tick(step);
+    ASTRAL_CHECK(world.Get<Framework::Collider>(entity)->failed && world.Physics().BodyCount() == 0);
+    world.Add<Framework::RigidBody>(entity, MovingBody(4));
+    world.Tick(step);
+    ASTRAL_CHECK(!world.Get<Framework::Collider>(entity)->failed && world.Physics().BodyCount() == 1);
+    ASTRAL_CHECK_NEAR(world.Physics().GetBody(world.Get<Framework::Collider>(entity)->body)->inverseMass, 0.25f, 1e-6f);
+    world.Add<Framework::RigidBody>(entity, MovingBody(0));
+    world.Tick(step);
+    ASTRAL_CHECK(world.Get<Framework::Collider>(entity)->failed && world.Physics().BodyCount() == 0);
+    world.Remove<Framework::RigidBody>(entity);
+    world.Tick(step);
+    ASTRAL_CHECK(!world.Get<Framework::Collider>(entity)->failed && world.Physics().BodyCount() == 1);
+    Framework::Collider invalid;
+    invalid.halfExtents = {};
+    world.Add<Framework::Collider>(entity, invalid);
+    world.Add<Framework::RigidBody>(entity, MovingBody(1));
+    world.Tick(step);
+    ASTRAL_CHECK(world.Get<Framework::Collider>(entity)->failed && world.Physics().BodyCount() == 0);
+}
+
+ASTRAL_TEST(RigidBodyChangesPreserveOtherBodiesMoversAndColliderConfiguration) {
+    Framework::GameWorld world(RigidSyncSettings());
+    const Entity changed = world.CreateEntity("changed", {{-10, 2, 0}, {}, {1, 1, 1}});
+    Framework::Collider collider;
+    collider.shape = Framework::ColliderShape::Sphere;
+    collider.radius = 0.75f;
+    collider.friction = 0.25f;
+    collider.restitution = 0.3f;
+    collider.isTrigger = true;
+    collider.layer = 4;
+    collider.mask = 8;
+    world.Add<Framework::Collider>(changed, collider);
+    const Entity untouched = world.CreateEntity("untouched", {{10, 2, 0}, {}, {1, 1, 1}});
+    world.Add<Framework::Collider>(untouched);
+    world.Add<Framework::RigidBody>(untouched, MovingBody(2, {1, 0, 0}));
+    const Entity character = world.CreateEntity("neutral mover", {{0, 20, 0}, {}, {1, 1, 1}});
+    world.Add<Framework::CharacterMover>(character);
+    const float step = world.Settings().fixedDelta;
+    world.Tick(step);
+    const Physics::BodyId unchangedBody = world.Get<Framework::Collider>(untouched)->body;
+    const Physics::BodyId moverBody = world.Get<Framework::CharacterMover>(character)->body;
+    const auto controller = world.Get<Framework::CharacterMover>(character)->controller;
+    world.Physics().ApplyForce(unchangedBody, {4, 0, 0});
+    world.Add<Framework::RigidBody>(changed, MovingBody(3));
+    const Physics::Body* unaffected = world.Physics().GetBody(unchangedBody);
+    ASTRAL_CHECK(unaffected && unaffected->linearVelocity.x == 1 && unaffected->force.x == 4);
+    for (int i = 0; i != 8; ++i) {
+        Framework::RigidBody replacement = MovingBody(3);
+        replacement.type = i % 2 ? Physics::BodyType::Dynamic : Physics::BodyType::Kinematic;
+        world.Add<Framework::RigidBody>(changed, replacement);
+        world.Tick(step);
+        ASTRAL_CHECK(world.Physics().BodyCount() == 3);
+        ASTRAL_CHECK(world.Get<Framework::Collider>(untouched)->body == unchangedBody);
+        ASTRAL_CHECK(world.Get<Framework::CharacterMover>(character)->body == moverBody);
+        ASTRAL_CHECK(world.Get<Framework::CharacterMover>(character)->controller == controller);
+        const Physics::Body* body = world.Physics().GetBody(world.Get<Framework::Collider>(changed)->body);
+        ASTRAL_CHECK(body && body->type == replacement.type && body->shape.type == Physics::ShapeType::Sphere);
+        ASTRAL_CHECK_NEAR(body->shape.radius, collider.radius, 1e-6f);
+        ASTRAL_CHECK(body->isTrigger && body->layer == 4 && body->mask == 8);
+        ASTRAL_CHECK_NEAR(body->friction, collider.friction, 1e-6f);
+        ASTRAL_CHECK_NEAR(body->restitution, collider.restitution, 1e-6f);
+    }
+    ASTRAL_CHECK(world.Physics().GetBody(unchangedBody)->linearVelocity.x > 1);
+    world.DestroyImmediate(changed);
+    ASTRAL_CHECK(world.Physics().BodyCount() == 2);
+    world.DestroyImmediate(character);
+    world.DestroyImmediate(untouched);
+    ASTRAL_CHECK(world.Physics().BodyCount() == 0);
+}
+
+ASTRAL_TEST(RigidBodyChangesPreserveDynamicMeshRestriction) {
+    Framework::GameWorld world(RigidSyncSettings());
+    const Entity entity = world.CreateEntity("neutral triangle");
+    Framework::Collider collider;
+    collider.shape = Framework::ColliderShape::Mesh;
+    std::string error;
+    collider.triangles = Physics::TriangleMesh::Create({{-1, 0, -1}, {1, 0, -1}, {0, 0, 1}}, {0, 1, 2}, error);
+    ASTRAL_CHECK(collider.triangles && error.empty());
+    world.Add<Framework::Collider>(entity, collider);
+    const float step = world.Settings().fixedDelta;
+    world.Tick(step);
+    world.Add<Framework::RigidBody>(entity, MovingBody(2));
+    world.Tick(step);
+    const Physics::Body* body = world.Physics().GetBody(world.Get<Framework::Collider>(entity)->body);
+    ASTRAL_CHECK(body && body->type == Physics::BodyType::Kinematic);
+    ASTRAL_CHECK(body->shape.mesh == collider.triangles);
+    world.Remove<Framework::RigidBody>(entity);
+    world.Tick(step);
+    body = world.Physics().GetBody(world.Get<Framework::Collider>(entity)->body);
+    ASTRAL_CHECK(body && body->type == Physics::BodyType::Static && world.Physics().BodyCount() == 1);
 }
 
 ASTRAL_TEST_MAIN("EngineWorldTests")
