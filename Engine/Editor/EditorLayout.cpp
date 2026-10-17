@@ -170,13 +170,14 @@ bool Overlaps(const EditorRect& a, const EditorRect& b) {
 }
 
 bool IsEditorToolAvailable(EditorTool tool) {
+    // These controls now route to the adopted scene editor and real viewport.
     switch (tool) {
     case EditorTool::Select:
     case EditorTool::Move:
     case EditorTool::Rotate:
     case EditorTool::Scale:
     case EditorTool::Play:
-        return false;
+        return true;
     }
     return false;
 }

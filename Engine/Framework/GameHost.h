@@ -115,12 +115,15 @@ public:
     // Applies a project (input map, config) and loads its startup scene.
     bool LoadProject(const std::string& path, std::string& error);
     bool ApplyProject(const ProjectDesc& project, std::string& error);
+    // Editor Play uses the project input/config with its current unsaved scene.
+    bool ApplyProjectSettings(const ProjectDesc& project, std::string& error);
     const ProjectDesc& Project() const { return project_; }
 
     // Replaces the world with a scene (content path). Transactional: on
     // failure the current world keeps running and `error` says why.
     bool LoadScene(const std::string& path, std::string& error);
-    bool LoadSceneJson(const Core::JsonValue& json, std::string& error); // an unnamed scene
+    // Unnamed scenes restart from their loaded document, including unsaved Play.
+    bool LoadSceneJson(const Core::JsonValue& json, std::string& error);
     // Starts an empty world (the HUD is cleared).
     void ResetWorld();
     const std::string& ScenePath() const { return scenePath_; }
