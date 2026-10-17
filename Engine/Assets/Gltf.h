@@ -126,10 +126,17 @@ struct GltfImportOptions {
     std::size_t maxFileBytes{512u * 1024u * 1024u};
     std::size_t maxElements{64u * 1024u * 1024u}; // per accessor
     bool decodeImages{true};
+    // All file reads, including the source model, must stay beneath this root
+    // after resolving links and dot segments. Empty approves only the source
+    // file's directory (or baseDirectory for a memory import). A project may
+    // approve a larger content root to allow in-root ../shared dependencies.
+    std::string approvedRoot;
 };
 
 bool ImportGltf(const std::string& path, GltfDocument& out, std::string& error, const GltfImportOptions& options = {});
-// `baseDirectory` resolves relative buffer/image URIs ("" disallows external files).
+// `baseDirectory` resolves relative buffer/image URIs ("" disallows external
+// files even with approvedRoot). External URIs are decoded once; malformed
+// escapes, NUL and absolute/drive/UNC/scheme references are rejected.
 bool ImportGltfFromMemory(const std::uint8_t* data, std::size_t size, const std::string& baseDirectory,
     GltfDocument& out, std::string& error, const GltfImportOptions& options = {});
 

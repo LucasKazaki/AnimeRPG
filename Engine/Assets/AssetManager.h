@@ -10,6 +10,8 @@
 //   - Collect to drop assets nobody references any more,
 //   - loaders per type (textures, glTF, audio, JSON, text are built in).
 // Paths are relative to the content root; absolute paths and ".." are refused.
+// The built-in glTF loader also confines decoded dependencies and source-model
+// links to that root; in-root ../ references within imported models are allowed.
 // The handle/publish API is single-threaded (the game thread); loaders run on
 // workers and must only touch their own output.
 
