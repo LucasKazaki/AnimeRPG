@@ -1,7 +1,8 @@
 # glTF import containment evidence — October 17, 2026
 
-Status: focused implementation verified locally in native Debug and Release;
-independent review and coordinator integration gates remain separate.
+Status: implementation and independent re-review complete; full native
+Debug/Release builds, deterministic suites and retained GDI smokes pass on this
+branch. PR 80 adoption and hosted/proposed-main gates remain separate.
 Branch: `engine/framework-containment-20261017`.
 Base: **unmerged PR #80** at `efac9db54e8f2781c20fbb1bb9be9a0ab85f4f5c`,
 not current main. Test source is that base plus the committed implementation
@@ -158,13 +159,47 @@ Changed paths are exactly `Engine/Assets/AssetManager.{h,cpp}`,
 `Engine/Assets/Gltf.{h,cpp}`, `Tests/EngineAssetsTests.cpp`, the task packet and
 this evidence record. No CMake, workflow, numeric, game-content or R0 edits.
 
-Independent review found the conversion error above; substantive re-review is
-pending after its repair. No review approval is inferred from these tests.
-No push/PR/merge was performed by this owner.
-Post-fix full-all engine/editor/player builds, broad deterministic suites,
-portable sanitizers, native GUI, performance, GPU, packaging and soak gates
-were not executed by this focused packet. The coordinator owns applicable
-integration validation. The full engine workflow gate remains unclaimed.
+Independent review found the conversion error above. Reviewer
+`/root/numeric_implementation` (not this packet's implementer) re-reviewed
+`efac9db..e4dac29a379dcd4cc620dd4f46eb8bca2d974419` after the retained
+reproduction and repair and reported no remaining actionable findings. The
+review covered actual root propagation, decoding, canonical comparison, file
+and directory links/junctions, source/dependency containment, data URIs, failed
+reload preservation, UTF-8 diagnostic/warning semantics and regressions. Review
+was read-only; it executed no tests. No push/PR/merge was performed by the
+implementation owner.
+
+Coordinator full validation on that frozen source, using the existing external
+`work/build-framework-baseline` cache:
+
+| Command | Exit/result | Log under `<session>/work/` |
+|---|---|---|
+| `cmake --build work/build-framework-baseline --config Debug --parallel 2` | 0, all configured engine/editor/player/test targets | `framework-fixed-Debug-build.log` |
+| `ctest --test-dir work/build-framework-baseline -C Debug --output-on-failure -E RuntimeSmoke --no-tests=error --stop-on-failure` | 0, 31/31, 55.42 s | `framework-fixed-Debug-test.log` |
+| Same build/test commands with Release | 0, 31/31, 5.78 s | `framework-fixed-Release-{build,test}.log` |
+| `ctest --test-dir work/build-framework-baseline -C Debug --output-on-failure -R RuntimeSmoke --no-tests=error --stop-on-failure` | 0, 6/6, 19.47 s | `framework-fixed-Debug-smoke.log` |
+| Same smoke command with Release | 0, 6/6, 19.27 s | `framework-fixed-Release-smoke.log` |
+| `python Scripts/test_test_safety.py` with installed CMake on process PATH | 0, 3/3, 5.652 s | `framework-fixed-test-safety.log` |
+
+Native smokes were serialized and exercise the retained GDI prototype. They do
+not establish interactive editor or Win32-player acceptance. A separate real
+headless Release player run also succeeds (exit 0):
+
+```text
+work/build-framework-baseline/Release/AstralPlayer.exe work/astral-framework/Content/Samples/Playground project.json --script work/astral-framework/Content/Samples/Playground/demo.play --frames 372 --size 320x180 --capture work/framework-player-captures --every 120
+```
+
+It loads 35 entities, runs 372 frames and emits four PNG captures; final hash
+`f0ee817693b4394b`. Log: `work/framework-fixed-player.log`. This reuses the
+existing engine sample, without authoring game content. Update/render figures
+printed by that tool are diagnostic observations, not performance acceptance.
+
+Hosted checks, proposed-main integration, portable sanitizer, interactive
+editor/player, GPU, distribution and soak evidence remain separate. This
+bounded root-path repair does **not** approve PR 80's unresolved input ownership,
+dependency propagation or reload diagnostics. The full workflow gate remains
+unclaimed. The coordinator will publish this scoped patch against its unmerged
+framework base, without merging the entire original PR stack.
 
 Canonical-check/open races under adversarial concurrent filesystem mutation
 are outside this bounded path contract. Custom user-supplied AssetManager
