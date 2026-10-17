@@ -1,7 +1,8 @@
 # Finite input evidence — October 17, 2026
 
-Status: focused native Debug/Release implementation verified; independent final
-re-review and coordinator integration gates remain separate.
+Status: implementation, independent final re-review, full native Debug/Release
+builds, deterministic suites and retained GDI smokes pass. Hosted and eventual
+proposed-main adoption gates remain separate.
 Owner: sole finite-input implementation agent, with independent read-only
 review by the coordinator's assigned reviewer.
 Branch/worktree: `engine/input-finite-20261017`,
@@ -167,10 +168,11 @@ Exactly seven authorized paths changed: InputSystem header/source, GameHost
 input parsing plus the explicitly approved narrow ApplyProject check, both
 test files, this record and the task packet. No UI, Assets, Math, CMake,
 workflow, policy, dependency or game-content edit. No push, PR or merge by this
-owner. Final independent re-review is pending coordinator receipt of the commit.
+owner. Final independent re-review and coordinator receipts follow below.
 
-This packet does not establish full-all engine/editor/player builds, complete
-native input acceptance, controller/analog support, focus/subframe/modifier
+The focused owner tests alone did not establish full-all builds; coordinator
+results below add that evidence. Complete native input acceptance,
+controller/analog support, focus/subframe/modifier
 behavior, clipboard/Unicode/IME/DPI support, GPU/performance, packaging or soak.
 The action API here is digital virtual-key contributions; recorded mouse
 deltas do not constitute controller/analog action ingress. Those gaps remain.
@@ -180,3 +182,33 @@ production readiness are not claimed by focused input tests or static markers.
 Primary references: [C++ floating conversions](https://eel.is/c++draft/conv.double),
 [MSVC hypot](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/hypot-hypotf-hypotl-hypot-hypotf-hypotl?view=msvc-170),
 and [MSVC numeric limits](https://learn.microsoft.com/en-us/cpp/standard-library/numeric-limits-class?view=msvc-170).
+
+## Coordinator matrix and final independent review
+
+Frozen source commit `8ecc7d356120c0f70719e5a4d56b18f009cb469d`, clean worktree.
+Independent reviewer `/root/numeric_implementation`, who did not implement this
+packet, reviewed all seven allowed paths and the actual public API regressions.
+Both timing findings were reproduced before the fixes and then re-reviewed:
+unresolved actions now age once, and small elapsed time plus FLT_MAX is detected
+without rejecting an exact FLT_MAX interval. Axis aggregation, JSON validation,
+AddContext rejection/staged ApplyProject and ordinary priority/consumption,
+rebind/recording behavior have no remaining actionable review findings. The
+reviewer ran no commands/tests and edited no files.
+
+Coordinator validation used the same external `work/build-finite-input` cache,
+installed VS2022 CMake/CTest, MSVC19.44, two build jobs and the baseline machine.
+Each exit was checked, native smokes ran sequentially, and no source changed
+between focused review and these full runs:
+
+| Command | Exit/result | External log under `<session>/work/` |
+|---|---|---|
+| `cmake --build work/build-finite-input --config Debug --parallel 2` | 0, all configured engine/editor/player/test targets | `finite-input-full-Debug-build.log` |
+| `ctest --test-dir work/build-finite-input -C Debug --output-on-failure -E RuntimeSmoke --no-tests=error --stop-on-failure` | 0, 31/31, 56.79 s | `finite-input-full-Debug-test.log` |
+| Same build/test commands with Release | 0, 31/31, 4.83 s | `finite-input-full-Release-{build,test}.log` |
+| `ctest --test-dir work/build-finite-input -C Debug --output-on-failure -R RuntimeSmoke --no-tests=error --stop-on-failure` | 0, 6/6, 19.45 s | `finite-input-full-Debug-smoke.log` |
+| Same smoke command with Release | 0, 6/6, 19.51 s | `finite-input-full-Release-smoke.log` |
+
+This establishes the bounded finite digital-input repair on its unmerged
+framework base. The GDI smokes do not establish native Win32 player/editor input
+coverage; UI/modal ownership and native Unicode/IME/controller/DPI gaps remain.
+No whole-engine performance or distribution/soak acceptance is claimed.
