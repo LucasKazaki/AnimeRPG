@@ -173,7 +173,8 @@ owner. Final independent re-review and coordinator receipts follow below.
 The focused owner tests alone did not establish full-all builds; coordinator
 results below add that evidence. Complete native input acceptance,
 controller/analog support, focus/subframe/modifier
-behavior, clipboard/Unicode/IME/DPI support, GPU/performance, packaging or soak.
+behavior, clipboard/Unicode/IME/DPI support, GPU/performance, packaging or soak
+remain open.
 The action API here is digital virtual-key contributions; recorded mouse
 deltas do not constitute controller/analog action ingress. Those gaps remain.
 The coordinator owns broader integration checks. Full engine workflow and
@@ -193,7 +194,7 @@ unresolved actions now age once, and small elapsed time plus FLT_MAX is detected
 without rejecting an exact FLT_MAX interval. Axis aggregation, JSON validation,
 AddContext rejection/staged ApplyProject and ordinary priority/consumption,
 rebind/recording behavior have no remaining actionable review findings. The
-reviewer ran no commands/tests and edited no files.
+reviewer performed read-only inspection, ran no builds/tests, and edited no files.
 
 Coordinator validation used the same external `work/build-finite-input` cache,
 installed VS2022 CMake/CTest, MSVC19.44, two build jobs and the baseline machine.
