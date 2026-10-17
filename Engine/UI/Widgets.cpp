@@ -487,7 +487,9 @@ bool UIRoot::InModalScope(const Widget* widget) const {
 }
 
 void UIRoot::SetModal(Widget* widget) {
-    modal_ = widget && Contains(widget) && widget->EffectiveVisible() && widget->EffectiveEnabled() ? widget : nullptr;
+    Widget* next = widget && Contains(widget) && widget->EffectiveVisible() && widget->EffectiveEnabled() ? widget : nullptr;
+    if (next && next != modal_) ++modalActivations_;
+    modal_ = next;
     Validate();
 }
 
@@ -511,10 +513,15 @@ void UIRoot::SetFocus(Widget* widget) {
         previous->focused_ = false;
         previous->OnFocusChanged(false);
     }
-    if (focused_) {
-        focused_->focused_ = true;
-        focused_->OnFocusChanged(true);
+    // Blur callbacks may remove the requested target, change modality, or
+    // recursively focus another widget. Honor that result without notifying
+    // the replacement twice or dereferencing a cancelled target.
+    Validate();
+    if (widget && focused_ == widget) {
+        widget->focused_ = true;
+        widget->OnFocusChanged(true);
     }
+    Validate();
 }
 
 void UIRoot::FocusNext(bool backwards) {
@@ -579,12 +586,21 @@ void UIRoot::PurgeRemoved(Widget& widget) {
 }
 
 UIInputResult UIRoot::Update(const UIInput& input, Vec2 viewport, bool suppressDispatch) {
+    const std::uint64_t modalAtStart = modalActivations_;
     Validate();
     Layout(viewport);
     UIInputResult result;
     result.modal = modal_ != nullptr || suppressDispatch;
     result.keyboardCaptured = WantsKeyboard() || result.modal;
     result.pointerConsumed = pointerOwned_ || result.modal;
+    // A modal may open and close inside a callback, so sampling only the
+    // current pointer misses ownership of the remaining queued input.
+    const auto observeModal = [&] {
+        result.modal = result.modal || modal_ != nullptr || modalActivations_ != modalAtStart;
+        result.keyboardCaptured = result.keyboardCaptured || result.modal;
+        result.pointerConsumed = result.pointerConsumed || result.modal;
+    };
+    observeModal();
     if (suppressDispatch) {
         if (captured_) captured_->pressed_ = false;
         captured_ = nullptr;
@@ -606,10 +622,12 @@ UIInputResult UIRoot::Update(const UIInput& input, Vec2 viewport, bool suppressD
     if (down && !pointerWasDown_) {
         pointerOwned_ = hovered_ != nullptr || modal_ != nullptr;
         if (hovered_) {
-            captured_ = hovered_;
-            captured_->pressed_ = true;
-            if (captured_->Focusable()) SetFocus(captured_);
-            captured_->OnPointerDown(input.pointer);
+            Widget* pressed = hovered_;
+            captured_ = pressed;
+            pressed->pressed_ = true;
+            if (pressed->Focusable()) SetFocus(pressed);
+            Validate();
+            if (captured_ == pressed) pressed->OnPointerDown(input.pointer);
         } else if (!modal_) {
             SetFocus(nullptr);
         }
@@ -625,13 +643,39 @@ UIInputResult UIRoot::Update(const UIInput& input, Vec2 viewport, bool suppressD
     if (!down) pointerOwned_ = false;
     pointerWasDown_ = down;
     Validate();
+    observeModal();
     // Keys go to the focused widget, bubbling to its parents; leftovers navigate.
     for (std::uint16_t key : input.keysPressed) {
         if (result.modal && !modal_) break;
         result.keyboardCaptured = result.keyboardCaptured || WantsKeyboard();
         bool handled = false;
-        for (Widget* w = focused_; w && !handled; w = w->parent_) {
-            handled = (w->keyHandler && w->keyHandler(key, input.shift)) || w->OnKey(key, input.shift);
+        Widget* routeFocus = focused_;
+        Widget* boundary = modal_;
+        const std::uint64_t routeModal = modalActivations_;
+        const auto routeValid = [&](Widget* w) {
+            return focused_ == routeFocus && modal_ == boundary && modalActivations_ == routeModal
+                && Contains(w) && w->EffectiveVisible() && w->EffectiveEnabled() && InModalScope(w);
+        };
+        for (Widget* w = routeFocus; w && !handled;) {
+            if (w->keyHandler) {
+                handled = w->keyHandler(key, input.shift);
+                Validate();
+                observeModal();
+            }
+            // A hook may transfer focus or cancel this route even if it returns
+            // false. Do not invoke the old widget or bubble into a new scope.
+            if (!routeValid(w)) {
+                handled = true;
+                break;
+            }
+            if (!handled) {
+                handled = w->OnKey(key, input.shift);
+                Validate();
+                observeModal();
+                if (!routeValid(w)) handled = true;
+            }
+            if (handled || w == boundary) break;
+            w = w->parent_;
         }
         if (!handled) {
             if (key == Keys::Tab) {
@@ -647,11 +691,12 @@ UIInputResult UIRoot::Update(const UIInput& input, Vec2 viewport, bool suppressD
         }
         if (handled && key < result.consumedKeys.size()) result.consumedKeys.set(key);
         Validate();
+        observeModal();
         if (result.modal && !modal_) break; // a modal callback closed its scope
     }
     if (!input.text.empty() && focused_ && !(result.modal && !modal_)) focused_->OnText(input.text);
     Validate();
-    result.modal = result.modal || modal_ != nullptr;
+    observeModal();
     result.keyboardCaptured = result.keyboardCaptured || WantsKeyboard() || result.modal;
     result.pointerConsumed = result.pointerConsumed || result.modal;
     PurgeRemoved(*root_);

@@ -1,6 +1,7 @@
 # UI input ownership evidence — October 17, 2026
 
-Status: focused native Debug/Release verified; independent review/integration
+Status: focused native Debug/Release verified after three independently found
+callback defects were reproduced and repaired; independent re-review/integration
 remain pending. Sole implementation owner: UI-input packet agent.
 Worktree: `C:/Users/lucas/Documents/Codex/2026-10-17/files-pasted-by-the-user-you/work/astral-ui-input`.
 Branch: `engine/ui-input-ownership-20261017`.
@@ -43,13 +44,39 @@ and closing-frame UI dispatch is suppressed so simultaneous pointer/keyboard
 events cannot activate the HUD. Modal capture masks all gameplay keys and mouse
 delta. Held keys remain masked after closing until physically released.
 
+## Independent-review failures and follow-up
+
+The first candidate, `74eed63f3a684e207653499963317b93fce6a4f3`, passed its
+15-case focused suite but independent review found three additional dispatch
+defects. Added direct UIRoot regressions and executed each against that unchanged
+production source before repairing it:
+
+- A previous widget's blur callback set another modal scope, cancelling the
+  pointer target. Dispatch then dereferenced null: access violation exit
+  **-1073741819** (`0xC0000005`).
+- An unhandled Space bubbled past a nested modal root to an outside handler:
+  one outside invocation, expected assertion exit **3**.
+- Pointer release opened a modal, queued Enter closed it, then queued Space
+  reactivated the outside launcher: two launches instead of one, exit **3**.
+
+The follow-up validates the original captured target after focus callbacks.
+Focus notifications honor callback-driven replacement/cancellation. Key hooks
+are followed by validation before invoking the old widget or continuing its
+route; a hook that disables/removes the target or changes modality cancels that
+route even if it returns false. Keyboard bubbling ends at the modal root,
+inclusive. A modal activation counter records ownership throughout dispatch,
+including a modal opened and closed entirely inside one callback. Subsequent
+queued keys/text cannot escape its closing frame. There is no GameHost change
+in this follow-up; its existing modal-result consumer provides gameplay masking.
+
 ## Focused validation
 
 VS2022 Community x64, MSVC 19.44 / tools 14.44; CMake 3.31.6-msvc6,
 `Visual Studio 17 2022` generator. External multi-config Debug/Release cache:
 `work/build-ui-input-ownership`. Existing `astral_add_test(EngineUITests)` and
 `AssertionsEnabled.cpp` remain unchanged; Release logs show `/UNDEBUG`
-overriding `/DNDEBUG`. No post-fix build or test failure occurred.
+overriding `/DNDEBUG`. The three review failures above are retained; no failure
+occurred in the subsequent follow-up builds/tests.
 
 | Step | Exit/result |
 |---|---|
@@ -59,6 +86,11 @@ overriding `/DNDEBUG`. No post-fix build or test failure occurred.
 | Fixed Release build / full focused CTest | 0 / 0; **15 cases**, 0.04 seconds |
 | Test-safety fixture suite | 0; **3/3**, 6.643 seconds |
 | Static milestone 1 / 2 / 3 | 0 / 0 / 0 |
+| Review old-source Debug build | 0 |
+| Three review regressions against unchanged `74eed63` | **-1073741819 / 3 / 3**, expected reproduction |
+| Review-fixed Debug build / full focused CTest | 0 / 0; **19 cases**, 0.04 seconds (0.05 total) |
+| Review-fixed Release build / full focused CTest | 0 / 0; **19 cases**, 0.03 seconds |
+| Review-fixed test safety / static milestones 1, 2, 3 | 0; **3/3**, 5.289 seconds / 0, 0, 0 |
 | `git diff --check` | 0 |
 
 The nine added cases cover the four original leaks, multi-frame Space/MouseLeft
@@ -75,6 +107,14 @@ Initial old-reproduction slot: `2026-10-17T14:13:19.5178578-04:00` to
 `14:14:31.2507891-04:00`. It was released during source editing. Post-fix slot:
 `14:18:36.0753419-04:00` to `14:20:04.4442577-04:00`, then released. All native
 compilation/tests were serialized by the coordinator. No GUI/GPU run was made.
+
+Review-reproduction slot: `2026-10-17T14:24:04.3581497-04:00` to
+`14:24:08.1225122-04:00`. The coordinator-authorized follow-up focused builds
+started at `14:26:29.1877814-04:00`; native suite checks finished at
+`14:26:56.9910279-04:00`. Safety/static checks finished and the compiler/native
+slot was released at `14:27:13.4009193-04:00`. Four additional cases cover all
+three reported defects, same-callback transient modality, and false-return
+key-hook removal/disable/modal cancellation. The original 15 cases still pass.
 
 ## Retained exact commands
 
@@ -107,6 +147,28 @@ foreach ($milestone in 1,2,3) {
 }
 git diff --check
 git diff --name-only
+```
+
+The review follow-up used these commands in the same worktree/cache; original
+logs were preserved. The three old-source test exits were individually retained
+and checked before production edits.
+
+```powershell
+& $cmake --build $build --config Debug --target EngineUITests --parallel 2 *> "$evidence/review-reproduction-build-debug.log"
+$reviewTests = @('UIFocusCallbackCanCancelPointerTargetBeforeDispatch','UIModalKeyboardBubblingStopsAtModalRoot','UIModalOpenedAndClosedDuringDispatchOwnsRemainingFrame')
+foreach ($testName in $reviewTests) {
+    & "$build/Debug/EngineUITests.exe" $testName *> "$evidence/review-old-$testName.log"
+}
+# Only after retaining those failures, apply the production follow-up:
+& $cmake --build $build --config Debug --target EngineUITests --parallel 2 *> "$evidence/review-fixed-build-debug.log"
+& $ctest --test-dir $build -C Debug --output-on-failure -V -R '^EngineUITests$' --no-tests=error *> "$evidence/review-fixed-tests-debug.log"
+& $cmake --build $build --config Release --target EngineUITests --parallel 2 *> "$evidence/review-fixed-build-release.log"
+& $ctest --test-dir $build -C Release --output-on-failure -V -R '^EngineUITests$' --no-tests=error *> "$evidence/review-fixed-tests-release.log"
+& $python Scripts/test_test_safety.py *> "$evidence/review-test-safety.log"
+foreach ($milestone in 1,2,3) {
+    & $python "Scripts/verify_milestone$milestone.py" *> "$evidence/review-milestone$milestone.log"
+}
+git diff --check
 ```
 
 ## Scope, design guidance and remaining gates

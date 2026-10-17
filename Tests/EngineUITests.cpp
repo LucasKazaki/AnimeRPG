@@ -280,6 +280,100 @@ ASTRAL_TEST(UIConsumptionReportsActualHandlersAndCapture) {
     ASTRAL_CHECK(!result.pointerConsumed);
 }
 
+ASTRAL_TEST(UIFocusCallbackCanCancelPointerTargetBeforeDispatch) {
+    class BlurButton : public Button {
+    public:
+        std::function<void()> onBlur;
+    protected:
+        void OnFocusChanged(bool focused) override { if (!focused && onBlur) onBlur(); }
+    };
+    class PointerProbe : public Button {
+    public:
+        int downs{};
+    protected:
+        void OnPointerDown(Vec2) override { ++downs; }
+    };
+    UIRoot ui;
+    Panel& modal = Placed(ui.Root().Add<Panel>("new modal"), 200, 180, 150, 80);
+    modal.useTheme = true;
+    BlurButton& previous = Placed(ui.Root().Add<BlurButton>(), 10, 10, 100, 30);
+    PointerProbe& target = Placed(ui.Root().Add<PointerProbe>(), 50, 80, 100, 40);
+    previous.onBlur = [&] { ui.SetModal(&modal); };
+    ui.Update({}, kViewport);
+    ui.SetFocus(&previous);
+    const UIInputResult result = ui.Update(At(60, 90, true), kViewport);
+    ASTRAL_CHECK(ui.Modal() == &modal && target.downs == 0 && !target.Pressed());
+    ASTRAL_CHECK(result.modal && result.pointerConsumed);
+    ui.Update(At(60, 90), kViewport);
+}
+
+ASTRAL_TEST(UIModalKeyboardBubblingStopsAtModalRoot) {
+    UIRoot ui;
+    Panel& outer = Placed(ui.Root().Add<Panel>("outer"), 0, 0, 400, 300);
+    Panel& modal = Placed(outer.Add<Panel>("modal"), 20, 20, 200, 100);
+    TextBox& input = Placed(modal.Add<TextBox>(), 0, 0, 150, 30);
+    int outsideCalls = 0;
+    outer.keyHandler = [&](std::uint16_t, bool) { ++outsideCalls; return true; };
+    ui.SetModal(&modal);
+    ui.SetFocus(&input);
+    const UIInputResult result = ui.Update(Key(Keys::Space), kViewport);
+    if (outsideCalls) std::fprintf(stderr, "modal key bubbled to outer handler %d time(s)\n", outsideCalls);
+    ASTRAL_CHECK(outsideCalls == 0 && result.modal && result.keyboardCaptured);
+}
+
+ASTRAL_TEST(UIModalOpenedAndClosedDuringDispatchOwnsRemainingFrame) {
+    UIRoot ui;
+    Button& launcher = Placed(ui.Root().Add<Button>("Launcher"), 50, 50, 100, 40);
+    Panel& modal = Placed(ui.Root().Add<Panel>("modal"), 200, 100, 150, 100);
+    modal.visible = false;
+    Button& close = Placed(modal.Add<Button>("Close"), 0, 0, 80, 30);
+    int launches = 0, closes = 0;
+    launcher.Clicked.Add([&] { ++launches; modal.visible = true; ui.SetModal(&modal); ui.SetFocus(&close); });
+    close.Clicked.Add([&] { ++closes; modal.visible = false; ui.SetModal(nullptr); ui.SetFocus(&launcher); });
+    ui.Update(At(60, 60, true), kViewport);
+    UIInput release = At(60, 60);
+    release.keysPressed = {Keys::Enter, Keys::Space};
+    const UIInputResult result = ui.Update(release, kViewport);
+    if (launches != 1) std::fprintf(stderr, "queued key escaped transient modal: launches=%d closes=%d\n", launches, closes);
+    ASTRAL_CHECK(launches == 1 && closes == 1 && ui.Modal() == nullptr);
+    ASTRAL_CHECK(result.modal && result.keyboardCaptured && result.pointerConsumed);
+
+    // Even a modal entirely opened and closed in one callback owns the frame.
+    UIRoot transient;
+    Button& activate = Placed(transient.Root().Add<Button>("Activate"), 50, 50, 100, 40);
+    Panel& brief = Placed(transient.Root().Add<Panel>("brief modal"), 200, 100, 150, 100);
+    int activations = 0;
+    activate.Clicked.Add([&] { ++activations; transient.SetModal(&brief); transient.SetModal(nullptr); transient.SetFocus(&activate); });
+    transient.SetFocus(&activate);
+    UIInput queued;
+    queued.keysPressed = {Keys::Enter, Keys::Space};
+    const UIInputResult briefResult = transient.Update(queued, kViewport);
+    ASTRAL_CHECK(activations == 1 && transient.Modal() == nullptr);
+    ASTRAL_CHECK(briefResult.modal && briefResult.keyboardCaptured && briefResult.pointerConsumed);
+}
+
+ASTRAL_TEST(UIKeyHookScopeChangesCancelOldRoute) {
+    for (int change = 0; change != 3; ++change) {
+        UIRoot ui;
+        Panel& parent = Placed(ui.Root().Add<Panel>("parent"), 0, 0, 150, 100);
+        Button& target = Placed(parent.Add<Button>("target"), 10, 10, 100, 30);
+        Panel& modal = Placed(ui.Root().Add<Panel>("modal"), 200, 100, 150, 100);
+        int clicks = 0, bubbled = 0;
+        target.Clicked.Add([&] { ++clicks; });
+        parent.keyHandler = [&](std::uint16_t, bool) { ++bubbled; return true; };
+        target.keyHandler = [&](std::uint16_t, bool) {
+            if (change == 0) target.enabled = false;
+            else if (change == 1) target.RemoveFromParent();
+            else ui.SetModal(&modal);
+            return false;
+        };
+        ui.SetFocus(&target);
+        const UIInputResult result = ui.Update(Key(Keys::Space), kViewport);
+        ASTRAL_CHECK(clicks == 0 && bubbled == 0 && result.consumedKeys.test(Keys::Space));
+        ASTRAL_CHECK(ui.Focused() == nullptr);
+    }
+}
+
 ASTRAL_TEST(LayoutMeasuresAndArrangesPanels) {
     UIRoot ui;
     StackPanel& stack = ui.Root().Add<StackPanel>("stack");

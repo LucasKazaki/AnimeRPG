@@ -47,6 +47,12 @@ handles the closing frame so simultaneous events do not activate the HUD.
 Modal capture masks all gameplay keys/mouse delta; owned pointer interaction
 masks left pointer input and mouse delta. Native focus/IME are out of scope.
 
+Callback dispatch must revalidate the original target after focus/key hooks and
+honor cancellation before another callback. Keyboard bubbling includes the
+modal root and stops there. Any modal activation during dispatch owns the rest
+of the frame, even if opened and closed within a single callback; remaining
+queued input cannot activate outside controls or gameplay.
+
 ## Design guidance
 
 Read the user's Apple design and fluid-motion skills proportionally for this
@@ -98,6 +104,12 @@ coordinator-owned/unclaimed. Unit snapshots cannot establish native event
 delivery or OS capture behavior.
 
 Focused outcome: all four old host regressions reproduced exit 3 before source
-edits; the repaired native Debug/Release suite passes 15 cases each. Test safety
-3/3 and static M1/2/3 pass. See the QA record for exact commands/logs and scope.
-Independent review and coordinator integration remain separate gates.
+edits. The first repaired candidate `74eed63` passed 15 cases, then independent
+review found a focus-callback capture crash, keyboard bubbling beyond a nested
+modal root, and queued input escaping a transient modal. All three reproduced
+against unchanged candidate production (access violation / exit 3 / exit 3).
+The follow-up native Debug/Release suite passes 19 cases each, retaining those
+regressions plus false-return key-hook cancellation and same-callback modality
+coverage. Test safety 3/3 and static M1/2/3 pass again. See the QA record for exact
+commands/logs and scope. Independent re-review and coordinator integration
+remain separate gates.

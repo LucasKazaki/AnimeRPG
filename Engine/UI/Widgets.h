@@ -342,8 +342,9 @@ public:
     Widget* Focused() const { return focused_; }
     Widget* Hovered() const { return hovered_; }
     void SetFocus(Widget* widget);
-    // A single modal subtree limits hit testing and focus navigation; outside
-    // presses remain owned by it. Null removes the modal scope.
+    // A single modal subtree limits hit testing, key bubbling and navigation;
+    // outside presses remain owned by it. Activation owns the rest of the
+    // dispatch frame even if a callback closes it. Null removes the scope.
     void SetModal(Widget* widget);
     Widget* Modal() const { return modal_; }
     // Moves focus to the next/previous focusable widget in tree order.
@@ -369,6 +370,7 @@ private:
     Widget* focused_{};
     Widget* captured_{};
     Widget* modal_{};
+    std::uint64_t modalActivations_{};
     bool pointerWasDown_{};
     bool pointerOwned_{};
 };
