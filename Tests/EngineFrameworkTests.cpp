@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -898,6 +899,228 @@ ASTRAL_TEST(SceneStrictReloadRejectsNewDegradedImageWithoutChangingInitialImport
     attempted.clear();
     ASTRAL_CHECK(serializer.Parse(json, document, error, &attempted, true));
     ASTRAL_CHECK(document.materials.at("model.gltf#material0")->baseTexture != nullptr);
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(PrefabCopiesRespectExpandedEntityBudget) {
+    SceneSerializer serializer;
+    serializer.maxEntities = 7;
+    const auto json = ParseText(R"({"prefabs":{"Tree":{"name":"Tree","children":[{},{}]}},
+        "entities":[{"prefab":"Tree"},{"prefab":"Tree"},{"prefab":"Tree"}]})");
+    SceneDocument document;
+    document.entities.emplace_back();
+    document.entities.front().name = "Retained";
+    std::string error;
+    const bool parsed = serializer.Parse(json, document, error);
+    if (parsed) {
+        GameWorld world;
+        serializer.Instantiate(document, world);
+        std::printf("expanded copies: runtime entities=%zu, configured limit=%zu\n", world.Registry().AliveCount(), serializer.maxEntities);
+        std::fflush(stdout);
+    }
+    ASTRAL_CHECK(!parsed);
+    ASTRAL_CHECK(error.find("entities[2]") != std::string::npos && error.find("7") != std::string::npos);
+    ASTRAL_CHECK(document.entities.size() == 1 && document.entities.front().name == "Retained");
+}
+
+ASTRAL_TEST(PrefabCopiesComposeInsertionDepth) {
+    SceneSerializer serializer;
+    serializer.maxDepth = 1;
+    const auto json = ParseText(R"({"prefabs":{"Branch":{"children":[{}]}},
+        "entities":[{"children":[{"prefab":"Branch"}]}]})");
+    SceneDocument document;
+    document.entities.emplace_back();
+    document.entities.front().name = "Retained";
+    std::string error;
+    const bool parsed = serializer.Parse(json, document, error);
+    if (parsed) {
+        GameWorld world;
+        serializer.Instantiate(document, world);
+        std::printf("expanded depth: accepted three-level runtime hierarchy with maxDepth=%zu, entities=%zu\n",
+            serializer.maxDepth, world.Registry().AliveCount());
+        std::fflush(stdout);
+    }
+    ASTRAL_CHECK(!parsed);
+    ASTRAL_CHECK(error.find("entities[0].children[0]") != std::string::npos && error.find("deeper") != std::string::npos);
+    ASTRAL_CHECK(document.entities.size() == 1 && document.entities.front().name == "Retained");
+}
+
+ASTRAL_TEST(AcyclicPrefabDoublingRespectsExpandedCacheBudget) {
+    JsonValue prefabs = JsonValue::MakeObject();
+    prefabs.Set("P0", JsonValue::MakeObject());
+    for (int i = 1; i != 9; ++i) {
+        JsonValue definition = JsonValue::MakeObject(), children = JsonValue::MakeArray();
+        JsonValue child = JsonValue::MakeObject();
+        child.Set("prefab", "P" + std::to_string(i - 1));
+        children.Append(child);
+        children.Append(child);
+        definition.Set("children", children);
+        prefabs.Set("P" + std::to_string(i), definition);
+    }
+    JsonValue json = JsonValue::MakeObject(), entities = JsonValue::MakeArray(), instance = JsonValue::MakeObject();
+    instance.Set("prefab", "P8");
+    entities.Append(instance);
+    json.Set("prefabs", prefabs);
+    json.Set("entities", entities);
+    SceneSerializer serializer;
+    serializer.maxEntities = 64;
+    SceneDocument document;
+    document.entities.emplace_back();
+    document.entities.front().name = "Retained";
+    std::string error;
+    const bool parsed = serializer.Parse(json, document, error);
+    if (parsed) {
+        GameWorld world;
+        serializer.Instantiate(document, world);
+        std::printf("acyclic doubling: definitions=%zu, runtime entities=%zu, configured limit=%zu\n",
+            document.prefabs.size(), world.Registry().AliveCount(), serializer.maxEntities);
+        std::fflush(stdout);
+    }
+    ASTRAL_CHECK(!parsed);
+    ASTRAL_CHECK(error.find("prefabs.") != std::string::npos && error.find("64") != std::string::npos);
+    ASTRAL_CHECK(document.entities.size() == 1 && document.entities.front().name == "Retained");
+}
+
+ASTRAL_TEST(PrefabBudgetsAcceptSeparateExactZeroAndOneLimits) {
+    SceneSerializer serializer;
+    serializer.maxEntities = serializer.maxDepth = 0;
+    SceneDocument document;
+    std::string error;
+    ASTRAL_CHECK(serializer.Parse(ParseText("{}"), document, error));
+    ASTRAL_CHECK(!serializer.Parse(ParseText(R"({"entities":[{}]})"), document, error));
+    ASTRAL_CHECK(!serializer.Parse(ParseText(R"({"prefabs":{"Unit":{}}})"), document, error));
+    ASTRAL_CHECK(document.entities.empty() && document.prefabs.empty());
+
+    serializer.maxEntities = 1;
+    const auto one = ParseText(R"({"prefabs":{"Unit":{"name":"Unit"}},"entities":[{"prefab":"Unit"}]})");
+    ASTRAL_CHECK(serializer.Parse(one, document, error)); // one cache node and one output node use independent limits
+    GameWorld single;
+    serializer.Instantiate(document, single);
+    ASTRAL_CHECK(single.Registry().AliveCount() == 1 && document.prefabs.size() == 1);
+    ASTRAL_CHECK(!serializer.Parse(ParseText(R"({"prefabs":{"A":{},"B":{}}})"), document, error));
+    ASTRAL_CHECK(error.find("cached prefab") != std::string::npos && document.entities.front().name == "Unit");
+
+    serializer.maxEntities = 7;
+    serializer.maxDepth = 1;
+    ASTRAL_CHECK(serializer.Parse(ParseText(R"({"prefabs":{"Tree":{"children":[{},{}]}},
+        "entities":[{"prefab":"Tree"},{"prefab":"Tree"},{}]})"), document, error));
+    GameWorld exact;
+    serializer.Instantiate(document, exact);
+    ASTRAL_CHECK(exact.Registry().AliveCount() == 7 && document.prefabs.size() == 1);
+
+    serializer.maxEntities = serializer.maxDepth = std::numeric_limits<std::size_t>::max();
+    ASTRAL_CHECK(serializer.Parse(one, document, error)); // huge limits must not wrap during admission
+    ASTRAL_CHECK(document.entities.size() == 1 && document.entities.front().name == "Unit");
+}
+
+ASTRAL_TEST(PrefabResolutionIndirectionHasAnIndependentDepthGuard) {
+    const auto aliases = ParseText(R"({"prefabs":{"A":{"prefab":"B"},"B":{"prefab":"C"},"C":{"name":"Leaf"}},
+        "entities":[{"prefab":"A"}]})");
+    SceneSerializer serializer;
+    serializer.maxEntities = 3;
+    serializer.maxDepth = 1;
+    SceneDocument document;
+    document.entities.emplace_back();
+    document.entities.front().name = "Retained";
+    std::string error;
+    ASTRAL_CHECK(!serializer.Parse(aliases, document, error));
+    ASTRAL_CHECK(error.find("prefab resolution deeper than 1") != std::string::npos);
+    ASTRAL_CHECK(document.entities.front().name == "Retained");
+    serializer.maxDepth = 2;
+    ASTRAL_CHECK(serializer.Parse(aliases, document, error)); // three cached alias roots, one flat output root
+    ASTRAL_CHECK(document.prefabs.size() == 3 && document.entities.front().children.empty());
+    ASTRAL_CHECK(document.entities.front().name == "Leaf");
+    ASTRAL_CHECK(!serializer.Parse(ParseText(R"({"prefabs":{"A":{"prefab":"A"}}})"), document, error));
+    ASTRAL_CHECK(error.find("contains itself") != std::string::npos && document.entities.front().name == "Leaf");
+}
+
+ASTRAL_TEST(ModelBudgetCountsGeneratedPrimitivesAndComposesDepth) {
+    const std::string root = TempDir("astral_framework_model_budget");
+    Assets::GltfDocument model;
+    Assets::GltfMesh mesh;
+    for (int i = 0; i != 3; ++i) {
+        Assets::GltfPrimitive primitive;
+        Graphics::MeshBuilder(primitive.mesh).AddBox({static_cast<float>(i), 0, 0}, {0.5f, 0.5f, 0.5f});
+        primitive.mesh.ComputeBounds();
+        mesh.primitives.push_back(std::move(primitive));
+    }
+    model.meshes.push_back(std::move(mesh));
+    Assets::GltfNode node;
+    node.name = "ModelNode";
+    node.mesh = 0;
+    model.nodes.push_back(node);
+    model.scenes.push_back({"Budget", {0}});
+    model.scene = 0;
+    std::string error;
+    ASTRAL_CHECK(Assets::ExportGltf(model, root + "/budget.glb", Assets::GltfContainer::Binary, error));
+    Assets::AssetManager assets(root, nullptr);
+    assets.RegisterDefaultLoaders();
+    SceneSerializer serializer(&assets);
+    serializer.maxEntities = 3;
+    const auto json = ParseText(R"({"entities":[{"model":"budget.glb"}]})");
+    SceneDocument document;
+    document.entities.emplace_back();
+    document.entities.front().name = "Retained";
+    std::vector<Assets::AssetDependency> attempted;
+    ASTRAL_CHECK(!serializer.Parse(json, document, error, &attempted)); // wrapper + node + two primitive children = four
+    ASTRAL_CHECK(attempted.size() == 1 && document.entities.front().name == "Retained");
+    serializer.maxEntities = 4;
+    serializer.maxDepth = 2;
+    ASTRAL_CHECK(serializer.Parse(json, document, error));
+    GameWorld exact;
+    serializer.Instantiate(document, exact);
+    ASTRAL_CHECK(exact.Registry().AliveCount() == 4);
+    serializer.maxDepth = 1;
+    ASTRAL_CHECK(!serializer.Parse(json, document, error) && error.find("deeper") != std::string::npos);
+    ASTRAL_CHECK(document.entities.front().children.front().name == "ModelNode");
+
+    serializer.maxEntities = 5;
+    serializer.maxDepth = 2;
+    const auto nested = ParseText(R"({"entities":[{"children":[{"model":"budget.glb"}]}]})");
+    ASTRAL_CHECK(!serializer.Parse(nested, document, error) && error.find("entities[0].children[0].model") != std::string::npos);
+    serializer.maxDepth = 3;
+    ASTRAL_CHECK(serializer.Parse(nested, document, error));
+    GameWorld nestedWorld;
+    serializer.Instantiate(document, nestedWorld);
+    ASTRAL_CHECK(nestedWorld.Registry().AliveCount() == 5);
+
+    serializer.maxEntities = 4;
+    serializer.maxDepth = 2;
+    const auto prefab = ParseText(R"({"prefabs":{"Model":{"model":"budget.glb"}},"entities":[{"prefab":"Model"}]})");
+    ASTRAL_CHECK(serializer.Parse(prefab, document, error)); // model-derived cache extent includes both primitive children
+    serializer.maxEntities = 3;
+    ASTRAL_CHECK(!serializer.Parse(prefab, document, error) && error.find("cached prefab") != std::string::npos);
+    ASTRAL_CHECK(document.prefabs.size() == 1 && document.entities.front().children.front().children.size() == 2);
+    std::filesystem::remove_all(root);
+}
+
+ASTRAL_TEST(PrefabBudgetFailureRetainsNestedAttemptedWatchesAndOutput) {
+    const std::string root = TempDir("astral_framework_prefab_budget_watches");
+    WriteText(root + "/outer.json", R"({"entity":{"prefab":"inner.json","children":[{}]}})");
+    WriteText(root + "/inner.json", R"({"entity":{"name":"Inner","children":[{}]}})");
+    Assets::AssetManager assets(root, nullptr);
+    assets.RegisterDefaultLoaders();
+    SceneSerializer serializer(&assets);
+    serializer.maxEntities = 4;
+    const auto json = ParseText(R"({"entities":[{"prefab":"outer.json"}]})");
+    SceneDocument document;
+    document.entities.emplace_back();
+    document.entities.front().name = "Retained";
+    std::vector<Assets::AssetDependency> attempted;
+    std::string error;
+    ASTRAL_CHECK(!serializer.Parse(json, document, error, &attempted, true)); // cache would retain two + three nodes
+    ASTRAL_CHECK(attempted.size() == 2 && error.find("cached prefab") != std::string::npos);
+    ASTRAL_CHECK(document.entities.size() == 1 && document.entities.front().name == "Retained");
+    assets.Collect();
+    WriteText(root + "/inner.json", R"({"entity":{"name":"Inner"}})");
+    ASTRAL_CHECK(assets.PollChanges() == 1);
+    ASTRAL_CHECK(std::any_of(attempted.begin(), attempted.end(), [](const auto& watch) { return watch.Changed(); }));
+    attempted.clear();
+    ASTRAL_CHECK(serializer.Parse(json, document, error, &attempted, true));
+    ASTRAL_CHECK(document.dependencies.size() == 2 && document.entities.front().name == "Inner");
+    GameWorld world;
+    serializer.Instantiate(document, world);
+    ASTRAL_CHECK(world.Registry().AliveCount() == 2);
     std::filesystem::remove_all(root);
 }
 

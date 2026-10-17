@@ -152,6 +152,11 @@ std::shared_ptr<const Graphics::MeshData> MakePrimitiveMesh(const std::string& k
     return mesh;
 }
 
+struct SceneSerializer::SpecExtent {
+    std::size_t nodes{1};
+    std::size_t height{};
+};
+
 struct SceneSerializer::ParseState {
     ParseState(SceneDocument& documentIn, std::string& errorIn, std::vector<Assets::AssetDependency>& dependenciesIn,
         bool strictIn) : document(documentIn), error(errorIn), dependencies(dependenciesIn), strictReload(strictIn) {}
@@ -162,6 +167,8 @@ struct SceneSerializer::ParseState {
     const JsonValue* prefabSources{};
     std::set<std::string> resolving;
     std::size_t entities{};
+    std::size_t cachedEntities{};
+    std::map<std::string, SpecExtent> prefabExtents;
 
     template <typename T>
     bool Current(const Assets::AssetHandle<T>& handle) {
@@ -345,7 +352,8 @@ bool SceneSerializer::Parse(const JsonValue& json, SceneDocument& out, std::stri
         if (!entities->IsArray()) return Fail(error, "entities", "must be an array");
         for (std::size_t i = 0; i < entities->Size(); ++i) {
             EntitySpec spec;
-            if (!ParseEntity((*entities)[i], At("entities", i), state, spec, 0)) return false;
+            SpecExtent extent;
+            if (!ParseEntity((*entities)[i], At("entities", i), state, spec, 0, false, extent)) return false;
             document.entities.push_back(std::move(spec));
         }
     }
@@ -376,6 +384,8 @@ bool SceneSerializer::ParsePrefab(const std::string& name, const std::string& pa
     SceneDocument& document = state.document;
     if (document.prefabs.count(name)) return true;
     if (state.resolving.count(name)) return Fail(state.error, path, "prefab '" + name + "' contains itself");
+    if (state.resolving.size() > maxDepth)
+        return Fail(state.error, path, "prefab resolution deeper than " + std::to_string(maxDepth));
     const JsonValue* source = state.prefabSources ? state.prefabSources->Find(name) : nullptr;
     JsonValue file;
     if (!source) {
@@ -406,18 +416,31 @@ bool SceneSerializer::ParsePrefab(const std::string& name, const std::string& pa
     }
     state.resolving.insert(name);
     EntitySpec spec;
-    const bool ok = ParseEntity(*source, path, state, spec, 0);
+    SpecExtent extent;
+    const bool ok = ParseEntity(*source, path, state, spec, 0, true, extent);
     state.resolving.erase(name);
     if (!ok) return false;
+    state.prefabExtents[name] = extent;
     document.prefabs[name] = std::move(spec);
     return true;
 }
 
+bool SceneSerializer::Admit(const SpecExtent& extent, std::size_t depth, bool cached, ParseState& state,
+    const std::string& path) const {
+    if (depth > maxDepth || extent.height > maxDepth - depth)
+        return Fail(state.error, path, "hierarchy deeper than " + std::to_string(maxDepth));
+    std::size_t& used = cached ? state.cachedEntities : state.entities;
+    if (used > maxEntities || extent.nodes > maxEntities - used)
+        return Fail(state.error, path, "more than " + std::to_string(maxEntities)
+            + (cached ? " cached prefab entities" : " entities"));
+    used += extent.nodes;
+    return true;
+}
+
 bool SceneSerializer::ParseEntity(const JsonValue& json, const std::string& path, ParseState& state, EntitySpec& out,
-    std::size_t depth) const {
+    std::size_t depth, bool cached, SpecExtent& parsedExtent) const {
     std::string& error = state.error;
     if (depth > maxDepth) return Fail(error, path, "hierarchy deeper than " + std::to_string(maxDepth));
-    if (++state.entities > maxEntities) return Fail(error, path, "more than " + std::to_string(maxEntities) + " entities");
     if (!json.IsObject()) return Fail(error, path, "an entity must be an object");
     for (const std::string& key : json.Keys()) {
         if (key != "name" && key != "transform" && key != "components" && key != "behaviours" && key != "children"
@@ -425,12 +448,19 @@ bool SceneSerializer::ParseEntity(const JsonValue& json, const std::string& path
             return Fail(error, Join(path, key), "unknown key");
         }
     }
-    EntitySpec spec;
+    const EntitySpec* source = nullptr;
+    SpecExtent extent;
     if (const JsonValue* prefab = json.Find("prefab")) {
         if (!prefab->IsString()) return Fail(error, Join(path, "prefab"), "must be a prefab name");
         if (!ParsePrefab(prefab->AsString(), Join(path, "prefab"), state)) return false;
-        spec = state.document.prefabs.at(prefab->AsString());
+        source = &state.document.prefabs.at(prefab->AsString());
+        extent = state.prefabExtents.at(prefab->AsString());
     }
+    // A reference replaces this root rather than adding an extra wrapper. Its
+    // entire already-expanded subtree must fit before recursive vector copying.
+    if (!Admit(extent, depth, cached, state, source ? Join(path, "prefab") : path)) return false;
+    EntitySpec spec;
+    if (source) spec = *source;
     if (const JsonValue* model = json.Find("model")) {
         if (!model->IsString()) return Fail(error, Join(path, "model"), "must be a model path");
         bool colliders = false;
@@ -440,7 +470,7 @@ bool SceneSerializer::ParseEntity(const JsonValue& json, const std::string& path
             }
             colliders = collider->AsString() == "mesh";
         }
-        if (!ExpandModel(model->AsString(), colliders, Join(path, "model"), state, spec)) return false;
+        if (!ExpandModel(model->AsString(), colliders, Join(path, "model"), state, spec, depth, cached, extent)) return false;
     } else if (json.Find("collider")) {
         return Fail(error, Join(path, "collider"), "only applies to \"model\" entities");
     }
@@ -481,12 +511,20 @@ bool SceneSerializer::ParseEntity(const JsonValue& json, const std::string& path
     }
     if (const JsonValue* children = json.Find("children")) {
         if (!children->IsArray()) return Fail(error, Join(path, "children"), "must be an array");
+        if (children->Size() != 0 && depth == maxDepth)
+            return Fail(error, At(Join(path, "children"), 0), "hierarchy deeper than " + std::to_string(maxDepth));
         for (std::size_t i = 0; i < children->Size(); ++i) {
             EntitySpec child;
-            if (!ParseEntity((*children)[i], At(Join(path, "children"), i), state, child, depth + 1)) return false;
+            SpecExtent childExtent;
+            if (!ParseEntity((*children)[i], At(Join(path, "children"), i), state, child, depth + 1, cached, childExtent)) return false;
+            // Admission already bounded the domain sum; child admission also
+            // proved height <= maxDepth - (depth + 1), so these cannot wrap.
+            extent.nodes += childExtent.nodes;
+            extent.height = std::max(extent.height, childExtent.height + 1);
             spec.children.push_back(std::move(child));
         }
     }
+    parsedExtent = extent;
     out = std::move(spec);
     return true;
 }
@@ -545,12 +583,54 @@ bool SceneSerializer::ParseComponents(const JsonValue& json, const std::string& 
 }
 
 bool SceneSerializer::ExpandModel(const std::string& model, bool colliders, const std::string& path, ParseState& state,
-    EntitySpec& out) const {
+    EntitySpec& out, std::size_t depth, bool cached, SpecExtent& extent) const {
     std::string& error = state.error;
     if (!assets_) return Fail(error, path, "model '" + model + "' needs an asset manager");
     const auto handle = assets_->Load<Assets::GltfDocument>(model);
     if (!state.Current(handle)) return Fail(error, path, "cannot load model '" + model + "': " + state.Diagnostic(handle));
     const Assets::GltfDocument& gltf = *handle.Get();
+    // Count the exact selected hierarchy and generated primitive children before
+    // constructing EntitySpecs. Pending node indices are charged before enqueue.
+    const std::size_t used = cached ? state.cachedEntities : state.entities;
+    const std::size_t available = maxEntities - used; // prior root admission bounded used
+    const std::size_t remainingDepth = maxDepth - depth;
+    SpecExtent expansion{0, 0};
+    const auto add = [&](std::size_t count, std::size_t relativeDepth) {
+        if (relativeDepth > remainingDepth)
+            return Fail(error, path, "model hierarchy deeper than " + std::to_string(maxDepth));
+        if (count > available - expansion.nodes)
+            return Fail(error, path, "more than " + std::to_string(maxEntities)
+                + (cached ? " cached prefab entities" : " entities"));
+        expansion.nodes += count;
+        expansion.height = std::max(expansion.height, relativeDepth);
+        return true;
+    };
+    const std::vector<int> roots = gltf.RootNodes();
+    std::vector<std::pair<int, std::size_t>> pending;
+    if (!roots.empty()) {
+        if (!add(roots.size(), 1)) return false;
+        for (int root : roots) pending.emplace_back(root, 1);
+    }
+    while (!pending.empty()) {
+        const auto next = pending.back();
+        pending.pop_back();
+        const Assets::GltfNode& source = gltf.nodes[static_cast<std::size_t>(next.first)];
+        if (source.mesh >= 0) {
+            const std::size_t primitives = gltf.meshes[static_cast<std::size_t>(source.mesh)].primitives.size();
+            if (primitives > 1) {
+                if (next.second == remainingDepth)
+                    return Fail(error, path, "model hierarchy deeper than " + std::to_string(maxDepth));
+                if (!add(primitives - 1, next.second + 1)) return false;
+            }
+        }
+        if (!source.children.empty()) {
+            if (next.second == remainingDepth)
+                return Fail(error, path, "model hierarchy deeper than " + std::to_string(maxDepth));
+            if (!add(source.children.size(), next.second + 1)) return false;
+            for (int child : source.children) pending.emplace_back(child, next.second + 1);
+        }
+    }
+    if (!Admit(expansion, depth, cached, state, path)) return false;
     if (out.name.empty()) out.name = Stem(model);
 
     auto addMesh = [&](EntitySpec& spec, std::size_t mesh, std::size_t primitive) {
@@ -577,9 +657,7 @@ bool SceneSerializer::ExpandModel(const std::string& model, bool colliders, cons
         return true;
     };
 
-    std::function<bool(int, std::size_t, EntitySpec&)> node = [&](int index, std::size_t depth, EntitySpec& spec) {
-        if (depth > maxDepth) return Fail(error, path, "model hierarchy deeper than " + std::to_string(maxDepth));
-        if (++state.entities > maxEntities) return Fail(error, path, "more than " + std::to_string(maxEntities) + " entities");
+    std::function<bool(int, EntitySpec&)> node = [&](int index, EntitySpec& spec) {
         const Assets::GltfNode& source = gltf.nodes[static_cast<std::size_t>(index)];
         spec.name = source.name.empty() ? "node" + std::to_string(index) : source.name;
         spec.transform = {source.local.translation, source.local.rotation, source.local.scale};
@@ -599,16 +677,19 @@ bool SceneSerializer::ExpandModel(const std::string& model, bool colliders, cons
         }
         for (int child : source.children) {
             EntitySpec childSpec;
-            if (!node(child, depth + 1, childSpec)) return false;
+            if (!node(child, childSpec)) return false;
             spec.children.push_back(std::move(childSpec));
         }
         return true;
     };
-    for (int root : gltf.RootNodes()) {
+    for (int root : roots) {
         EntitySpec rootSpec;
-        if (!node(root, 1, rootSpec)) return false;
+        if (!node(root, rootSpec)) return false;
         out.children.push_back(std::move(rootSpec));
     }
+    // Whole-expansion admission bounded this addition before any construction.
+    extent.nodes += expansion.nodes;
+    extent.height = std::max(extent.height, expansion.height);
     return true;
 }
 
