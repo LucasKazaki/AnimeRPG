@@ -1,5 +1,22 @@
 {
   "schema_version": 1,
+  "weekend_2026_10_17": {
+    "owner": "Codex chat 01a14ae5-1646-7c80-b8a8-c76ba4ab5747",
+    "deadline": "2026-10-18T23:59:00-04:00",
+    "scope": "engine-only implementation; October 17 user authorization governs this session",
+    "baseline_sha": "c644eec79752b9dc101aeca6b03141cf26854c96",
+    "baseline_status": "locally_verified",
+    "baseline_verified_scope": "native MSVC Debug/Release all configured targets, 25 deterministic suites and six retained GDI runtime smokes per configuration; test-safety and milestone verifiers",
+    "evidence": "Docs/QA/ENGINE-WEEKEND-BASELINE-2026-10-17.md",
+    "checkpoint": "Docs/Agents/ENGINE-WEEKEND-2026-10-17.md",
+    "development_workflow_gate": "not_passed",
+    "editor_workflow": "stub_on_main; substantive committed local candidate needs review and runtime verification",
+    "framework_assets_players": "implemented_but_unintegrated_in_PR_80; known reproduced audit leads require repair",
+    "gpu_backend": "absent",
+    "packaged_external_project": "absent",
+    "immutable_24_hour_soak": "not_started",
+    "parity_claim": false
+  },
   "assessed_at": "2026-09-22",
   "repository": "LucasKazaki/AnimeRPG",
   "inspected_base": "e12e6c559bf776ffc9c715c809a517f8e02ce5d5",
