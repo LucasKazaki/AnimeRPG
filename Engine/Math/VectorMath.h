@@ -81,12 +81,18 @@ inline Vec3 Cross(Vec3 a, Vec3 b) {
     return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
 }
 inline float LengthSquared(Vec3 a) { return Dot(a, a); }
-inline float Length(Vec3 a) { return std::sqrt(LengthSquared(a)); }
+inline float Length(Vec3 a) { return a.Length(); }
 inline float Distance(Vec3 a, Vec3 b) { return Length(a - b); }
 inline float DistanceSquared(Vec3 a, Vec3 b) { return LengthSquared(a - b); }
 inline Vec3 Normalize(Vec3 a, Vec3 fallback = {0.0f, 0.0f, 0.0f}) {
-    const float length = Length(a);
-    return length > kEpsilon && IsFinite(length) ? a / length : fallback;
+    if (!IsFinite(a)) return fallback;
+    // A finite float vector can have a norm beyond float range. Widen before
+    // computing the norm so its direction remains usable, retaining the cutoff.
+    const double length = std::hypot(static_cast<double>(a.x),
+        static_cast<double>(a.y), static_cast<double>(a.z));
+    if (!(length > kEpsilon) || !std::isfinite(length)) return fallback;
+    return {static_cast<float>(a.x / length), static_cast<float>(a.y / length),
+        static_cast<float>(a.z / length)};
 }
 inline Vec3 Lerp(Vec3 a, Vec3 b, float t) { return a + (b - a) * t; }
 inline Vec3 Min(Vec3 a, Vec3 b) { return {std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z)}; }
@@ -95,7 +101,6 @@ inline Vec3 Abs(Vec3 a) { return {std::fabs(a.x), std::fabs(a.y), std::fabs(a.z)
 inline Vec3 Clamp(Vec3 a, Vec3 low, Vec3 high) { return Min(Max(a, low), high); }
 inline float MaxComponent(Vec3 a) { return std::max(a.x, std::max(a.y, a.z)); }
 inline float MinComponent(Vec3 a) { return std::min(a.x, std::min(a.y, a.z)); }
-inline bool IsFinite(Vec3 a) { return IsFinite(a.x) && IsFinite(a.y) && IsFinite(a.z); }
 inline Vec3 Reflect(Vec3 incident, Vec3 normal) { return incident - normal * (2.0f * Dot(incident, normal)); }
 inline Vec3 ProjectOnPlane(Vec3 v, Vec3 unitNormal) { return v - unitNormal * Dot(v, unitNormal); }
 inline Vec3 Horizontal(Vec3 v) { return {v.x, 0.0f, v.z}; }
