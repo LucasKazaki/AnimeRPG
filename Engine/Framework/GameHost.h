@@ -49,6 +49,7 @@
 #include "Engine/UI/Widgets.h"
 
 #include <cstddef>
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -169,6 +170,7 @@ private:
     Core::ConsoleRegistry commands_;
     Input::InputSystem input_;
     UI::UIRoot ui_;
+    std::bitset<256> uiHeldKeys_; // UI-owned physical holds remain masked until release
     UI::CanvasPanel* hud_{};
     std::unique_ptr<UI::ConsoleOverlay> console_;
     Graphics::SceneRenderer renderer_;

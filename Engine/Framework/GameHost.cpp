@@ -350,12 +350,26 @@ void GameHost::Update(float dt, const HostInput& input) {
     ++stats_.frames;
     dt = std::max(0.0f, dt);
 
-    // UI first: the console and a focused text box take the keyboard.
+    // UI reports event ownership; physical holds stay owned through release,
+    // even when their widget disappears or a modal closes during this frame.
     UI::UIInput ui = input.ui;
-    console_->PreprocessInput(ui);
-    ui_.Update(ui, viewport_);
+    UI::UIInputResult consumed = console_->PreprocessInput(ui);
+    consumed.Merge(ui_.Update(ui, viewport_, consumed.modal && !console_->IsOpen()));
     Input::InputSnapshot keys = input.keys;
-    if (ui_.WantsKeyboard()) keys = {};
+    if (consumed.keyboardCaptured) {
+        std::bitset<256> keyboard = input.keys.keys;
+        // Mouse virtual keys are a separate pointer channel, not text entry.
+        for (std::uint16_t mouse : {1, 2, 4, 5, 6}) keyboard.reset(mouse);
+        consumed.consumedKeys |= keyboard;
+    }
+    if (consumed.modal) consumed.consumedKeys |= input.keys.keys;
+    if (consumed.pointerConsumed || consumed.modal) {
+        consumed.consumedKeys.set(Input::Keys::MouseLeft);
+        keys.mouseDelta = {};
+    }
+    uiHeldKeys_ &= input.keys.keys;
+    uiHeldKeys_ |= consumed.consumedKeys & input.keys.keys;
+    keys.keys &= ~(consumed.consumedKeys | uiHeldKeys_);
     keys.dt = dt;
     input_.Update(keys);
 
