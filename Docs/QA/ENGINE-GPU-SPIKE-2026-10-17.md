@@ -6,10 +6,10 @@ Base `5245a3dd079083a534b4afd16924a6a5496d1a0d`, dedicated
 
 ## Current evidence boundary
 
-Source preparation only. No configure, compilation, GPU device creation,
-rendering, native UI, performance result or image inspection has run for this
-packet. Production source pre-review is clean; workflow review, final binding
-and all execution receipts are pending.
+No local configure, compilation, GPU device creation, rendering, native UI,
+performance result or image inspection has run for this packet. Production and
+workflow source pre-reviews are clean. The first hosted compile attempt failed
+in a test fixture; exact receipts and the bounded correction are recorded below.
 The coordinator currently holds hardware execution pending desktop/GPU ownership
 and RAM headroom. Other applications/processes are untouched.
 
@@ -60,8 +60,10 @@ Each Windows-2022 leg configures the backend/tests ON, builds only
 EngineD3D11Tests Debug/Release with two jobs, and executes only the CPU
 `ShaderCompilerReturnsRealDiagnosticsAndRecovers` filter. It never runs CTest,
 Initialize, rendering, WARP or native UI. Hosted compile/shader success cannot
-satisfy local hardware/performance/image acceptance. These hosted runs are also
-pending until the coordinator reviews and authorizes candidate publication.
+satisfy local hardware/performance/image acceptance. The coordinator subsequently
+reviewed the complete
+eleven-path candidate, recomputed matching source/whole hashes, published it as
+draft PR94, and retained the first failed hosted attempt below.
 
 The selected adapter identity must be recorded during actual hardware execution;
 the first non-software DXGI adapter is not assumed to be the RTX5080 when more
@@ -83,3 +85,40 @@ Per-call uploads are not a residency system or a general performance claim;
 CPU reference includes CPU post and is explicitly not pass-equivalent timing.
 No 24-hour soak, constrained-hardware, packaging or whole-engine acceptance is
 inferred from this packet.
+
+## First hosted compile attempt: failed, retained
+
+Draft [PR94](https://github.com/LucasKazaki/AnimeRPG/pull/94) published WIP commit
+`e6885ae0658ea638c024dc860bb8743442076a98` against frozen base
+`2c69888774c074a69ec12c5f659e3632280db420`. Its source patch was the reviewed
+`2399E8E25C1365C083D2AA903DB49A5BE0B0ED4116EA22190EC8565203D202C2`; complete
+eleven-path patch was
+`814CC840DCD0FDD3DB767332F2E1838D24F942A98558BDB13B3E7B7183F339BA`.
+
+[Hosted run 39063303365](https://github.com/LucasKazaki/AnimeRPG/actions/runs/39063303365)
+executed both PR legs on October 17, 2026. Exact checkout/ordered-parent checks
+passed, followed by successful configure. Both compiled AstralEngineRuntime and
+AstralD3D11 Debug static libraries, then failed compiling EngineD3D11Tests.
+
+| Job | Exact checkout | Debug compile failure UTC |
+| --- | --- | --- |
+| [Head 117485605758](https://github.com/LucasKazaki/AnimeRPG/actions/runs/39063303365/job/117485605758) | `e6885ae0658ea638c024dc860bb8743442076a98` | 19:38:54 |
+| [Merge 117485606050](https://github.com/LucasKazaki/AnimeRPG/actions/runs/39063303365/job/117485606050) | `3914f228d5d5408aa708c58710450f79b62d4d72` | 19:39:07 |
+
+The merge's ordered parents were
+`2c69888774c074a69ec12c5f659e3632280db420` and
+`e6885ae0658ea638c024dc860bb8743442076a98`. The first diagnostic in both jobs was
+EngineD3D11Tests.cpp:231 C2513, Material missing a variable before `=`, followed
+by cascading syntax errors. Windows SDK minwindef.h defines legacy `near`/`far`
+macros as empty; those names erased two fixture-local identifiers. The bounded
+correction renames them to `nearMaterial`/`farMaterial` and updates their uses.
+No production, CMake, workflow, budget or tolerance changed.
+
+Both CPU shader filter steps and Release build steps were skipped. No HLSL
+compilation, device creation, rendering or hardware measurement ran in this
+attempt. It does not establish even complete hosted compile acceptance.
+Actual run metadata and complete head/merge logs are retained externally in
+`work/d3d11-evidence/hosted-39063303365.json`, `hosted-first-head.log`,
+`hosted-first-merge.log` and `hosted-39063303365-watch.log`. No identical rerun was
+requested. Correction source review/new commit and a new hosted attempt are
+pending. Human desktop/GPU hold and local RAM/build/test hold remain in force.

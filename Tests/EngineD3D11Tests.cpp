@@ -228,11 +228,11 @@ ASTRAL_TEST(WorldRenderSceneMatchesHardwareUnlitAndLinearTextures) {
 
 ASTRAL_TEST(DepthClippingWindingAndDoubleSidedUseHardware) {
     GPU::D3D11Renderer renderer; Initialize(renderer);
-    auto mesh = Quad(); Material near = Unlit({0.9f, 0.1f, 0.2f}), far = Unlit({0.1f, 0.8f, 0.3f});
+    auto mesh = Quad(); Material nearMaterial = Unlit({0.9f, 0.1f, 0.2f}), farMaterial = Unlit({0.1f, 0.8f, 0.3f});
     RenderView view = RenderView::Perspective({}, {0, 0, 1}, 65, 320, 180, .25f, 20);
     RenderScene scene; Neutral(scene);
-    scene.draws.push_back({mesh.get(), &far, Math::Translation({0, 0, 4}), 72});
-    scene.draws.push_back({mesh.get(), &near, Math::Translation({0, 0, 2}), 71});
+    scene.draws.push_back({mesh.get(), &farMaterial, Math::Translation({0, 0, 4}), 72});
+    scene.draws.push_back({mesh.get(), &nearMaterial, Math::Translation({0, 0, 2}), 71});
     GPU::Frame gpu; RenderTarget cpu;
     Reference(scene, view, cpu); Render(renderer, scene, view, gpu); Compare(cpu, gpu, false);
     ASTRAL_CHECK(gpu.objectId[static_cast<std::size_t>(90) * 320 + 160] == 71);
@@ -242,7 +242,7 @@ ASTRAL_TEST(DepthClippingWindingAndDoubleSidedUseHardware) {
     for (std::size_t i = 0; i < mesh->indices.size(); i += 3) std::swap(mesh->indices[i], mesh->indices[i + 1]);
     Render(renderer, scene, view, gpu);
     ASTRAL_CHECK(std::all_of(gpu.objectId.begin(), gpu.objectId.end(), [](auto id) { return id == 0; }));
-    near.doubleSided = far.doubleSided = true;
+    nearMaterial.doubleSided = farMaterial.doubleSided = true;
     Render(renderer, scene, view, gpu); ASTRAL_CHECK(gpu.objectId == first);
     // One vertex crosses the near plane and two cross screen boundaries.
     mesh->vertices[0].position = {-3, -2, -1.9f}; mesh->ComputeBounds();
