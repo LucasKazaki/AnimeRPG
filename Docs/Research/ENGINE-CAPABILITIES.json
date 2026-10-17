@@ -11,7 +11,14 @@
     "checkpoint": "Docs/Agents/ENGINE-WEEKEND-2026-10-17.md",
     "development_workflow_gate": "not_passed",
     "editor_workflow": "stub_on_main; substantive committed local candidate needs review and runtime verification",
-    "framework_assets_players": "implemented_but_unintegrated_in_PR_80; known reproduced audit leads require repair",
+    "framework_assets_players": "implemented_but_unintegrated_in_PR_80; source-confirmed audit leads pending local reproduction and repair",
+    "numeric_repair": {
+      "classification": "locally_verified",
+      "integration": "branch_only_pending_current_main_and_hosted_checks",
+      "source_sha": "ec3822df1966e50c944ab064c9c694f26639445e",
+      "evidence": "Docs/QA/ENGINE-NUMERIC-2026-10-17.md",
+      "scope": "member/free Vec3 length and normalization, finite camera/controller, checked translation hierarchy; independent review clean, full native Debug/Release and smokes pass; fixed CPU fixture p95 ratio 1.09733"
+    },
     "gpu_backend": "absent",
     "packaged_external_project": "absent",
     "immutable_24_hour_soak": "not_started",

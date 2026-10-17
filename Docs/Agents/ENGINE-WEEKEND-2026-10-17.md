@@ -1,6 +1,6 @@
 # Astral Engine weekend checkpoint
 
-Updated: 2026-10-17 13:33 America/New_York. Owner: Codex chat
+Updated: 2026-10-17 13:41 America/New_York. Owner: Codex chat
 `01a14ae5-1646-7c80-b8a8-c76ba4ab5747`, coordinator `/root`.
 Scope/authority: `Tasks/ENGINE-WEEKEND-COORDINATION-2026-10-17.md` and Lucas's
 October 17 pasted request. Deadline: 2026-10-18 23:59 Eastern.
@@ -18,10 +18,15 @@ October 17 pasted request. Deadline: 2026-10-18 23:59 Eastern.
   `engine/weekend-coordinator-20261017`, created from exact current remote main.
 - Numeric owner worktree: `<session-root>/work/astral-numeric`, branch
   `engine/numeric-repair-20261017`, same base; implementation agent
-  `/root/numeric_implementation`. Baseline-clear given; repair in progress.
+  `/root/numeric_implementation`. Frozen repair `ec3822df1966e50c944ab064c9c694f26639445e`;
+  clean independent review and full native checks passed; coordinator cherry-pick
+  `94d4e8a7b6437bc99a64898407361dbfa1dff285`. No remote merge yet.
 - Framework worktree: `<session-root>/work/astral-framework`, branch
   `engine/framework-containment-20261017`, deliberately based on unmerged PR 80.
-  No source modifications yet; establish baseline before the containment packet.
+  Owner `/root/containment_implementation`. Exact PR80 full Debug build and
+  31/31 deterministic CTest passed (56.05 s). Old importer root escape locally
+  reproduced with harmless fixtures (exit 3); scoped repair is in progress.
+  Focused post-fix Debug asset suite passes; Release and independent review pending.
 - Full builds/native/GPU tests belong to coordinator and run serially. No Astral,
   CMake, MSBuild, or R0 process was observed before the owned baseline build.
 - Chat inventory shows other active projects on this host; leave their processes,
@@ -63,7 +68,16 @@ not on PATH; preserve both failure and `baseline-path-fixed-*` success logs.
 Numeric reproduction harness compiled successfully and exited 1 on exact main:
 member/free length infinity, normalized vector zero, NaN projection succeeds,
 idle NaN time poisons position, hierarchy translation infinity. Harness/logs:
-`<session-root>/work/numeric-evidence/`. No repair acceptance yet.
+`<session-root>/work/numeric-evidence/`. Repaired harness passes all six checks.
+Numeric full Debug/Release builds and deterministic CTest pass 25/25 each
+(52.23/4.90 s); native smokes pass 6/6 each (18.96/19.29 s). No surviving owned
+Astral processes observed. Fixed original 320x180 CPU fixture p95 rose from
+9.1984 to 10.0937 ms (1.09733 ratio, under the predeclared 1.25 guard); images
+visually inspected, 10 changed pixels. This is a robustness/cost check, not
+general real-time or GPU acceptance. Full evidence: `Docs/QA/ENGINE-NUMERIC-2026-10-17.md`.
+Next coordinator action: final integration documentation review, push scoped
+numeric PR, verify actual head/base/merge trees and CI, merge only passing work,
+then verify integrated main. Do not blindly merge original PR76 or PR80.
 
 One read of historical PR 52 job logs via `gh api` failed because the response
 contained terminal escape sequences; a subsequent explicitly escape-tolerant
@@ -86,6 +100,14 @@ was changed. The app must be running for local execution.
    dependency containment (E), finite input accumulation (F). Keep original sample
    only as existing engine validation; create no game content.
 4. Repair actual head/merge execution coverage (G), reconcile editor smoke candidate.
+   Existing editor-only adoption candidates after repaired PR80:
+   `1c3d2ddb732b48d2129a5a0150747dbe3aa55978` then
+   `96c25cbb6d56094b49a3e60717d150db42a9b873`. Skip game commits `bffe363` and
+   `abadca8` wholesale. Preserve dirty local-test work. Confirmed source gaps:
+   failed project-open loses document, untitled save confirmation, capture-loss
+   cancellation, Unicode/surrogates, keyboard traversal/DPI, project creation,
+   Play audio and dependency reload. PR13 shell predicates are obsolete for this
+   editor; preserve its process containment but test a current neutral fixture.
 5. Connect existing editor to runtime world and save/play restoration; then GPU
    spike/ADR/backend, asset/animation integration, external projects/packaging,
    starter walkthrough and measured hardening, dependency ordered.

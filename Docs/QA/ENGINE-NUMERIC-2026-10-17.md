@@ -137,3 +137,76 @@ builds and deterministic CTest, serialized repaired native smokes, representativ
 performance comparison, proposed-integration/current-main verification and any
 portable sanitizer evidence remain pending with the coordinator. GPU rendering
 and the 24-hour soak are outside this bounded numeric packet and remain open.
+
+## Coordinator verification and independent review
+
+Source commit: `ec3822df1966e50c944ab064c9c694f26639445e` on the numeric-owner
+branch. Coordinator cherry-pick: `94d4e8a7b6437bc99a64898407361dbfa1dff285`.
+`git diff ec3822d HEAD -- Engine Tests Scripts` is empty: integration did not
+change the reviewed production, regression or verifier code. Full native runs
+use the numeric worktree and external `work/build-numeric` cache.
+
+Independent reviewer `/root/candidate_review` verified the clean exact source
+commit against `c644eec79752b9dc101aeca6b03141cf26854c96`, inspected the full
+14-path diff, actual Renderer.cpp rounding/GDI/HUD consumers, API compatibility,
+atomic failure behavior, finite extreme movement, cycle/deep/overflow handling,
+borrowed pointer limits, test registration/assertions and retained reproduction
+logs. **No blocking correctness findings.** The reviewer did not execute tests
+or edit source. Its one nonblocking suggestion is a future regression directly
+around the raster conversion margin; existing checks cover gross rejection and
+accepted finite offscreen output. The 4096 margin exceeds current HUD offsets
+and float rounding. Review acceptance was conditional on the following gates,
+which the coordinator then completed:
+
+| Command | Exit/result | Log under `<session>/work/` |
+|---|---|---|
+| `cmake --build work/build-numeric --config Debug --parallel 2` | 0, all configured targets | `numeric-full-Debug-build.log` |
+| `ctest --test-dir work/build-numeric -C Debug --output-on-failure -E RuntimeSmoke --no-tests=error --stop-on-failure` | 0, 25/25, 52.23 s | `numeric-full-Debug-test.log` |
+| Same build/test commands with Release | 0, 25/25, 4.90 s | `numeric-full-Release-{build,test}.log` |
+| `ctest --test-dir work/build-numeric -C Debug --output-on-failure -R RuntimeSmoke --no-tests=error --stop-on-failure` | 0, 6/6, 18.96 s | `numeric-full-Debug-smoke.log` |
+| Same smoke command with Release | 0, 6/6, 19.29 s | `numeric-full-Release-smoke.log` |
+
+Desktop smokes were serialized; process inspection afterwards found no surviving
+Astral/smoke processes. No game-content implementation was changed. Main merge
+and hosted source/merge-result SHA verification are still pending at this record.
+
+## Fixed workload cost and image check
+
+Before measurement the coordinator declared a relative p95 guard of **at most
+1.25 times exact-main baseline** for this numeric repair. This is a bounded cost
+check, not a general engine performance budget or a 60 Hz acceptance result.
+
+Same original static plane/box/sphere fixture, 320x180, renderer preset 1,
+512 shadow resolution, three draws/331 rasterized triangles/32,521 shaded pixels,
+no job workers, 10 warm-up frames and 100 measured frames. Same MSVC 19.44 `/O2
+/MD /std:c++17` harness is linked separately against each exact-source Release
+runtime library. CPU/OS/GPU identity is the baseline machine in the session QA
+record; GPU timing/VRAM allocation measurement is not supplied by this CPU path.
+
+Harness SHA-256: `58aa7ba47312f301438e5e91db81c5a4443e39ebef536cad0fe72441822563fd`.
+External source/command: `work/numeric-render-benchmark.cpp` and
+`work/run-numeric-benchmark.cmd` (run from `work` via `cmd /d /c`). Both compiles
+and both runs exit 0; compile/run logs are `benchmark-{baseline,numeric}*`.
+
+| Measurement | Main c644eec | Numeric ec3822d |
+|---|---:|---:|
+| Mean ms | 8.500648 | 9.664544 |
+| p50 ms | 8.265100 | 9.649400 |
+| p95 ms | 9.198400 | 10.093700 |
+| p99 ms | 10.522400 | 10.296200 |
+| Measured duration ms | 850.064800 | 966.454400 |
+| Process working set bytes | 16,990,208 | 17,199,104 |
+| Private bytes | 12,795,904 | 12,967,936 |
+| Renderer-reported memory bytes | 4,429,752 | 4,429,752 |
+
+p95 ratio **1.09733**, passing the declared 1.25 guard. There is a measured
+cost for robust normalization; do not describe this change as a speedup. This
+short single-process fixture is not evidence about GPU, high-resolution scenes,
+other machines or whole-engine worst-case performance.
+
+Both PNGs were visually inspected. Geometry, shadow and composition are intact;
+floating-point precision changes affect 10/57,600 pixels, four by more than one
+channel value (maximum channel delta 43 at a sphere boundary; mean absolute
+channel delta 0.000798611). Hashes differ (`dbc92f74aab8369a` versus
+`76d234329c17828a`); bit identity is not claimed. Existing semantic renderer
+regressions pass. PNGs remain in external evidence, not source commits.
