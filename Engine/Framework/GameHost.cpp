@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <utility>
 
 namespace Astral::Framework {
@@ -45,7 +46,8 @@ bool OnlyKeys(const JsonValue& json, std::initializer_list<const char*> allowed,
 bool ReadSeconds(const JsonValue& json, const std::string& key, const std::string& path, float& out, std::string& error) {
     const JsonValue* value = json.Find(key);
     if (!value) return true;
-    if (!value->IsNumber() || !(value->AsNumber() >= 0.0 && value->AsNumber() <= 10.0)) {
+    if (!value->IsNumber() || !std::isfinite(value->AsNumber())
+        || !(value->AsNumber() >= 0.0 && value->AsNumber() <= 10.0)) {
         return Fail(error, Join(path, key), "must be a number of seconds in [0, 10]");
     }
     out = value->AsFloat();
@@ -58,7 +60,7 @@ bool ParseKey(const JsonValue& json, const std::string& path, std::uint16_t& out
         if (out == 0) return Fail(error, path, "unknown key name '" + json.AsString() + "'");
         return true;
     }
-    if (json.IsNumber() && json.AsNumber() >= 1.0 && json.AsNumber() <= 255.0
+    if (json.IsNumber() && std::isfinite(json.AsNumber()) && json.AsNumber() >= 1.0 && json.AsNumber() <= 255.0
         && std::floor(json.AsNumber()) == json.AsNumber()) {
         out = static_cast<std::uint16_t>(json.AsInt());
         return true;
@@ -106,7 +108,13 @@ bool ParseAction(const JsonValue& json, const std::string& path, Input::ActionDe
             if (!axis || !axis->IsArray() || axis->Size() != 2 || !(*axis)[0].IsNumber() || !(*axis)[1].IsNumber()) {
                 return Fail(error, Join(bindingPath, "axis"), "Axis2D bindings need \"axis\": [x, y]");
             }
-            binding.axisContribution = {(*axis)[0].AsFloat(), (*axis)[1].AsFloat()};
+            for (std::size_t c = 0; c < 2; ++c) {
+                const double component = (*axis)[c].AsNumber();
+                if (!std::isfinite(component) || std::fabs(component) > std::numeric_limits<float>::max()) {
+                    return Fail(error, At(Join(bindingPath, "axis"), c), "must be finite and in the float range");
+                }
+            }
+            binding.axisContribution = {static_cast<float>((*axis)[0].AsNumber()), static_cast<float>((*axis)[1].AsNumber())};
         } else if (axis) {
             return Fail(error, Join(bindingPath, "axis"), "only Axis2D actions take an axis");
         }
@@ -150,7 +158,8 @@ bool ParseInputMap(const JsonValue& json, std::vector<Input::InputContext>& out,
             if (other.name == context.name) return Fail(error, Join(path, "name"), "duplicate context '" + context.name + "'");
         }
         if (const JsonValue* priority = source.Find("priority")) {
-            if (!priority->IsNumber() || std::floor(priority->AsNumber()) != priority->AsNumber()
+            if (!priority->IsNumber() || !std::isfinite(priority->AsNumber())
+                || std::floor(priority->AsNumber()) != priority->AsNumber()
                 || std::fabs(priority->AsNumber()) > 1000000.0) {
                 return Fail(error, Join(path, "priority"), "must be an integer");
             }
@@ -308,12 +317,17 @@ bool GameHost::LoadSceneJson(const JsonValue& json, std::string& error) {
 }
 
 bool GameHost::ApplyProject(const ProjectDesc& project, std::string& error) {
+    Input::InputSystem validatedInput;
+    for (std::size_t i = 0; i < project.input.size(); ++i) {
+        std::string inputError;
+        if (!validatedInput.AddContext(project.input[i], &inputError))
+            return Report(error = At("input.contexts", i) + ": " + inputError);
+    }
     for (const auto& [name, value] : project.config) {
         std::string setError;
         if (!commands_.Set(name, value, setError)) return Report(error = "config." + name + ": " + setError);
     }
-    input_ = Input::InputSystem();
-    for (const Input::InputContext& context : project.input) input_.AddContext(context);
+    input_ = std::move(validatedInput);
     project_ = project;
     return LoadScene(project.startupScene, error);
 }
