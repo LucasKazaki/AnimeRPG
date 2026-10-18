@@ -15,6 +15,57 @@ import package_engine_project as package
 import release_manifest
 
 
+# Verbatim excerpts of actual MSVC14.44 native-player reports retained at
+# work/noon-package-first and work/noon-package-pe-format-first. Unrelated
+# optional/section-header fields are omitted; DLL entries and section placement
+# are unchanged. These are text fixtures, never a real package/build receipt.
+RECORDED_PE_HEADERS = """FILE HEADER VALUES
+            8664 machine (x64)
+               7 number of sections
+
+SECTION HEADER #2
+  .rdata name
+   5C9BE virtual size
+
+SECTION HEADER #3
+   .data name
+   140D8 virtual size
+
+  Summary
+
+       15000 .data
+        1000 .fptable
+        D000 .pdata
+       5D000 .rdata
+        2000 .reloc
+        1000 .rsrc
+      13A000 .text
+"""
+RECORDED_DEPENDENCY_BLOCK = """  Image has the following dependencies:
+
+    USER32.dll
+    GDI32.dll
+    WINMM.dll
+    KERNEL32.dll
+"""
+RECORDED_PE_DEPENDENTS = """File Type: EXECUTABLE IMAGE
+
+""" + RECORDED_DEPENDENCY_BLOCK + """
+  Summary
+
+       15000 .data
+        1000 .fptable
+        D000 .pdata
+       5D000 .rdata
+        2000 .reloc
+        1000 .rsrc
+      13A000 .text
+"""
+RECORDED_PE_COMBINED = RECORDED_PE_HEADERS.replace(
+    "\nSECTION HEADER #3", "\n" + RECORDED_DEPENDENCY_BLOCK + "\nSECTION HEADER #3")
+RECORDED_IMPORTS = ["GDI32.dll", "KERNEL32.dll", "USER32.dll", "WINMM.dll"]
+
+
 class PackageControls(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="astral_engine_package_")
@@ -208,6 +259,71 @@ class PackageControls(unittest.TestCase):
         text = "  8664 machine (x64)\n  Image has the following dependencies:\n\n    KERNEL32.dll\n    Summary.dll\n\n  Summary\n"
         with self.assertRaises(package.PackageError):
             package.inspect_imports(text)
+
+    def test_stage_accepts_recorded_pe_reports_only_with_separate_dumpbin_commands(self):
+        # Orchestration unit only: dummy tools/binaries and captured text. Root's
+        # separate real builds/dumpbin/launch gates remain required acceptance.
+        content = self.content()
+        original = {p.relative_to(content): p.read_bytes() for p in content.rglob('*') if p.is_file()}
+        args = self.args(content)
+        args.cmake.write_bytes(b"disposable dummy tool")
+        args.dumpbin.write_bytes(b"disposable dummy tool")
+        commands = []
+
+        def replay(label, argv, **kwargs):
+            self.assertEqual(kwargs['cwd'], args.source)
+            if label == 'configure':
+                (args.build / 'Release').mkdir(parents=True)
+                return ''
+            if label == 'build-release':
+                for target in package.TARGETS:
+                    (args.build / 'Release' / (target + '.exe')).write_bytes(b"dummy " + target.encode('ascii'))
+                return ''
+            self.assertEqual(Path(argv[0]), args.dumpbin)
+            self.assertEqual(kwargs['timeout'], 30)
+            commands.append(tuple(str(value) for value in argv))
+            flags = tuple(str(value) for value in argv[1:-1])
+            if flags == ('/headers', '/dependents'):
+                return RECORDED_PE_COMBINED  # OLD fails on SECTION HEADER #3
+            if flags == ('/headers',):
+                return RECORDED_PE_HEADERS
+            if flags == ('/dependents',):
+                return RECORDED_PE_DEPENDENTS
+            self.fail('Unexpected dumpbin command: ' + repr(argv))
+
+        runner = mock.Mock()
+        runner.run.side_effect = replay
+        with mock.patch.object(package, 'source_binding', return_value={'commit': 'a'*40, 'tree': 'b'*40}), \
+                mock.patch.object(package, 'admit_build'), mock.patch.object(package, 'Runner', return_value=runner):
+            result = package.stage(args)
+        self.assertEqual(result, args.destination)
+        expected = []
+        for target in package.TARGETS:
+            executable = str(args.build / 'Release' / (target + '.exe'))
+            expected.extend(((str(args.dumpbin), '/headers', executable),
+                             (str(args.dumpbin), '/dependents', executable)))
+        self.assertEqual(commands, expected)
+        info = json.loads((result / 'BuildInfo.json').read_text(encoding='utf-8'))
+        self.assertEqual(info['pe_imports'], {target: RECORDED_IMPORTS for target in package.TARGETS})
+        self.assertTrue((args.evidence / 'package-result.json').exists())
+        for relative, data in original.items():
+            self.assertEqual((content / relative).read_bytes(), data)
+            self.assertEqual((result / 'Content' / relative).read_bytes(), data)
+
+    def test_actual_separate_dumpbin_reports_retain_complete_inventory(self):
+        self.assertEqual(package.inspect_imports(RECORDED_PE_HEADERS + '\n' + RECORDED_PE_DEPENDENTS), RECORDED_IMPORTS)
+
+    def test_separate_reports_reject_missing_or_unparsed_pe_proof(self):
+        for headers, dependents in (
+                (RECORDED_PE_HEADERS, RECORDED_PE_DEPENDENTS.replace('WINMM.dll', 'custom runtime.dll')),
+                (RECORDED_PE_HEADERS, RECORDED_PE_DEPENDENTS.replace('WINMM.dll', 'MSVCP140.dll')),
+                (RECORDED_PE_HEADERS, RECORDED_PE_DEPENDENTS.replace('WINMM.dll', 'Summary.dll')),
+                (RECORDED_PE_HEADERS, RECORDED_PE_DEPENDENTS + RECORDED_PE_DEPENDENTS),
+                ('', RECORDED_PE_DEPENDENTS),
+                (RECORDED_PE_HEADERS.replace('8664 machine (x64)', '14C machine (x86)'), RECORDED_PE_DEPENDENTS),
+                (RECORDED_PE_HEADERS, RECORDED_PE_DEPENDENTS.replace('  Summary', ''))):
+            with self.subTest(headers=headers, dependents=dependents), self.assertRaises(package.PackageError):
+                package.inspect_imports(headers + '\n' + dependents)
 
 
 if __name__ == "__main__":

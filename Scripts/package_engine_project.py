@@ -317,7 +317,9 @@ def stage(args):
     for target in TARGETS:
         executable = build / "Release" / (target + ".exe")
         info = ordinary(executable)
-        pe[target] = inspect_imports(runner.run("imports-"+target, [dumpbin, "/headers", "/dependents", executable], cwd=source, timeout=30))
+        headers = runner.run("headers-"+target, [dumpbin, "/headers", executable], cwd=source, timeout=30)
+        dependents = runner.run("imports-"+target, [dumpbin, "/dependents", executable], cwd=source, timeout=30)
+        pe[target] = inspect_imports(headers + "\n" + dependents)
         executables.append(input_file(executable, executable.name))
     if source_binding(source) != original:
         raise PackageError("source changed during build; no package reserved")
