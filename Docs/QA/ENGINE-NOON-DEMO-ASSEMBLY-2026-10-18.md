@@ -85,3 +85,51 @@ Ready/current-Error boundary hypothesis. A separate owner prepares safe old
 fixtures in a new isolated packet; no result is claimed yet. The full combined
 all-target/native/package acceptance is still pending, and full workflow gate
 remains NOT PASSED. No clean-machine or24hour-soak claim is made.
+
+## Runtime-only native input and matrix admission
+
+The eight-path native-player commit is c381c4049fa241fb02d23ef1e7cffa04d0e35d4c,
+tree a2a8e86af2d9463ac3ac13e32eab817e6c64c568, based on creator5c9fb44. Its
+whole delta EF03FF00A249F47915B1365CE61A4A6FE57A92FE9E967162A1C20666445F2CDA
+matches the independently reviewed exact eight paths; production873F32E8...
+and native Tool1C189024... stayed unchanged through all gates. Debug/Release
+builds passed Game, old/new native players and four suites68cases each;
+safety3/3 and M1-M3 passed. A separate reviewed normal device-status diagnostic
+rebuilt old/new native targets in both configurations.
+
+Root staged the exact Debug56B2153F... and ReleaseC2CC35CE... binaries and whole
+Content beside each EXE in an exclusively new pilot directory containing spaces.
+Four actual supervised launches passed: both configurations no-argument defaults
+from unrelated cwd and both explicit cross-configuration Content roots plus the
+saved imported scene. Actual marker/box/ground, console device-active and F5
+reload were observed; Debug default and Release explicit maximize/restore were
+also checked. All four child/wrapper exits0, reaped/noTimeout, final windows and
+process inventories empty. Device availability does not establish audible
+content, and informal window-title FPS is not a fixed-workload measurement.
+The input QA retains exact binary hashes, intervals, PIDs and external receipts.
+DraftPR103 is published and attached; packaging/native legacy smokes remain
+separate combined gates.
+
+The normal merge encountered only adjacent top-level CMake blocks. Resolution
+retains the candidate's exact optional D3D11 block after the shared Runtime
+helper, then adds the incoming exact shared Win32Audio block. Incoming Game and
+legacy/new-player target definitions apply unchanged. The other seven paths
+remain byte-identical to c381c40. Independent resolution review is required
+before final merge and acceptance execution.
+
+That independent review completed CLEAN against HEAD60a908f plus incomingc381c40:
+exact eight-path staged delta A0B359EB3E3572565BE0FE7318E476F1E4A02197D2BFA182E244DD118131D608,
+treef32306f9b72ff9e35f22ea635b4cff686477f138. The reviewer independently rebuilt
+the combined CMake text from its candidate blocks plus incoming audio/target
+edits and confirmed byte-for-line equality; seven other incoming blobs match.
+Its physical CMake SHA256 is CB5FE9F933617C854EED6CC6F9F9C1EE97B2C2D4B03FC7A93631C5687A5490BB.
+No source execution occurred in review. Evidence is
+work/native-runtime-player-evidence/native-candidate-merge-review.receipt.json.
+
+The reviewed external CPU runner is work/run_noon_combined_cpu.py, SHA256
+66e0a72cfccea1609b9e3fde8651e919ac53e4b689b80db369771c69b97ecfc3. It binds the
+final clean HEAD/tree and complete source before/after, attributable short
+cache, two-job/no-node-reuse build, fresh8GiB per configuration, all targets,
+exact33 deterministic suites with RuntimeSmoke/GPU excluded, safety/M1-M3 and
+the16 packaging unit cases. Native and hardware execution require later slots.
+No complete matrix or package result is asserted by this admission record.
