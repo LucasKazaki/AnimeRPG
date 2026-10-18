@@ -144,7 +144,7 @@ treec98fb623ee88668788ae920819e97db475dd96a3, passed the complete native CPU
 matrix. All-target Debug/Release builds returned0 in30.234/70.531s. Both exact
 inventories selected33 deterministic CTest suites, all passed in106.828/7.219s.
 Seventeen self-registering engine suites totaled299 cases per configuration;
-the other16 are legacy suites. Safety3/3 passed in5.726s, milestones1â€“3 each0,
+the other16 are legacy suites. Safety3/3 passed in5.726s, milestones1–3 each0,
 and the then-current16 packaging controls passed. Fresh RAM was12.791/12.778/
 12.561GiB before configure/Debug/Release. All23 bounded recorded commands
 returned0/reaped without timeout. Full615-file/56-directory before/after source,
@@ -196,14 +196,14 @@ The independently verified editor reopen86cd91a normal-merged as034009c without
 conflicts after the8867 hardware source binding completed. Exactly its4 paths
 are adopted: two current-Error guards, six meaningful original/recovery fixtures
 and Task/QA. Four safe old failures/two controls preceded production. Component
-D/R five targets and four suites all passed (Editor30), safety3/M1â€“3; exact full
+D/R five targets and four suites all passed (Editor30), safety3/M1–3; exact full
 patch71a3b7c711ed3485d8e02241a85007b3be86a86fdcf1c427b8b37c0fb5099286.
 DraftPR104 is attached. The combined editor and real package still need the
 subsequent source-bound checks; earlier8867 acceptance does not validate new code.
 
 The separate four-path PE-format correction was independently reviewed against
 actual output. Its OLD unit reproduced the sameSECTION failure; final19 controls,
-safety3 and M1â€“3 passed with the parser/allowlist unchanged. The only production
+safety3 and M1–3 passed with the parser/allowlist unchanged. The only production
 change makes two real dumpbin calls and concatenates headers before dependents.
 Root is integrating that accepted packet before the next real package attempt.
 No mocked fixture constitutes a real package or native acceptance. Validation

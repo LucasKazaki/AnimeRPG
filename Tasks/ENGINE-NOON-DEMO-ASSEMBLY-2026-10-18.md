@@ -27,7 +27,7 @@ No installs, policy/workflow relaxation, game content, scheduler or history edit
 Record merge parents/conflicts and independently review each resolution against
 both input commits. Build all relevant targets in native Debug and Release with
 assertions active, exclusive resource admission, external short build paths,
-at most two jobs and 6â€“8GiB headroom. Run deterministic suites, safety/milestones,
+at most two jobs and 6–8GiB headroom. Run deterministic suites, safety/milestones,
 then separately serialize runtime/native/GPU checks. Exact argv, source/tree and
 actual exits/captures belong in external evidence and matching QA.
 
