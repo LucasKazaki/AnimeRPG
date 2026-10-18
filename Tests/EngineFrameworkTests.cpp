@@ -6,14 +6,18 @@
 #include "Engine/Framework/GameWorld.h"
 #include "Engine/Framework/Scene.h"
 #include "Engine/Graphics/SceneRenderer.h"
+#include "Engine/World/Components.h"
 #include "Tests/EngineTestSupport.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <string>
@@ -1122,6 +1126,671 @@ ASTRAL_TEST(PrefabBudgetFailureRetainsNestedAttemptedWatchesAndOutput) {
     serializer.Instantiate(document, world);
     ASTRAL_CHECK(world.Registry().AliveCount() == 2);
     std::filesystem::remove_all(root);
+}
+
+namespace {
+
+// Original verification fixture. File coordinates are glTF right-handed;
+// expected coordinates below are literal engine-space values, not values
+// generated with BuildSkeleton/BuildClip or the future scene-binding helper.
+const char* kImportedAnimationGltf = R"({
+"asset":{"version":"2.0","generator":"Astral original two-joint verification fixture"},
+"extensionsUsed":["KHR_materials_unlit"],
+"buffers":[{"uri":"TwoJointRibbon.bin","byteLength":492}],
+"bufferViews":[
+ {"buffer":0,"byteOffset":0,"byteLength":36,"target":34962},
+ {"buffer":0,"byteOffset":36,"byteLength":36,"target":34962},
+ {"buffer":0,"byteOffset":72,"byteLength":12,"target":34962},
+ {"buffer":0,"byteOffset":84,"byteLength":48,"target":34962},
+ {"buffer":0,"byteOffset":132,"byteLength":6,"target":34963},
+ {"buffer":0,"byteOffset":140,"byteLength":36,"target":34962},
+ {"buffer":0,"byteOffset":176,"byteLength":36,"target":34962},
+ {"buffer":0,"byteOffset":212,"byteLength":12,"target":34962},
+ {"buffer":0,"byteOffset":224,"byteLength":48,"target":34962},
+ {"buffer":0,"byteOffset":272,"byteLength":6,"target":34963},
+ {"buffer":0,"byteOffset":280,"byteLength":128},
+ {"buffer":0,"byteOffset":408,"byteLength":12},
+ {"buffer":0,"byteOffset":420,"byteLength":36},
+ {"buffer":0,"byteOffset":456,"byteLength":36}],
+"accessors":[
+ {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[-2,0,0],"max":[0,1,0]},
+ {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+ {"bufferView":2,"componentType":5121,"count":3,"type":"VEC4"},
+ {"bufferView":3,"componentType":5126,"count":3,"type":"VEC4"},
+ {"bufferView":4,"componentType":5123,"count":3,"type":"SCALAR"},
+ {"bufferView":5,"componentType":5126,"count":3,"type":"VEC3","min":[-2,1,0],"max":[0,2,0]},
+ {"bufferView":6,"componentType":5126,"count":3,"type":"VEC3"},
+ {"bufferView":7,"componentType":5121,"count":3,"type":"VEC4"},
+ {"bufferView":8,"componentType":5126,"count":3,"type":"VEC4"},
+ {"bufferView":9,"componentType":5123,"count":3,"type":"SCALAR"},
+ {"bufferView":10,"componentType":5126,"count":2,"type":"MAT4"},
+ {"bufferView":11,"componentType":5126,"count":3,"type":"SCALAR","min":[0],"max":[1]},
+ {"bufferView":12,"componentType":5126,"count":3,"type":"VEC3"},
+ {"bufferView":13,"componentType":5126,"count":3,"type":"VEC3"}],
+"materials":[
+ {"name":"Blue","pbrMetallicRoughness":{"baseColorFactor":[0.1,0.4,0.9,1]},"extensions":{"KHR_materials_unlit":{}}},
+ {"name":"Orange","pbrMetallicRoughness":{"baseColorFactor":[1,0.4,0.1,1]},"extensions":{"KHR_materials_unlit":{}}}],
+"meshes":[
+ {"name":"Ribbon","primitives":[
+   {"attributes":{"POSITION":0,"NORMAL":1,"JOINTS_0":2,"WEIGHTS_0":3},"indices":4,"material":0},
+   {"attributes":{"POSITION":5,"NORMAL":6,"JOINTS_0":7,"WEIGHTS_0":8},"indices":9,"material":1}]},
+ {"name":"Rigid","primitives":[{"attributes":{"POSITION":0,"NORMAL":1},"indices":4,"material":0}]}],
+"nodes":[
+ {"name":"RigSpace","translation":[0,3,0],"children":[1,3,4,5]},
+ {"name":"RootJoint","children":[2]},
+ {"name":"TipJoint","translation":[0,1,0]},
+ {"name":"BodyOne","mesh":0,"skin":0,"translation":[-2,0,0],"rotation":[0,0,-0.7071067811865476,0.7071067811865476]},
+ {"name":"BodyTwo","mesh":0,"skin":0,"translation":[-5,0,0]},
+ {"name":"RigidControl","mesh":1,"translation":[-8,0,0]}],
+"skins":[{"name":"ReverseSlots","joints":[2,1],"inverseBindMatrices":10}],
+"animations":[
+ {"name":"Raise","samplers":[{"input":11,"output":12,"interpolation":"LINEAR"}],"channels":[{"sampler":0,"target":{"node":2,"path":"translation"}}]},
+ {"name":"Bend","samplers":[{"input":11,"output":13,"interpolation":"LINEAR"}],"channels":[{"sampler":0,"target":{"node":2,"path":"translation"}}]}],
+"scenes":[{"name":"Verification","nodes":[0]}],"scene":0
+})";
+
+const char* kImportedAnimationScene = R"({"format":"astral-scene","version":1,
+"settings":{"gravity":[0,0,0]},"entities":[
+ {"name":"InstanceA","model":"TwoJointRibbon.gltf","components":{"Animator":{"speed":1}}},
+ {"name":"InstanceB","model":"TwoJointRibbon.gltf","transform":{"position":[10,0,0]},"components":{"Animator":{"speed":0.5}}}
+]})";
+
+void AppendImportedFloat(std::vector<std::uint8_t>& out, float value) {
+    static_assert(sizeof(float) == sizeof(std::uint32_t), "fixture requires Float32");
+    std::uint32_t bits{};
+    std::memcpy(&bits, &value, sizeof(bits));
+    for (int shift = 0; shift < 32; shift += 8)
+        out.push_back(static_cast<std::uint8_t>((bits >> shift) & 255u));
+}
+
+std::vector<std::uint8_t> ImportedAnimationBuffer() {
+    std::vector<std::uint8_t> out;
+    const float positions[2][9] = {{0,0,0, -2,0,0, 0,1,0}, {0,1,0, -2,1,0, 0,2,0}};
+    for (int primitive = 0; primitive < 2; ++primitive) {
+        ASTRAL_CHECK(out.size() == static_cast<std::size_t>(primitive * 140));
+        for (float v : positions[primitive]) AppendImportedFloat(out, v);
+        for (int vertex = 0; vertex < 3; ++vertex) {
+            AppendImportedFloat(out, 0); AppendImportedFloat(out, 0); AppendImportedFloat(out, 1);
+        }
+        for (int vertex = 0; vertex < 3; ++vertex) {
+            const int slot = primitive == 0 ? (vertex == 2 ? 0 : 1) : (vertex == 1 ? 1 : 0);
+            out.insert(out.end(), {static_cast<std::uint8_t>(slot), 0, 0, 0});
+        }
+        for (int vertex = 0; vertex < 3; ++vertex) {
+            AppendImportedFloat(out, 1); AppendImportedFloat(out, 0);
+            AppendImportedFloat(out, 0); AppendImportedFloat(out, 0);
+        }
+        out.insert(out.end(), {0,0, 2,0, 1,0, 0,0}); // ushort indices, then two alignment bytes
+    }
+    // Column-major glTF inverse binds, in skin-slot order: TipJoint, RootJoint.
+    // Their engine matrices are J_bind^-1 * M_BodyOne. Explicit constants keep
+    // the numeric witness independent from the engine's inverse implementation.
+    const float inverseBind[32] = {
+        0,-1,0,0, 1,0,0,0, 0,0,1,0, -2,-1,0,1,
+        0,-1,0,0, 1,0,0,0, 0,0,1,0, -2, 0,0,1};
+    for (float v : inverseBind) AppendImportedFloat(out, v);
+    const float times[3] = {0, 0.5f, 1};
+    const float raise[9] = {0,1,0, 0,2,0, 0,3,0};
+    const float bend[9] = {0,1,0, -1,1,0, -2,1,0};
+    for (float v : times) AppendImportedFloat(out, v);
+    for (float v : raise) AppendImportedFloat(out, v);
+    for (float v : bend) AppendImportedFloat(out, v);
+    ASTRAL_CHECK(out.size() == 492);
+    return out;
+}
+
+struct ImportedAnimationFixture {
+    std::filesystem::path root;
+    std::filesystem::path physicalRoot;
+    std::vector<std::filesystem::path> ownedFiles;
+
+    ImportedAnimationFixture() {
+        static unsigned sequence{};
+        const auto temp = std::filesystem::canonical(std::filesystem::temp_directory_path());
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        for (unsigned attempt = 0; attempt < 100; ++attempt) {
+            root = temp / ("astral-imported-animation-" + std::to_string(stamp) + "-" + std::to_string(++sequence));
+            std::error_code error;
+            if (std::filesystem::create_directory(root, error)) break;
+            ASTRAL_CHECK(!error || error == std::errc::file_exists);
+            root.clear();
+        }
+        ASTRAL_CHECK(!root.empty());
+        physicalRoot = std::filesystem::canonical(root);
+        ASTRAL_CHECK(physicalRoot.parent_path() == temp);
+        std::printf("[ IMPORTED_ANIMATION_FIXTURE ] %s\n", root.string().c_str());
+        std::fflush(stdout);
+        const auto binary = ImportedAnimationBuffer();
+        const std::string model(kImportedAnimationGltf), scene(kImportedAnimationScene);
+        Write("TwoJointRibbon.gltf", {model.begin(), model.end()});
+        Write("TwoJointRibbon.bin", binary);
+        Write("two-joint.scene.json", {scene.begin(), scene.end()});
+        Write("TwoJointRibbon.gltf.initial", {model.begin(), model.end()});
+        Write("TwoJointRibbon.bin.initial", binary);
+        Write("two-joint.scene.json.initial", {scene.begin(), scene.end()});
+    }
+
+    void Write(const char* filename, const std::vector<std::uint8_t>& bytes) {
+        const auto target = root / filename;
+        ASTRAL_CHECK(target.parent_path() == root && !std::filesystem::exists(target));
+        std::ofstream file(target, std::ios::binary | std::ios::trunc);
+        ASTRAL_CHECK(file && file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())));
+        file.close();
+        ASTRAL_CHECK(file.good());
+        ownedFiles.push_back(target);
+    }
+
+    ~ImportedAnimationFixture() {
+        // abort() on an OLD assertion retains the exact owned fixture. Normal
+        // completion removes only this ledger, never recursively unknown files.
+        ASTRAL_CHECK(std::filesystem::canonical(root) == physicalRoot);
+        for (const auto& file : ownedFiles) {
+            ASTRAL_CHECK(file.parent_path() == root);
+            ASTRAL_CHECK(std::filesystem::symlink_status(file).type() == std::filesystem::file_type::regular);
+            ASTRAL_CHECK(std::filesystem::remove(file));
+        }
+        ASTRAL_CHECK(std::filesystem::remove(root));
+    }
+};
+
+void CheckImportedAnimationSource(const Assets::GltfDocument& model) {
+    ASTRAL_CHECK(model.nodes.size() == 6 && model.meshes.size() == 2);
+    ASTRAL_CHECK(model.skins.size() == 1 && model.animations.size() == 2);
+    ASTRAL_CHECK(model.skins[0].joints == std::vector<int>({2, 1}));
+    ASTRAL_CHECK(model.skins[0].inverseBind.size() == 2);
+    ASTRAL_CHECK(model.meshes[0].primitives.size() == 2 && model.meshes[1].primitives.size() == 1);
+    ASTRAL_CHECK(model.nodes[3].skin == 0 && model.nodes[4].skin == 0);
+    ASTRAL_CHECK(model.nodes[3].mesh == 0 && model.nodes[4].mesh == 0);
+    ASTRAL_CHECK(model.animations[0].name == "Raise" && model.animations[1].name == "Bend");
+    ASTRAL_CHECK(model.animations[0].channels.size() == 1 && model.animations[0].channels[0].node == 2);
+    for (const auto& primitive : model.meshes[0].primitives) {
+        ASTRAL_CHECK(primitive.mesh.vertices.size() == 3 && primitive.mesh.skin.size() == 3);
+        ASTRAL_CHECK(primitive.mesh.indices.size() == 3);
+    }
+    ASTRAL_CHECK(model.meshes[0].primitives[0].mesh.skin[0].joints[0] == 1);
+    ASTRAL_CHECK(model.meshes[0].primitives[0].mesh.skin[2].joints[0] == 0);
+    ASTRAL_CHECK(model.meshes[1].primitives[0].mesh.skin.empty());
+}
+
+Vec3 ImportedBindVertex(int primitive, std::size_t vertex) {
+    const Vec3 expected[2][3] = {{{0,0,0}, {2,0,0}, {0,1,0}}, {{0,1,0}, {2,1,0}, {0,2,0}}};
+    ASTRAL_CHECK(primitive >= 0 && primitive < 2 && vertex < 3);
+    return expected[primitive][vertex];
+}
+
+bool ImportedTipVertex(int primitive, std::size_t vertex) {
+    return primitive == 0 ? vertex == 2 : vertex != 1;
+}
+
+Vec3 ImportedExpectedWorld(int primitive, std::size_t vertex, float time, float wrapperX = 0) {
+    const Vec3 bind = ImportedBindVertex(primitive, vertex);
+    // BodyOne bind M is T(2,3,0) * Rz(+90deg). Raise adds world +Y
+    // 2*time to tip-weighted vertices; BodyTwo has a different local inverse
+    // but the same skin/inverse-bind pair, hence the same document-space result.
+    return {wrapperX + 2 - bind.y, 3 + bind.x + (ImportedTipVertex(primitive, vertex) ? 2 * time : 0), 0};
+}
+
+Entity ImportedDescendant(const GameWorld& world, Entity parent, const std::string& name) {
+    for (Entity child : World::GetChildren(world.Registry(), parent)) {
+        const auto* label = world.Get<World::Name>(child);
+        if (label && label->value == name) return child;
+        const Entity found = ImportedDescendant(world, child, name);
+        if (!found.IsNull()) return found;
+    }
+    return {};
+}
+
+void CheckImportedRenderedVertices(const GameWorld& world, Entity entity, int primitive, float time, float wrapperX) {
+    const auto* renderer = world.Get<MeshRenderer>(entity);
+    ASTRAL_CHECK(renderer && renderer->mesh && renderer->mesh->vertices.size() == 3);
+    const TRS transform = world.GetWorld(entity);
+    for (std::size_t vertex = 0; vertex < 3; ++vertex) {
+        const Vec3 actual = Math::TransformPoint(transform, renderer->mesh->vertices[vertex].position);
+        ASTRAL_CHECK(Near(actual, ImportedExpectedWorld(primitive, vertex, time, wrapperX), 2e-4f));
+    }
+}
+
+} // namespace
+
+ASTRAL_TEST(ImportedAnimationFixtureConvertsWithIndependentCoordinates) {
+    ImportedAnimationFixture fixture;
+    Assets::AssetManager assets(fixture.root.string(), nullptr);
+    assets.RegisterDefaultLoaders();
+    const auto handle = assets.Load<Assets::GltfDocument>("TwoJointRibbon.gltf");
+    ASTRAL_CHECK(handle.Ready() && handle.Error().empty());
+    CheckImportedAnimationSource(*handle.Get());
+    Assets::GltfSkeletonBinding binding;
+    std::string error;
+    ASTRAL_CHECK(Assets::BuildSkeleton(*handle.Get(), 0, binding, error));
+    ASTRAL_CHECK(binding.nodeToJoint[1] == 0 && binding.nodeToJoint[2] == 1);
+    ASTRAL_CHECK(binding.skeleton.JointCount() == 2 && binding.skeleton.GetJoint(1).parent == 0);
+    Animation::AnimationClip raise = Assets::BuildClip(*handle.Get(), 0, binding);
+    Animation::AnimationClip bend = Assets::BuildClip(*handle.Get(), 1, binding);
+    ASTRAL_CHECK(raise.Validate(binding.skeleton, error) && bend.Validate(binding.skeleton, error));
+    Animation::Pose pose = Animation::Pose::Bind(binding.skeleton);
+    raise.Sample(0.5f, pose);
+    ASTRAL_CHECK(Near(pose.local[0].translation, {0,3,0}, 1e-5f));
+    ASTRAL_CHECK(Near(pose.local[1].translation, {0,2,0}, 1e-5f));
+    std::vector<Math::Mat4> matrices;
+    Animation::ComputeSkinMatrices(binding.skeleton, pose, matrices);
+    Math::Mat4 inverseOne, inverseTwo;
+    ASTRAL_CHECK(Math::Inverse(handle->WorldMatrix(3), inverseOne));
+    ASTRAL_CHECK(Math::Inverse(handle->WorldMatrix(4), inverseTwo));
+    for (int primitive = 0; primitive < 2; ++primitive) {
+        Graphics::MeshData remapped = handle->meshes[0].primitives[primitive].mesh;
+        // Test-only explicit swap for this exact reversed two-joint fixture.
+        // Do not call the future production binding/remapping helper.
+        for (auto& influence : remapped.skin) {
+            ASTRAL_CHECK(influence.joints[0] <= 1);
+            influence.joints[0] = static_cast<std::uint16_t>(1 - influence.joints[0]);
+        }
+        Graphics::MeshData result;
+        Animation::SkinMesh(remapped, matrices, result);
+        for (std::size_t vertex = 0; vertex < 3; ++vertex) {
+            const Vec3 world = ImportedExpectedWorld(primitive, vertex, 0.5f);
+            ASTRAL_CHECK(Near(result.vertices[vertex].position, world, 1e-5f));
+            // Literal inverse BodyOne: (world.y - 3, 2 - world.x, world.z).
+            const Vec3 localOne = Math::TransformPoint(inverseOne, result.vertices[vertex].position);
+            Vec3 expectedOne = ImportedBindVertex(primitive, vertex);
+            if (ImportedTipVertex(primitive, vertex)) expectedOne.x += 1;
+            ASTRAL_CHECK(Near(localOne, expectedOne, 1e-5f));
+            // BodyTwo is T(5,3,0), which must not reuse BodyOne's inverse.
+            const Vec3 localTwo = Math::TransformPoint(inverseTwo, result.vertices[vertex].position);
+            const Vec3 bind = ImportedBindVertex(primitive, vertex);
+            const Vec3 expectedTwo{-3 - bind.y, bind.x + (ImportedTipVertex(primitive, vertex) ? 1.0f : 0), 0};
+            ASTRAL_CHECK(Near(localTwo, expectedTwo, 1e-5f));
+        }
+    }
+    pose = Animation::Pose::Bind(binding.skeleton);
+    bend.Sample(0.5f, pose);
+    ASTRAL_CHECK(Near(pose.local[1].translation, {1,1,0}, 1e-5f));
+}
+
+ASTRAL_TEST(ImportedModelSceneBindsEveryPrimitiveAndOwnsPlayback) {
+    ImportedAnimationFixture fixture;
+    Assets::AssetManager assets(fixture.root.string(), nullptr);
+    assets.RegisterDefaultLoaders();
+    auto handle = assets.Load<Assets::GltfDocument>("TwoJointRibbon.gltf");
+    ASTRAL_CHECK(handle.Ready() && handle.Error().empty());
+    CheckImportedAnimationSource(*handle.Get());
+    const auto original = *handle.Get();
+    SceneSerializer serializer(&assets);
+    SceneDocument document;
+    std::string error;
+    const bool parsed = serializer.ParseFile("two-joint.scene.json", document, error);
+    if (!parsed) std::fprintf(stderr, "imported scene: %s\n", error.c_str());
+    ASTRAL_CHECK(parsed && document.entities.size() == 2);
+    GameWorld world;
+    serializer.Instantiate(document, world);
+    const Entity instances[] = {world.Find("InstanceA"), world.Find("InstanceB")};
+    std::vector<Entity> parts;
+    for (Entity instance : instances) {
+        ASTRAL_CHECK(!instance.IsNull());
+        for (const char* name : {"BodyOne", "BodyOne.primitive1", "BodyTwo", "BodyTwo.primitive1"}) {
+            const Entity entity = ImportedDescendant(world, instance, name);
+            ASTRAL_CHECK(!entity.IsNull());
+            const auto* renderer = world.Get<MeshRenderer>(entity);
+            ASTRAL_CHECK(renderer && renderer->mesh && renderer->mesh->vertices.size() == 3);
+            parts.push_back(entity);
+        }
+        const Entity rigid = ImportedDescendant(world, instance, "RigidControl");
+        ASTRAL_CHECK(!rigid.IsNull() && world.Get<MeshRenderer>(rigid));
+        ASTRAL_CHECK(!world.Get<AnimatorComponent>(rigid));
+    }
+    ASTRAL_CHECK(parts.size() == 8);
+    // Check the still-cached source before Collect could reload clean bytes
+    // and hide an in-place mutation during scene binding.
+    for (std::size_t primitive = 0; primitive < 2; ++primitive) {
+        const auto& before = original.meshes[0].primitives[primitive].mesh;
+        const auto& cached = handle->meshes[0].primitives[primitive].mesh;
+        for (std::size_t vertex = 0; vertex < 3; ++vertex) {
+            ASTRAL_CHECK(Near(before.vertices[vertex].position, cached.vertices[vertex].position, 0));
+            ASTRAL_CHECK(before.skin[vertex].joints == cached.skin[vertex].joints);
+            ASTRAL_CHECK(before.skin[vertex].weights == cached.skin[vertex].weights);
+        }
+    }
+    std::vector<Graphics::MeshData> bindSnapshots;
+    for (Entity entity : parts) {
+        const auto* bound = world.Get<AnimatorComponent>(entity);
+        // OLD must stop here: never dereference the absent imported binding.
+        ASTRAL_CHECK(bound != nullptr);
+        ASTRAL_CHECK(bound->skeleton && bound->machine && bound->bindMesh);
+        bindSnapshots.push_back(*bound->bindMesh);
+    }
+    document = {}; // instantiated bindings must own all conversion resources
+    handle = {};
+    assets.Collect();
+    world.Tick(0);
+    for (std::size_t part = 0; part < parts.size(); ++part)
+        CheckImportedRenderedVertices(world, parts[part], static_cast<int>(part % 2), 0, part < 4 ? 0.0f : 10.0f);
+    Run(world, 0.5f, 0.25f);
+    for (std::size_t part = 0; part < parts.size(); ++part) {
+        CheckImportedRenderedVertices(world, parts[part], static_cast<int>(part % 2), part < 4 ? 0.5f : 0.25f,
+            part < 4 ? 0.0f : 10.0f);
+        const auto* animator = world.Get<AnimatorComponent>(parts[part]);
+        ASTRAL_CHECK(animator && animator->animator && animator->skinned);
+        ASTRAL_CHECK(animator->bindMesh && animator->bindMesh->vertices.size() == bindSnapshots[part].vertices.size());
+        for (std::size_t vertex = 0; vertex < animator->bindMesh->vertices.size(); ++vertex)
+            ASTRAL_CHECK(Near(animator->bindMesh->vertices[vertex].position, bindSnapshots[part].vertices[vertex].position, 0));
+        for (std::size_t prior = 0; prior < part; ++prior) {
+            const auto* other = world.Get<AnimatorComponent>(parts[prior]);
+            ASTRAL_CHECK(animator->animator != other->animator && animator->skinned != other->skinned);
+        }
+    }
+    const auto current = assets.Load<Assets::GltfDocument>("TwoJointRibbon.gltf");
+    ASTRAL_CHECK(current.Ready() && current.Error().empty());
+    for (std::size_t primitive = 0; primitive < 2; ++primitive) {
+        const auto& before = original.meshes[0].primitives[primitive].mesh;
+        const auto& after = current->meshes[0].primitives[primitive].mesh;
+        for (std::size_t vertex = 0; vertex < 3; ++vertex) {
+            ASTRAL_CHECK(Near(before.vertices[vertex].position, after.vertices[vertex].position, 0));
+            ASTRAL_CHECK(before.skin[vertex].joints == after.skin[vertex].joints);
+            ASTRAL_CHECK(before.skin[vertex].weights == after.skin[vertex].weights);
+        }
+    }
+}
+
+namespace {
+void ReplaceImportedFile(const ImportedAnimationFixture& fixture, const char* name, const std::vector<std::uint8_t>& bytes) {
+    const auto path = fixture.root / name;
+    ASTRAL_CHECK(std::filesystem::canonical(fixture.root) == fixture.physicalRoot);
+    ASTRAL_CHECK(std::find(fixture.ownedFiles.begin(), fixture.ownedFiles.end(), path) != fixture.ownedFiles.end());
+    ASTRAL_CHECK(std::filesystem::symlink_status(path).type() == std::filesystem::file_type::regular);
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    ASTRAL_CHECK(file && file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())));
+    file.close(); ASTRAL_CHECK(file.good());
+}
+void ReplaceImportedModel(const ImportedAnimationFixture& fixture, const JsonValue& model) {
+    const auto text = Core::WriteJson(model);
+    ReplaceImportedFile(fixture, "TwoJointRibbon.gltf", {text.begin(), text.end()});
+}
+JsonValue* ImportedJsonNode(JsonValue& node, const std::string& name) {
+    if (node.String("name") == name) return &node;
+    for (const char* key : {"entities", "children"}) if (auto* array = node.Find(key))
+        for (auto& child : array->Items()) if (auto* found = ImportedJsonNode(child, name)) return found;
+    return nullptr;
+}
+JsonValue& ImportedAnimatorJson(JsonValue& scene, const char* name) {
+    auto* node = ImportedJsonNode(scene, name);
+    ASTRAL_CHECK(node && node->Find("components") && node->Find("components")->Find("Animator"));
+    return *node->Find("components")->Find("Animator");
+}
+SceneDocument ImportedParse(SceneSerializer& serializer, const JsonValue& json) {
+    SceneDocument document; std::string error;
+    const bool parsed = serializer.Parse(json, document, error);
+    if (!parsed) std::fprintf(stderr, "imported variant: %s\n", error.c_str());
+    ASTRAL_CHECK(parsed); return document;
+}
+}
+
+ASTRAL_TEST(ImportedAnimationInitialPosePreservesBehaviourLifecycle) {
+    ImportedAnimationFixture fixture;
+    Assets::AssetManager assets(fixture.root.string(), nullptr); assets.RegisterDefaultLoaders();
+    RegisterTestBehaviours(); Log().clear();
+    JsonValue json = ParseText(kImportedAnimationScene);
+    auto* root = ImportedJsonNode(json, "InstanceA");
+    JsonValue behaviours = JsonValue::MakeArray();
+    auto recorder = JsonValue::MakeObject(); recorder.Set("type", "Recorder"); recorder.Set("tag", "initial");
+    behaviours.Append(recorder); root->Set("behaviours", behaviours);
+    root->Find("components")->Set("ParticleSystem", ParseText(R"({"playOnStart":true})"));
+    root->Find("components")->Set("AudioSource", ParseText(R"({"playOnStart":true})"));
+    SceneSerializer serializer(&assets); const auto document = ImportedParse(serializer, json);
+    GameWorld world; serializer.Instantiate(document, world);
+    ASTRAL_CHECK(world.Time() == 0 && world.Frame() == 0);
+    ASTRAL_CHECK(Log() == std::vector<std::string>({"initial:create"}));
+    const Entity instance = world.Find("InstanceA");
+    ASTRAL_CHECK(!world.Get<ParticleSystem>(instance)->started && !world.Get<AudioSource>(instance)->started);
+    for (const char* name : {"BodyOne", "BodyOne.primitive1", "BodyTwo", "BodyTwo.primitive1"})
+        CheckImportedRenderedVertices(world, ImportedDescendant(world, instance, name), std::string(name).find("primitive1") != std::string::npos, 0, 0);
+    world.Tick(0);
+    ASTRAL_CHECK(std::find(Log().begin(), Log().end(), "initial:start") != Log().end());
+}
+
+ASTRAL_TEST(ImportedAnimationFlattenedControllerRoundTrips) {
+    ImportedAnimationFixture fixture;
+    Assets::AssetManager assets(fixture.root.string(), nullptr); assets.RegisterDefaultLoaders();
+    SceneSerializer serializer(&assets); GameWorld original;
+    serializer.Instantiate(ImportedParse(serializer, ParseText(kImportedAnimationScene)), original);
+    auto flat = serializer.Save(original);
+    auto* root = ImportedJsonNode(flat, "InstanceA");
+    ASTRAL_CHECK(root && !root->Has("model"));
+    ASTRAL_CHECK(ImportedAnimatorJson(flat, "InstanceA")["binding"].String("role") == "controller");
+    auto& part = ImportedAnimatorJson(flat, "BodyOne");
+    ASTRAL_CHECK(part.Size() == 1 && part["binding"].Int("node") == 3 && part["binding"].Int("skin") == 0);
+    ASTRAL_CHECK(part["binding"]["meshBind"][12].AsNumber() == 0 && part["binding"]["meshBind"][15].AsNumber() == 1);
+    GameWorld restored; serializer.Instantiate(ImportedParse(serializer, flat), restored);
+    const Entity instance = restored.Find("InstanceA");
+    CheckImportedRenderedVertices(restored, ImportedDescendant(restored, instance, "BodyTwo"), 0, 0, 0);
+    ImportedAnimatorJson(flat, "InstanceA").Set("clip", "Bend");
+    ImportedAnimatorJson(flat, "InstanceA").Set("speed", 0.5);
+    GameWorld edited; serializer.Instantiate(ImportedParse(serializer, flat), edited);
+    Run(edited, 0.5f, 0.25f);
+    const Entity body = ImportedDescendant(edited, edited.Find("InstanceA"), "BodyOne");
+    const auto* renderer = edited.Get<MeshRenderer>(body);
+    const Vec3 tip = Math::TransformPoint(edited.GetWorld(body), renderer->mesh->vertices[2].position);
+    ASTRAL_CHECK(Near(tip, {1.5f,3,0}, 2e-4f)); // Bend +X0.5 at local time .25
+    CheckImportedRenderedVertices(edited, ImportedDescendant(edited, edited.Find("InstanceB"), "BodyTwo"), 0, 0.25f, 10);
+}
+
+ASTRAL_TEST(ImportedAnimationBindingValidationIsTransactional) {
+    ImportedAnimationFixture fixture;
+    Assets::AssetManager assets(fixture.root.string(), nullptr); assets.RegisterDefaultLoaders();
+    SceneSerializer serializer(&assets); GameWorld world;
+    serializer.Instantiate(ImportedParse(serializer, ParseText(kImportedAnimationScene)), world);
+    const JsonValue flat = serializer.Save(world);
+    const std::vector<std::function<void(JsonValue&)>> mutations = {
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Set("node",99); },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Set("node",3.5); },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Set("role","unknown"); },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Set("skin",99); },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Set("mesh",1); },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Set("primitive",99); },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Set("model","missing.gltf"); },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Set("unknown",true); },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Set("speed",2); },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Find("meshBind")->Items()[12] = 0.125; },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Find("meshBind")->Items().pop_back(); },
+        [](auto& j) { for (int i=0;i<4;++i) ImportedAnimatorJson(j,"BodyOne").Find("binding")->Find("meshBind")->Items()[i] = 0; },
+        [](auto& j) { ImportedAnimatorJson(j,"BodyOne").Find("binding")->Find("meshBind")->Items()[0] = std::numeric_limits<double>::max(); },
+        [](auto& j) { ImportedAnimatorJson(j,"InstanceA").Set("applyRootMotion",true); },
+        [](auto& j) { ImportedJsonNode(j,"BodyOne")->Find("components")->Find("MeshRenderer")->Set("autoLod",true); },
+        [](auto& j) { ImportedJsonNode(j,"BodyOne")->Find("components")->Find("MeshRenderer")->Set("mesh","TwoJointRibbon.gltf#0.1"); },
+        [](auto& j) { ImportedJsonNode(j,"BodyOne")->Find("components")->Set("Collider",ParseText(R"({"shape":"Mesh"})")); },
+        [](auto& j) { ImportedJsonNode(j,"InstanceA")->Find("components")->Erase("Animator"); },
+    };
+    for (const auto& mutate : mutations) {
+        auto bad = flat; mutate(bad);
+        SceneDocument retained; retained.entities.emplace_back(); retained.entities[0].name = "Retained";
+        std::string error;
+        ASTRAL_CHECK(!serializer.Parse(bad, retained, error) && !error.empty());
+        ASTRAL_CHECK(retained.entities.size() == 1 && retained.entities[0].name == "Retained");
+    }
+}
+
+ASTRAL_TEST(ImportedAnimationNamedAndUnnamedClipSelection) {
+    ImportedAnimationFixture fixture;
+    Assets::AssetManager assets(fixture.root.string(), nullptr); assets.RegisterDefaultLoaders();
+    SceneSerializer serializer(&assets);
+    auto named = ParseText(kImportedAnimationScene); ImportedAnimatorJson(named,"InstanceA").Set("clip","Raise");
+    auto source = ParseText(kImportedAnimationGltf);
+    std::swap(source.Find("animations")->Items()[0], source.Find("animations")->Items()[1]);
+    ReplaceImportedModel(fixture, source);
+    auto document = ImportedParse(serializer, named);
+    ASTRAL_CHECK(document.entities[0].importedAnimator->owner->animation == 1);
+    source.Find("animations")->Items().pop_back(); ReplaceImportedModel(fixture,source); ASTRAL_CHECK(assets.Reload("TwoJointRibbon.gltf"));
+    std::string error;
+    const auto retained = document.entities[0].importedAnimator;
+    ASTRAL_CHECK(!serializer.Parse(named,document,error));
+    ASTRAL_CHECK(document.entities[0].importedAnimator == retained);
+    source = ParseText(kImportedAnimationGltf); source.Find("animations")->Items()[0].Erase("name");
+    ReplaceImportedModel(fixture,source); ASTRAL_CHECK(assets.Reload("TwoJointRibbon.gltf"));
+    GameWorld automatic;
+    serializer.Instantiate(ImportedParse(serializer,ParseText(kImportedAnimationScene)),automatic);
+    auto flat = serializer.Save(automatic);
+    ASTRAL_CHECK(ImportedAnimatorJson(flat,"InstanceA").String("clip").empty());
+    GameWorld restored; serializer.Instantiate(ImportedParse(serializer,flat),restored);
+    Run(restored,0.5f,0.25f);
+    CheckImportedRenderedVertices(restored,ImportedDescendant(restored,restored.Find("InstanceA"),"BodyOne"),0,0.5f,0);
+    source = ParseText(kImportedAnimationGltf); source.Find("animations")->Items()[1].Set("name","Raise");
+    ReplaceImportedModel(fixture,source); ASTRAL_CHECK(assets.Reload("TwoJointRibbon.gltf"));
+    ASTRAL_CHECK(!serializer.Parse(named,document,error));
+    ASTRAL_CHECK(serializer.Parse(ParseText(kImportedAnimationScene),document,error)); // automatic duplicate name remains unpinned
+    source = ParseText(kImportedAnimationGltf);
+    source.Find("animations")->Items()[0].Find("channels")->Items()[0].Find("target")->Set("node",0);
+    ReplaceImportedModel(fixture,source); ASTRAL_CHECK(assets.Reload("TwoJointRibbon.gltf"));
+    ASTRAL_CHECK(!serializer.Parse(ParseText(kImportedAnimationScene),document,error));
+}
+
+ASTRAL_TEST(ImportedAnimationTwoSkinsStayIndependent) {
+    ImportedAnimationFixture fixture;
+    auto source = ParseText(kImportedAnimationGltf);
+    auto binary = ImportedAnimationBuffer();
+    const float extraInverse[32] = {0,-1,0,0, 1,0,0,0, 0,0,1,0, -4,-1,0,1,
+                                  0,-1,0,0, 1,0,0,0, 0,0,1,0, -4,0,0,1};
+    for (float value : extraInverse) AppendImportedFloat(binary,value);
+    source.Find("buffers")->Items()[0].Set("byteLength",620);
+    source.Find("bufferViews")->Append(ParseText(R"({"buffer":0,"byteOffset":492,"byteLength":128})"));
+    source.Find("accessors")->Append(ParseText(R"({"bufferView":14,"componentType":5126,"count":2,"type":"MAT4"})"));
+    JsonValue skin = source["skins"][0]; skin.Set("inverseBindMatrices",14); source.Find("skins")->Append(skin);
+    source.Find("skins")->Items()[1].Set("joints",ParseText("[7,6]"));
+    source.Find("nodes")->Append(ParseText(R"({"name":"IndependentRoot","children":[7]})"));
+    source.Find("nodes")->Append(ParseText(R"({"name":"IndependentTip","translation":[0,1,0]})"));
+    source.Find("nodes")->Items()[0].Find("children")->Append(6);
+    source.Find("nodes")->Items()[4].Set("skin",1);
+    ReplaceImportedFile(fixture,"TwoJointRibbon.bin",binary); ReplaceImportedModel(fixture,source);
+    Assets::AssetManager assets(fixture.root.string(),nullptr); assets.RegisterDefaultLoaders();
+    SceneSerializer serializer(&assets); GameWorld world;
+    serializer.Instantiate(ImportedParse(serializer,ParseText(kImportedAnimationScene)),world);
+    Run(world,0.5f,0.25f);
+    const Entity a=world.Find("InstanceA");
+    const auto* first=world.Get<AnimatorComponent>(ImportedDescendant(world,a,"BodyOne"));
+    const auto* second=world.Get<AnimatorComponent>(ImportedDescendant(world,a,"BodyTwo"));
+    ASTRAL_CHECK(first && second && first->skeleton != second->skeleton);
+    CheckImportedRenderedVertices(world,ImportedDescendant(world,a,"BodyOne"),0,0.5f,0);
+    const Entity body=ImportedDescendant(world,a,"BodyTwo");
+    const auto* renderer=world.Get<MeshRenderer>(body);
+    for (std::size_t vertex=0;vertex<3;++vertex) {
+        Vec3 expected=ImportedExpectedWorld(0,vertex,0); expected.x+=2; // untargeted second skin stays bound
+        ASTRAL_CHECK(Near(Math::TransformPoint(world.GetWorld(body),renderer->mesh->vertices[vertex].position),expected,2e-4f));
+    }
+}
+
+ASTRAL_TEST(ImportedAnimationNestedModelsUseNearestController) {
+    ImportedAnimationFixture fixture;
+    Assets::AssetManager assets(fixture.root.string(),nullptr); assets.RegisterDefaultLoaders();
+    auto scene=ParseText(kImportedAnimationScene);
+    auto nested=scene["entities"][1]; nested.Set("name","NestedB");
+    nested.Find("components")->Find("Animator")->Set("clip","Bend");
+    auto rigid=nested; rigid.Set("name","StaticNested"); rigid.Erase("components");
+    auto children=JsonValue::MakeArray(); children.Append(nested); children.Append(rigid);
+    scene.Find("entities")->Items()[0].Set("children",children);
+    SceneSerializer serializer(&assets); GameWorld world;
+    serializer.Instantiate(ImportedParse(serializer,scene),world);
+    Run(world,0.5f,0.25f);
+    const Entity parent=world.Find("InstanceA");
+    const Entity child=ImportedDescendant(world,parent,"NestedB");
+    const Entity body=ImportedDescendant(world,child,"BodyOne");
+    const auto* animator=world.Get<AnimatorComponent>(body);
+    ASTRAL_CHECK(animator && animator->importedController==child);
+    ASTRAL_CHECK(animator->importedOwner!=world.Get<AnimatorComponent>(parent)->importedOwner);
+    const auto* renderer=world.Get<MeshRenderer>(body);
+    ASTRAL_CHECK(Near(Math::TransformPoint(world.GetWorld(body),renderer->mesh->vertices[2].position),{11.5f,3,0},2e-4f));
+    const Entity staticRoot=ImportedDescendant(world,parent,"StaticNested");
+    ASTRAL_CHECK(!world.Get<AnimatorComponent>(ImportedDescendant(world,staticRoot,"BodyOne")));
+    CheckImportedRenderedVertices(world,ImportedDescendant(world,parent,"BodyOne"),0,0.5f,0);
+}
+
+namespace {
+std::string ImportedNonuniformNormalModelText() {
+    std::string model(kImportedAnimationGltf);
+    const std::string marker = R"({"name":"BodyOne","mesh":0,"skin":0,)";
+    const auto position = model.find(marker);
+    ASTRAL_CHECK(position != std::string::npos && model.find(marker, position + 1) == std::string::npos);
+    model.insert(position + marker.size(), R"("scale":[2,3,4],)");
+    return model;
+}
+std::vector<std::uint8_t> ImportedNonuniformNormalBuffer() {
+    auto bytes = ImportedAnimationBuffer();
+    const float rawNormal[3] = {-2.0f / 7, 3.0f / 7, 6.0f / 7};
+    for (std::size_t offset : {std::size_t(36), std::size_t(176)}) {
+        for (std::size_t vertex = 0; vertex < 3; ++vertex) for (std::size_t axis = 0; axis < 3; ++axis) {
+            std::uint32_t bits{};
+            std::memcpy(&bits, &rawNormal[axis], sizeof(bits));
+            for (std::size_t byte = 0; byte < 4; ++byte)
+                bytes[offset + vertex * 12 + axis * 4 + byte] = static_cast<std::uint8_t>((bits >> (byte * 8)) & 0xff);
+        }
+    }
+    return bytes;
+}
+}
+
+ASTRAL_TEST(ImportedAnimationNonuniformMeshNormalMatchesWorld) {
+    ImportedAnimationFixture fixture;
+    const auto model = ImportedNonuniformNormalModelText();
+    ReplaceImportedFile(fixture, "TwoJointRibbon.bin", ImportedNonuniformNormalBuffer());
+    ReplaceImportedFile(fixture, "TwoJointRibbon.gltf", {model.begin(), model.end()});
+    Assets::AssetManager assets(fixture.root.string(), nullptr); assets.RegisterDefaultLoaders();
+    SceneSerializer serializer(&assets); GameWorld world;
+    serializer.Instantiate(ImportedParse(serializer, ParseText(kImportedAnimationScene)), world);
+    ASTRAL_CHECK(world.Time() == 0 && world.Frame() == 0);
+    const Entity body = ImportedDescendant(world, world.Find("InstanceA"), "BodyOne");
+    const auto* renderer = world.Get<MeshRenderer>(body);
+    const auto* bound = world.Get<AnimatorComponent>(body);
+    ASTRAL_CHECK(bound && bound->animator && renderer && renderer->mesh && renderer->mesh->vertices.size() == 3);
+    CheckImportedRenderedVertices(world, body, 0, 0, 0); // the mesh frame must still cancel for positions
+    Math::Mat4 inverseWorld;
+    ASTRAL_CHECK(Math::Inverse(world.Get<World::WorldTransform>(body)->matrix, inverseWorld));
+    const Vec3 localNormal = renderer->mesh->vertices[0].normal;
+    ASTRAL_CHECK(Math::IsFinite(localNormal) && Math::Length(localNormal) > 0.5f);
+    const Vec3 worldNormal = Math::Normalize(Math::TransformVector(Math::Transpose(inverseWorld), localNormal));
+    const Vec3 expectedWorldNormal{-3.0f / 7, 2.0f / 7, 6.0f / 7};
+    std::printf("[ IMPORTED_NORMAL_WITNESS ] world=(%.9g,%.9g,%.9g) expected=(-3/7,2/7,6/7) local=(%.9g,%.9g,%.9g)\n",
+        worldNormal.x, worldNormal.y, worldNormal.z, localNormal.x, localNormal.y, localNormal.z);
+    std::fflush(stdout);
+    ASTRAL_CHECK(Near(worldNormal, expectedWorldNormal, 2e-4f)); // first safe OLD-normal numeric rejection
+    ASTRAL_CHECK(Near(localNormal, Math::Normalize(Vec3{4,9,24}), 2e-4f));
+    const Entity part = ImportedDescendant(world, world.Find("InstanceA"), "BodyOne.primitive1");
+    CheckImportedRenderedVertices(world, part, 1, 0, 0);
+    for (Entity entity : {body, part}) for (const auto& vertex : world.Get<MeshRenderer>(entity)->mesh->vertices)
+        ASTRAL_CHECK(Near(vertex.normal, Math::Normalize(Vec3{4,9,24}), 2e-4f));
+}
+
+ASTRAL_TEST(ImportedAnimationHelperNormalBlendHasDocumentFallback) {
+    for (int mode = 0; mode < 3; ++mode) {
+        auto skeleton = std::make_shared<Animation::Skeleton>();
+        skeleton->AddJoint("first", -1, {}); skeleton->AddJoint("second", -1, {});
+        skeleton->ComputeBindMatrices();
+        Animation::AnimationClip clip;
+        const Vec3 firstScale = mode == 0 ? Vec3{1,1,1} : mode == 1 ? Vec3{1,2,1} : Vec3{0,1,1};
+        const Vec3 secondScale = mode == 0 ? Vec3{1,1,1} : mode == 1 ? Vec3{2,1,1} : Vec3{0,1,1};
+        clip.AddKey(0, 0, {{}, {}, firstScale}); clip.AddKey(1, 0, {{}, {}, secondScale});
+        auto machine = std::make_shared<Animation::AnimStateMachine>();
+        machine->AddState({"normal-control", &clip});
+        auto bind = std::make_shared<Graphics::MeshData>();
+        for (Vec3 position : {Vec3{1,1,1}, Vec3{2,1,1}, Vec3{1,2,1}}) {
+            Graphics::Vertex vertex; vertex.position = position; vertex.normal = {2.0f/7,3.0f/7,6.0f/7};
+            bind->vertices.push_back(vertex);
+            Graphics::SkinInfluence influence; influence.joints = {0,1,0,0}; influence.weights = {0.25f,0.75f,0,0};
+            bind->skin.push_back(influence);
+        }
+        bind->indices = {0,1,2}; bind->ComputeBounds();
+        AnimatorComponent component; component.skeleton = skeleton; component.machine = machine; component.bindMesh = bind;
+        component.binding.role = ImportedAnimatorRole::Primitive;
+        component.binding.meshBind = Math::Scaling({2,3,4});
+        component.modelToMesh = Math::Scaling({0.5f,1.0f/3,0.25f});
+        component.animator = std::make_shared<Animation::Animator>(*skeleton, *machine);
+        MeshRenderer renderer; PublishImportedAnimationMesh(component, renderer);
+        ASTRAL_CHECK(renderer.mesh && renderer.mesh->vertices.size() == 3);
+        const Vec3 actualLocal = renderer.mesh->vertices[0].normal;
+        ASTRAL_CHECK(Math::IsFinite(actualLocal) && Math::Length(actualLocal) > 0.5f);
+        const Vec3 actualWorld = Math::Normalize(Math::TransformVector(component.modelToMesh, actualLocal)); // diagonal B^-T
+        const Vec3 expectedWorld = Math::Normalize(mode == 1 ? Vec3{10,21,48} : Vec3{2,3,6});
+        const Vec3 expectedLocal = Math::Normalize(mode == 1 ? Vec3{20,63,192} : Vec3{4,9,24});
+        ASTRAL_CHECK(Near(actualWorld, expectedWorld, 2e-4f) && Near(actualLocal, expectedLocal, 2e-4f));
+        const Vec3 position = Math::TransformPoint(component.binding.meshBind, renderer.mesh->vertices[0].position);
+        const Vec3 expectedPosition = mode == 0 ? Vec3{1,1,1} : mode == 1 ? Vec3{1.75f,1.25f,1} : Vec3{0,1,1};
+        ASTRAL_CHECK(Near(position, expectedPosition, 2e-4f));
+    }
 }
 
 ASTRAL_TEST_MAIN("EngineFrameworkTests")

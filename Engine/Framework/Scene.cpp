@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstddef>
 #include <functional>
+#include <limits>
 #include <utility>
 
 namespace Astral::Framework {
@@ -184,6 +185,71 @@ struct SceneSerializer::ParseState {
     }
 };
 
+namespace {
+
+JsonValue AnimatorPlayback(JsonValue fields) { fields.Erase("binding"); return fields; }
+
+bool AffineInverse(const Mat4& matrix, Mat4& inverse) {
+    for (const auto& row : matrix.m) for (float value : row) if (!std::isfinite(value)) return false;
+    if (matrix.m[3][0] != 0 || matrix.m[3][1] != 0 || matrix.m[3][2] != 0 || matrix.m[3][3] != 1) return false;
+    if (!Inverse(matrix, inverse)) return false;
+    for (const auto& row : inverse.m) for (float value : row) if (!std::isfinite(value)) return false;
+    return true;
+}
+
+bool ReadAnimatorBinding(const JsonValue& json, ImportedAnimatorBinding& binding, std::string& error,
+    const std::string& path) {
+    if (!json.IsObject()) return Fail(error, path, "must be an object");
+    const std::string role = json.String("role");
+    if (role != "controller" && role != "primitive") return Fail(error, path, "role must be controller or primitive");
+    const bool primitive = role == "primitive";
+    for (const auto& key : json.Keys()) {
+        if (key != "role" && key != "model" && !(primitive && (key == "node" || key == "skin" || key == "mesh"
+            || key == "primitive" || key == "meshBind"))) return Fail(error, Join(path, key), "unknown binding field");
+    }
+    if (!json["model"].IsString() || json.String("model").empty() || json.String("model").find('#') != std::string::npos)
+        return Fail(error, Join(path, "model"), "needs a model content path without a fragment");
+    binding.role = primitive ? ImportedAnimatorRole::Primitive : ImportedAnimatorRole::Controller;
+    binding.model = json.String("model");
+    if (!primitive) return true;
+    const char* names[] = {"node", "skin", "mesh", "primitive"};
+    int* destinations[] = {&binding.node, &binding.skin, &binding.mesh, &binding.primitive};
+    for (int i = 0; i < 4; ++i) {
+        const auto& value = json[names[i]];
+        const auto index = value.AsInt(-1);
+        if (!value.IsNumber() || index < 0 || index > std::numeric_limits<int>::max())
+            return Fail(error, Join(path, names[i]), "must be a nonnegative bounded integer");
+        *destinations[i] = static_cast<int>(index);
+    }
+    const auto& frame = json["meshBind"];
+    if (!frame.IsArray() || frame.Size() != 16) return Fail(error, path, "meshBind needs sixteen row-major numbers");
+    for (std::size_t i = 0; i < 16; ++i) {
+        const double value = frame[i].AsNumber(std::numeric_limits<double>::quiet_NaN());
+        if (!std::isfinite(value) || std::fabs(value) > std::numeric_limits<float>::max())
+            return Fail(error, path, "meshBind needs finite Float32 numbers");
+        if (i >= 12 && value != (i == 15 ? 1.0 : 0.0)) return Fail(error, path, "meshBind must be affine");
+        binding.meshBind.m[i / 4][i % 4] = static_cast<float>(value);
+    }
+    Mat4 inverse;
+    return AffineInverse(binding.meshBind, inverse) || Fail(error, path, "meshBind must be finite, affine and invertible");
+}
+
+JsonValue AnimatorBindingJson(const ImportedAnimatorBinding& binding) {
+    JsonValue json = JsonValue::MakeObject();
+    json.Set("role", binding.role == ImportedAnimatorRole::Controller ? "controller" : "primitive");
+    json.Set("model", binding.model);
+    if (binding.role == ImportedAnimatorRole::Primitive) {
+        json.Set("node", binding.node); json.Set("skin", binding.skin);
+        json.Set("mesh", binding.mesh); json.Set("primitive", binding.primitive);
+        JsonValue matrix = JsonValue::MakeArray();
+        for (const auto& row : binding.meshBind.m) for (float value : row) matrix.Append(value);
+        json.Set("meshBind", matrix);
+    }
+    return json;
+}
+
+} // namespace
+
 SceneSerializer::SceneSerializer(Assets::AssetManager* assets, const BehaviourRegistry& behaviours)
     : assets_(assets), behaviours_(behaviours) {}
 
@@ -357,6 +423,10 @@ bool SceneSerializer::Parse(const JsonValue& json, SceneDocument& out, std::stri
             document.entities.push_back(std::move(spec));
         }
     }
+    for (std::size_t i = 0; i < document.entities.size(); ++i)
+        if (!ResolveImportedAnimations(document.entities[i], At("entities", i), state)) return false;
+    for (auto& [name, prefab] : document.prefabs)
+        if (!ResolveImportedAnimations(prefab, Join("prefabs", name), state)) return false;
     document.dependencies = state.dependencies;
     out = std::move(document);
     return true;
@@ -471,6 +541,7 @@ bool SceneSerializer::ParseEntity(const JsonValue& json, const std::string& path
             colliders = collider->AsString() == "mesh";
         }
         if (!ExpandModel(model->AsString(), colliders, Join(path, "model"), state, spec, depth, cached, extent)) return false;
+        spec.modelSource = model->AsString();
     } else if (json.Find("collider")) {
         return Fail(error, Join(path, "collider"), "only applies to \"model\" entities");
     }
@@ -543,7 +614,7 @@ bool SceneSerializer::ParseComponents(const JsonValue& json, const std::string& 
         const Core::TypeInfo* info = FrameworkTypes().Find(name);
         void* scratch = info->create();
         std::string fieldError;
-        const bool ok = info->FromJson(scratch, merged, fieldError, true);
+        const bool ok = info->FromJson(scratch, name == "Animator" ? AnimatorPlayback(merged) : merged, fieldError, true);
         info->destroy(scratch);
         if (!ok) return Fail(error, componentPath, WithoutType(fieldError, name));
         spec.components.Set(name, merged);
@@ -633,7 +704,7 @@ bool SceneSerializer::ExpandModel(const std::string& model, bool colliders, cons
     if (!Admit(expansion, depth, cached, state, path)) return false;
     if (out.name.empty()) out.name = Stem(model);
 
-    auto addMesh = [&](EntitySpec& spec, std::size_t mesh, std::size_t primitive) {
+    auto addMesh = [&](EntitySpec& spec, std::size_t mesh, std::size_t primitive, int nodeIndex) {
         const std::string meshRef = model + "#" + std::to_string(mesh) + "." + std::to_string(primitive);
         const int material = gltf.meshes[mesh].primitives[primitive].material;
         const std::string materialRef = material >= 0 ? model + "#material" + std::to_string(material) : std::string();
@@ -643,6 +714,11 @@ bool SceneSerializer::ExpandModel(const std::string& model, bool colliders, cons
         renderer.Set("mesh", meshRef);
         if (!materialRef.empty()) renderer.Set("material", materialRef);
         spec.components.Set("MeshRenderer", renderer);
+        if (gltf.nodes[static_cast<std::size_t>(nodeIndex)].skin >= 0) {
+            spec.modelPrimitive = {ImportedAnimatorRole::Primitive, model, nodeIndex,
+                gltf.nodes[static_cast<std::size_t>(nodeIndex)].skin, static_cast<int>(mesh),
+                static_cast<int>(primitive), gltf.WorldMatrix(nodeIndex)};
+        }
         if (colliders) {
             std::string cookError;
             if (!state.document.collisionMeshes.count(meshRef)) {
@@ -665,12 +741,12 @@ bool SceneSerializer::ExpandModel(const std::string& model, bool colliders, cons
             const auto mesh = static_cast<std::size_t>(source.mesh);
             for (std::size_t p = 0; p < gltf.meshes[mesh].primitives.size(); ++p) {
                 if (p == 0) {
-                    if (!addMesh(spec, mesh, 0)) return false;
+                    if (!addMesh(spec, mesh, 0, index)) return false;
                 } else {
                     // Extra primitives (other materials) become child entities.
                     EntitySpec part;
                     part.name = spec.name + ".primitive" + std::to_string(p);
-                    if (!addMesh(part, mesh, p)) return false;
+                    if (!addMesh(part, mesh, p, index)) return false;
                     spec.children.push_back(std::move(part));
                 }
             }
@@ -690,6 +766,147 @@ bool SceneSerializer::ExpandModel(const std::string& model, bool colliders, cons
     // Whole-expansion admission bounded this addition before any construction.
     extent.nodes += expansion.nodes;
     extent.height = std::max(extent.height, expansion.height);
+    return true;
+}
+
+bool SceneSerializer::ResolveImportedAnimations(EntitySpec& spec, const std::string& path, ParseState& state,
+    std::shared_ptr<ImportedModelAnimation> controller, const JsonValue* controls) const {
+    const std::string componentPath = Join(path, "components.Animator");
+    JsonValue* fields = spec.components.Find("Animator");
+    ImportedAnimatorBinding binding;
+    bool explicitBinding = fields && fields->Has("binding");
+    if (explicitBinding && !ReadAnimatorBinding((*fields)["binding"], binding, state.error, componentPath)) return false;
+    if (explicitBinding && !spec.modelSource.empty()) return Fail(state.error, componentPath, "model and flattened binding cannot be combined");
+    const bool newController = (fields && !spec.modelSource.empty()) || binding.role == ImportedAnimatorRole::Controller;
+    if (!newController && !spec.modelSource.empty()) { controller.reset(); controls = nullptr; }
+    if (newController) {
+        if (fields->Bool("applyRootMotion")) return Fail(state.error, componentPath, "imported root motion is not supported");
+        if (const auto* collider = spec.components.Find("Collider"); collider && collider->String("shape") == "Mesh")
+            return Fail(state.error, componentPath, "imported animation does not deform mesh collision");
+        binding.role = ImportedAnimatorRole::Controller;
+        if (!spec.modelSource.empty()) binding.model = spec.modelSource;
+        if (!assets_) return Fail(state.error, componentPath, "imported animation needs an asset manager");
+        const auto handle = assets_->Load<Assets::GltfDocument>(binding.model);
+        if (!state.Current(handle)) return Fail(state.error, componentPath, state.Diagnostic(handle));
+        controller = std::make_shared<ImportedModelAnimation>();
+        controller->model = binding.model;
+        controller->version = handle.Version();
+        controller->source = std::make_shared<const Assets::GltfDocument>(*handle.Get());
+        const auto& source = *controller->source;
+        if (source.animations.empty()) return Fail(state.error, componentPath, "model has no animation clips");
+        const std::string requested = fields->String("clip");
+        int selected = 0;
+        if (!requested.empty()) {
+            selected = -1;
+            for (std::size_t i = 0; i < source.animations.size(); ++i) if (source.animations[i].name == requested) {
+                if (selected >= 0) return Fail(state.error, componentPath, "clip name is ambiguous: " + requested);
+                selected = static_cast<int>(i);
+            }
+            if (selected < 0) return Fail(state.error, componentPath, "clip not found: " + requested);
+        }
+        controller->animation = selected;
+        const auto& clip = source.animations[static_cast<std::size_t>(selected)];
+        // Preserve the authored selector. Empty deliberately means automatic
+        // first, including when the importer supplies a generated display name.
+        controller->selector = requested;
+        std::set<int> jointNodes;
+        std::vector<int> pending = source.RootNodes();
+        while (!pending.empty()) {
+            const int node = pending.back(); pending.pop_back();
+            if (node < 0 || static_cast<std::size_t>(node) >= source.nodes.size()) return Fail(state.error, componentPath, "invalid model node");
+            const auto& item = source.nodes[static_cast<std::size_t>(node)];
+            if (item.mesh >= 0 && item.skin >= 0) {
+                if (static_cast<std::size_t>(item.skin) >= source.skins.size()) return Fail(state.error, componentPath, "invalid skin");
+                const auto& joints = source.skins[static_cast<std::size_t>(item.skin)].joints;
+                jointNodes.insert(joints.begin(), joints.end());
+            }
+            pending.insert(pending.end(), item.children.begin(), item.children.end());
+        }
+        if (jointNodes.empty() || clip.channels.empty()) return Fail(state.error, componentPath, "clip needs a skinned model with joint channels");
+        for (const auto& channel : clip.channels) if (!jointNodes.count(channel.node))
+            return Fail(state.error, componentPath, "selected clip contains unsupported non-joint animation");
+        fields->Set("clip", controller->selector);
+        controls = fields;
+        auto resolved = std::make_shared<ResolvedImportedAnimator>();
+        resolved->binding = binding;
+        resolved->owner = controller;
+        spec.importedAnimator = std::move(resolved);
+    } else {
+        if (!explicitBinding && spec.modelPrimitive.role == ImportedAnimatorRole::Primitive && controller
+            && spec.modelPrimitive.model == controller->model) binding = spec.modelPrimitive;
+        if (binding.role == ImportedAnimatorRole::Primitive) {
+            if (!controller || binding.model != controller->model || !controls)
+                return Fail(state.error, componentPath, "primitive needs its matching ancestor Animator controller");
+            if (explicitBinding) for (const auto& key : fields->Keys()) if (key != "binding")
+                return Fail(state.error, componentPath, "edit playback on the ancestor Animator controller");
+            const auto& source = *controller->source;
+            if (binding.node < 0 || static_cast<std::size_t>(binding.node) >= source.nodes.size()
+                || binding.skin < 0 || static_cast<std::size_t>(binding.skin) >= source.skins.size()
+                || binding.mesh < 0 || static_cast<std::size_t>(binding.mesh) >= source.meshes.size()
+                || binding.primitive < 0 || static_cast<std::size_t>(binding.primitive) >= source.meshes[static_cast<std::size_t>(binding.mesh)].primitives.size())
+                return Fail(state.error, componentPath, "binding index is outside the referenced model");
+            const auto& node = source.nodes[static_cast<std::size_t>(binding.node)];
+            const std::string meshRef = binding.model + "#" + std::to_string(binding.mesh) + "." + std::to_string(binding.primitive);
+            const auto* renderer = spec.components.Find("MeshRenderer");
+            if (node.mesh != binding.mesh || node.skin != binding.skin || !renderer || renderer->String("mesh") != meshRef)
+                return Fail(state.error, componentPath, "binding does not match source node, skin and renderer");
+            if (renderer->Bool("autoLod")) return Fail(state.error, componentPath, "imported animation cannot use static LOD");
+            if (const auto* collider = spec.components.Find("Collider"); collider && collider->String("shape") == "Mesh")
+                return Fail(state.error, componentPath, "imported animation does not deform mesh collision");
+            auto resolved = std::make_shared<ResolvedImportedAnimator>();
+            resolved->binding = binding;
+            resolved->owner = controller;
+            if (!AffineInverse(binding.meshBind, resolved->modelToMesh)) return Fail(state.error, componentPath, "meshBind must be finite, affine and invertible");
+            auto found = controller->rigs.find(binding.skin);
+            if (found == controller->rigs.end()) {
+                Assets::GltfSkeletonBinding skeleton;
+                std::string conversionError;
+                if (!Assets::BuildSkeleton(source, binding.skin, skeleton, conversionError)) return Fail(state.error, componentPath, conversionError);
+                if (skeleton.skeleton.JointCount() > 65536) return Fail(state.error, componentPath, "too many runtime skin joints");
+                auto rig = std::make_shared<ImportedAnimationRig>();
+                rig->clip = Assets::BuildClip(source, controller->animation, skeleton);
+                rig->skeleton = std::move(skeleton.skeleton);
+                rig->nodeToJoint = std::move(skeleton.nodeToJoint);
+                if (!rig->clip.Validate(rig->skeleton, conversionError)) return Fail(state.error, componentPath, conversionError);
+                Animation::AnimState stateClip;
+                stateClip.name = rig->clip.name;
+                stateClip.clip = &rig->clip;
+                rig->machine.AddState(stateClip);
+                found = controller->rigs.emplace(binding.skin, std::move(rig)).first;
+            }
+            resolved->rig = found->second;
+            auto bindMesh = std::make_shared<Graphics::MeshData>(source.meshes[static_cast<std::size_t>(binding.mesh)].primitives[static_cast<std::size_t>(binding.primitive)].mesh);
+            std::string meshError;
+            if (!bindMesh->Validate(meshError)) return Fail(state.error, componentPath, meshError);
+            if (bindMesh->skin.size() != bindMesh->vertices.size() || bindMesh->skin.empty()) return Fail(state.error, componentPath, "primitive has no skin influences");
+            const auto& skin = source.skins[static_cast<std::size_t>(binding.skin)];
+            for (auto& influence : bindMesh->skin) for (std::size_t i = 0; i < 4; ++i) {
+                if (influence.weights[i] <= 0) { influence.joints[i] = 0; continue; }
+                const std::size_t slot = influence.joints[i];
+                if (slot >= skin.joints.size()) return Fail(state.error, componentPath, "skin influence references a missing slot");
+                const int jointNode = skin.joints[slot];
+                if (jointNode < 0 || static_cast<std::size_t>(jointNode) >= resolved->rig->nodeToJoint.size()) return Fail(state.error, componentPath, "skin joint node is missing");
+                const int joint = resolved->rig->nodeToJoint[static_cast<std::size_t>(jointNode)];
+                if (joint < 0 || joint > 65535) return Fail(state.error, componentPath, "skin joint cannot fit the runtime mesh");
+                influence.joints[i] = static_cast<std::uint16_t>(joint);
+            }
+            resolved->bindMesh = std::move(bindMesh);
+            spec.importedAnimator = std::move(resolved);
+            JsonValue inherited = AnimatorPlayback(*controls);
+            inherited.Set("binding", AnimatorBindingJson(binding));
+            spec.components.Set("Animator", inherited);
+        } else if (fields && !fields->String("clip").empty()) {
+            return Fail(state.error, componentPath, "a clip needs a model root or imported binding");
+        }
+    }
+    for (std::size_t i = 0; i < spec.children.size(); ++i)
+        if (!ResolveImportedAnimations(spec.children[i], At(Join(path, "children"), i), state, controller, controls)) return false;
+    if (newController) {
+        const auto current = assets_->Load<Assets::GltfDocument>(controller->model);
+        if (!state.Current(current) || current.Version() != controller->version)
+            return Fail(state.error, componentPath, "model changed during animation binding");
+        if (controller->rigs.empty()) return Fail(state.error, componentPath, "controller has no bound skinned primitives");
+    }
     return true;
 }
 
@@ -805,7 +1022,25 @@ void SceneSerializer::AddComponents(const EntitySpec& spec, const SceneDocument&
     }
     if (spec.components.Find("Animator")) {
         AnimatorComponent animator;
-        fill("Animator", &animator);
+        std::string ignored;
+        types.Find("Animator")->FromJson(&animator, AnimatorPlayback(spec.components["Animator"]), ignored, true);
+        if (spec.importedAnimator) {
+            const auto& resolved = *spec.importedAnimator;
+            animator.binding = resolved.binding;
+            animator.importedOwner = resolved.owner;
+            if (resolved.rig) {
+                animator.skeleton = std::shared_ptr<const Animation::Skeleton>(resolved.rig, &resolved.rig->skeleton);
+                animator.machine = std::shared_ptr<const Animation::AnimStateMachine>(resolved.rig, &resolved.rig->machine);
+                animator.bindMesh = resolved.bindMesh;
+                animator.modelToMesh = resolved.modelToMesh;
+                for (Entity ancestor = World::GetParent(world.Registry(), entity); !ancestor.IsNull(); ancestor = World::GetParent(world.Registry(), ancestor)) {
+                    const auto* owner = world.Get<AnimatorComponent>(ancestor);
+                    if (owner && owner->binding.role == ImportedAnimatorRole::Controller) { animator.importedController = ancestor; break; }
+                }
+                animator.animator = std::make_shared<Animation::Animator>(*animator.skeleton, *animator.machine);
+                if (auto* renderer = world.Get<MeshRenderer>(entity)) PublishImportedAnimationMesh(animator, *renderer);
+            }
+        }
         world.Add<AnimatorComponent>(entity, std::move(animator));
     }
 }
@@ -870,7 +1105,12 @@ JsonValue SceneSerializer::SaveEntity(const GameWorld& world, Entity entity) con
     save("AudioSource", world.Get<AudioSource>(entity));
     save("AudioListener", world.Get<AudioListener>(entity));
     save("ParticleSystem", world.Get<ParticleSystem>(entity));
-    save("Animator", world.Get<AnimatorComponent>(entity));
+    if (const auto* animator = world.Get<AnimatorComponent>(entity)) {
+        JsonValue fields = animator->binding.role == ImportedAnimatorRole::Primitive ? JsonValue::MakeObject()
+            : types.Find("Animator")->ToJson(animator);
+        if (animator->binding.role != ImportedAnimatorRole::None) fields.Set("binding", AnimatorBindingJson(animator->binding));
+        components.Set("Animator", fields);
+    }
     if (components.Size() > 0) json.Set("components", components);
 
     if (const Behaviours* behaviours = world.Get<Behaviours>(entity)) {

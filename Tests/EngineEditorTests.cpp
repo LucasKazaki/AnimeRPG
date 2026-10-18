@@ -12,6 +12,7 @@
 #include "Tests/EngineTestSupport.h"
 
 #include <chrono>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -1010,6 +1011,291 @@ ASTRAL_TEST(FailedSaveRejectsAliasedTemporaryFileAndPreservesSavedBytes) {
     before.Check(editor);
     ASTRAL_CHECK(FileText(files.root / "author.scene.json") == lastSaved);
     ASTRAL_CHECK(std::filesystem::is_directory(files.root / "blocked.scene.json"));
+}
+
+
+namespace {
+const char* kEditorImportedModel = R"({
+"asset":{"version":"2.0","generator":"Astral original two-joint verification fixture"},
+"extensionsUsed":["KHR_materials_unlit"],
+"buffers":[{"uri":"TwoJointRibbon.bin","byteLength":492}],
+"bufferViews":[
+ {"buffer":0,"byteOffset":0,"byteLength":36,"target":34962},
+ {"buffer":0,"byteOffset":36,"byteLength":36,"target":34962},
+ {"buffer":0,"byteOffset":72,"byteLength":12,"target":34962},
+ {"buffer":0,"byteOffset":84,"byteLength":48,"target":34962},
+ {"buffer":0,"byteOffset":132,"byteLength":6,"target":34963},
+ {"buffer":0,"byteOffset":140,"byteLength":36,"target":34962},
+ {"buffer":0,"byteOffset":176,"byteLength":36,"target":34962},
+ {"buffer":0,"byteOffset":212,"byteLength":12,"target":34962},
+ {"buffer":0,"byteOffset":224,"byteLength":48,"target":34962},
+ {"buffer":0,"byteOffset":272,"byteLength":6,"target":34963},
+ {"buffer":0,"byteOffset":280,"byteLength":128},
+ {"buffer":0,"byteOffset":408,"byteLength":12},
+ {"buffer":0,"byteOffset":420,"byteLength":36},
+ {"buffer":0,"byteOffset":456,"byteLength":36}],
+"accessors":[
+ {"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[-2,0,0],"max":[0,1,0]},
+ {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"},
+ {"bufferView":2,"componentType":5121,"count":3,"type":"VEC4"},
+ {"bufferView":3,"componentType":5126,"count":3,"type":"VEC4"},
+ {"bufferView":4,"componentType":5123,"count":3,"type":"SCALAR"},
+ {"bufferView":5,"componentType":5126,"count":3,"type":"VEC3","min":[-2,1,0],"max":[0,2,0]},
+ {"bufferView":6,"componentType":5126,"count":3,"type":"VEC3"},
+ {"bufferView":7,"componentType":5121,"count":3,"type":"VEC4"},
+ {"bufferView":8,"componentType":5126,"count":3,"type":"VEC4"},
+ {"bufferView":9,"componentType":5123,"count":3,"type":"SCALAR"},
+ {"bufferView":10,"componentType":5126,"count":2,"type":"MAT4"},
+ {"bufferView":11,"componentType":5126,"count":3,"type":"SCALAR","min":[0],"max":[1]},
+ {"bufferView":12,"componentType":5126,"count":3,"type":"VEC3"},
+ {"bufferView":13,"componentType":5126,"count":3,"type":"VEC3"}],
+"materials":[
+ {"name":"Blue","pbrMetallicRoughness":{"baseColorFactor":[0.1,0.4,0.9,1]},"extensions":{"KHR_materials_unlit":{}}},
+ {"name":"Orange","pbrMetallicRoughness":{"baseColorFactor":[1,0.4,0.1,1]},"extensions":{"KHR_materials_unlit":{}}}],
+"meshes":[
+ {"name":"Ribbon","primitives":[
+   {"attributes":{"POSITION":0,"NORMAL":1,"JOINTS_0":2,"WEIGHTS_0":3},"indices":4,"material":0},
+   {"attributes":{"POSITION":5,"NORMAL":6,"JOINTS_0":7,"WEIGHTS_0":8},"indices":9,"material":1}]},
+ {"name":"Rigid","primitives":[{"attributes":{"POSITION":0,"NORMAL":1},"indices":4,"material":0}]}],
+"nodes":[
+ {"name":"RigSpace","translation":[0,3,0],"children":[1,3,4,5]},
+ {"name":"RootJoint","children":[2]},
+ {"name":"TipJoint","translation":[0,1,0]},
+ {"name":"BodyOne","mesh":0,"skin":0,"translation":[-2,0,0],"rotation":[0,0,-0.7071067811865476,0.7071067811865476]},
+ {"name":"BodyTwo","mesh":0,"skin":0,"translation":[-5,0,0]},
+ {"name":"RigidControl","mesh":1,"translation":[-8,0,0]}],
+"skins":[{"name":"ReverseSlots","joints":[2,1],"inverseBindMatrices":10}],
+"animations":[
+ {"name":"Raise","samplers":[{"input":11,"output":12,"interpolation":"LINEAR"}],"channels":[{"sampler":0,"target":{"node":2,"path":"translation"}}]},
+ {"name":"Bend","samplers":[{"input":11,"output":13,"interpolation":"LINEAR"}],"channels":[{"sampler":0,"target":{"node":2,"path":"translation"}}]}],
+"scenes":[{"name":"Verification","nodes":[0]}],"scene":0
+})";
+const char* kEditorImportedScene = R"({"format":"astral-scene","version":1,
+"settings":{"gravity":[0,0,0]},"entities":[
+ {"name":"InstanceA","model":"TwoJointRibbon.gltf","components":{"Animator":{"speed":1}}},
+ {"name":"InstanceB","model":"TwoJointRibbon.gltf","transform":{"position":[10,0,0]},"components":{"Animator":{"speed":0.5}}}
+]})";
+const char* kEditorImportedHex = "000000000000000000000000000000c00000000000000000000000000000803f0000000000000000000000000000803f00000000000000000000803f00000000000000000000803f0100000001000000000000000000803f0000000000000000000000000000803f0000000000000000000000000000803f0000000000000000000000000000020001000000000000000000803f00000000000000c00000803f0000000000000000000000400000000000000000000000000000803f00000000000000000000803f00000000000000000000803f0000000001000000000000000000803f0000000000000000000000000000803f0000000000000000000000000000803f000000000000000000000000000002000100000000000000000080bf00000000000000000000803f00000000000000000000000000000000000000000000803f00000000000000c0000080bf000000000000803f00000000000080bf00000000000000000000803f00000000000000000000000000000000000000000000803f00000000000000c000000000000000000000803f000000000000003f0000803f000000000000803f00000000000000000000004000000000000000000000404000000000000000000000803f00000000000080bf0000803f00000000000000c00000803f00000000";
+
+std::vector<std::uint8_t> EditorImportedBuffer() {
+    std::vector<std::uint8_t> bytes;
+    const std::string text(kEditorImportedHex);
+    auto nibble=[](char c) { ASTRAL_CHECK((c>='0'&&c<='9')||(c>='a'&&c<='f')); return c<='9'?c-'0':c-'a'+10; };
+    ASTRAL_CHECK(text.size()==984);
+    for (std::size_t i=0;i<text.size();i+=2) bytes.push_back(static_cast<std::uint8_t>(nibble(text[i])*16+nibble(text[i+1])));
+    return bytes;
+}
+Core::JsonValue EditorImportedJson(const char* text) {
+    Core::JsonValue json; std::string error;
+    ASTRAL_CHECK(Core::ParseJson(text,json,error)); return json;
+}
+struct EditorImportedFixture {
+    std::filesystem::path root, physical;
+    std::vector<std::filesystem::path> owned;
+    int mutation{};
+    EditorImportedFixture() {
+        static unsigned sequence{};
+        const auto parent=std::filesystem::canonical(std::filesystem::temp_directory_path());
+        const auto stamp=std::chrono::steady_clock::now().time_since_epoch().count();
+        for (int attempt=0;attempt<100;++attempt) {
+            root=parent/("astral-editor-imported-animation-"+std::to_string(stamp)+"-"+std::to_string(++sequence));
+            std::error_code error;
+            if (std::filesystem::create_directory(root,error)) break;
+            ASTRAL_CHECK(!error || error==std::errc::file_exists); root.clear();
+        }
+        ASTRAL_CHECK(!root.empty()); physical=std::filesystem::canonical(root);
+        ASTRAL_CHECK(physical.parent_path()==parent);
+        std::printf("[ EDITOR_IMPORTED_ANIMATION_FIXTURE ] %s\n",root.string().c_str()); std::fflush(stdout);
+        const std::string model(kEditorImportedModel),scene(kEditorImportedScene);
+        Create("TwoJointRibbon.gltf",{model.begin(),model.end()});
+        Create("TwoJointRibbon.bin",EditorImportedBuffer());
+        Create("two-joint.scene.json",{scene.begin(),scene.end()});
+    }
+    void Track(const char* name) {
+        const auto path=root/name;
+        ASTRAL_CHECK(path.parent_path()==root && std::filesystem::symlink_status(path).type()==std::filesystem::file_type::regular);
+        ASTRAL_CHECK(std::find(owned.begin(),owned.end(),path)==owned.end()); owned.push_back(path);
+    }
+    void Create(const char* name,const std::vector<std::uint8_t>& bytes) {
+        const auto path=root/name;
+        ASTRAL_CHECK(path.parent_path()==root && !std::filesystem::exists(path));
+        std::ofstream file(path,std::ios::binary|std::ios::trunc);
+        ASTRAL_CHECK(file && file.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size())));
+        file.close(); ASTRAL_CHECK(file.good()); Track(name);
+    }
+    void Replace(const char* name,const std::vector<std::uint8_t>& bytes) {
+        const auto path=root/name;
+        ASTRAL_CHECK(std::filesystem::canonical(root)==physical);
+        ASTRAL_CHECK(std::find(owned.begin(),owned.end(),path)!=owned.end());
+        ASTRAL_CHECK(std::filesystem::symlink_status(path).type()==std::filesystem::file_type::regular);
+        std::ofstream file(path,std::ios::binary|std::ios::trunc);
+        ASTRAL_CHECK(file && file.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size())));
+        file.close(); ASTRAL_CHECK(file.good());
+        std::filesystem::last_write_time(path,std::filesystem::file_time_type::clock::now()+std::chrono::seconds(++mutation));
+    }
+    ~EditorImportedFixture() {
+        ASTRAL_CHECK(std::filesystem::canonical(root)==physical);
+        for (const auto& path:owned) {
+            ASTRAL_CHECK(path.parent_path()==root && std::filesystem::symlink_status(path).type()==std::filesystem::file_type::regular);
+            ASTRAL_CHECK(std::filesystem::remove(path));
+        }
+        ASTRAL_CHECK(std::filesystem::remove(root));
+    }
+};
+World::Entity EditorImportedDescendant(const Framework::GameWorld& world,World::Entity parent,const std::string& name) {
+    for (auto child:World::GetChildren(world.Registry(),parent)) {
+        const auto* label=world.Get<World::Name>(child);
+        if (label && label->value==name) return child;
+        auto found=EditorImportedDescendant(world,child,name); if (!found.IsNull()) return found;
+    }
+    return {};
+}
+Vec3 EditorImportedTip(const Framework::GameWorld& world,World::Entity root) {
+    const auto body=EditorImportedDescendant(world,root,"BodyOne");
+    const auto* renderer=world.Get<Framework::MeshRenderer>(body);
+    ASTRAL_CHECK(renderer && renderer->mesh && renderer->mesh->vertices.size()==3);
+    return Math::TransformPoint(world.GetWorld(body),renderer->mesh->vertices[2].position);
+}
+std::shared_ptr<const Framework::ImportedModelAnimation> EditorImportedOwner(const SceneEditor& editor) {
+    const auto body=EditorImportedDescendant(editor.Preview(),editor.PreviewEntity(editor.Selection()),"BodyOne");
+    const auto* animator=editor.Preview().Get<Framework::AnimatorComponent>(body);
+    ASTRAL_CHECK(animator && animator->importedOwner); return animator->importedOwner;
+}
+}
+
+ASTRAL_TEST(EditorImportedAnimationHistorySaveReopenAndPlay) {
+    EditorImportedFixture fixture; SceneEditor editor(fixture.root.string(),0); std::string error;
+    ASTRAL_CHECK(editor.OpenScene("two-joint.scene.json",error) && editor.Select({0}));
+    ASTRAL_CHECK(editor.SetField(InspectorGroupKind::Component,"Animator",0,"clip","Bend",error));
+    ASTRAL_CHECK(editor.SetField(InspectorGroupKind::Component,"Animator",0,"speed",0.5,error));
+    ASTRAL_CHECK(editor.Undo() && editor.CanRedo());
+    ASTRAL_CHECK(editor.Redo());
+    ASTRAL_CHECK(editor.SaveAs("saved.scene.json",error)); fixture.Track("saved.scene.json");
+    ASTRAL_CHECK(editor.OpenScene("saved.scene.json",error) && editor.Select({0}));
+    const auto document=editor.Document();
+    for (int attempt=0;attempt<3;++attempt) {
+        ASTRAL_CHECK(editor.Play(error));
+        editor.Game()->Update(0.25f,{}); editor.Game()->Update(0.25f,{});
+        ASTRAL_CHECK(Near(EditorImportedTip(editor.Game()->World(),editor.Game()->World().Find("InstanceA")),{1.5f,3,0},2e-4f));
+        editor.Stop();
+        ASTRAL_CHECK(editor.Document()==document && !editor.Dirty());
+    }
+}
+
+ASTRAL_TEST(EditorImportedAnimationModelOnlyReloadPreservesDirtyState) {
+    EditorImportedFixture fixture; SceneEditor editor(fixture.root.string(),0); std::string error;
+    ASTRAL_CHECK(editor.OpenScene("two-joint.scene.json",error) && editor.Select({0}));
+    ASTRAL_CHECK(editor.Rename("DirtyA",error));
+    ASTRAL_CHECK(editor.SetTransform({1,0,0},{0,0,0},{1,1,1},error) && editor.Undo());
+    const auto document=editor.Document(); const auto selection=editor.Selection();
+    ASTRAL_CHECK(editor.Dirty() && editor.CanUndo() && editor.CanRedo());
+    editor.Camera().target={4,5,6}; editor.Camera().distance=17; editor.Camera().yawDegrees=53;
+    const auto camera=editor.Camera(); const auto oldOwner=EditorImportedOwner(editor);
+    const auto saved=FileText(fixture.root/"two-joint.scene.json");
+    auto bytes=EditorImportedBuffer(); bytes[424]=0; bytes[425]=0; bytes[426]=0; bytes[427]=0x40; // Raise t0 Y=2
+    fixture.Replace("TwoJointRibbon.bin",bytes);
+    ASTRAL_CHECK(editor.ReloadIfChangedOnDisk());
+    ASTRAL_CHECK(editor.Document()==document && editor.Selection()==selection && editor.Dirty() && editor.CanUndo() && editor.CanRedo());
+    ASTRAL_CHECK(Near(editor.Camera().target,camera.target) && editor.Camera().distance==camera.distance && editor.Camera().yawDegrees==camera.yawDegrees);
+    ASTRAL_CHECK(FileText(fixture.root/"two-joint.scene.json")==saved && EditorImportedOwner(editor)!=oldOwner);
+    ASTRAL_CHECK(Near(EditorImportedTip(editor.Preview(),editor.PreviewEntity(selection)),{1,4,0},2e-4f));
+    ASTRAL_CHECK(editor.Redo() && Near(editor.Position(),{1,0,0}));
+    ASTRAL_CHECK(editor.Undo() && editor.Document()==document);
+}
+
+ASTRAL_TEST(EditorImportedAnimationFailedDependencyRecoversOnce) {
+    for (int mode=0;mode<3;++mode) {
+        EditorImportedFixture fixture; SceneEditor editor(fixture.root.string(),0); std::string error;
+        if (mode==2) {
+            ASTRAL_CHECK(editor.CreateEntity("model:TwoJointRibbon.gltf",error));
+            ASTRAL_CHECK(editor.AddComponent("Animator",error));
+        } else {
+            ASTRAL_CHECK(editor.OpenScene("two-joint.scene.json",error) && editor.Select({0}));
+            if (mode==1) ASTRAL_CHECK(editor.Rename("DirtyFailureA",error));
+        }
+        const AuthorState before(editor); const auto* oldWorld=&editor.Preview(); const auto oldOwner=EditorImportedOwner(editor);
+        fixture.Replace("TwoJointRibbon.bin",{0,0,0,0});
+        ASTRAL_CHECK(!editor.ReloadIfChangedOnDisk()); before.Check(editor);
+        ASTRAL_CHECK(&editor.Preview()==oldWorld && EditorImportedOwner(editor)==oldOwner);
+        const auto status=editor.Status();
+        ASTRAL_CHECK(!editor.ReloadIfChangedOnDisk() && editor.Status()==status);
+        fixture.Replace("TwoJointRibbon.bin",EditorImportedBuffer());
+        ASTRAL_CHECK(editor.ReloadIfChangedOnDisk() && editor.Document()==before.document && editor.Selection()==before.selection);
+        const auto repairedOwner=EditorImportedOwner(editor);
+        fixture.Replace("TwoJointRibbon.gltf",{'{','b','a','d'});
+        ASTRAL_CHECK(!editor.ReloadIfChangedOnDisk() && EditorImportedOwner(editor)==repairedOwner);
+        const std::string model(kEditorImportedModel);
+        fixture.Replace("TwoJointRibbon.gltf",{model.begin(),model.end()});
+        ASTRAL_CHECK(editor.ReloadIfChangedOnDisk() && editor.Document()==before.document);
+    }
+}
+
+ASTRAL_TEST(EditorImportedAnimationNewFailedDiskDependencyRecovers) {
+    EditorImportedFixture fixture; SceneEditor editor(fixture.root.string(),0); std::string error;
+    ASTRAL_CHECK(editor.OpenScene("two-joint.scene.json",error));
+    auto next=EditorImportedJson(kEditorImportedScene);
+    for (auto& node:next.Find("entities")->Items()) node.Set("model","MissingRibbon.gltf");
+    const auto text=Core::WriteJson(next);
+    fixture.Replace("two-joint.scene.json",{text.begin(),text.end()});
+    const auto before=editor.Document(); const auto* oldWorld=&editor.Preview();
+    ASTRAL_CHECK(!editor.ReloadIfChangedOnDisk() && editor.Document()==before && &editor.Preview()==oldWorld);
+    const std::string model(kEditorImportedModel); fixture.Create("MissingRibbon.gltf",{model.begin(),model.end()});
+    ASTRAL_CHECK(editor.ReloadIfChangedOnDisk() && editor.Document()==next);
+}
+
+ASTRAL_TEST(EditorImportedAnimationDirtyExternalJsonDoesNotBlockResourceReload) {
+    EditorImportedFixture fixture; SceneEditor editor(fixture.root.string(),0); std::string error;
+    ASTRAL_CHECK(editor.OpenScene("two-joint.scene.json",error) && editor.Select({0}));
+    ASTRAL_CHECK(editor.Rename("DirtyA",error));
+    const auto document=editor.Document(); const auto selection=editor.Selection();
+    fixture.Replace("two-joint.scene.json",{'{','b','a','d'});
+    ASTRAL_CHECK(!editor.ReloadIfChangedOnDisk() && editor.Document()==document);
+    auto bytes=EditorImportedBuffer(); bytes[424]=0; bytes[425]=0; bytes[426]=0; bytes[427]=0x40;
+    fixture.Replace("TwoJointRibbon.bin",bytes);
+    ASTRAL_CHECK(editor.ReloadIfChangedOnDisk());
+    ASTRAL_CHECK(editor.Document()==document && editor.Selection()==selection && editor.Dirty() && editor.CanUndo());
+    ASTRAL_CHECK(Near(EditorImportedTip(editor.Preview(),editor.PreviewEntity(selection)),{1,4,0},2e-4f));
+    ASTRAL_CHECK(FileText(fixture.root/"two-joint.scene.json")=="{bad");
+}
+
+ASTRAL_TEST(EditorImportedAnimationFlatControllerInspector) {
+    EditorImportedFixture fixture;
+    Assets::AssetManager assets(fixture.root.string(),nullptr); assets.RegisterDefaultLoaders();
+    Framework::SceneSerializer serializer(&assets); Framework::SceneDocument document; std::string error;
+    ASTRAL_CHECK(serializer.Parse(EditorImportedJson(kEditorImportedScene),document,error));
+    Framework::GameWorld world; serializer.Instantiate(document,world);
+    const auto text=Core::WriteJson(serializer.Save(world));
+    fixture.Replace("two-joint.scene.json",{text.begin(),text.end()});
+    SceneEditor editor(fixture.root.string(),0);
+    ASTRAL_CHECK(editor.OpenScene("two-joint.scene.json",error) && editor.Select({0}));
+    ASTRAL_CHECK(editor.SetField(InspectorGroupKind::Component,"Animator",0,"clip","Bend",error));
+    const auto body=Find(editor,"BodyOne"); ASTRAL_CHECK(editor.Select(body));
+    const auto groups=editor.Inspector();
+    ASTRAL_CHECK(Group(groups,InspectorGroupKind::Component,"Animator")==nullptr);
+    ASTRAL_CHECK(editor.SetTransform({3,0,0},{0,0,90},{1,1,1},error));
+    ASTRAL_CHECK(editor.SaveAs("flat-saved.scene.json",error)); fixture.Track("flat-saved.scene.json");
+    ASTRAL_CHECK(editor.OpenScene("flat-saved.scene.json",error));
+    ASTRAL_CHECK(Near(EditorImportedTip(editor.Preview(),editor.PreviewEntity({0})),{2,3,0},2e-4f));
+}
+
+ASTRAL_TEST(EditorImportedAnimationNamedHostReloadIsAtomic) {
+    EditorImportedFixture fixture;
+    Framework::HostSettings settings; settings.contentRoot=fixture.root.string(); settings.workerThreads=0;
+    settings.audio=false; settings.hotReload=true; settings.hotReloadInterval=0.001f;
+    Framework::GameHost host(settings); std::string error;
+    ASTRAL_CHECK(host.LoadScene("two-joint.scene.json",error));
+    const auto* before=&host.World();
+    const auto body=EditorImportedDescendant(host.World(),host.World().Find("InstanceA"),"BodyOne");
+    const auto owner=host.World().Get<Framework::AnimatorComponent>(body)->importedOwner;
+    fixture.Replace("TwoJointRibbon.bin",{0,0,0,0}); host.Update(0.01f,{});
+    ASTRAL_CHECK(&host.World()==before && !host.LastError().empty());
+    ASTRAL_CHECK(host.World().Get<Framework::AnimatorComponent>(body)->importedOwner==owner);
+    const auto count=host.Log().size(); host.Update(0.01f,{});
+    ASTRAL_CHECK(host.Log().size()==count);
+    auto bytes=EditorImportedBuffer(); bytes[424]=0; bytes[425]=0; bytes[426]=0; bytes[427]=0x40;
+    fixture.Replace("TwoJointRibbon.bin",bytes); host.Update(0.01f,{});
+    ASTRAL_CHECK(host.LastError().empty());
+    ASTRAL_CHECK(Near(EditorImportedTip(host.World(),host.World().Find("InstanceA")),{1,4,0},2e-4f));
 }
 
 ASTRAL_TEST_MAIN("EngineEditorTests")
