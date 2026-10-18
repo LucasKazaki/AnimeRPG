@@ -4,7 +4,9 @@
 // waveOut, and blits the rendered frame with StretchDIBits.
 //
 //   AstralPlayerWin32.exe [content-root] [project-or-scene.json]
-//   (defaults: Content/Samples/Playground and project.json)
+//   (legacy defaults: Content/Samples/Playground and project.json)
+//   AstralEnginePlayerWin32.exe [content-root] [project-or-scene.json]
+//   (engine defaults: Content/project.json beside the actual executable)
 //
 // Keys: the project's input map (Playground: WASD/arrows move, Space jumps,
 // Shift sprints, Q/E orbit), ` opens the console, F3 toggles stats, F5
@@ -18,8 +20,10 @@
 
 #include "Engine/Framework/GameHost.h"
 #include "Engine/Input/InputSystem.h"
+#include "Engine/Platform/Win32/Win32WaveOutput.h"
+#if defined(ASTRAL_PLAYER_PLAYGROUND)
 #include "Game/Samples/Playground/PlaygroundBehaviours.h"
-#include "Game/Showcase/Win32AstralPresenter.h" // Win32WaveOutput
+#endif
 
 #include <windows.h>
 
@@ -29,9 +33,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cwchar>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace {
@@ -62,6 +68,24 @@ void AppendUtf8(std::string& out, wchar_t c) {
     const wchar_t pair[2] = {c, L'\0'};
     out += Utf8(pair);
 }
+
+#if !defined(ASTRAL_PLAYER_PLAYGROUND)
+bool PackagedContentRoot(std::string& root, std::string& error) {
+    std::vector<wchar_t> module(32768);
+    const DWORD length = GetModuleFileNameW(nullptr, module.data(), static_cast<DWORD>(module.size()));
+    if (length == 0 || length >= module.size()) {
+        error = "Cannot resolve the player executable path (Windows error " + std::to_string(GetLastError()) + ")";
+        return false;
+    }
+    try {
+        root = (std::filesystem::path(std::wstring(module.data(), length)).parent_path() / L"Content").u8string();
+        return true;
+    } catch (const std::system_error& exception) {
+        error = "Cannot resolve packaged Content: " + exception.code().message();
+        return false;
+    }
+}
+#endif
 
 // Everything the window procedure feeds and the frame loop consumes.
 struct PlayerWindow {
@@ -201,12 +225,23 @@ int Fail(const std::string& text) {
 } // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
-    std::string contentRoot = "Content/Samples/Playground";
+    std::string contentRoot;
     std::string startPath = "project.json";
+#if defined(ASTRAL_PLAYER_PLAYGROUND)
+    contentRoot = "Content/Samples/Playground";
+#else
+    if (__argc > 3) return Fail("Usage: AstralEnginePlayerWin32.exe [content-root] [project-or-scene.json]");
+    if (__argc <= 1) {
+        std::string error;
+        if (!PackagedContentRoot(contentRoot, error)) return Fail(error);
+    }
+#endif
     if (__argc > 1) contentRoot = Utf8(__wargv[1]);
     if (__argc > 2) startPath = Utf8(__wargv[2]);
 
+#if defined(ASTRAL_PLAYER_PLAYGROUND)
     Samples::RegisterPlaygroundBehaviours();
+#endif
     Framework::HostSettings settings;
     settings.contentRoot = contentRoot;
     settings.hotReload = true; // edit-and-see iteration while the player runs
@@ -235,8 +270,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&player));
     ShowWindow(window, showCommand);
 
-    std::unique_ptr<Showcase::Win32WaveOutput> audio;
-    if (host->Audio()) audio = std::make_unique<Showcase::Win32WaveOutput>(*host->Audio());
+    std::unique_ptr<Platform::Win32WaveOutput> audio;
+    if (host->Audio()) {
+        audio = std::make_unique<Platform::Win32WaveOutput>(*host->Audio());
+        host->Console().Print(audio->Active() ? "Audio output device active" : "Audio output unavailable");
+    }
 
     using Clock = std::chrono::steady_clock;
     Clock::time_point last = Clock::now();
