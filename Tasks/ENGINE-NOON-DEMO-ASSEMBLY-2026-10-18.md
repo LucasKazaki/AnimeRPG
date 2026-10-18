@@ -16,6 +16,9 @@ overlap in their approved paths; retain Project's transactional Host/settings
 hook, Creator's Runtime factoring and Editor's authoring/play separation. Do not
 replace established subsystems or silently drop tests. Native-player and Host
 ingress packets are still independently owned and unaccepted until reviewed.
+Reviewed ingress95834bf, packager8c6d68f and SaveAs4ca4a31 have now passed their
+component gates and normal-merged. Record their exact scope/receipts in the QA;
+the final reusable native-player packet still awaits accepted immutable input.
 This Task and its QA record are the integration-specific documentation paths.
 No installs, policy/workflow relaxation, game content, scheduler or history edits.
 
