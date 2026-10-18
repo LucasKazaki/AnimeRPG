@@ -79,6 +79,13 @@ public:
     const ConsoleVariable* Find(std::string_view name) const;
     bool HasCommand(std::string_view name) const;
     bool Set(std::string_view name, std::string_view value, std::string& error);
+    // Validate known variables, permissions and typed/ranged values without
+    // callbacks. A failed batch changes nothing; duplicate aliases use the last
+    // value. Success commits every value before notifying each changed target.
+    // Game-thread use; keep this registry alive/unreplaced during callbacks.
+    // Callback exceptions propagate after commit, as with single-variable Set.
+    bool ValidateBatch(const std::vector<std::pair<std::string, std::string>>& values, std::string& error) const;
+    bool SetBatch(const std::vector<std::pair<std::string, std::string>>& values, std::string& error);
 
     // Runs one console line: "name" prints a variable, "name value" sets it,
     // "command args..." runs a command. Built-ins: help, list [prefix], reset <name>.
@@ -96,6 +103,9 @@ public:
     void EnableCheats(bool enabled) { cheats_ = enabled; }
 
 private:
+    using PreparedChange = std::pair<const ConsoleVariable*, ConsoleVariable>;
+    bool PrepareBatch(const std::vector<std::pair<std::string, std::string>>& values,
+        std::vector<PreparedChange>& prepared, std::string& error) const;
     ConsoleVariable* Register(std::string name, CVarType type, double number, std::string text, std::string help,
         std::uint32_t flags);
     std::map<std::string, std::unique_ptr<ConsoleVariable>, std::less<>> variables_;

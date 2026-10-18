@@ -331,6 +331,65 @@ bool ConsoleRegistry::Set(std::string_view name, std::string_view value, std::st
     return variable->SetFromString(value, error);
 }
 
+bool ConsoleRegistry::PrepareBatch(const std::vector<std::pair<std::string, std::string>>& values,
+    std::vector<PreparedChange>& prepared, std::string& error) const {
+    for (const auto& [name, value] : values) {
+        const ConsoleVariable* variable = Find(name);
+        if (!variable) {
+            error = name + ": unknown variable " + name;
+            return false;
+        }
+        if ((variable->flags_ & CVarReadOnly) || ((variable->flags_ & CVarCheat) && !cheats_)) {
+            error = name + ": " + variable->name_ + ((variable->flags_ & CVarReadOnly) ? " is read-only" : " requires cheats");
+            return false;
+        }
+        auto change = std::find_if(prepared.begin(), prepared.end(),
+            [&](const PreparedChange& entry) { return entry.first == variable; });
+        if (change == prepared.end()) {
+            ConsoleVariable probe = *variable;
+            probe.callbacks_.clear(); // copied callbacks can still capture live host services
+            prepared.emplace_back(variable, std::move(probe));
+            change = prepared.end() - 1;
+        }
+        std::string fieldError;
+        if (!change->second.SetFromString(value, fieldError)) {
+            error = name + ": " + fieldError;
+            return false;
+        }
+    }
+    error.clear();
+    return true;
+}
+
+bool ConsoleRegistry::ValidateBatch(const std::vector<std::pair<std::string, std::string>>& values,
+    std::string& error) const {
+    std::vector<PreparedChange> prepared;
+    return PrepareBatch(values, prepared, error);
+}
+
+bool ConsoleRegistry::SetBatch(const std::vector<std::pair<std::string, std::string>>& values, std::string& error) {
+    std::vector<PreparedChange> prepared;
+    if (!PrepareBatch(values, prepared, error)) return false;
+    std::vector<ConsoleVariable*> changed;
+    changed.reserve(prepared.size());
+    // No validation or allocating value copies follow the first live write.
+    // Notification is a second phase so callbacks see all committed settings.
+    for (auto& entry : prepared) {
+        auto* variable = const_cast<ConsoleVariable*>(entry.first);
+        ConsoleVariable& value = entry.second;
+        if (variable->type_ == CVarType::String) {
+            if (variable->text_ == value.text_) continue;
+            variable->text_.swap(value.text_);
+        } else {
+            if (variable->number_ == value.number_) continue;
+            variable->number_ = value.number_;
+        }
+        changed.push_back(variable);
+    }
+    for (ConsoleVariable* variable : changed) variable->Notify();
+    return true;
+}
+
 std::string ConsoleRegistry::Execute(std::string_view line) {
     const std::vector<std::string> tokens = TokenizeCommandLine(line);
     if (tokens.empty()) return {};

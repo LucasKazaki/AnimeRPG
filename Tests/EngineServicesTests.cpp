@@ -617,4 +617,75 @@ ASTRAL_TEST(CVarRangesRejectNonfiniteBoundsWithoutLosingTheOldRange) {
     }
 }
 
+ASTRAL_TEST(ConsoleBatchesRejectEveryInvalidEntryWithoutCallbacks) {
+    ConsoleRegistry console;
+    auto* quality = console.RegisterInt("Quality", 2, "");
+    auto* title = console.RegisterString("Title", "original", "");
+    auto* flag = console.RegisterBool("Flag", false, "");
+    auto* gain = console.RegisterFloat("Gain", 0.5f, "");
+    auto* locked = console.RegisterInt("Locked", 3, "", CVarReadOnly);
+    auto* cheat = console.RegisterInt("Cheat", 4, "", CVarCheat);
+    int notifications = 0;
+    quality->OnChanged([&](const ConsoleVariable&) { ++notifications; });
+    title->OnChanged([&](const ConsoleVariable&) { ++notifications; });
+    const std::vector<std::pair<std::string, std::string>> invalid[] = {
+        {{"Unknown", "1"}}, {{"Locked", "8"}}, {{"Cheat", "8"}}, {{"Quality", "bad"}},
+        {{"Flag", "maybe"}}, {{"Gain", "nan"}}, {{"Gain", "1e400"}},
+        {{"Gain", "1e100"}}, {{"Gain", "-1e100"}},
+        {{"Quality", "2147483648"}}, {{"Quality", "-2147483649.0"}}};
+    for (const auto& entry : invalid) {
+        std::vector<std::pair<std::string, std::string>> batch{{"Quality", "1"}, {"Title", "new"}};
+        batch.insert(batch.end(), entry.begin(), entry.end());
+        std::string error;
+        ASTRAL_CHECK(!console.ValidateBatch(batch, error) && error.find(entry[0].first) != std::string::npos);
+        ASTRAL_CHECK(!console.SetBatch(batch, error) && !error.empty());
+        ASTRAL_CHECK(quality->GetInt() == 2 && title->GetString() == "original" && !flag->GetBool());
+        ASTRAL_CHECK(gain->GetFloat() == 0.5f && locked->GetInt() == 3 && cheat->GetInt() == 4);
+        ASTRAL_CHECK(notifications == 0);
+    }
+    console.EnableCheats(true);
+    std::string error;
+    ASTRAL_CHECK(console.SetBatch({{"Cheat", "7"}}, error) && cheat->GetInt() == 7);
+}
+
+ASTRAL_TEST(ConsoleBatchesPublishAllValuesBeforeChangeCallbacks) {
+    ConsoleRegistry console;
+    auto* quality = console.RegisterInt("Quality", 2, "");
+    quality->SetRange(0, 3);
+    auto* gain = console.RegisterFloat("Gain", 0.5f, "");
+    gain->SetRange(0, 1);
+    auto* flag = console.RegisterBool("Flag", false, "");
+    auto* title = console.RegisterString("Title", "original", "");
+    const std::string exact = "literal=title\n#not a comment; \"quoted\"";
+    int notifications = 0;
+    const auto observe = [&](const ConsoleVariable&) {
+        ++notifications;
+        ASTRAL_CHECK(quality->GetInt() == 3 && gain->GetFloat() == 1.0f && flag->GetBool());
+        ASTRAL_CHECK(title->GetString() == exact);
+    };
+    for (ConsoleVariable* variable : {quality, gain, flag, title}) variable->OnChanged(observe);
+    const std::vector<std::pair<std::string, std::string>> batch{
+        {"Quality", "99"}, {"Gain", "2"}, {"Flag", "true"}, {"Title", exact}};
+    std::string error;
+    ASTRAL_CHECK(console.ValidateBatch(batch, error));
+    ASTRAL_CHECK(quality->GetInt() == 2 && title->GetString() == "original" && notifications == 0);
+    ASTRAL_CHECK(console.SetBatch(batch, error) && error.empty() && notifications == 4);
+    ASTRAL_CHECK(console.SetBatch(batch, error) && notifications == 4);
+    ASTRAL_CHECK(console.Find("Quality") == quality && console.Find("Title") == title);
+}
+
+ASTRAL_TEST(ConsoleBatchesResolveDuplicateAliasesWithoutIntermediateNotifications) {
+    ConsoleRegistry console;
+    auto* quality = console.RegisterInt("Render.Quality", 2, "");
+    int notifications = 0;
+    quality->OnChanged([&](const ConsoleVariable&) { ++notifications; });
+    std::string error;
+    ASTRAL_CHECK(console.SetBatch({{"render.quality", "1"}, {"RENDER.QUALITY", "2"}}, error));
+    ASTRAL_CHECK(quality->GetInt() == 2 && notifications == 0);
+    ASTRAL_CHECK(console.SetBatch({{"render.quality", "1"}, {"RENDER.QUALITY", "3"}}, error));
+    ASTRAL_CHECK(quality->GetInt() == 3 && notifications == 1);
+    ASTRAL_CHECK(console.Set("Render.Quality", "1", error)); // existing single-set callback stays attached
+    ASTRAL_CHECK(quality->GetInt() == 1 && notifications == 2);
+}
+
 ASTRAL_TEST_MAIN("EngineServicesTests")
