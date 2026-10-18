@@ -11,6 +11,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(cmake/AstralEngineSources.cmake)
 include(cmake/AstralRuntime.cmake)
 astral_add_runtime()
+# Windows device adapter shared by native game/player consumers. The portable
+# Runtime source list and independent Runtime consumers stay platform-neutral.
+add_library(AstralWin32Audio STATIC Engine/Platform/Win32/Win32WaveOutput.cpp)
+target_compile_definitions(AstralWin32Audio PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(AstralWin32Audio PUBLIC Astral::Runtime PRIVATE winmm)
+
 add_library(AstralShowcase STATIC ${ASTRAL_SHOWCASE_SOURCES} ${ASTRAL_GAMEPLAY_SOURCES} ${ASTRAL_SAMPLE_SOURCES})
 target_link_libraries(AstralShowcase PUBLIC AstralEngineRuntime)
 
@@ -44,7 +50,7 @@ target_link_libraries(AstralGame PRIVATE user32 gdi32)
 # Opt-in Astral renderer (F2 / ASTRAL_RENDER_MODE=astral). AstralGame already
 # compiles the gameplay sources, so it takes the showcase sources directly.
 target_sources(AstralGame PRIVATE ${ASTRAL_SHOWCASE_SOURCES} Game/Showcase/Win32AstralPresenter.cpp)
-target_link_libraries(AstralGame PRIVATE AstralEngineRuntime winmm)
+target_link_libraries(AstralGame PRIVATE AstralEngineRuntime AstralWin32Audio winmm)
 if(MSVC)
     target_link_options(AstralGame PRIVATE "$<$<CONFIG:Release>:/Brepro>")
 endif()
@@ -70,9 +76,12 @@ add_executable(AstralEnginePlayer Tools/AstralPlayer.cpp)
 target_link_libraries(AstralEnginePlayer PRIVATE Astral::Runtime)
 add_executable(AstralProject Tools/AstralProject.cpp)
 target_link_libraries(AstralProject PRIVATE Astral::Runtime)
-add_executable(AstralPlayerWin32 WIN32 Tools/AstralPlayerWin32.cpp Game/Showcase/Win32AstralPresenter.cpp)
-target_compile_definitions(AstralPlayerWin32 PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_link_libraries(AstralPlayerWin32 PRIVATE AstralShowcase user32 gdi32 winmm)
+add_executable(AstralPlayerWin32 WIN32 Tools/AstralPlayerWin32.cpp)
+target_compile_definitions(AstralPlayerWin32 PRIVATE ASTRAL_PLAYER_PLAYGROUND UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(AstralPlayerWin32 PRIVATE AstralShowcase AstralWin32Audio user32 gdi32 winmm)
+add_executable(AstralEnginePlayerWin32 WIN32 Tools/AstralPlayerWin32.cpp)
+target_compile_definitions(AstralEnginePlayerWin32 PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(AstralEnginePlayerWin32 PRIVATE Astral::Runtime AstralWin32Audio user32 gdi32)
 
 include(CTest)
 if(BUILD_TESTING)
