@@ -14,7 +14,8 @@
 // ExecuteInEditMode) and rendered from an orbiting editor camera. Selection is
 // by authored node path; entities that prefabs or models add select their
 // authored ancestor. Play() runs the current, possibly unsaved, document in a
-// GameHost with the project's input map; Stop() returns to the edit state.
+// GameHost with the project's input map; authoring mutations and undo/redo are
+// rejected until Stop(). Runtime changes never copy back into the document.
 
 #include "Engine/Assets/AssetManager.h"
 #include "Engine/Core/JobSystem.h"
@@ -89,6 +90,11 @@ public:
     // An unsaved scene with a sun, a ground plane and a camera.
     void NewScene();
     bool Save(std::string& error);
+    // Relative paths may contain in-root parent segments and in-root links.
+    // Canonical destination and the atomic writer's .tmp sibling must stay in
+    // the existing content root. Success stores the resolved root-relative
+    // spelling; failure preserves document/path/history and last saved bytes.
+    // This path contract does not provide a race-proof filesystem sandbox.
     bool SaveAs(const std::string& path, std::string& error);
     const std::string& ContentRoot() const { return contentRoot_; }
     const std::string& ScenePath() const { return scenePath_; }

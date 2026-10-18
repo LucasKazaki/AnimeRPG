@@ -1,10 +1,13 @@
 # Editor adoption evidence — October 17, 2026
 
-Status: adopted original editor baseline passed native Debug/Release builds
-and all three granted suites, retaining its 14 cases plus one real neutral
-preview lifecycle proof. Corrective editor changes and native GUI reproductions
-have not begun. This is a frozen baseline, not final editor acceptance.
-Owner `/root/containment_implementation`, worktree `work/astral-editor-adoption`,
+Current status: the corrected editor core passed the granted five-target builds
+and four full Editor/Layout/Framework/Sample suites in both Debug and Release,
+including all24 editor cases and real junction/symlink/hard-link controls without
+skips. Test safety3/3 and milestones1–3 pass. The coordinator independently
+reviewed the exact source before this matrix. All earlier failures and diagnosis
+are retained below. Native GUI reproductions have not begun; this is bounded
+editor-core evidence, not the full demonstration/workflow gate.
+Owner `/root/demo_editor` (transferred from `/root/containment_implementation`), worktree `work/astral-editor-adoption`,
 branch `engine/editor-adoption-20261017`, deliberate base
 `964a8c46b8469e549dd57ebeaadd7b224a350c30`. Coordinator reports its full native
 Debug/Release baseline: all targets built and 31/31 suites each, 78.09/4.96s.
@@ -100,10 +103,214 @@ $editorCmakeDir = 'C:/Program Files/Microsoft Visual Studio/2022/Community/Commo
 git diff --check
 ```
 
+The baseline was committed clean as
+`d5dc908ddec40d03d6cb40a2ff1b15f4c8d453f6`. Before any subsequent build, its
+Debug `AstralEditor.exe` was copied to external
+`work/editor-adoption-evidence/baseline-native/AstralEditor.exe`: 7,034,368
+bytes, SHA256 `fb227c169c58bd612ddb5d4f1df1d53104edda8f78be734c3d300fb89ece881a`.
+No repository-local Debug runtime DLLs were present. The adjacent
+`baseline-binding.receipt.json` binds the preserved binary to that clean
+source commit, the source manifest and the baseline test results. Use this
+untouched binary for coordinator-owned old native reproductions.
+
 After this baseline, GameHost ownership transfers separately for a bounded
 transactional project/settings repair. The editor owner will not modify those
-files during that reservation. Old editor core failure regressions and actual
-native observations must still precede their respective corrective changes.
+files during that reservation. Root `CMakeLists.txt` is also reserved separately
+for the optional backend owner. Neither file set changes in the editor fixes.
+
+## Core old failures retained before corrective changes
+
+Under the next explicit compiler/test slot, only `EngineEditorTests.cpp` changed
+from adopted production `d5dc908`. A Debug `EngineEditorTests` build passed
+(exit0), starting `2026-10-17T15:13:24.7559785-04:00`, ending
+`15:13:28.2979347-04:00`. Eight separate native test children then ran through
+the existing filter API, with their stdout/stderr and exact argv/times/exits
+retained in `work/editor-adoption-evidence/old-<filter>.*`. The test source
+SHA256 was `fad3a5e1fc8c94228e6168e73d27b7cb3e09e38b80ca659eec5fc6e70d63f89a`.
+The child runner was external `run-old-core.py`; it stops on an unexpected
+deterministic result. Production code was unchanged throughout this run.
+
+| Filter | Actual old exit | Observation |
+|---|---|---|
+| `PlayingRejectsAuthoringCommandsWithoutChangingPreviewOrHistory` | **3** | Create while playing succeeds instead of rejecting |
+| `PlayingRejectsDirectTransformWithoutChangingAuthoredState` | **3** | Direct SetTransform succeeds while playing |
+| `PlayingPreservesUndoAndRedoUntilStopped` | **3** | Undo succeeds while playing; the later Redo arm is not reached in this old run |
+| `SaveAsRejectsCanonicalDirectoryEscapeWithoutWritingOutside` | **3** | SaveAs returns1 and creates the disposable outside JSON through a junction |
+| `SaveAsRejectsCanonicalTemporaryFileEscape` | **3** | SaveAs follows the temporary-file symlink and succeeds |
+| `SaveAsAcceptsInRootNormalizationAndRejectsInvalidPathsTransactionally` | **3** | Legitimate `..hidden.scene.json` filename is rejected; later invalid-path checks not reached yet |
+| `FailedSavePreservesDocumentSelectionHistoryAndLastSavedBytes` | **0** | Existing atomic writer preserves document, selection, undo/redo and last-saved bytes after write/rename failures |
+| `SaveAsAllowsInRootDirectoryLinksAndKeepsAuthoredReferences` | **0** | Legitimate in-root junction SaveAs and reopen work |
+
+All fixtures use unique disposable directories and original neutral content.
+Both junction and file-symlink facilities were available; **no link test was
+skipped**. Expected aborts leave only these harmless fixture files in the test
+temporary directory. No GUI, full suite or corrective source change occurred.
+No unexpected failure occurred. Final child ended and the slot was explicitly
+released at `2026-10-17T15:13:42.488192-04:00`. Fixed verification is still pending.
+
+## Staged core correction contract — fixed execution pending
+
+The coordinator accepted the old receipts and cleared production corrections.
+Authoring commits, direct transforms, active drags and Undo/Redo reject while
+Play is active. They retain the document, selection, history, dirty state and
+preview; runtime world edits remain isolated in its existing separate host.
+Stop makes authoring available again. Explicit document replacement remains a
+separate file operation; no new Play framework was added.
+
+SaveAs resolves its existing approved root, destination and fixed `.tmp`
+sibling before directory creation or writing. Complete-prefix filesystem
+identity handles casing and symlink/junction ancestry. An outside target or
+temporary path is rejected; pre-existing temporary file symlinks are rejected
+even in-root. Following the independently reproduced review failure, an
+existing regular temporary file must also have a successfully inspected hard
+link count of at most1 before any truncation; aliases and inspection errors
+are rejected. This preserves the shared atomic writer's sibling-file behavior.
+Absolute/drive/UNC/scheme references and embedded NUL are errors; Windows path
+conversion errors return diagnostics. Parent segments and links are allowed
+when their physical resolution stays in-root, including legitimate `..hidden`
+filenames. Success publishes the canonical root-relative spelling, so the
+existing AssetManager can reopen it without forbidden parent segments. Failed
+saves preserve authored state and last-saved bytes. The shared JSON writer is
+unchanged. This is a bounded path/temporary-alias contract, not a race-proof
+sandbox against concurrent filesystem replacement.
+
+The fixed test set retains original15 and adds9 cases (24 total), covering the
+valid mutation families, direct-transform bypass, Undo and Redo, actual runtime
+mutation then Stop, outside links and temporary links, malformed/absolute paths,
+in-root normalization/reopen, mixed slashes, physical link/parent semantics,
+write/rename failure and author-state invariants. The old run reached only the
+specific assertions listed above; later arms await fixed verification. Host,
+root CMake and all three native-only hypotheses remain untouched by these fixes.
+
+The coordinator's independent source review then identified another promised
+failed-save invariant at risk: an existing regular `.tmp` file can be a hard
+link to the last-saved authored file, so truncation precedes a failed rename.
+A new disposable regression, `FailedSaveRejectsAliasedTemporaryFileAndPreservesSavedBytes`,
+saves `author.scene.json`, edits the document, hard-links that saved file to
+`blocked.scene.json.tmp` and creates a directory at the final destination to
+force rename failure. It checks the existing public author state and last-saved
+bytes. Under a separate brief granted slot it **actually failed with child
+exit3**, at the last-saved byte comparison. SaveAs had returnedfalse/error and
+the public AuthorState checks had passed first; this is a concrete disk-byte
+preservation failure, with no out-of-root access or privilege skip. No hard-link
+guard preceded that reproduction. Debug incremental build exited0, starting
+`2026-10-17T15:18:31.8873412-04:00`, ending`15:18:36.2852273-04:00`; the sole
+filtered child ran`15:18:44.387227`–`15:18:44.443430-04:00`, then the slot was
+explicitly released. Logs: `old-hardlink-build-Debug.log` and
+`old-hardlink.stdout.log`/`.stderr.log`/`.receipt.json`, plus build receipt,
+under the same external evidence root. Receipt hashes bind SceneEditor.h
+`20635a32bb1b73407fa02a436ab414a37ee51e899b53790ebc881b3a9f0592e7`,
+SceneEditor.cpp `d0bcb710aa18764a70412eb53612cf5babfdf0eeb23a4567b44dc87b8df02960`
+and tests`4a79b780eff22c771a64b98788083a205a944e917a5d612895a78ecd571dab3f`.
+No GUI/visible native application ran. The coordinator accepted that receipt
+and cleared the bounded regular-temporary hard-link guard, which is now staged
+for independent review. The fixed matrix remains pending. The user explicitly
+requested that the desktop/GPU remain free, and the coordinator paused all new
+local builds/tests because available RAM was below the requested headroom.
+No new build/test/GUI work will run until the coordinator releases those gates.
+
+## First fixed Debug matrix — stopped on a real failure
+
+The user released the desktop/GPU hold for the October18 noon Eastern live
+demonstration. Under an exclusive coordinator CPU slot, the existing CMake
+cache's source was checked against this exact worktree. No GUI or GPU device
+was used. Wrapper `work/editor-adoption-evidence/run-fixed-core.py` records all
+commands, times and exits. Its five-target Debug build succeeded (exit0,
+7.344s; `2026-10-17T23:52:24.667247-04:00`–`23:52:32.001217-04:00`).
+The anchored Editor/Layout/Framework/Sample CTest then failed (exit8, 3/4 suites,
+5.79s reported by CTest). Layout, Framework14 and Sample20 passed. Editor passed
+its first22 cases, then failed `SaveAsAllowsInRootDirectoryLinksAndKeepsAuthoredReferences`
+at `ScenePath() == "scenes/physical-parent.scene.json"` after the public SaveAs
+had returned success. The final hard-link case was not reached. No assertion
+was weakened and no Release/safety/milestone step ran after the failure.
+
+Logs `fixed-build-Debug.log`, `fixed-test-Debug.log` and adjacent step receipts,
+plus `fixed-matrix.receipt.json`, are retained. Source pre/post binding is
+identical: manifest264 files, SHA256
+`24b58e65975d26b7ba46741997628a4654f827971eb611fe5b10c0e58e7cfaf4`;
+SceneEditor.cpp `8c08ce3433a7084cce92fa0c6967c6c0687144c429813f20bdc2fbb3bb5e2af1`,
+SceneEditor.h `20635a32bb1b73407fa02a436ab414a37ee51e899b53790ebc881b3a9f0592e7`,
+tests `4a79b780eff22c771a64b98788083a205a944e917a5d612895a78ecd571dab3f`.
+Wrapper session81272 closed with exit1 and an explicit failure message; no
+task-owned compiler/test process remained when the slot was released.
+
+A diagnostic-only print was added after that failure, before the unchanged
+assertion, to show the reported path, both possible file locations, full-path
+weakly_canonical result and separately canonicalized link parent. Current test
+SHA256 is `e04fa86fe11e8ac708582bdaaa59fd06e38c9c54c85daee7680ded4ef209152c`.
+The installed MSVC14.44
+`include/filesystem` implementation at weakly_canonical shows it tries the
+entire path, then lexically_normal() before walking existing components when
+the final file is absent. Under a subsequent brief exclusive diagnostic slot,
+the Debug EngineEditorTests-only build exited0 (`23:55:22.481644-04:00`–
+`23:55:24.947338-04:00`). The sole in-root linked-save filter then actually
+exited3 at the unchanged assertion. It printed:
+`reported=physical-parent.scene.json expected-dir-file=0 root-file=1`, with
+weakly_canonical returning the content-root file while separately canonicalizing
+the link first returned its physical parent `content/scenes`. Thus both disk
+location and reported path were wrong. The test hash stayed e04fa86f... before
+and after; no production change preceded the diagnostic. Logs and command/time/
+exit receipts are `path-diagnostic-build-Debug.*` and `path-diagnostic-old.*`.
+The slot was released with no remaining task-owned compiler/test processes.
+
+The coordinator accepted the observation and authorized a bounded helper repair:
+walk components in order, canonicalize each existing component before a later
+`..`, and append missing suffix components while still allowing them to be
+cancelled by a subsequent parent segment. Final whole-component filesystem
+identity containment and the temporary symlink/hard-link checks remain. This
+correction was staged for independent source review before the next fixed
+matrix slot. The diagnostic print and every existing assertion remain; there
+is no relaxed physical-target expectation. The matrix is recorded below.
+
+## Corrected component-path matrix — passed Debug and Release
+
+The coordinator independently reviewed SceneEditor.cpp c6b22ffa... and the
+unchanged24-case diagnostic/assertion source e04fa86f... as clean, then granted
+the exclusive CPU slot. `run-component-fixed-core.py` used the existing verified
+cache, two build jobs, exact five targets AstralEditor/EngineEditorTests/
+EditorLayoutTests/EngineFrameworkTests/EngineSampleTests and anchored four-suite
+CTest. The installed CMake bin was prepended only to the command process PATH
+so the test-safety harness could find its existing compiler tools. No system
+configuration, GUI or GPU operation occurred.
+
+| Step | Actual result | External evidence prefix |
+|---|---|---|
+| Debug five-target build | exit0, 4.094s | `component-fixed-build-Debug` |
+| Debug four-suite CTest | exit0, **4/4**, 5.45s | `component-fixed-test-Debug` |
+| Release five-target build | exit0, 10.016s | `component-fixed-build-Release` |
+| Release four-suite CTest | exit0, **4/4**, 0.78s | `component-fixed-test-Release` |
+| Test safety | exit0, **3/3**, 5.164s harness time | `component-fixed-test_test_safety` |
+| Milestones1/2/3 | exit0 each | `component-fixed-verify_milestone1/2/3` |
+| Whitespace check | exit0 | `component-fixed-diff-check` |
+
+Both configurations execute Editor24, Framework14 and Sample20 plus the retained
+Layout assertions. Logs show no SKIP; actual folder junction, file symlink and
+hard-link controls ran. The preserved diagnostic now reports
+`scenes/physical-parent.scene.json expected-dir-file=1 root-file=0`, confirming
+both intended physical write location and saved-path spelling. The final
+temporary-hard-link saved-byte preservation case also passes. The safety
+harness confirms Release evaluates assertions and serialized smoke safeguards.
+
+The slot ran `2026-10-17T23:59:23.746150-04:00`–`23:59:49.568184-04:00`.
+Wrapper session74489 closed0; an inventory normalized path separators and found
+no remaining task-owned compiler/test/native process before explicit release.
+Each step's `.log`/`.receipt.json` and complete
+`component-fixed-matrix.receipt.json` remain under
+`work/editor-adoption-evidence`, alongside the first failed matrix and actual
+diagnostic receipts. No unchanged failure was rerun as an acceptance attempt.
+
+The physical264-file Engine/Game/Tests/cmake/root-CMake binding is identical
+before and after: SHA256
+`23d3a1947b86aa636492f49478bf282a92571016a10b707fd4c5990bc08d29ac`.
+Exact tested source SHA256: SceneEditor.cpp
+`c6b22ffa16bcff623742820c53a7c2867a5a24ce38aaaf58396227aaf5aecd7e`,
+SceneEditor.h `20635a32bb1b73407fa02a436ab414a37ee51e899b53790ebc881b3a9f0592e7`,
+EngineEditorTests.cpp
+`e04fa86fe11e8ac708582bdaaa59fd06e38c9c54c85daee7680ded4ef209152c`.
+Only this Task/QA prose is updated after the matrix. The original preserved
+native baseline exe remains hashfb227c169c58bd612ddb5d4f1df1d53104edda8f78be734c3d300fb89ece881a.
+Native open/save/focus observations and full creation/import/package/performance
+acceptance remain separate pending gates.
 
 ## Prepared native reproduction — not yet executed
 
@@ -114,7 +321,7 @@ slot and launch are authorized. Retain files rather than cleaning other work.
 
 ```powershell
 $nativeFixture = 'C:/Users/lucas/Documents/Codex/2026-10-17/files-pasted-by-the-user-you/work/editor-adoption-evidence/native-fixtures'
-$nativeEditorBuild = 'C:/Users/lucas/Documents/Codex/2026-10-17/files-pasted-by-the-user-you/work/build-editor-adoption'
+$nativeEditorBaseline = 'C:/Users/lucas/Documents/Codex/2026-10-17/files-pasted-by-the-user-you/work/editor-adoption-evidence/baseline-native'
 New-Item -ItemType Directory -Force -Path "$nativeFixture/root-a", "$nativeFixture/root-b" | Out-Null
 $nativeUtf8 = [System.Text.UTF8Encoding]::new($false)
 $neutralScene = @'
@@ -128,7 +335,7 @@ $brokenProject = @'
 {"format":"astral-project","version":1,"name":"Broken project","startupScene":"missing.scene.json"}
 '@
 [System.IO.File]::WriteAllText("$nativeFixture/root-b/bad.project.json", $brokenProject, $nativeUtf8)
-& "$nativeEditorBuild/Debug/AstralEditor.exe" "$nativeFixture/root-a" 'keep.scene.json'
+& "$nativeEditorBaseline/AstralEditor.exe" "$nativeFixture/root-a" 'keep.scene.json'
 ```
 
 1. **Failed external/project open:** Confirm the named scene, Box outliner row

@@ -14,12 +14,22 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <string>
 #include <vector>
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <winioctl.h>
+#endif
 
 using namespace Astral;
 using Editor::GizmoAxis;
@@ -110,6 +120,87 @@ Vec2 SelectionPixel(const SceneEditor& editor) {
     Vec2 pixel{};
     ASTRAL_CHECK(editor.Camera().Project(editor.SelectionBounds().Center(), kWidth, kHeight, pixel));
     return pixel;
+}
+
+struct EditorFiles {
+    std::filesystem::path directory;
+    std::filesystem::path root;
+    std::filesystem::path outside;
+    EditorFiles() {
+        static unsigned sequence = 0;
+        directory = std::filesystem::temp_directory_path() / ("astral-editor-contract-"
+            + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())
+            + "-" + std::to_string(++sequence));
+        root = directory / "content";
+        outside = directory / "outside";
+        std::filesystem::create_directories(root);
+        std::filesystem::create_directories(outside);
+    }
+    ~EditorFiles() { std::filesystem::remove_all(directory); }
+};
+
+// Observe document/selection/history and the actual preview without exposing
+// implementation-only state. Rejection may update the visible diagnostic.
+struct AuthorState {
+    Core::JsonValue document;
+    SelectionKind kind;
+    NodePath selection;
+    std::string scenePath, projectPath;
+    bool dirty, undo, redo;
+    Vec3 position;
+    Framework::Entity previewEntity;
+    explicit AuthorState(const SceneEditor& editor)
+        : document(editor.Document()), kind(editor.Selected()), selection(editor.Selection()),
+          scenePath(editor.ScenePath()), projectPath(editor.ProjectPath()), dirty(editor.Dirty()),
+          undo(editor.CanUndo()), redo(editor.CanRedo()), position(editor.Position()),
+          previewEntity(editor.PreviewEntity(selection)) {}
+    void Check(const SceneEditor& editor) const {
+        ASTRAL_CHECK(editor.Document() == document && editor.Selected() == kind && editor.Selection() == selection);
+        ASTRAL_CHECK(editor.ScenePath() == scenePath && editor.ProjectPath() == projectPath);
+        ASTRAL_CHECK(editor.Dirty() == dirty && editor.CanUndo() == undo && editor.CanRedo() == redo);
+        ASTRAL_CHECK(Near(editor.Position(), position) && editor.PreviewEntity(selection) == previewEntity);
+        if (!previewEntity.IsNull()) {
+            ASTRAL_CHECK(Near(editor.Preview().GetLocal(previewEntity).translation, position));
+        }
+    }
+};
+
+bool EditorDirectoryLink(const std::filesystem::path& target, const std::filesystem::path& link) {
+#if defined(_WIN32)
+    // Local junctions work without the symbolic-link privilege.
+    struct JunctionData {
+        DWORD tag; WORD length, reserved, substituteOffset, substituteLength, printOffset, printLength;
+        wchar_t paths[4096];
+    } data{};
+    const std::wstring absolute = std::filesystem::absolute(target).make_preferred().wstring();
+    const std::wstring substitute = L"\\??\\" + absolute;
+    if (substitute.size() + absolute.size() + 2 > 4096) return false;
+    data.tag = IO_REPARSE_TAG_MOUNT_POINT;
+    data.substituteLength = static_cast<WORD>(substitute.size() * sizeof(wchar_t));
+    data.printOffset = static_cast<WORD>((substitute.size() + 1) * sizeof(wchar_t));
+    data.printLength = static_cast<WORD>(absolute.size() * sizeof(wchar_t));
+    std::memcpy(data.paths, substitute.c_str(), data.substituteLength + sizeof(wchar_t));
+    std::memcpy(data.paths + substitute.size() + 1, absolute.c_str(), data.printLength + sizeof(wchar_t));
+    data.length = static_cast<WORD>(8 + data.printOffset + data.printLength + sizeof(wchar_t));
+    if (!CreateDirectoryW(link.c_str(), nullptr)) return false;
+    HANDLE handle = CreateFileW(link.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
+        FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) return false;
+    DWORD returned = 0;
+    const bool ok = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, &data, data.length + 8,
+        nullptr, 0, &returned, nullptr) != FALSE;
+    CloseHandle(handle);
+    return ok;
+#else
+    std::error_code ec;
+    std::filesystem::create_directory_symlink(target, link, ec);
+    return !ec;
+#endif
+}
+
+std::string FileText(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 }
 
 } // namespace
@@ -513,6 +604,234 @@ ASTRAL_TEST(PreviewNeverAttachesOrCreatesAuthoredAndInheritedBehaviours) {
         ASTRAL_CHECK(previewProbeCounts.destroyed == 5 && editor.Document() == document);
     }
     std::filesystem::remove_all(root); // unique directory created by this fixture
+}
+
+ASTRAL_TEST(PlayingRejectsAuthoringCommandsWithoutChangingPreviewOrHistory) {
+    EditorFiles files;
+    Framework::BehaviourRegistry::Global().Register<EditorPreviewProbe>("EditorPreviewProbe");
+    SceneEditor editor(files.root.string(), 0);
+    std::string error;
+    ASTRAL_CHECK(editor.Select(Find(editor, "Ground")));
+    ASTRAL_CHECK(editor.AddBehaviour("EditorPreviewProbe", error));
+    ASTRAL_CHECK(editor.AddMaterial("Authored", error));
+    ASTRAL_CHECK(editor.SaveAs("author.scene.json", error));
+    ASTRAL_CHECK(editor.Rename("Authored ground", error));
+    ASTRAL_CHECK(editor.Play(error));
+    Framework::GameHost* const game = editor.Game();
+    const AuthorState before(editor);
+    const std::vector<std::function<bool()>> commands = {
+        [&] { return editor.CreateEntity("primitive:cube", error); },
+        [&] { return editor.Rename("Must not persist", error); },
+        [&] { return editor.Duplicate(error); },
+        [&] { return editor.Delete(error); },
+        [&] { return editor.Reparent(Find(editor, "Sun"), error); },
+        [&] { return editor.SetField(InspectorGroupKind::Entity, "", 0, "name", Core::JsonValue("Changed"), error); },
+        [&] { return editor.ResetField(InspectorGroupKind::Entity, "", 0, "name", error); },
+        [&] { return editor.AddComponent("Light", error); },
+        [&] { return editor.RemoveComponent("MeshRenderer", error); },
+        [&] { return editor.AddBehaviour("EditorPreviewProbe", error); },
+        [&] { return editor.RemoveBehaviour(0, error); },
+        [&] { return editor.AddMaterial("DuringPlay", error); }
+    };
+    for (const auto& command : commands) {
+        error.clear();
+        ASTRAL_CHECK(!command());
+        ASTRAL_CHECK(error.find("playing") != std::string::npos);
+        before.Check(editor);
+        ASTRAL_CHECK(editor.Playing() && editor.Game() == game);
+    }
+    // Runtime edits really happen, but Stop cannot copy them into authoring.
+    const auto runtimeEntity = game->World().Find("Authored ground");
+    Math::TRS moved = game->World().GetLocal(runtimeEntity);
+    moved.translation.x += 9;
+    game->World().SetLocal(runtimeEntity, moved);
+    ASTRAL_CHECK(Near(game->World().GetLocal(runtimeEntity).translation, moved.translation));
+    editor.Stop();
+    before.Check(editor);
+    ASTRAL_CHECK(editor.Rename("Allowed after Stop", error));
+}
+
+ASTRAL_TEST(PlayingRejectsDirectTransformWithoutChangingAuthoredState) {
+    EditorFiles files;
+    SceneEditor editor(files.root.string(), 0);
+    std::string error;
+    ASTRAL_CHECK(editor.Select(Find(editor, "Ground")) && editor.Play(error));
+    const AuthorState before(editor);
+    ASTRAL_CHECK(!editor.SetTransform({7, 2, 1}, {0, 45, 0}, {2, 2, 2}, error));
+    ASTRAL_CHECK(error.find("playing") != std::string::npos);
+    before.Check(editor);
+    editor.Stop();
+    ASTRAL_CHECK(editor.SetTransform({7, 2, 1}, {0, 45, 0}, {2, 2, 2}, error));
+}
+
+ASTRAL_TEST(PlayingPreservesUndoAndRedoUntilStopped) {
+    for (const bool redo : {false, true}) {
+        EditorFiles files;
+        SceneEditor editor(files.root.string(), 0);
+        std::string error;
+        ASTRAL_CHECK(editor.Select(Find(editor, "Ground")));
+        ASTRAL_CHECK(editor.Rename("Edited", error));
+        if (redo) ASTRAL_CHECK(editor.Undo());
+        ASTRAL_CHECK(editor.Play(error));
+        const AuthorState before(editor);
+        ASTRAL_CHECK(!(redo ? editor.Redo() : editor.Undo()));
+        before.Check(editor);
+        editor.Stop();
+        ASTRAL_CHECK(redo ? editor.Redo() : editor.Undo());
+    }
+}
+
+ASTRAL_TEST(SaveAsRejectsCanonicalDirectoryEscapeWithoutWritingOutside) {
+    EditorFiles files;
+    const auto link = files.root / "linked";
+    if (!EditorDirectoryLink(files.outside, link)) {
+        std::printf("[ SKIP ] directory link unavailable; canonical SaveAs escape fixture not executed\n");
+        return;
+    }
+    SceneEditor editor(files.root.string(), 0);
+    std::string error;
+    ASTRAL_CHECK(editor.Select(Find(editor, "Ground")) && editor.Rename("Unsaved marker", error));
+    const AuthorState before(editor);
+    const bool saved = editor.SaveAs("linked/escape.scene.json", error);
+    std::printf("SaveAs returned %d; disposable outside file exists=%d\n", saved,
+        std::filesystem::exists(files.outside / "escape.scene.json"));
+    ASTRAL_CHECK(!saved && !error.empty());
+    ASTRAL_CHECK(!std::filesystem::exists(files.outside / "escape.scene.json"));
+    ASTRAL_CHECK(!std::filesystem::exists(files.outside / "escape.scene.json.tmp"));
+    before.Check(editor);
+    std::filesystem::remove(link); // remove the owned link before recursive fixture cleanup
+}
+
+ASTRAL_TEST(SaveAsRejectsCanonicalTemporaryFileEscape) {
+    EditorFiles files;
+    const auto outside = files.outside / "marker.json";
+    std::ofstream(outside) << "original disposable marker";
+    std::error_code linkError;
+    std::filesystem::create_symlink(outside, files.root / "saved.scene.json.tmp", linkError);
+    if (linkError) {
+        std::printf("[ SKIP ] file symlink unavailable: %s\n", linkError.message().c_str());
+        return;
+    }
+    SceneEditor editor(files.root.string(), 0);
+    const AuthorState before(editor);
+    std::string error;
+    ASTRAL_CHECK(!editor.SaveAs("saved.scene.json", error) && !error.empty());
+    ASTRAL_CHECK(FileText(outside) == "original disposable marker");
+    ASTRAL_CHECK(!std::filesystem::exists(files.root / "saved.scene.json"));
+    before.Check(editor);
+}
+
+ASTRAL_TEST(SaveAsAcceptsInRootNormalizationAndRejectsInvalidPathsTransactionally) {
+    EditorFiles files;
+    SceneEditor editor(files.root.string(), 0);
+    std::string error;
+    ASTRAL_CHECK(editor.SaveAs("..hidden.scene.json", error)); // a filename, not a parent segment
+    ASTRAL_CHECK(editor.SaveAs("scenes/../copy.scene.json", error));
+    ASTRAL_CHECK(editor.ScenePath() == "copy.scene.json");
+    Core::JsonValue saved;
+    ASTRAL_CHECK(Core::ReadJsonFile((files.root / "copy.scene.json").string(), saved, error));
+    ASTRAL_CHECK(saved == editor.Document());
+    SceneEditor reopened(files.root.string(), 0);
+    ASTRAL_CHECK(reopened.OpenScene(editor.ScenePath(), error) && reopened.Document() == saved);
+    ASTRAL_CHECK(!editor.ReloadIfChangedOnDisk());
+    ASTRAL_CHECK(editor.SaveAs("nested\\mixed.scene.json", error));
+    ASTRAL_CHECK(editor.ScenePath() == "nested/mixed.scene.json");
+    ASTRAL_CHECK(editor.Select(Find(editor, "Ground")) && editor.Rename("Still unsaved", error));
+    const AuthorState before(editor);
+    const std::vector<std::string> invalid = {"", "../outside.json", "..\\outside.json", "/absolute.json",
+        "C:relative.json", "C:/absolute.json", "\\\\server\\share\\file.json", "file:scene.json",
+        std::string("nul.scene.json") + '\0' + "ignored"};
+    for (const auto& path : invalid) {
+        error.clear();
+        ASTRAL_CHECK(!editor.SaveAs(path, error) && !error.empty());
+        before.Check(editor);
+    }
+#if defined(_WIN32)
+    ASTRAL_CHECK(!editor.SaveAs(std::string(1, static_cast<char>(0xff)) + ".json", error));
+    before.Check(editor); // malformed UTF-8 is a diagnostic, never a path-conversion exception
+#endif
+}
+
+ASTRAL_TEST(FailedSavePreservesDocumentSelectionHistoryAndLastSavedBytes) {
+    EditorFiles files;
+    SceneEditor editor(files.root.string(), 0);
+    std::string error;
+    ASTRAL_CHECK(editor.SaveAs("author.scene.json", error));
+    const auto lastSaved = FileText(files.root / "author.scene.json");
+    ASTRAL_CHECK(editor.Select(Find(editor, "Ground")));
+    ASTRAL_CHECK(editor.Rename("Unsaved", error));
+    ASTRAL_CHECK(editor.SetTransform({4, 0, 0}, {}, {1, 1, 1}, error));
+    ASTRAL_CHECK(editor.Undo()); // preserve a real redo entry as well
+    const AuthorState before(editor);
+    std::filesystem::create_directory(files.root / "author.scene.json.tmp");
+    ASTRAL_CHECK(!editor.Save(error) && !error.empty());
+    before.Check(editor);
+    ASTRAL_CHECK(FileText(files.root / "author.scene.json") == lastSaved);
+    std::filesystem::create_directory(files.root / "blocked.scene.json");
+    ASTRAL_CHECK(!editor.SaveAs("blocked.scene.json", error)); // rename failure after temp write
+    before.Check(editor);
+    ASTRAL_CHECK(FileText(files.root / "author.scene.json") == lastSaved);
+    ASTRAL_CHECK(!std::filesystem::exists(files.root / "blocked.scene.json.tmp"));
+    ASTRAL_CHECK(editor.Redo());
+}
+
+ASTRAL_TEST(SaveAsAllowsInRootDirectoryLinksAndKeepsAuthoredReferences) {
+    EditorFiles files;
+    const auto destination = files.root / "scenes";
+    std::filesystem::create_directory(destination);
+    const auto link = files.root / "linked";
+    if (!EditorDirectoryLink(destination, link)) {
+        std::printf("[ SKIP ] directory link unavailable; in-root SaveAs control not executed\n");
+        return;
+    }
+    SceneEditor editor(files.root.string(), 0);
+    std::string error;
+    ASTRAL_CHECK(editor.Select(Find(editor, "Ground")) && editor.Rename("Authored through link", error));
+    const auto document = editor.Document();
+    ASTRAL_CHECK(editor.SaveAs("linked/author.scene.json", error));
+    ASTRAL_CHECK(editor.Document() == document && !editor.Dirty() && editor.CanUndo());
+    Core::JsonValue saved;
+    ASTRAL_CHECK(Core::ReadJsonFile((destination / "author.scene.json").string(), saved, error));
+    ASTRAL_CHECK(saved == document);
+    SceneEditor reopened(files.root.string(), 0);
+    ASTRAL_CHECK(reopened.OpenScene("linked/author.scene.json", error) && reopened.Document() == document);
+    std::filesystem::remove(link);
+    const auto deep = destination / "deep";
+    std::filesystem::create_directory(deep);
+    ASTRAL_CHECK(EditorDirectoryLink(deep, link));
+    ASTRAL_CHECK(editor.SaveAs("linked/../physical-parent.scene.json", error));
+    std::printf("physical-parent save: reported=%s expected-dir-file=%d root-file=%d weakly-canonical=%s resolved-link-parent=%s\n",
+        editor.ScenePath().c_str(), static_cast<int>(std::filesystem::exists(destination / "physical-parent.scene.json")),
+        static_cast<int>(std::filesystem::exists(files.root / "physical-parent.scene.json")),
+        std::filesystem::weakly_canonical(link / "../physical-parent.scene.json").generic_string().c_str(),
+        std::filesystem::canonical(link).parent_path().generic_string().c_str());
+    ASTRAL_CHECK(editor.ScenePath() == "scenes/physical-parent.scene.json");
+    ASTRAL_CHECK(std::filesystem::exists(destination / "physical-parent.scene.json"));
+    ASTRAL_CHECK(!std::filesystem::exists(files.root / "physical-parent.scene.json"));
+    std::filesystem::remove(link);
+}
+
+ASTRAL_TEST(FailedSaveRejectsAliasedTemporaryFileAndPreservesSavedBytes) {
+    EditorFiles files;
+    SceneEditor editor(files.root.string(), 0);
+    std::string error;
+    ASTRAL_CHECK(editor.SaveAs("author.scene.json", error));
+    const auto lastSaved = FileText(files.root / "author.scene.json");
+    ASTRAL_CHECK(editor.Select(Find(editor, "Ground")) && editor.Rename("Unsaved hard-link marker", error));
+    std::error_code linkError;
+    std::filesystem::create_hard_link(files.root / "author.scene.json",
+        files.root / "blocked.scene.json.tmp", linkError);
+    if (linkError) {
+        std::printf("[ SKIP ] hard-link fixture unavailable: %s\n", linkError.message().c_str());
+        return;
+    }
+    ASTRAL_CHECK(std::filesystem::hard_link_count(files.root / "blocked.scene.json.tmp") == 2);
+    std::filesystem::create_directory(files.root / "blocked.scene.json"); // force atomic rename failure
+    const AuthorState before(editor);
+    ASTRAL_CHECK(!editor.SaveAs("blocked.scene.json", error) && !error.empty());
+    before.Check(editor);
+    ASTRAL_CHECK(FileText(files.root / "author.scene.json") == lastSaved);
+    ASTRAL_CHECK(std::filesystem::is_directory(files.root / "blocked.scene.json"));
 }
 
 ASTRAL_TEST_MAIN("EngineEditorTests")

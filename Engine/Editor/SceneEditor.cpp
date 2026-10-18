@@ -56,6 +56,41 @@ bool Fail(std::string& error, std::string message) {
     return false;
 }
 
+bool ApprovedSavePath(const std::filesystem::path& root, const std::filesystem::path& candidate,
+    std::filesystem::path& resolved, std::string& error) {
+    std::error_code ec;
+    // MSVC weakly_canonical lexically normalizes a missing file's entire path
+    // before resolving its existing ancestors. That erases a junction/.. pair
+    // and changes the intended physical parent. Resolve each existing component
+    // before interpreting the next one; missing suffixes remain creatable.
+    resolved = candidate.root_path();
+    for (const auto& component : candidate.relative_path()) {
+        if (component == ".") continue;
+        if (component == "..") {
+            resolved = resolved.parent_path();
+            continue;
+        }
+        resolved /= component;
+        const auto status = std::filesystem::symlink_status(resolved, ec);
+        if (ec && ec != std::errc::no_such_file_or_directory)
+            return Fail(error, "cannot inspect scene save path: " + ec.message());
+        if (status.type() != std::filesystem::file_type::not_found) {
+            resolved = std::filesystem::canonical(resolved, ec);
+            if (ec) return Fail(error, "cannot resolve scene save path: " + ec.message());
+        }
+    }
+    // Compare complete directory components using filesystem identity, including
+    // Windows casing. An existing parent link is resolved before any write or
+    // directory creation, even when the destination file does not exist yet.
+    auto part = resolved.begin();
+    std::filesystem::path prefix;
+    for (auto rootPart = root.begin(); rootPart != root.end() && part != resolved.end(); ++rootPart)
+        prefix /= *part++;
+    if (!std::filesystem::equivalent(root, prefix, ec) || ec)
+        return Fail(error, "scene save path escapes the content root");
+    return true;
+}
+
 bool NearlyEqual(Vec3 a, Vec3 b) {
     return std::fabs(a.x - b.x) < 1.0e-5f && std::fabs(a.y - b.y) < 1.0e-5f && std::fabs(a.z - b.z) < 1.0e-5f;
 }
@@ -282,22 +317,60 @@ bool SceneEditor::Save(std::string& error) {
 }
 
 bool SceneEditor::SaveAs(const std::string& path, std::string& error) {
-    const std::filesystem::path relative(path);
-    if (path.empty() || relative.is_absolute() || relative.lexically_normal().string().rfind("..", 0) == 0) {
-        error = "scene paths are relative to the content root (" + contentRoot_ + ")";
-        return false;
+    if (path.empty() || path[0] == '/' || path[0] == '\\' || path.find(':') != std::string::npos
+        || path.find('\0') != std::string::npos || contentRoot_.find('\0') != std::string::npos)
+        return Fail(error, "scene paths must be relative to the content root");
+    try {
+        std::string portable = path;
+        std::replace(portable.begin(), portable.end(), '\\', '/');
+        const auto relative = std::filesystem::u8path(portable);
+        if (relative.has_root_path()) return Fail(error, "scene paths must be relative to the content root");
+        std::error_code ec;
+        const auto root = std::filesystem::canonical(contentRoot_.empty() ? "." : contentRoot_, ec);
+        if (ec || !std::filesystem::is_directory(root, ec) || ec)
+            return Fail(error, "cannot resolve scene content root");
+        std::filesystem::path full, temporary;
+        if (!ApprovedSavePath(root, root / relative, full, error)) return false;
+        const std::string writePath = full.string();
+        const std::filesystem::path temporaryPath(writePath + ".tmp");
+        if (!ApprovedSavePath(root, temporaryPath, temporary, error)) return false;
+        // The shared atomic writer uses a fixed .tmp sibling. Never follow a
+        // pre-existing file link there, even to another in-root authored file.
+        const auto temporaryStatus = std::filesystem::symlink_status(temporaryPath, ec);
+        if (ec && ec != std::errc::no_such_file_or_directory)
+            return Fail(error, "cannot inspect temporary scene path: " + ec.message());
+        if (std::filesystem::is_symlink(temporaryStatus))
+            return Fail(error, "temporary scene path must not be a symbolic link");
+        if (std::filesystem::is_regular_file(temporaryStatus)) {
+            // A regular .tmp can still alias a saved document. Truncating it
+            // would change that document even if the final atomic rename fails.
+            const auto links = std::filesystem::hard_link_count(temporaryPath, ec);
+            if (ec) return Fail(error, "cannot inspect temporary scene links: " + ec.message());
+            if (links > 1) return Fail(error, "temporary scene path must not have multiple hard links");
+        }
+
+        // Publish a normalized, root-relative spelling usable by AssetManager,
+        // which intentionally rejects parent segments. Resolve physical link/..
+        // semantics first; lexical normalization before that can change target.
+        auto part = full.begin();
+        for (auto rootPart = root.begin(); rootPart != root.end(); ++rootPart) ++part;
+        std::filesystem::path savedRelative;
+        for (; part != full.end(); ++part) savedRelative /= *part;
+        const std::string savedPath = savedRelative.generic_string();
+        if (savedPath.empty()) return Fail(error, "scene save path must name a file");
+        std::filesystem::create_directories(full.parent_path(), ec);
+        if (ec) return Fail(error, "cannot create scene directory: " + ec.message());
+        if (!Core::WriteJsonFile(writePath, json_, error)) return false;
+        scenePath_ = savedPath;
+        savedJson_ = json_;
+        // The asset cache now matches the file, so hot reload does not see our own save.
+        assets_->Reload(savedPath);
+        diskVersion_ = assets_->Load<JsonValue>(savedPath).Version();
+        status_ = "Saved " + savedPath;
+        return true;
+    } catch (const std::system_error& e) {
+        return Fail(error, "cannot convert or resolve scene save path: " + e.code().message());
     }
-    const std::filesystem::path full = std::filesystem::path(contentRoot_) / relative;
-    std::error_code directoryError;
-    if (full.has_parent_path()) std::filesystem::create_directories(full.parent_path(), directoryError);
-    if (!Core::WriteJsonFile(full.string(), json_, error)) return false;
-    scenePath_ = path;
-    savedJson_ = json_;
-    // The asset cache now matches the file, so hot reload does not see our own save.
-    assets_->Reload(path);
-    diskVersion_ = assets_->Load<JsonValue>(path).Version();
-    status_ = "Saved " + path;
-    return true;
 }
 
 bool SceneEditor::ReloadIfChangedOnDisk() {
@@ -374,6 +447,7 @@ void SceneEditor::PushUndo() {
 }
 
 bool SceneEditor::Commit(JsonValue next, SelectionKind kind, NodePath selection, std::string& error) {
+    if (Playing()) return Fail(error, "stop playing before editing the scene");
     Framework::SceneDocument document;
     if (!Framework::SceneSerializer(assets_.get()).Parse(next, document, error)) {
         status_ = "Edit rejected: " + error;
@@ -570,6 +644,7 @@ void SceneEditor::ApplyPreviewTransform(Vec3 position, Vec3 euler, Vec3 scale) {
 }
 
 bool SceneEditor::SetTransform(Vec3 position, Vec3 euler, Vec3 scale, std::string& error) {
+    if (Playing()) return Fail(error, "stop playing before editing the scene");
     if (selectionKind_ != SelectionKind::Entity) return Fail(error, "select an entity first");
     if (!Math::IsFinite(position) || !Math::IsFinite(euler) || !Math::IsFinite(scale)) return Fail(error, "values must be finite numbers");
     if (std::fabs(scale.x) < 1.0e-4f || std::fabs(scale.y) < 1.0e-4f || std::fabs(scale.z) < 1.0e-4f) {
@@ -844,6 +919,7 @@ bool SceneEditor::Reparent(const NodePath& parent, std::string& error) {
 }
 
 bool SceneEditor::Undo() {
+    if (Playing()) { status_ = "Stop playing before undo"; return false; }
     if (undo_.empty()) return false;
     Snapshot previous = std::move(undo_.back());
     undo_.pop_back();
@@ -866,6 +942,7 @@ bool SceneEditor::Undo() {
 }
 
 bool SceneEditor::Redo() {
+    if (Playing()) { status_ = "Stop playing before redo"; return false; }
     if (redo_.empty()) return false;
     Snapshot next = std::move(redo_.back());
     redo_.pop_back();
@@ -1228,7 +1305,7 @@ bool SceneEditor::BeginDrag(float x, float y, int width, int height) {
 bool SceneEditor::Drag(float x, float y, int width, int height) {
     (void)width;
     (void)height;
-    if (!drag_.active || selectionKind_ != SelectionKind::Entity) return false;
+    if (Playing() || !drag_.active || selectionKind_ != SelectionKind::Entity) return false;
     const Vec2 moved{x - drag_.start.x, y - drag_.start.y};
     const float along = moved.x * drag_.screenAxis.x + moved.y * drag_.screenAxis.y;
     Vec3 position = drag_.position;
@@ -1483,7 +1560,7 @@ bool SceneEditor::Play(std::string& error) {
     if (hasProject_ && !host->ApplyProjectSettings(project_, error)) return false;
     if (!host->LoadSceneJson(json_, error)) return false;
     game_ = std::move(host);
-    status_ = "Playing (Esc or Stop returns to the editor; edits made while playing are not kept)";
+    status_ = "Playing (Esc or Stop returns to the editor; scene authoring is locked until Stop)";
     return true;
 }
 

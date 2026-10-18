@@ -1,6 +1,6 @@
 # Adopt the committed scene editor — October 17, 2026
 
-Owner: `/root/containment_implementation`, sole implementation owner in
+Owner: `/root/demo_editor` (transferred from `/root/containment_implementation`), sole implementation owner in
 `work/astral-editor-adoption`, branch `engine/editor-adoption-20261017`.
 Deliberate base: `964a8c46b8469e549dd57ebeaadd7b224a350c30`; coordinator reports
 fresh full native Debug/Release all-target builds and 31/31 suites each
@@ -113,6 +113,49 @@ in Debug/Release: 3/3 suites, Editor15 (original14 plus real OnCreate/component
 proof), Framework14 and retained Layout/process safeguards. No corrective
 editor changes or GUI execution preceded these receipts. The native shell is
 built for root-owned actual reproduction. See QA for exact commands/times/logs.
-GameHost ownership then transfers separately for narrow project/settings
-transactionality; this editor owner will not overlap those files. Core old
-regressions are next, with compiler/native slots still coordinator-owned.
+Baseline committed clean as `d5dc908ddec40d03d6cb40a2ff1b15f4c8d453f6`.
+Its native Debug binary was preserved externally with a SHA/source receipt
+before the next build. GameHost ownership transferred separately for narrow
+project/settings transactionality, and root CMake transferred to the optional
+backend owner; this editor owner will not overlap those reservations.
+
+The subsequent test-only old run built Debug EngineEditorTests and retained six
+separate exit3 failures: Play authoring command, direct transform and Undo;
+SaveAs junction escape, temporary-file symlink escape and incorrect rejection
+of a legitimate `..hidden` filename. Two existing behavior controls passed:
+failed writes/rename preserve author state and last saved bytes, and in-root
+linked saves reopen. No link skip, GUI or unexpected failure occurred. Slot
+released October17 at15:13:42-04:00. See QA for exact filters/receipts; production
+corrections were then cleared by the coordinator. Core mutation guards and
+canonical destination/temporary-path SaveAs validation are now staged; fixed
+acceptance awaits a granted compiler slot. Save success publishes a normalized
+root-relative path usable by the existing asset cache; legitimate in-root links
+and parent segments remain supported. The shared atomic writer is unchanged.
+No race-proof filesystem sandbox claim. The 24-case fixed
+editor suite retains original15 and all new regressions/controls. GameHost,
+root CMake and native-only hypotheses remain untouched in these corrections.
+Independent review identified an existing regular temporary hard link that can
+overwrite last-saved bytes before rename failure. Its safe in-root regression
+actually failed with native childexit3 at the saved-byte equality on the frozen
+proposed fix, after an incremental Debug build0. The author-state checks passed;
+the prior saved file's bytes changed. No privilege skip/outside access occurred.
+The brief slot was released15:18:44-04:00. The coordinator accepted the receipt
+and cleared an existing-regular-temp hard-link-count guard, now staged before
+any truncation. No such guard preceded the actual review reproduction. The
+coordinator later completed source re-review. The user released the desktop/GPU
+hold for the October18 noon Eastern demonstration deadline; all execution remains
+serialized under the coordinator. The first fixed Debug matrix built all five
+granted targets, then stopped on a real in-root junction/parent-segment path
+assertion. No Release or safety check followed the failure. A brief independent
+diagnostic slot then confirmed the editor actually wrote to the wrong root
+folder and reported that wrong path. The coordinator authorized preserving
+component order: canonicalize each existing component before processing its
+following parent segment, while permitting missing suffixes and retaining final
+physical containment and temporary-file checks. That bounded correction passed
+the coordinator's independent source review, then all granted fixed checks:
+five target builds and four full suites in each Debug/Release, Editor24 cases
+without link skips, safety3/3 and milestones1–3. CTest totals5.45/0.78s. Source
+binding before/after is identical. The diagnostic and every assertion remain.
+See QA for exact commands/receipts and the preserved earlier failure. Only this
+Task/QA prose changed after the matrix. Native GUI findings and full workflow
+acceptance remain pending.
