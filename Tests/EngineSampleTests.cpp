@@ -846,4 +846,198 @@ ASTRAL_TEST(PlaythroughIsDeterministic) {
     ASTRAL_CHECK(first == second);
 }
 
+namespace {
+
+Framework::ProjectDesc TransactionProject(const std::string& name, const std::string& scene, std::uint16_t key) {
+    Framework::ProjectDesc project;
+    project.name = name;
+    project.startupScene = scene;
+    Input::InputContext context;
+    context.name = name;
+    Input::ActionDesc move;
+    move.name = "Move";
+    move.type = Input::ActionType::Axis2D;
+    move.bufferSeconds = 0.2f;
+    move.bindings.push_back({key, {0, 1}});
+    context.actions.push_back(std::move(move));
+    project.input.push_back(std::move(context));
+    return project;
+}
+
+struct ProjectTransactionFixture {
+    std::string root;
+    int notifications{};
+    std::unique_ptr<GameHost> host;
+    Framework::ProjectDesc original;
+    Framework::GameWorld* world{};
+    std::string bindings;
+    float held{};
+
+    explicit ProjectTransactionFixture(const char* name) : root(TempDir(name)) {
+        WriteText(root + "/good.json", R"({"prefabs":{"OriginalPrefab":{"name":"Spawned"}},
+            "entities":[{"name":"Keep","components":{"Camera":{}}}]})");
+        WriteText(root + "/next.json", R"({"entities":[{"name":"Replacement"}]})");
+        Framework::HostSettings settings;
+        settings.contentRoot = root;
+        settings.workerThreads = 0;
+        settings.audio = false;
+        host = std::make_unique<GameHost>(settings);
+        host->Commands().RegisterInt("project.observed", 1, "original neutral test setting");
+        host->Commands().RegisterInt("project.locked", 3, "read-only fixture", Core::CVarReadOnly);
+        host->Commands().RegisterInt("project.cheat", 4, "cheat fixture", Core::CVarCheat);
+        original = TransactionProject("Original", "good.json", 'W');
+        original.config = {{"r.Quality", "1"}, {"host.showStats", "false"}, {"project.observed", "1"}};
+        std::string error;
+        ASTRAL_CHECK(host->ApplyProject(original, error));
+        host->Commands().Find("r.Quality")->OnChanged([this](const Core::ConsoleVariable&) { ++notifications; });
+        host->Commands().Find("project.observed")->OnChanged([this](const Core::ConsoleVariable&) { ++notifications; });
+        host->Update(kFrame, Hold({"W"}));
+        world = &host->World();
+        bindings = host->Input().SaveBindings();
+        held = host->Input().HeldSeconds("Move");
+        ASTRAL_CHECK(host->Input().Down("Move") && host->Input().Pressed("Move"));
+    }
+
+    ~ProjectTransactionFixture() {
+        host.reset();
+        std::filesystem::remove_all(root);
+    }
+
+    Framework::ProjectDesc Candidate(const std::string& scene) const {
+        auto project = TransactionProject("Candidate", scene, 'S');
+        project.config = {{"r.Quality", "0"}, {"host.showStats", "true"}, {"project.observed", "9"}};
+        return project;
+    }
+
+    void CheckPreserved() {
+        std::printf("project transaction: worldSame=%d project=%s quality=%d observed=%d notifications=%d moveDown=%d\n",
+            &host->World() == world, host->Project().name.c_str(), host->Commands().Find("r.Quality")->GetInt(),
+            host->Commands().Find("project.observed")->GetInt(), notifications, host->Input().Down("Move"));
+        std::fflush(stdout);
+        ASTRAL_CHECK(&host->World() == world && !host->World().Find("Keep").IsNull());
+        ASTRAL_CHECK(host->ScenePath() == "good.json" && host->Document().prefabs.count("OriginalPrefab") == 1);
+        ASTRAL_CHECK(host->Project().name == original.name && host->Project().startupScene == original.startupScene);
+        ASTRAL_CHECK(host->Project().config == original.config);
+        ASTRAL_CHECK(host->Input().SaveBindings() == bindings);
+        ASTRAL_CHECK(host->Input().Down("Move") && host->Input().Pressed("Move"));
+        ASTRAL_CHECK(host->Input().HeldSeconds("Move") == held && host->Input().Axis("Move").y == 1.0f);
+        ASTRAL_CHECK(host->Commands().Find("r.Quality")->GetInt() == 1);
+        ASTRAL_CHECK(!host->Commands().Find("host.showStats")->GetBool());
+        ASTRAL_CHECK(host->Commands().Find("project.observed")->GetInt() == 1);
+        ASTRAL_CHECK(host->Commands().Find("project.locked")->GetInt() == 3);
+        ASTRAL_CHECK(host->Commands().Find("project.cheat")->GetInt() == 4);
+        ASTRAL_CHECK(host->Renderer().Settings().maxShadowResolution == Graphics::RendererSettings::Preset(1).maxShadowResolution);
+        ASTRAL_CHECK(notifications == 0); // restoring values cannot undo callback side effects
+    }
+
+    void CheckRecovery() {
+        std::string error;
+        ASTRAL_CHECK(host->ApplyProject(Candidate("next.json"), error));
+        ASTRAL_CHECK(host->LastError().empty() && host->Project().name == "Candidate");
+        ASTRAL_CHECK(host->ScenePath() == "next.json" && !host->World().Find("Replacement").IsNull());
+        ASTRAL_CHECK(host->World().Find("Keep").IsNull());
+        ASTRAL_CHECK(host->Commands().Find("r.Quality")->GetInt() == 0);
+        ASTRAL_CHECK(host->Commands().Find("host.showStats")->GetBool());
+        ASTRAL_CHECK(host->Commands().Find("project.observed")->GetInt() == 9 && notifications == 2);
+        host->Update(kFrame, Hold({"S"}));
+        ASTRAL_CHECK(host->Input().Down("Move") && host->Input().Axis("Move").y == 1.0f);
+    }
+};
+
+} // namespace
+
+ASTRAL_TEST(FailedProjectScenePreservesRunningProject) {
+    for (int failure = 0; failure != 4; ++failure) {
+        ProjectTransactionFixture fixture("astral_project_scene_transaction");
+        const std::string path = "bad.json";
+        if (failure == 1) WriteText(fixture.root + "/" + path, "{malformed");
+        if (failure == 2) WriteText(fixture.root + "/" + path, R"({"entities":[{"components":{"Unknown":{}}}]})");
+        if (failure == 3) WriteText(fixture.root + "/" + path, R"({"entities":[{"prefab":"missing.prefab.json"}]})");
+        std::string error;
+        ASTRAL_CHECK(!fixture.host->ApplyProject(fixture.Candidate(path), error));
+        ASTRAL_CHECK(!error.empty() && !fixture.host->LastError().empty());
+        fixture.CheckPreserved();
+        fixture.CheckRecovery();
+    }
+}
+
+ASTRAL_TEST(FailedProjectConfigPreservesRunningProject) {
+    for (const auto& invalid : std::vector<std::pair<std::string, std::string>>{
+             {"project.unknown", "1"}, {"project.locked", "8"}, {"project.cheat", "8"}, {"project.observed", "bad-int"}}) {
+        ProjectTransactionFixture fixture("astral_project_config_transaction");
+        auto candidate = fixture.Candidate("next.json");
+        candidate.config.push_back(invalid); // late failure follows valid observable settings
+        std::string error;
+        ASTRAL_CHECK(!fixture.host->ApplyProject(candidate, error));
+        ASTRAL_CHECK(!error.empty() && !fixture.host->LastError().empty());
+        fixture.CheckPreserved();
+        fixture.CheckRecovery();
+    }
+}
+
+ASTRAL_TEST(ProjectSettingsAdapterIsAtomicWithoutLoadingItsStartupScene) {
+    ProjectTransactionFixture fixture("astral_project_settings_transaction");
+    auto invalid = fixture.Candidate("deliberately-unloaded.json");
+    invalid.config.push_back({"project.observed", "bad-int"});
+    std::string error;
+    ASTRAL_CHECK(!fixture.host->ApplyProjectSettings(invalid, error));
+    fixture.CheckPreserved();
+    ASTRAL_CHECK(fixture.host->ApplyProjectSettings(fixture.Candidate("deliberately-unloaded.json"), error));
+    ASTRAL_CHECK(error.empty() && fixture.host->LastError().empty());
+    ASTRAL_CHECK(&fixture.host->World() == fixture.world && !fixture.world->Find("Keep").IsNull());
+    ASTRAL_CHECK(fixture.host->ScenePath() == "good.json" && fixture.host->Document().prefabs.count("OriginalPrefab") == 1);
+    ASTRAL_CHECK(fixture.host->Project().name == "Candidate"
+        && fixture.host->Project().startupScene == "deliberately-unloaded.json");
+    ASTRAL_CHECK(fixture.host->Commands().Find("project.observed")->GetInt() == 9 && fixture.notifications == 2);
+    fixture.host->Update(kFrame, Hold({"S"}));
+    ASTRAL_CHECK(fixture.host->Input().Down("Move"));
+}
+
+ASTRAL_TEST(ProjectTransactionsPreserveInvalidInputAndAcceptAliasedMetadata) {
+    ProjectTransactionFixture fixture("astral_project_input_transaction");
+    auto invalid = fixture.Candidate("next.json");
+    invalid.input[0].actions[0].bindings[0].axisContribution.x = std::numeric_limits<float>::infinity();
+    std::string error;
+    ASTRAL_CHECK(!fixture.host->ApplyProject(invalid, error));
+    fixture.CheckPreserved();
+    ASTRAL_CHECK(!fixture.host->ApplyProjectSettings(invalid, error));
+    fixture.CheckPreserved();
+    ASTRAL_CHECK(!fixture.host->ApplyProject(fixture.Candidate(""), error));
+    fixture.CheckPreserved();
+    ASTRAL_CHECK(fixture.host->ApplyProject(fixture.host->Project(), error));
+    ASTRAL_CHECK(error.empty() && fixture.host->LastError().empty() && fixture.host->Project().name == "Original");
+    ASTRAL_CHECK(!fixture.host->World().Find("Keep").IsNull() && fixture.notifications == 0);
+    ASTRAL_CHECK(fixture.host->Input().SaveBindings() == fixture.bindings);
+}
+
+namespace {
+struct ProjectCreateProbe final : Framework::Behaviour {
+    static GameHost* host;
+    static int creates;
+    void OnCreate() override {
+        ++creates;
+        ASTRAL_CHECK(host && &World() == &host->World());
+        ASTRAL_CHECK(host->Project().name == "Candidate" && host->Project().startupScene == "next.json");
+        ASTRAL_CHECK(World().Input()->SaveBindings().find("Candidate Move 0 83") != std::string::npos); // S
+        ASTRAL_CHECK(host->Commands().Find("r.Quality")->GetInt() == 0);
+        ASTRAL_CHECK(host->Commands().Find("project.observed")->GetInt() == 9);
+        ASTRAL_CHECK(host->Renderer().Settings().maxShadowResolution == Graphics::RendererSettings::Preset(0).maxShadowResolution);
+    }
+};
+GameHost* ProjectCreateProbe::host{};
+int ProjectCreateProbe::creates{};
+} // namespace
+
+ASTRAL_TEST(ProjectSceneOnCreateSeesFinalProjectSettings) {
+    ProjectTransactionFixture fixture("astral_project_create_transaction");
+    Framework::BehaviourRegistry::Global().Register<ProjectCreateProbe>("ProjectTransactionProbe");
+    WriteText(fixture.root + "/next.json", R"({"entities":[{"name":"Replacement",
+        "behaviours":[{"type":"ProjectTransactionProbe"}]}]})");
+    ProjectCreateProbe::host = fixture.host.get();
+    ProjectCreateProbe::creates = 0;
+    fixture.CheckRecovery();
+    ASTRAL_CHECK(ProjectCreateProbe::creates == 1);
+    ProjectCreateProbe::host = nullptr;
+}
+
 ASTRAL_TEST_MAIN("EngineSampleTests")

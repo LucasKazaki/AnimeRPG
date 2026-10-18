@@ -333,20 +333,56 @@ bool GameHost::LoadSceneJson(const JsonValue& json, std::string& error) {
     return true;
 }
 
-bool GameHost::ApplyProject(const ProjectDesc& project, std::string& error) {
-    Input::InputSystem validatedInput;
+bool GameHost::PrepareProjectSettings(const ProjectDesc& project, Input::InputSystem& input, std::string& error) {
     for (std::size_t i = 0; i < project.input.size(); ++i) {
         std::string inputError;
-        if (!validatedInput.AddContext(project.input[i], &inputError))
+        if (!input.AddContext(project.input[i], &inputError))
             return Report(error = At("input.contexts", i) + ": " + inputError);
     }
-    for (const auto& [name, value] : project.config) {
-        std::string setError;
-        if (!commands_.Set(name, value, setError)) return Report(error = "config." + name + ": " + setError);
-    }
+    std::string configError;
+    if (!commands_.ValidateBatch(project.config, configError)) return Report(error = "config." + configError);
+    return true;
+}
+
+bool GameHost::ApplyProjectSettings(const ProjectDesc& project, std::string& error) {
+    ProjectDesc staged = project; // project may alias Project()
+    Input::InputSystem validatedInput;
+    if (!PrepareProjectSettings(staged, validatedInput, error)) return false;
+    std::string configError;
+    if (!commands_.SetBatch(staged.config, configError)) return Report(error = "config." + configError);
     input_ = std::move(validatedInput);
-    project_ = project;
-    return LoadScene(project.startupScene, error);
+    project_ = std::move(staged);
+    lastError_.clear();
+    error.clear();
+    return true;
+}
+
+bool GameHost::ApplyProject(const ProjectDesc& project, std::string& error) {
+    ProjectDesc staged = project;
+    Input::InputSystem validatedInput;
+    if (!PrepareProjectSettings(staged, validatedInput, error)) return false;
+    const std::string path = staged.startupScene;
+    if (path.empty()) return Report(error = "no scene path");
+    const auto handle = assets_->Load<JsonValue>(path);
+    std::vector<Assets::AssetDependency> attempted{handle.Dependency()};
+    const auto reject = [&](const std::string& message) {
+        if (path == scenePath_) WatchReloadAttempt(attempted);
+        return Report(error = path + ": " + message);
+    };
+    if (!handle.Ready() || !handle.Error().empty()) return reject(handle.Error());
+    SceneDocument document;
+    std::string parseError;
+    if (!SceneSerializer(assets_.get()).Parse(*handle.Get(), document, parseError, &attempted, hasScene_)) return reject(parseError);
+    std::vector<Assets::AssetDependency> watches = document.dependencies;
+    std::string configError;
+    if (!commands_.SetBatch(staged.config, configError)) return Report(error = "config." + configError);
+    input_ = std::move(validatedInput);
+    project_ = std::move(staged);
+    Activate(std::move(document), path);
+    sceneWatches_ = std::move(watches);
+    console_->Print("loaded " + path);
+    error.clear();
+    return true;
 }
 
 bool GameHost::LoadProject(const std::string& path, std::string& error) {

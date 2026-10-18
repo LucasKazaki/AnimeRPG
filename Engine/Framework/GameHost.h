@@ -115,6 +115,9 @@ public:
     // Applies a project (input map, config) and loads its startup scene.
     bool LoadProject(const std::string& path, std::string& error);
     bool ApplyProject(const ProjectDesc& project, std::string& error);
+    // Applies validated settings without replacing the current scene (editor
+    // adapter). Both project entry points preserve live settings on failure.
+    bool ApplyProjectSettings(const ProjectDesc& project, std::string& error);
     const ProjectDesc& Project() const { return project_; }
 
     // Replaces the world with a scene (content path). Transactional: on
@@ -158,6 +161,7 @@ public:
 private:
     void RegisterCommands();
     std::unique_ptr<GameWorld> MakeWorld();
+    bool PrepareProjectSettings(const ProjectDesc& project, Input::InputSystem& input, std::string& error);
     void Activate(SceneDocument document, const std::string& path);
     void WatchReloadAttempt(const std::vector<Assets::AssetDependency>& attempted);
     bool Report(const std::string& error); // logs a load error, returns false
