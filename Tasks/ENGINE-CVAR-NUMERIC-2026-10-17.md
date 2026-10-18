@@ -1,6 +1,6 @@
 # Guard console numeric destinations — October 17, 2026
 
-Owner `/root/candidate_review`; independent reviewer `/root` or
+Owner `/root/demo_runtime` (transferred from `/root/candidate_review`); independent reviewer `/root` or
 `/root/numeric_implementation`. Dedicated worktree `work/astral-cvar-numeric`,
 branch `engine/cvar-numeric-20261017`, exact base
 `2c69888774c074a69ec12c5f659e3632280db420` (original Console API, no project
@@ -15,7 +15,7 @@ Void Set(double) can likewise store values outside the declared Int or Float
 destination. SetRange may force an otherwise valid current value into an unsafe
 range, and RegisterFloat can publish nonfinite defaults. The integral-float
 spelling of the legitimate -2147483648 boundary is also rejected by an absolute
-max-value check. These are source hypotheses, not executed reproductions yet.
+max-value check. Local OLD execution confirmed these on October18 at03:51:20Z.
 
 Allowed paths only: `Engine/Core/Console.{h,cpp}`,
 `Tests/EngineServicesTests.cpp`, this packet and
@@ -26,11 +26,28 @@ policy to it. No GameHost, Scene, input/math/physics/audio, editor/native, asset
 game content, CMake, dependency or policy edits here. The separate LoadProject
 stale Ready/Error finding remains queued elsewhere.
 
-Only task/QA and existing-API regressions may be prepared now. No Console
-production edit or local execution before actual old failure receipts and
-explicit coordinator clearance. Lucas requested the desktop/GPU remain free;
-all new local build/test slots are paused for RAM headroom. Do not bypass this
-hold with another compiler, runtime, sanitizer, process fixture or GPU path.
+Lucas released the desktop/GPU hold and moved the demonstration deadline to
+October18 noon Eastern (16:00Z). The coordinator accepted local OLD receipts
+from assembled source `afd4a21`, whose Engine bytes equal base2c698887, and
+authorized the bounded production fix. All nine OLD failure filters aborted
+with child exit3, before unsafe typed reads; both positive controls returned0.
+Root retained exact commands/output in `work/cpu-repro-evidence/receipts.json`.
+Configure returned0 in5.0s and the two-job Debug Services/World build returned0
+in34.344s. Original Services file hash8b74ac7501cdfd263cb9806b17763611ef6c5b0161ac9f2203a468717aac06a0 matched.
+The first corrected source passed affected Debug/Release suites, but independent
+review found a Float archive boundary issue. A new safe SaveConfig/LoadConfig
+fixture actually aborted with child exit3 on that first correction, at accepted
+load=false before any destination getter (03:58:41Z). Nine-digit formatting wrote
+3.40282347e+38 beyond exact FLT_MAX. Root accepted this failure and authorized
+conditional17-digit formatting only when nine-digit text cannot parse safely or
+crosses Float bounds. Ordinary display remains unchanged. Positive controls
+cover 0.1, tiny finite doubles/Float subnormals, and both finite Float boundaries.
+This final source was independently reviewed clean and passed fresh Debug/
+Release Services/Framework/Sample3/3 (66 cases each), safety3/3 and M1-3 at04:10Z.
+Exact source-before/after patchSHA256
+`de048e3b7ef294e637ce6fa4edaca1386a506955ccede1509ad45bf7ecbfde9b`
+matched. Logs are in `work/cvar-numeric-final-evidence`; final independent
+logs/docs/commit binding remains required. Root schedules all execution slots.
 
 ## Approved bounded ingress contract
 

@@ -507,6 +507,59 @@ ASTRAL_TEST(CVarNumericIngressKeepsUsefulClampRoundingAndUnderflow) {
     ASTRAL_CHECK(integer->GetInt() == 10);
     integer->Set(2.6);
     ASTRAL_CHECK(integer->GetInt() == 3);
+    ASTRAL_CHECK(integer->SetFromString("1e100", error) && integer->GetInt() == 10);
+    ASTRAL_CHECK(integer->SetFromString("-9223372036854775809", error) && integer->GetInt() == 0);
+    integer->Reset();
+    ASTRAL_CHECK(integer->GetInt() == 2);
+}
+
+ASTRAL_TEST(CVarWideFiniteRangesPreserveSafeValuesAndReset) {
+    ConsoleRegistry console;
+    auto* value = console.RegisterFloat("WideFloat", 0.5f, "");
+    value->SetRange(-1e100, 1e100); // wide endpoints are valid while the effective value is safe
+    std::string error;
+    ASTRAL_CHECK(value->SetFromString("1.25", error) && value->GetFloat() == 1.25f);
+    ASTRAL_CHECK(!value->SetFromString("1e100", error) && value->GetFloat() == 1.25f);
+    value->Reset();
+    ASTRAL_CHECK(value->GetFloat() == 0.5f);
+    value->SetRange(2, 10);
+    ASTRAL_CHECK(value->GetFloat() == 2);
+    value->Set(8.0);
+    value->Reset(); // default is normalized through the current range
+    ASTRAL_CHECK(value->GetFloat() == 2);
+    auto* integer = console.RegisterInt("IntLimits", 0, "");
+    integer->SetRange(-1e100, 1e100);
+    integer->Set(static_cast<double>(std::numeric_limits<int>::lowest()));
+    ASTRAL_CHECK(integer->GetInt() == std::numeric_limits<int>::lowest());
+    integer->Set(static_cast<double>(std::numeric_limits<int>::max()));
+    ASTRAL_CHECK(integer->GetInt() == std::numeric_limits<int>::max());
+    integer->Set(2147483647.6); // rounding, followed by destination check
+    ASTRAL_CHECK(integer->GetInt() == std::numeric_limits<int>::max());
+}
+
+ASTRAL_TEST(CVarFloatArchiveRoundTripsBothFiniteDestinationBoundaries) {
+    const double candidates[] = {static_cast<double>(std::numeric_limits<float>::max()),
+        -static_cast<double>(std::numeric_limits<float>::max()), 0.1, 1e-100,
+        static_cast<double>(std::numeric_limits<float>::denorm_min())};
+    for (double candidate : candidates) {
+        const float boundary = static_cast<float>(candidate); // all candidates are valid finite Float inputs
+        ConsoleRegistry source;
+        auto* original = source.RegisterFloat("FloatBoundary", 0.0f, "", CVarArchive);
+        original->Set(candidate);
+        ASTRAL_CHECK(original->GetFloat() == boundary);
+        const std::string saved = source.SaveConfig();
+        ASTRAL_CHECK(!saved.empty());
+        if (candidate == 0.1) ASTRAL_CHECK(saved == "FloatBoundary = 0.1\n");
+        if (candidate == 1e-100) ASTRAL_CHECK(saved == "FloatBoundary = 1e-100\n");
+        ConsoleRegistry destination;
+        auto* restored = destination.RegisterFloat("FloatBoundary", 0.5f, "", CVarArchive);
+        std::string error;
+        const bool accepted = destination.LoadConfig(saved, error);
+        std::printf("Float boundary archive '%s': accepted=%d error='%s'\n", saved.c_str(), accepted, error.c_str());
+        std::fflush(stdout);
+        ASTRAL_CHECK(accepted); // no matching getter until the load has safely succeeded
+        ASTRAL_CHECK(error.empty() && restored->GetFloat() == boundary);
+    }
 }
 
 ASTRAL_TEST(CVarConfigRejectsUnrepresentableFloatBeforeRead) {
