@@ -1,0 +1,61 @@
+# Assemble and rehearse the noon engine candidate
+
+Owner/coordinator: `/root`. Deadline October18 noon America/New_York.
+Isolated worktree work/astral-demo-candidate, branch
+engine/noon-demo-candidate-20261018 deliberately starts at independently reviewed
+Project1804a3c (full reviewed CVar/Physics/framework histories retained).
+Lucas's engine-only overnight assignment authorizes integration after review
+and applicable technical gates. Main remains distinct until those gates pass.
+
+## Inputs and permitted changes
+
+Integrate reviewed creator5c9fb44, editor1429312, D3D11 backend1c370c4 and later
+reviewed native-runtime player and packager commits using normal merges. Preserve
+original fixtures, prior failed evidence and game behavior. Resolve only actual
+overlap in their approved paths; retain Project's transactional Host/settings
+hook, Creator's Runtime factoring and Editor's authoring/play separation. Do not
+replace established subsystems or silently drop tests. Native-player and Host
+ingress packets are still independently owned and unaccepted until reviewed.
+Reviewed ingress95834bf, packager8c6d68f and SaveAs4ca4a31 have now passed their
+component gates and normal-merged. Record their exact scope/receipts in the QA;
+the final reusable native-player packet still awaits accepted immutable input.
+This Task and its QA record are the integration-specific documentation paths.
+No installs, policy/workflow relaxation, game content, scheduler or history edits.
+
+## Acceptance and ordering
+
+Record merge parents/conflicts and independently review each resolution against
+both input commits. Build all relevant targets in native Debug and Release with
+assertions active, exclusive resource admission, external short build paths,
+at most two jobs and 6–8GiB headroom. Run deterministic suites, safety/milestones,
+then separately serialize runtime/native/GPU checks. Exact argv, source/tree and
+actual exits/captures belong in external evidence and matching QA.
+
+Use the real creator and original neutral glTF fixture to verify native project
+open, Assets model creation, outliner/viewport selection, transform edits,
+undo/redo, Save As/reopen, Play/Stop, then the Runtime-only player. Build and stage
+one immutable Release package with actual PE dependency inventory and full
+content integrity; launch from outside the repository without explicit content
+arguments, exercise restart/resize/close and inspect actual output. Keep legacy
+sample behavior verified. Clean-machine acceptance is recorded only if available.
+
+Prepare exact launch commands and rehearse the demonstrated sequence before the
+deadline. Freeze the demonstration candidate by09:30Eastern if feasible, rehearse
+before11:00, and stop starting packets at noon. A full24hour soak cannot finish
+in this window and stays explicitly incomplete. GPU offscreen acceptance does
+not establish editor/player GPU presentation. Full workflow gate remains NOT
+PASSED until the complete required workflow has actual evidence.
+
+
+## Accepted immutable inputs and final documentation checkpoint
+
+The independent reviews and actual applicable local gates for nativec381,
+editor-reopen86cd and PE-format12cdbc are complete and their scoped normal
+merges are recorded in the matching QA. The final compiled/package source is
+8056ff6a6d04589bffbac84120365c271f2e9e85. Complete D/R targets,33 deterministic
+suites each,12 separate unchanged native harnesses, actual reusable/legacy
+players and the complete fresh-project CPU editor/package workflow passed.
+This final two-path Task/QA update changes no compiled source, tests or workflow.
+Overall current-main proposed merge and hosted checks still require verification
+before promotion. Optional native GPU and imported-animation implementation
+remain separate isolated packets. Keep the accepted CPU delivery frozen.

@@ -1,0 +1,19 @@
+{
+  "materials": {
+    "star": {"shading": "Toon", "baseColor": [1.0, 0.82, 0.25], "emissive": [0.55, 0.4, 0.08],
+             "rimColor": [1.0, 0.95, 0.7], "rimIntensity": 0.6}
+  },
+  "entity": {
+    "name": "Star",
+    "transform": {"scale": [0.6, 0.6, 0.6]},
+    "components": {
+      "MeshRenderer": {"mesh": "primitive:sphere", "material": "star", "autoLod": true},
+      "Collider": {"shape": "Sphere", "radius": 0.8, "isTrigger": true}
+    },
+    "behaviours": [
+      {"type": "Collectible", "points": 1},
+      {"type": "Spinner", "degreesPerSecond": 120},
+      {"type": "Bobber", "amplitude": 0.2, "frequency": 0.6}
+    ]
+  }
+}

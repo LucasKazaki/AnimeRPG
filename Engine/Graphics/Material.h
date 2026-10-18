@@ -22,6 +22,7 @@ struct Material {
     Color baseColor{0.8f, 0.8f, 0.8f};
     float opacity{1.0f};
     const Texture2D* baseTexture{};
+    std::string baseTexturePath; // asset path baseTexture came from (for scene serialisation)
     Math::Vec2 uvScale{1.0f, 1.0f};
     Color emissive{0.0f, 0.0f, 0.0f}; // linear HDR, added after lighting
 

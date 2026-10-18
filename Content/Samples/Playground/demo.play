@@ -1,0 +1,11 @@
+# AstralPlayer demo script for the Playground sample (see Tools/AstralPlayer.cpp).
+# <frames> <keys held...> [| console command on the step's first frame]
+30  -                          # settle
+60  W                          # walk through the centre star
+40  W D
+1   W Space                    # jump
+50  W
+40  D Shift                    # sprint east
+60  E                          # orbit the camera
+1   -                          | spawn Crate 0 6 -2
+90  -

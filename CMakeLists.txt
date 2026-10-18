@@ -9,12 +9,37 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # cmake/AstralEngineSources.cmake; Tests/EngineRuntime builds the same sources
 # headless on Linux with sanitizers).
 include(cmake/AstralEngineSources.cmake)
-find_package(Threads REQUIRED)
-add_library(AstralEngineRuntime STATIC ${ASTRAL_ENGINE_RUNTIME_SOURCES})
-target_include_directories(AstralEngineRuntime PUBLIC .)
-target_link_libraries(AstralEngineRuntime PUBLIC Threads::Threads)
-add_library(AstralShowcase STATIC ${ASTRAL_SHOWCASE_SOURCES} ${ASTRAL_GAMEPLAY_SOURCES})
+include(cmake/AstralRuntime.cmake)
+astral_add_runtime()
+
+# Isolated hardware spike. Neither the portable source list nor existing
+# player/editor consumers depend on Windows graphics or shader compilation.
+option(ASTRAL_BUILD_D3D11 "Build the Windows D3D11 offscreen opaque-Unlit backend" OFF)
+option(ASTRAL_ENABLE_HARDWARE_GPU_TESTS "Run exclusive hardware D3D11 tests (no software fallback)" OFF)
+if(ASTRAL_ENABLE_HARDWARE_GPU_TESTS AND NOT ASTRAL_BUILD_D3D11)
+    message(FATAL_ERROR "Hardware GPU tests require ASTRAL_BUILD_D3D11=ON")
+endif()
+if(ASTRAL_BUILD_D3D11)
+    if(NOT WIN32)
+        message(FATAL_ERROR "ASTRAL_BUILD_D3D11 requires Windows")
+    endif()
+    add_library(AstralD3D11 STATIC
+        Engine/Graphics/D3D11/D3D11Renderer.cpp
+        Engine/Graphics/D3D11/ShaderCompiler.cpp)
+    target_link_libraries(AstralD3D11 PUBLIC AstralEngineRuntime PRIVATE d3d11 dxgi d3dcompiler)
+    target_compile_definitions(AstralD3D11 PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+
+# Windows device adapter shared by native game/player consumers. The portable
+# Runtime source list and independent Runtime consumers stay platform-neutral.
+add_library(AstralWin32Audio STATIC Engine/Platform/Win32/Win32WaveOutput.cpp)
+target_compile_definitions(AstralWin32Audio PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(AstralWin32Audio PUBLIC Astral::Runtime PRIVATE winmm)
+
+add_library(AstralShowcase STATIC ${ASTRAL_SHOWCASE_SOURCES} ${ASTRAL_GAMEPLAY_SOURCES} ${ASTRAL_SAMPLE_SOURCES})
 target_link_libraries(AstralShowcase PUBLIC AstralEngineRuntime)
+add_library(AstralEditorCore STATIC ${ASTRAL_EDITOR_SOURCES})
+target_link_libraries(AstralEditorCore PUBLIC AstralEngineRuntime)
 
 add_executable(AstralGame WIN32
     Engine/Assets/StaticMesh.cpp
@@ -46,7 +71,7 @@ target_link_libraries(AstralGame PRIVATE user32 gdi32)
 # Opt-in Astral renderer (F2 / ASTRAL_RENDER_MODE=astral). AstralGame already
 # compiles the gameplay sources, so it takes the showcase sources directly.
 target_sources(AstralGame PRIVATE ${ASTRAL_SHOWCASE_SOURCES} Game/Showcase/Win32AstralPresenter.cpp)
-target_link_libraries(AstralGame PRIVATE AstralEngineRuntime winmm)
+target_link_libraries(AstralGame PRIVATE AstralEngineRuntime AstralWin32Audio winmm)
 if(MSVC)
     target_link_options(AstralGame PRIVATE "$<$<CONFIG:Release>:/Brepro>")
 endif()
@@ -57,15 +82,39 @@ add_executable(AstralEditor WIN32
 )
 target_include_directories(AstralEditor PRIVATE .)
 target_compile_definitions(AstralEditor PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_link_libraries(AstralEditor PRIVATE user32 gdi32)
+target_link_libraries(AstralEditor PRIVATE AstralEditorCore AstralShowcase user32 gdi32 comdlg32)
 
 # Headless National Mall capture: PNG frames, WAV mix and Chrome trace.
 add_executable(AstralCapture Tools/AstralCapture.cpp)
 target_link_libraries(AstralCapture PRIVATE AstralShowcase)
 
+# Engine players: run a project or scene (Content/Samples/Playground) headless
+# with PNG captures, or in a Win32 window with keyboard, mouse and audio.
+add_executable(AstralPlayer Tools/AstralPlayer.cpp)
+target_compile_definitions(AstralPlayer PRIVATE ASTRAL_PLAYER_PLAYGROUND)
+target_link_libraries(AstralPlayer PRIVATE AstralShowcase)
+add_executable(AstralEnginePlayer Tools/AstralPlayer.cpp)
+target_link_libraries(AstralEnginePlayer PRIVATE Astral::Runtime)
+add_executable(AstralProject Tools/AstralProject.cpp)
+target_link_libraries(AstralProject PRIVATE Astral::Runtime)
+add_executable(AstralPlayerWin32 WIN32 Tools/AstralPlayerWin32.cpp)
+target_compile_definitions(AstralPlayerWin32 PRIVATE ASTRAL_PLAYER_PLAYGROUND UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(AstralPlayerWin32 PRIVATE AstralShowcase AstralWin32Audio user32 gdi32 winmm)
+add_executable(AstralEnginePlayerWin32 WIN32 Tools/AstralPlayerWin32.cpp)
+target_compile_definitions(AstralEnginePlayerWin32 PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(AstralEnginePlayerWin32 PRIVATE Astral::Runtime AstralWin32Audio user32 gdi32)
+
 include(CTest)
 if(BUILD_TESTING)
     include(cmake/AstralTestSafety.cmake)
+
+    if(ASTRAL_ENABLE_HARDWARE_GPU_TESTS)
+        add_executable(EngineD3D11Tests Tests/EngineD3D11Tests.cpp)
+        target_link_libraries(EngineD3D11Tests PRIVATE AstralD3D11 psapi)
+        target_compile_definitions(EngineD3D11Tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+        astral_add_test(EngineD3D11Tests)
+        set_tests_properties(EngineD3D11Tests PROPERTIES LABELS GPU RUN_SERIAL TRUE TIMEOUT 180)
+    endif()
     add_executable(AstralMathTests Tests/MathTests.cpp)
     target_include_directories(AstralMathTests PRIVATE .)
     astral_add_test(AstralMathTests)
@@ -223,6 +272,32 @@ if(BUILD_TESTING)
     add_executable(EngineShowcaseTests Tests/EngineShowcaseTests.cpp)
     target_link_libraries(EngineShowcaseTests PRIVATE AstralShowcase)
     astral_add_test(EngineShowcaseTests)
+    add_executable(EngineServicesTests Tests/EngineServicesTests.cpp)
+    target_link_libraries(EngineServicesTests PRIVATE AstralShowcase)
+    astral_add_test(EngineServicesTests)
+    add_executable(EngineAssetsTests Tests/EngineAssetsTests.cpp)
+    target_link_libraries(EngineAssetsTests PRIVATE AstralShowcase)
+    astral_add_test(EngineAssetsTests)
+    add_executable(EngineFrameworkTests Tests/EngineFrameworkTests.cpp)
+    target_link_libraries(EngineFrameworkTests PRIVATE AstralShowcase)
+    astral_add_test(EngineFrameworkTests)
+    add_executable(EngineTimelineTests Tests/EngineTimelineTests.cpp)
+    target_link_libraries(EngineTimelineTests PRIVATE AstralShowcase)
+    astral_add_test(EngineTimelineTests)
+    add_executable(EngineUITests Tests/EngineUITests.cpp)
+    target_link_libraries(EngineUITests PRIVATE AstralShowcase)
+    astral_add_test(EngineUITests)
+    add_executable(EngineSampleTests Tests/EngineSampleTests.cpp)
+    target_link_libraries(EngineSampleTests PRIVATE AstralShowcase)
+    target_compile_definitions(EngineSampleTests PRIVATE ASTRAL_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+    astral_add_test(EngineSampleTests)
+    add_executable(EngineProjectTests Tests/EngineProjectTests.cpp)
+    target_link_libraries(EngineProjectTests PRIVATE Astral::Runtime)
+    astral_add_test(EngineProjectTests)
+    add_executable(EngineEditorTests Tests/EngineEditorTests.cpp)
+    target_link_libraries(EngineEditorTests PRIVATE AstralEditorCore AstralShowcase)
+    target_compile_definitions(EngineEditorTests PRIVATE ASTRAL_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+    astral_add_test(EngineEditorTests)
     set_tests_properties(${ASTRAL_ENGINE_TEST_SUITES} PROPERTIES TIMEOUT 300)
 
     add_executable(M4RuntimeSmoke Tests/CombatSandboxTests.cpp)

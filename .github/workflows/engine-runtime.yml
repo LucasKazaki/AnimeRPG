@@ -16,6 +16,9 @@ on:
       - "Tests/EngineRuntime/**"
       - "Tests/EngineTestSupport.h"
       - "Tools/AstralCapture.cpp"
+      - "Tools/AstralPlayer.cpp"
+      - "Game/Samples/**"
+      - "Content/Samples/**"
       - ".github/workflows/engine-runtime.yml"
   push:
     branches: [main]
@@ -27,6 +30,9 @@ on:
       - "Tests/EngineRuntime/**"
       - "Tests/EngineTestSupport.h"
       - "Tools/AstralCapture.cpp"
+      - "Tools/AstralPlayer.cpp"
+      - "Game/Samples/**"
+      - "Content/Samples/**"
       - ".github/workflows/engine-runtime.yml"
 
 permissions:
@@ -79,6 +85,19 @@ jobs:
           test -s "$RUNNER_TEMP/captures/08_lincoln_discovered.png"
           test -s "$RUNNER_TEMP/captures/astral_capture.wav"
           test -s "$RUNNER_TEMP/captures/astral_trace.json"
+
+      - name: Headless Playground sample (AstralPlayer demo script)
+        if: matrix.type == 'Release'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/player"
+          "$RUNNER_TEMP/build/AstralPlayer" Content/Samples/Playground project.json \
+            --script Content/Samples/Playground/demo.play --capture "$RUNNER_TEMP/player" --every 120 \
+            --track Player | tee "$RUNNER_TEMP/player/log.txt"
+          test -s "$RUNNER_TEMP/player/frame_00120.png"
+          grep -q "spawned Crate" "$RUNNER_TEMP/player/log.txt"
+          if grep -q "last error" "$RUNNER_TEMP/player/log.txt"; then exit 1; fi
 
       - name: Confirm clean tracked tree
         shell: bash

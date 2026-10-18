@@ -214,42 +214,36 @@ inline Vec3 ClosestPointOnSegment(Vec3 p, Vec3 a, Vec3 b, float* tOut = nullptr)
 inline Vec3 ClosestPointOnAABB(Vec3 p, const AABB& box) { return Clamp(p, box.min, box.max); }
 
 // Ericson, Real-Time Collision Detection 5.1.9. Returns squared distance.
+// The clamping is written as straight-line alternating projections (s, then t
+// for that s, then s for that t), which gives the same pairs as Ericson's
+// clamped branches. The branch form re-assigned s inside `if (t < 0) / else if
+// (t > 1)`, and MSVC x64 Release (14.44) compiled those reassignments as if the
+// divisor `a` were zero, returning s = 1 (see EngineMathTests
+// ClosestPointsClampToTheSharedCorner).
 inline float ClosestPointsSegmentSegment(Vec3 p1, Vec3 q1, Vec3 p2, Vec3 q2,
-    float& s, float& t, Vec3& c1, Vec3& c2) {
+    float& sOut, float& tOut, Vec3& c1, Vec3& c2) {
     const Vec3 d1 = q1 - p1;
     const Vec3 d2 = q2 - p2;
     const Vec3 r = p1 - p2;
     const float a = LengthSquared(d1);
     const float e = LengthSquared(d2);
+    const float b = Dot(d1, d2);
+    const float c = Dot(d1, r);
     const float f = Dot(d2, r);
-    if (a <= kEpsilon && e <= kEpsilon) {
-        s = t = 0.0f;
-        c1 = p1;
-        c2 = p2;
-        return LengthSquared(c1 - c2);
+    float s = 0.0f;
+    float t = 0.0f;
+    if (a > kEpsilon && e > kEpsilon) {
+        const float denominator = a * e - b * b;
+        s = denominator > kEpsilon ? Saturate((b * f - c * e) / denominator) : 0.0f; // 0 when parallel
+        t = Saturate((b * s + f) / e);
+        s = Saturate((b * t - c) / a);
+    } else if (a > kEpsilon) {
+        s = Saturate(-c / a); // the second segment is a point
+    } else if (e > kEpsilon) {
+        t = Saturate(f / e); // the first segment is a point
     }
-    if (a <= kEpsilon) {
-        s = 0.0f;
-        t = Saturate(f / e);
-    } else {
-        const float c = Dot(d1, r);
-        if (e <= kEpsilon) {
-            t = 0.0f;
-            s = Saturate(-c / a);
-        } else {
-            const float b = Dot(d1, d2);
-            const float denominator = a * e - b * b;
-            s = denominator > kEpsilon ? Saturate((b * f - c * e) / denominator) : 0.0f;
-            t = (b * s + f) / e;
-            if (t < 0.0f) {
-                t = 0.0f;
-                s = Saturate(-c / a);
-            } else if (t > 1.0f) {
-                t = 1.0f;
-                s = Saturate((b - c) / a);
-            }
-        }
-    }
+    sOut = s;
+    tOut = t;
     c1 = p1 + d1 * s;
     c2 = p2 + d2 * t;
     return LengthSquared(c1 - c2);

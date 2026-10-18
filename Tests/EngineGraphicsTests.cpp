@@ -1,11 +1,15 @@
 #include "Engine/Core/JobSystem.h"
 #include "Engine/Graphics/Image.h"
 #include "Engine/Graphics/Mesh.h"
+#include "Engine/Graphics/MeshSimplify.h"
 #include "Engine/Graphics/SceneRenderer.h"
 #include "Engine/Graphics/Texture.h"
 #include "Tests/EngineTestSupport.h"
 
+#include <cmath>
 #include <cstdlib>
+#include <cstring>
+#include <memory>
 #include <string>
 
 using namespace Astral;
@@ -407,6 +411,130 @@ ASTRAL_TEST(SkyLutMatchesAnalyticSkyAndPresetsScale) {
         ASTRAL_CHECK(target.flags[target.Index(48, 1)] & kPixelSky);
         for (const Color& c : target.hdr) ASTRAL_CHECK(Math::IsFinite(c));
     }
+}
+
+// ------------------------------------------------------------------ simplification and LOD
+
+namespace {
+bool SameVertex(const Vertex& a, const Vertex& b) {
+    return std::memcmp(&a.position, &b.position, sizeof(a.position)) == 0 && std::memcmp(&a.uv, &b.uv, sizeof(a.uv)) == 0
+        && std::memcmp(&a.normal, &b.normal, sizeof(a.normal)) == 0;
+}
+bool IsInputVertex(const MeshData& input, const Vertex& v) {
+    for (const Vertex& original : input.vertices) {
+        if (SameVertex(original, v)) return true;
+    }
+    return false;
+}
+} // namespace
+
+ASTRAL_TEST(SimplificationCollapsesFlatSurfacesWithoutError) {
+    MeshData plane;
+    MeshBuilder(plane).AddPlane({0, 0, 0}, {4, 4}, 16);
+    plane.ComputeBounds();
+    ASTRAL_CHECK(plane.TriangleCount() == 512);
+    MeshData simplified;
+    SimplifyStats stats;
+    SimplifyOptions options;
+    options.targetTriangles = 2;
+    ASTRAL_CHECK(SimplifyMesh(plane, options, simplified, &stats));
+    ASTRAL_CHECK(simplified.TriangleCount() <= 4 && stats.trianglesIn == 512 && stats.collapses > 0);
+    ASTRAL_CHECK(stats.error < 1e-3f);
+    ASTRAL_CHECK(simplified.bounds.min.x == -4.0f && simplified.bounds.max.z == 4.0f); // corners survive
+    for (std::size_t i = 0; i < simplified.indices.size(); i += 3) {
+        const Vec3 a = simplified.vertices[simplified.indices[i]].position, b = simplified.vertices[simplified.indices[i + 1]].position,
+                   c = simplified.vertices[simplified.indices[i + 2]].position;
+        ASTRAL_CHECK(Math::Cross(b - a, c - a).y > 0.0f); // still facing up
+    }
+    // Locked borders keep every boundary vertex; the interior still collapses.
+    options.lockBorders = true;
+    options.targetTriangles = 0;
+    options.targetRatio = 0.0f;
+    ASTRAL_CHECK(SimplifyMesh(plane, options, simplified, &stats));
+    ASTRAL_CHECK(simplified.TriangleCount() < 200);
+    std::size_t borderVertices = 0;
+    for (const Vertex& v : simplified.vertices) {
+        if (std::fabs(std::fabs(v.position.x) - 4.0f) < 1e-6f || std::fabs(std::fabs(v.position.z) - 4.0f) < 1e-6f) ++borderVertices;
+    }
+    ASTRAL_CHECK(borderVertices == 64);
+    // Invalid input is refused.
+    MeshData broken = plane;
+    broken.indices.push_back(9999);
+    broken.indices.push_back(0);
+    broken.indices.push_back(1);
+    ASTRAL_CHECK(!SimplifyMesh(broken, options, simplified));
+}
+
+ASTRAL_TEST(SimplifiedSpheresStayCloseAndFacingOut) {
+    MeshData sphere;
+    MeshBuilder(sphere).AddSphere({0, 0, 0}, 1.0f, 32, 48);
+    sphere.ComputeBounds();
+    MeshData simplified;
+    SimplifyStats stats;
+    SimplifyOptions options;
+    options.targetRatio = 0.25f;
+    ASTRAL_CHECK(SimplifyMesh(sphere, options, simplified, &stats));
+    ASTRAL_CHECK(simplified.TriangleCount() <= sphere.TriangleCount() / 4 + 1);
+    ASTRAL_CHECK(simplified.TriangleCount() > sphere.TriangleCount() / 8);
+    ASTRAL_CHECK(stats.error > 0.0f && stats.error < 0.2f);
+    std::string error;
+    ASTRAL_CHECK(simplified.Validate(error));
+    // Half-edge collapses keep original vertices (UVs and normals untouched).
+    for (const Vertex& v : simplified.vertices) ASTRAL_CHECK(IsInputVertex(sphere, v));
+    for (std::size_t i = 0; i < simplified.indices.size(); i += 3) {
+        const Vec3 a = simplified.vertices[simplified.indices[i]].position, b = simplified.vertices[simplified.indices[i + 1]].position,
+                   c = simplified.vertices[simplified.indices[i + 2]].position;
+        const Vec3 centroid = (a + b + c) / 3.0f;
+        ASTRAL_CHECK(Math::Dot(Math::Cross(b - a, c - a), centroid) > 0.0f); // outward winding kept
+        ASTRAL_CHECK(Math::Length(centroid) > 0.8f);                          // hugs the surface
+    }
+    // A tight error bound stops early on curved surfaces.
+    options.maxError = 1.0e-4f;
+    ASTRAL_CHECK(SimplifyMesh(sphere, options, simplified, &stats));
+    ASTRAL_CHECK(simplified.TriangleCount() > sphere.TriangleCount() * 9 / 10);
+
+    // Skinned meshes keep one influence per surviving vertex.
+    MeshData skinned;
+    MeshBuilder builder(skinned);
+    builder.SetSkinJoint(3);
+    builder.AddPlane({0, 0, 0}, {1, 1}, 8);
+    ASTRAL_CHECK(skinned.skin.size() == skinned.vertices.size());
+    options = {};
+    options.targetRatio = 0.1f;
+    ASTRAL_CHECK(SimplifyMesh(skinned, options, simplified, &stats));
+    ASTRAL_CHECK(simplified.TriangleCount() < skinned.TriangleCount() / 4);
+    ASTRAL_CHECK(simplified.skin.size() == simplified.vertices.size());
+    for (const SkinInfluence& influence : simplified.skin) ASTRAL_CHECK(influence.joints[0] == 3);
+}
+
+ASTRAL_TEST(LodGroupsSelectByScreenSizeWithHysteresis) {
+    ASTRAL_CHECK_NEAR(ScreenSize(1.0f, 10.0f, Math::Radians(90.0f)), 0.1f, 1e-5);
+    ASTRAL_CHECK(ScreenSize(1.0f, 0.5f, 1.0f) > 1.0f && ScreenSize(0.0f, 5.0f, 1.0f) == 0.0f);
+    auto sphere = std::make_shared<MeshData>();
+    MeshBuilder(*sphere).AddSphere({0, 0, 0}, 1.0f, 24, 32);
+    sphere->ComputeBounds();
+    const LodGroup group = BuildLodGroup(sphere);
+    ASTRAL_CHECK(group.Count() == 4);
+    ASTRAL_CHECK(group.levels[0].mesh == sphere);
+    for (std::size_t i = 1; i < group.Count(); ++i) {
+        ASTRAL_CHECK(group.levels[i].mesh->TriangleCount() < group.levels[i - 1].mesh->TriangleCount());
+        ASTRAL_CHECK(group.levels[i].minScreenSize < group.levels[i - 1].minScreenSize);
+    }
+    ASTRAL_CHECK(group.levels.back().minScreenSize == 0.0f);
+    ASTRAL_CHECK(group.Select(0.8f) == 0 && group.Select(0.3f) == 1 && group.Select(0.15f) == 2 && group.Select(0.01f) == 3);
+    // Hysteresis: thresholds must be passed by 10% before switching.
+    ASTRAL_CHECK(group.Select(0.52f, 1) == 1 && group.Select(0.56f, 1) == 0);
+    ASTRAL_CHECK(group.Select(0.48f, 0) == 0 && group.Select(0.44f, 0) == 1);
+    ASTRAL_CHECK(group.Select(0.01f, 0) == 3 && group.Select(0.9f, 3) == 0);
+    ASTRAL_CHECK(LodGroup{}.Select(1.0f) == -1);
+    // A mesh that cannot be reduced (one triangle) yields a single level used everywhere.
+    auto triangle = std::make_shared<MeshData>();
+    MeshBuilder builder(*triangle);
+    builder.AddTriangle(builder.AddVertex({0, 0, 0}, {0, 1, 0}, {}), builder.AddVertex({0, 0, 1}, {0, 1, 0}, {}),
+        builder.AddVertex({1, 0, 0}, {0, 1, 0}, {}));
+    triangle->ComputeBounds();
+    const LodGroup single = BuildLodGroup(triangle);
+    ASTRAL_CHECK(single.Count() == 1 && single.Select(0.001f) == 0);
 }
 
 ASTRAL_TEST_MAIN("EngineGraphicsTests")

@@ -80,7 +80,7 @@ struct PhysicsSettings {
     float sleepLinearSpeed{0.05f};
     float sleepAngularSpeed{0.08f};
     float sleepTime{0.5f};
-    float maxLinearSpeed{120.0f};
+    float maxLinearSpeed{120.0f}; // dynamic bodies only; kinematic bodies are never clamped
     float maxAngularSpeed{60.0f};
 };
 
@@ -125,7 +125,8 @@ class PhysicsWorld {
 public:
     explicit PhysicsWorld(PhysicsSettings settings = {}) : settings_(settings) {}
 
-    // Returns a null handle for an invalid description (bad shape, non-finite pose, mass <= 0 for dynamics).
+    // Returns a null handle for an invalid description (bad shape, non-finite
+    // pose, mass <= 0 for dynamics, or a dynamic mesh: meshes are static or kinematic).
     BodyId CreateBody(const BodyDesc& desc);
     bool DestroyBody(BodyId id);
     Body* GetBody(BodyId id) { return bodies_.Get(id); }
@@ -144,7 +145,7 @@ public:
 
     bool Raycast(const Math::Ray& ray, float maxDistance, RaycastHit& hit, std::uint32_t mask = 0xFFFFFFFFu,
         BodyId ignore = {}, bool includeTriggers = false) const;
-    // Sphere/capsule sweep; returns the closest hit along the motion.
+    // Sphere/capsule sweep (against any shape, meshes included); returns the closest hit along the motion.
     bool ShapeCast(const Shape& shape, const Pose& start, Vec3 motion, ShapeCastHit& hit,
         std::uint32_t mask = 0xFFFFFFFFu, BodyId ignore = {}, bool includeTriggers = false) const;
     void Overlap(const Shape& shape, const Pose& pose, std::vector<BodyId>& out, std::uint32_t mask = 0xFFFFFFFFu,
@@ -155,6 +156,7 @@ public:
     const std::vector<ContactEvent>& Events() const { return events_; }
     const PhysicsStats& Stats() const { return stats_; }
     PhysicsSettings& Settings() { return settings_; }
+    const PhysicsSettings& Settings() const { return settings_; }
 
     template <typename Fn>
     void ForEachBody(Fn&& fn) { bodies_.ForEach([&](Core::Handle, Body& body) { fn(body); }); }
@@ -164,6 +166,7 @@ public:
 private:
     struct CachedPoint {
         Vec3 position{};
+        Vec3 normal{};
         float normalImpulse{};
         float tangentImpulse[2]{};
     };

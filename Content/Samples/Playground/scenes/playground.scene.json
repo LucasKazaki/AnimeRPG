@@ -1,0 +1,120 @@
+{
+  "format": "astral-scene",
+  "version": 1,
+  "settings": {"gravity": [0, -9.81, 0], "fixedDelta": 0.0166667},
+  "environment": {
+    "ambientSky": [0.34, 0.38, 0.52], "ambientGround": [0.2, 0.18, 0.16],
+    "fog": true, "fogColor": [0.72, 0.8, 0.94], "fogDensity": 0.008,
+    "shadowRadius": 45
+  },
+  "materials": {
+    "grass": {"shading": "Toon", "baseColor": [0.36, 0.62, 0.34], "shadeColor": [0.2, 0.34, 0.3]},
+    "stone": {"shading": "Toon", "baseColor": [0.72, 0.72, 0.76]},
+    "wood": {"shading": "Toon", "baseColor": [0.66, 0.46, 0.28]},
+    "pad": {"shading": "Toon", "baseColor": [0.2, 0.85, 0.95], "emissive": [0.1, 0.45, 0.55]},
+    "hero": {"shading": "Toon", "baseColor": [0.95, 0.5, 0.36], "rimColor": [1, 0.9, 0.8], "rimIntensity": 0.5},
+    "visor": {"shading": "Toon", "baseColor": [0.16, 0.14, 0.3]},
+    "bulb": {"shading": "Unlit", "baseColor": [1, 0.92, 0.7], "emissive": [1, 0.85, 0.55]},
+    "gate": {"shading": "Toon", "baseColor": [0.52, 0.36, 0.86], "emissive": [0.12, 0.05, 0.25]},
+    "water": {"shading": "Water", "baseColor": [0.22, 0.46, 0.7], "opacity": 0.85, "reflectivity": 0.6}
+  },
+  "prefabs": {
+    "Crate": {
+      "name": "Crate",
+      "components": {
+        "MeshRenderer": {"mesh": "primitive:cube", "material": "wood"},
+        "Collider": {"shape": "Box", "friction": 0.7},
+        "RigidBody": {"mass": 3}
+      }
+    },
+    "Lamp": {
+      "name": "Lamp",
+      "children": [
+        {"name": "Post", "transform": {"position": [0, 1.2, 0], "scale": [0.25, 1.2, 0.25]},
+         "components": {"MeshRenderer": {"mesh": "primitive:cylinder", "material": "stone"},
+                        "Collider": {"shape": "Capsule", "radius": 0.5, "height": 2}}},
+        {"name": "Bulb", "transform": {"position": [0, 2.7, 0], "scale": [0.6, 0.6, 0.6]},
+         "components": {"MeshRenderer": {"mesh": "primitive:sphere", "material": "bulb"},
+                        "Light": {"type": "Point", "color": [1, 0.86, 0.6], "intensity": 3, "radius": 9}}}
+      ]
+    }
+  },
+  "entities": [
+    {"name": "GameMode",
+     "behaviours": [{"type": "GameMode", "title": "Playground", "restartDelay": 4, "winTimeline": "GateSequence"}]},
+    {"name": "GateSequence",
+     "behaviours": [{"type": "Timeline", "asset": "timelines/gate_open.json", "playOnStart": false}]},
+
+    {"name": "Sun", "transform": {"rotation": {"euler": [52, 35, 0]}},
+     "components": {"Light": {"type": "Directional", "color": [1, 0.95, 0.86], "intensity": 2.6}}},
+    {"name": "Camera", "transform": {"position": [0, 4, -14]},
+     "components": {"Camera": {"fieldOfView": 60, "farPlane": 300}, "AudioListener": {}},
+     "behaviours": [{"type": "FollowCamera", "target": "Player", "distance": 7, "pitchDegrees": 18}]},
+
+    {"name": "Player", "transform": {"position": [0, 0.05, -6]},
+     "components": {"CharacterMover": {"radius": 0.35, "height": 1.8, "jumpSpeed": 8.5}},
+     "behaviours": [{"type": "PlayerController", "camera": "Camera", "moveSpeed": 6}],
+     "children": [
+       {"name": "PlayerBody", "transform": {"position": [0, 0.9, 0], "scale": [0.7, 0.9, 0.7]},
+        "components": {"MeshRenderer": {"mesh": "primitive:capsule", "material": "hero"}}},
+       {"name": "PlayerVisor", "transform": {"position": [0, 1.4, 0.3], "scale": [0.45, 0.16, 0.12]},
+        "components": {"MeshRenderer": {"mesh": "primitive:cube", "material": "visor"}}}
+     ]},
+
+    {"name": "Floor", "transform": {"scale": [40, 1, 40]},
+     "components": {"MeshRenderer": {"mesh": "primitive:plane", "material": "grass"}, "Collider": {"shape": "Mesh"}}},
+    {"name": "WallNorth", "transform": {"position": [0, 1, 20], "scale": [40, 2, 1]},
+     "components": {"MeshRenderer": {"mesh": "primitive:cube", "material": "stone"}, "Collider": {"shape": "Box"}}},
+    {"name": "WallSouth", "transform": {"position": [0, 1, -20], "scale": [40, 2, 1]},
+     "components": {"MeshRenderer": {"mesh": "primitive:cube", "material": "stone"}, "Collider": {"shape": "Box"}}},
+    {"name": "WallEast", "transform": {"position": [20, 1, 0], "scale": [1, 2, 40]},
+     "components": {"MeshRenderer": {"mesh": "primitive:cube", "material": "stone"}, "Collider": {"shape": "Box"}}},
+    {"name": "WallWest", "transform": {"position": [-20, 1, 0], "scale": [1, 2, 40]},
+     "components": {"MeshRenderer": {"mesh": "primitive:cube", "material": "stone"}, "Collider": {"shape": "Box"}}},
+
+    {"name": "Ramp", "transform": {"position": [8, 0.9, 0], "rotation": {"euler": [-15, 0, 0]}, "scale": [4, 0.4, 8]},
+     "components": {"MeshRenderer": {"mesh": "primitive:cube", "material": "stone"}, "Collider": {"shape": "Box"}}},
+    {"name": "Platform", "transform": {"position": [8, 1.05, 6], "scale": [4, 2.1, 4]},
+     "components": {"MeshRenderer": {"mesh": "primitive:cube", "material": "stone"}, "Collider": {"shape": "Box"}}},
+    {"name": "Ledge", "transform": {"position": [-8, 4.5, 8.5], "scale": [3, 0.5, 3]},
+     "components": {"MeshRenderer": {"mesh": "primitive:cube", "material": "stone"}, "Collider": {"shape": "Box"}}},
+    {"name": "JumpPad", "transform": {"position": [-8, 0.05, 4.5], "scale": [1.8, 0.1, 1.8]},
+     "components": {
+       "MeshRenderer": {"mesh": "primitive:cylinder", "material": "pad"},
+       "Collider": {"shape": "Box", "halfExtents": [0.5, 4, 0.5], "isTrigger": true},
+       "ParticleSystem": {"rate": 0, "burst": 40, "duration": 0.1, "playOnStart": false, "direction": [0, 1, 0],
+                          "spreadDegrees": 25, "speedMin": 3, "speedMax": 6, "gravity": [0, -6, 0],
+                          "sizeStart": 0.12, "colorStart": [0.5, 1, 1, 1], "colorEnd": [0.2, 0.6, 1, 0]}},
+     "behaviours": [{"type": "JumpPad", "launchSpeed": 16}]},
+
+    {"name": "Pool", "transform": {"position": [-8, 0.02, -8], "scale": [7, 1, 5]},
+     "components": {"MeshRenderer": {"mesh": "primitive:plane", "material": "water"}}},
+    {"name": "Fountain", "transform": {"position": [0, 0, 6]},
+     "components": {"MeshRenderer": {"mesh": "primitive:cylinder", "material": "stone"}},
+     "children": [
+       {"name": "FountainSpray", "transform": {"position": [0, 1.1, 0]},
+        "components": {"ParticleSystem": {"rate": 60, "direction": [0, 1, 0], "spreadDegrees": 12, "speedMin": 2.5,
+                                          "speedMax": 3.5, "gravity": [0, -7, 0], "lifetimeMin": 0.6, "lifetimeMax": 0.9,
+                                          "sizeStart": 0.08, "sizeEnd": 0.02, "colorStart": [0.7, 0.9, 1, 0.9],
+                                          "colorEnd": [0.5, 0.7, 1, 0], "seed": 7}}}
+     ]},
+    {"prefab": "Lamp", "name": "LampEast", "transform": {"position": [4, 0, 10]}},
+    {"prefab": "Lamp", "name": "LampWest", "transform": {"position": [-4, 0, 10]}},
+
+    {"prefab": "Crate", "name": "Crate1", "transform": {"position": [-3, 0.5, 0]}},
+    {"prefab": "Crate", "name": "Crate2", "transform": {"position": [-4.2, 0.5, 0.3]}},
+    {"prefab": "Crate", "name": "Crate3", "transform": {"position": [-3.6, 1.5, 0.15]}},
+
+    {"prefab": "prefabs/star.prefab.json", "name": "Star1", "transform": {"position": [0, 1, 0]}},
+    {"prefab": "prefabs/star.prefab.json", "name": "Star2", "transform": {"position": [-6, 1, -4]}},
+    {"prefab": "prefabs/star.prefab.json", "name": "Star3", "transform": {"position": [8, 3.2, 6]}},
+    {"prefab": "prefabs/star.prefab.json", "name": "Star4", "transform": {"position": [-8, 5.8, 8.5]}},
+    {"prefab": "prefabs/star.prefab.json", "name": "Star5", "transform": {"position": [6, 1, -8]}},
+
+    {"name": "Gate", "transform": {"position": [0, 1.5, 15], "scale": [4, 3, 0.5]},
+     "components": {"MeshRenderer": {"mesh": "primitive:cube", "material": "gate"},
+                    "Collider": {"shape": "Box"}, "RigidBody": {"type": "Kinematic"}}},
+    {"name": "GateLight", "transform": {"position": [0, 3.5, 13.5]},
+     "components": {"Light": {"type": "Point", "color": [0.8, 0.6, 1], "intensity": 0, "radius": 10}}}
+  ]
+}
