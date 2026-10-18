@@ -123,7 +123,8 @@ public:
     // Replaces the world with a scene (content path). Transactional: on
     // failure the current world keeps running and `error` says why.
     bool LoadScene(const std::string& path, std::string& error);
-    bool LoadSceneJson(const Core::JsonValue& json, std::string& error); // an unnamed scene
+    // Unnamed scenes restart from their loaded document, including unsaved Play.
+    bool LoadSceneJson(const Core::JsonValue& json, std::string& error);
     // Starts an empty world (the HUD is cleared).
     void ResetWorld();
     const std::string& ScenePath() const { return scenePath_; }

@@ -45,6 +45,10 @@ add_library(AstralShowcase STATIC ${ASTRAL_SHOWCASE_SOURCES} ${ASTRAL_GAMEPLAY_S
 astral_portable_options(AstralShowcase)
 target_link_libraries(AstralShowcase PUBLIC AstralEngineRuntime)
 
+add_library(AstralEditorCore STATIC ${ASTRAL_EDITOR_SOURCES})
+astral_portable_options(AstralEditorCore)
+target_link_libraries(AstralEditorCore PUBLIC AstralEngineRuntime)
+
 if(EXISTS "${ASTRAL_ROOT}/Tools/AstralCapture.cpp")
     add_executable(AstralCapture "${ASTRAL_ROOT}/Tools/AstralCapture.cpp")
     astral_portable_options(AstralCapture)
@@ -71,6 +75,9 @@ if(BUILD_TESTING)
             target_link_libraries(${suite} PRIVATE Astral::Runtime)
         else()
             target_link_libraries(${suite} PRIVATE AstralShowcase)
+        endif()
+        if(suite STREQUAL "EngineEditorTests")
+            target_link_libraries(${suite} PRIVATE AstralEditorCore)
         endif()
         # Suites that read sample content find it here.
         target_compile_definitions(${suite} PRIVATE ASTRAL_SOURCE_ROOT="${ASTRAL_ROOT}")

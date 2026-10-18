@@ -454,6 +454,11 @@ void GameHost::ProcessRequests() {
     if (loads.empty()) return;
     const std::string path = loads.back().empty() ? scenePath_ : loads.back(); // the last request wins
     std::string error;
+    if (path.empty() && hasScene_) {
+        SceneDocument document = document_;
+        Activate(std::move(document), {});
+        return;
+    }
     if (path.empty()) {
         Report("reload requested but no scene file is loaded");
         return;
@@ -508,9 +513,9 @@ void GameHost::RegisterCommands() {
         return "opening " + arguments[0];
     });
     commands_.RegisterCommand("restart", "reload the current scene", [this](const Arguments&) {
-        if (scenePath_.empty()) return std::string("no scene file is loaded");
+        if (!hasScene_) return std::string("no scene file is loaded");
         pendingLoads_.push_back(scenePath_);
-        return "restarting " + scenePath_;
+        return "restarting " + (scenePath_.empty() ? std::string("the unsaved scene") : scenePath_);
     });
     commands_.RegisterCommand("pause", "pause or resume the simulation", [this](const Arguments&) {
         paused_ = !paused_;

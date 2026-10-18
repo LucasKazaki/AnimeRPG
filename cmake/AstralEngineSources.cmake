@@ -89,6 +89,12 @@ set(ASTRAL_SAMPLE_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Game/Samples/Playground/PlaygroundBehaviours.cpp"
 )
 
+# Platform-independent model behind the native scene editor.
+set(ASTRAL_EDITOR_SOURCES
+    "${ASTRAL_ENGINE_ROOT}/Engine/Editor/EditorCamera.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Editor/SceneEditor.cpp"
+)
+
 # Each suite is Tests/<name>.cpp and links the runtime and showcase libraries.
 set(ASTRAL_ENGINE_TEST_SUITES
     EngineMathTests
@@ -107,4 +113,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineUITests
     EngineSampleTests
     EngineProjectTests
+    EngineEditorTests
 )
