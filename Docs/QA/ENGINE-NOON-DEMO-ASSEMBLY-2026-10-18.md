@@ -274,8 +274,10 @@ Astral Noon Live title/content, F5, maximize/restore and normal close. All exact
 commands/receipts are in work/noon-rehearsal-first,
 work/noon-rehearsal-package-first and noon-rehearsal-package-supervision-first.
 
-New delivery outputs/astral-noon-cpu-8056ff6 contains the12-file primary Package,
-14-file RecoveryPackage, separate verification/addendum and reviewed walkthrough.
+New delivery outputs/astral-noon-cpu-8056ff6 contains the primary Package with12
+manifest-listed payload files plus its manifest seal (13 files total), and the
+RecoveryPackage with14 payload files plus its seal (15 files total), separate
+verification/addendum and the reviewed walkthrough.
 Both copies include unchanged release manifests and byte-identical complete
 inventories. The3,088,755-byte ZIP SHA256 is
 9b6a21790ceefce0c3a7ec938252ae8eb5166c6c1c73070b3c567a3ee4f024aa;
