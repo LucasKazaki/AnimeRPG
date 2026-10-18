@@ -49,6 +49,7 @@ set(ASTRAL_ENGINE_RUNTIME_SOURCES
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/Destruction.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/PhysicsWorld.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/Physics/TriangleMesh.cpp"
+    "${ASTRAL_ENGINE_ROOT}/Engine/Projects/ProjectCreation.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/UI/ConsoleOverlay.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/UI/Widgets.cpp"
     "${ASTRAL_ENGINE_ROOT}/Engine/VFX/Particles.cpp"
@@ -105,4 +106,5 @@ set(ASTRAL_ENGINE_TEST_SUITES
     EngineTimelineTests
     EngineUITests
     EngineSampleTests
+    EngineProjectTests
 )
