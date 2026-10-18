@@ -159,3 +159,94 @@ binding before/after is identical. The diagnostic and every assertion remain.
 See QA for exact commands/receipts and the preserved earlier failure. Only this
 Task/QA prose changed after the matrix. Native GUI findings and full workflow
 acceptance remain pending.
+
+## Native failed-open correction — authorized after actual reproduction
+
+The core correction is committed as `2c4d286b27b2fd9bdc9eee6608da89f8b2ea6d42`,
+clean before this extension. Root used the untouched d5dc908 native baseline
+(exeSHA256 fb227c169c58bd612ddb5d4f1df1d53104edda8f78be734c3d300fb89ece881a)
+and actually reproduced native hypothesis1 during the verified October18
+04:06:50–04:10:10UTC interval:
+opening root-a/keep.scene.json showed Keep Authored Box/Camera/Sun and its cube;
+opening root-b/bad.project.json with a missing startup scene then replaced it
+with an untitled Sun/Ground/Main Camera scene and status New scene. The prior
+authored document/cube disappeared despite the failed candidate. No error modal
+was visible. This is the coordinator's native observation, not a source-only
+claim or an agent-run GUI.
+
+Root authorized exactly `Tools/AstralEditorMain.cpp` plus this Task/QA for the
+narrow native correction (the message called it AstralEditorWin32.cpp; this
+repository's real front-end file is AstralEditorMain.cpp). Stage an external
+scene/project's replacement SceneEditor separately; replace/stop the current
+editor only after the candidate fully opens. On failure retain the prior root,
+document, selection/history and window state and leave a useful path-specific
+error visible. Same-root OpenScene keeps its existing transactional core load.
+Do not touch CMake/Host/Game or core source, native close-save/focus hypotheses
+until their actual observations arrive. Root retains the desktop and all
+execution slots; no build/test or fixed GUI acceptance has occurred for this
+native correction yet.
+
+Root subsequently reproduced the other two hypotheses on that same preserved
+baseline before authorizing their corrections. Later in that interval, Ground
+Position X showed a typed5 with caret and no Enter/focus loss; F5 entered Play
+with disabled X0, and Stop returned X0 without a dirty marker. Finally in that
+interval, renaming Ground to Unsaved Native Probe and pressing Return showed the
+dirty marker; Close displayed the real Yes/No/Cancel save confirmation, but Yes
+produced no Save As picker and left the dirty document with the no-file/use-Save-As
+status error. Root supplied these actual Sky observations; no screenshot file
+is claimed saved by this agent.
+The coordinator corrected its earlier estimated per-action timestamps; only
+the verified common interval and action order are recorded. It then preserved
+the probe through explicit Save As to root-b/preserved-native-probe.scene.json,
+SHA256 `29638753063e53a00ccfc49e1f068215eaca420eaa9289b0fcc9e44b156d7498`,
+closed normally and found no remaining owned native process.
+
+The same narrow native file may now flush/validate pending inspector edits while
+still authoring before Play and context-replacing/rebuilding actions. Invalid
+input must remain editable, retain its text and block transition with a useful
+error until corrected or explicitly reverted. Keep the core Play mutation guards.
+For dirty untitled close, use the same Save As path as explicit Save, returning
+failure on cancellation or failed writes so the window stays open. Root retains
+all native and compiler execution; these changes need independent source review,
+granted builds and actual fixed native rehearsal before acceptance.
+
+All three native corrections are now staged in source only. Invalid inspector
+values remain in their controls with a tracked failed binding; other commits or
+context transitions cannot bypass that invalid field. Enter retries, and Escape
+explicitly restores the displayed field value. Successful focused edits flush
+before Play while authoring guards still allow the commit. Selection, authoring
+commands, file actions and layout rebuilds use the same guard; disk reload waits
+while an inspector control has focus or a failed field remains. Error status is
+kept visible until a successful action or explicit correction. Untitled Yes
+returns the actual Save As result, preserving the window on cancel/write failure.
+Native acceptance and compiler execution remain pending root review/slot.
+
+A separate native numeric warning was corrected after tracing the actual JSON
+helper: JsonValue::AsFloat already clamps finite values to ±FLT_MAX before
+conversion. There is no unchecked-conversion claim or undefined-behavior witness
+for that path. The proposed rejection-policy harness/expansion was cancelled;
+existing supported finite clamping and scalar declared ranges remain unchanged.
+
+The native Tool51815b18... then passed root's independent source review and a
+granted Debug/Release five-target/four-suite matrix:4/4 each5.65/0.78s, Editor24
+retained, safety3/3 and milestones1–3. No source changed during the run; the
+268-file binding including Tools is882b07681533a77b02d7797c8b31ef1a9cea8f560e96bce8af94e37465ad4c41.
+Session43362 closed0 and no owned process remained before slot release.
+Release native exeSHA256 is462056871f9e14aa04411416961bbd52b563479d4464704a11d7d3152ebcfa49.
+Root will now perform the actual fixed native rehearsal; these core suites and
+compilation do not establish interaction correctness. Only Task/QA prose changed
+after the frozen source matrix, pending final observation/review/commit.
+
+Root completed the actual fixed native rehearsal on the exact Release binary
+46205687... from `2026-10-18T04:20:43Z` through close/cleanup `04:24:54Z`.
+Focused X0→5 survived F5 Play/Stop; invalid text blocked Play, retained its text
+and recovered through Escape. Failed project open preserved the prior scene,
+selection/cube/X5 and usable undo/redo history, with a visible useful error.
+Untitled Close > Yes opened Save As; cancelling retained the dirty document,
+then a repeated save succeeded and closed the window. The actual saved
+root-a/fixed-close-save.scene.json contains Fixed Save Probe, SHA256
+`73778f0a654bb147bc0c78b54ce4632ea69a52292ad01da8b9bfd73a29cc7d09`.
+Root's fresh Sky and owned-process inventories were empty. No actual exit code
+was captured, and no saved screenshot PNG is claimed; the screenshots were in
+chat. Source51815/core c6b22/tests e04 remain exact. See QA for bounded details;
+full import/project/package and broad native coverage remain separate gates.

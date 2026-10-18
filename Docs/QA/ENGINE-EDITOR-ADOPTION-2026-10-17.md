@@ -5,8 +5,11 @@ and four full Editor/Layout/Framework/Sample suites in both Debug and Release,
 including all24 editor cases and real junction/symlink/hard-link controls without
 skips. Test safety3/3 and milestones1–3 pass. The coordinator independently
 reviewed the exact source before this matrix. All earlier failures and diagnosis
-are retained below. Native GUI reproductions have not begun; this is bounded
-editor-core evidence, not the full demonstration/workflow gate.
+are retained below. The coordinator has reproduced all three old native GUI
+failures. Their reviewed fixes compile and pass the same Debug/Release matrix;
+root's actual Release GUI rehearsal also passes all three fixes plus invalid
+text and Save As cancellation controls. This remains bounded editor evidence,
+not the full creation/import/package demonstration gate.
 Owner `/root/demo_editor` (transferred from `/root/containment_implementation`), worktree `work/astral-editor-adoption`,
 branch `engine/editor-adoption-20261017`, deliberate base
 `964a8c46b8469e549dd57ebeaadd7b224a350c30`. Coordinator reports its full native
@@ -313,6 +316,150 @@ Native open/save/focus observations and full creation/import/package/performance
 acceptance remain separate pending gates.
 
 ## Prepared native reproduction — not yet executed
+
+Chronological plan below is preserved. All three old native hypotheses have
+since been reproduced by the coordinator as recorded here; fixed runs remain pending.
+Using the preserved d5dc908 Debug baseline with exeSHA256 fb227c169c58bd612ddb5d4f1df1d53104edda8f78be734c3d300fb89ece881a,
+root opened root-a/keep.scene.json successfully: title keep.scene.json, outliner
+Keep Authored Box/Camera/Sun and visible cube. File > Open Project selected the
+owned root-b/bad.project.json (missing startup scene) and Return. During the
+verified October18 04:06:50–04:10:10UTC interval, the window instead showed
+untitled scene, Sun/Ground/Main
+Camera, status New scene and no prior cube; no error modal was visible. Root
+reported this actual old witness before authorizing the narrow native file fix.
+No fixed GUI run has occurred. The old ReportError is status/beep only, and its
+following RefreshAll overwrites that error status; the source explains the
+missing visible diagnostic but is not a substitute for the observed replacement.
+
+The native correction is restricted to Tools/AstralEditorMain.cpp plus Task/QA:
+open an external/project candidate in a separate SceneEditor, then stop/swap
+only on success; failed opens return immediately after a path-specific status
+error, preserving the old authored context. Same-root scene opens retain the
+existing core transaction. Core commit2c4d286 remains exact/unchanged. The user
+has made desktop/GPU available, but root still owns native execution and will
+rehearse the fixed candidate after source review and granted builds.
+
+Root then reproduced native hypothesis3 later in that same verified interval on the
+untouched baseline. Ground's Position X initially0 was selected by Home and
+Shift+End; typing5 visibly left5 with the caret, without Enter or focus loss.
+F5 entered [PLAYING], with the disabled inspector showing X0. F5 Stop returned
+X0, untitled title without dirty marker and status Stopped. The pending edit was
+actually lost. Root authorized a native flush/validation guard before Play and
+context-rebuilding actions; invalid input must retain editable text and prevent
+the transition, preserving the already tested core Play guards.
+
+Root reproduced native hypothesis2 last in that same verified interval: Ground was renamed
+Unsaved Native Probe through Return, and outliner/title showed the dirty marker.
+Close displayed the real unsaved-changes Yes/No/Cancel confirmation. Yes dismissed
+the modal but opened no Save As picker; the editor remained dirty with status
+Error: the scene has no file yet; use Save As. Root authorized routing this
+untitled confirmation through the same Save As path as explicit Save, retaining
+the window/document on cancellation or failed writes. These are root's actual
+Sky UI observations; no saved screenshot file or fixed native pass is invented.
+Only the same native Tool and Task/QA may change; all three fixed UI rehearsals
+and granted builds remain pending.
+The coordinator corrected its earlier rough per-action times; the common
+verified interval and ordered actions above supersede those estimates. It used
+explicit Save As to preserve root-b/preserved-native-probe.scene.json with SHA256
+`29638753063e53a00ccfc49e1f068215eaca420eaa9289b0fcc9e44b156d7498`, then
+closed normally and reported no remaining owned native process. No precise
+individual-action timestamp or screenshot artifact is invented.
+
+The proposed native source now stages all three corrections. CommitField returns
+a real result, retains invalid text and tracks its binding instead of refreshing
+it away. CommitPendingInspector guards Play and actions that replace/rebuild the
+authored context; validation failure blocks the transition. Escape is an explicit
+revert. Ordinary typing notifications do not commit each keystroke. Disk hot
+reload waits while inspector focus/failed input is active. Untitled save
+confirmation uses the actual boolean Save As result, and failed candidate opens
+retain the old editor/root/document before showing a useful path-specific error.
+The chosen filename and actual load error precede the full selected path so
+the cause is visible first in a narrow status bar.
+Only Tools/AstralEditorMain.cpp plus this Task/QA change after core commit2c4d286;
+no build, fixed native rehearsal or source-only acceptance is claimed yet.
+A source-only numeric concern raised during this review was withdrawn after
+reading JsonValue::AsFloat: it already clamps finite values outside ±FLT_MAX
+before conversion. No undefined-behavior claim, failed numeric witness or
+rejection policy is asserted. The coordinator cancelled that proposed harness;
+no numeric production change or numeric harness execution occurred.
+
+## Native correction builds and retained core suites — passed
+
+After independent source review of native Tool SHA256
+`51815b188dd43dc20ae5dd612b1b946635e85031e2325e88f521d0e89590bd14`,
+root granted the exclusive CPU slot. Fresh available RAM was12.966GiB. The
+existing cache source and frozen Editor tests e04fa86f... were checked before
+launch. `run-native-fixed.py` built the same five targets with two jobs and ran
+the same four anchored suites in Debug/Release, then safety and milestones1–3.
+No numeric harness, GUI or GPU operation occurred in this slot.
+
+| Step | Actual result | Evidence prefix |
+|---|---|---|
+| Debug five-target build | exit0, 4.187s | `native-fixed-build-Debug` |
+| Debug four suites | exit0, **4/4**, 5.65s | `native-fixed-test-Debug` |
+| Release five-target build | exit0, 4.422s | `native-fixed-build-Release` |
+| Release four suites | exit0, **4/4**, 0.78s | `native-fixed-test-Release` |
+| Safety | exit0, **3/3**, 5.418s harness time | `native-fixed-test_test_safety` |
+| Milestones1/2/3 and whitespace | exit0 each | matching `native-fixed-*` logs |
+
+Each configuration retains Editor24, Framework14 and Sample20 plus Layout
+guards, with no reported SKIP. This verifies compilation and existing core
+coverage; it does not turn those unit suites into native interaction proof.
+The slot ran October18 `00:19:22.162430-04:00`–`00:19:43.006544-04:00`.
+Session43362 closed0; normalized-path inventory found no remaining task-owned
+compiler/test/editor process before explicit slot release.
+
+The268-file Engine/Game/Tests/Tools/cmake/root-CMake physical binding is identical
+before and after, SHA256
+`882b07681533a77b02d7797c8b31ef1a9cea8f560e96bce8af94e37465ad4c41`.
+Core c6b22ffa..., header20635a32... and tests e04fa86f... stay unchanged.
+Logs/step receipts and `native-fixed-matrix.receipt.json` are retained under
+`work/editor-adoption-evidence`. `native-fixed-binaries.receipt.json` binds:
+
+- Debug AstralEditor.exe:7,058,432 bytes, SHA256
+  `2ee89552d7a6da48ebf302e369fe1a304a1e22b6d28411fc85a5724892b3ed7c`.
+- Release AstralEditor.exe:1,787,392 bytes, SHA256
+  `462056871f9e14aa04411416961bbd52b563479d4464704a11d7d3152ebcfa49`.
+
+The built files are in the matching Debug/Release directories of
+`work/build-editor-adoption`. The immutable original baseline remains separate.
+Root's actual fixed open/F5/close-save and invalid-input/cancel controls are the
+next acceptance gate; no such fixed native outcome is claimed here yet.
+
+## Actual fixed native rehearsal — coordinator observed all three repairs
+
+Root launched the exact fixed Release AstralEditor.exe (SHA256
+`462056871f9e14aa04411416961bbd52b563479d4464704a11d7d3152ebcfa49`),
+reported launch process10700 at `2026-10-18T04:20:43Z`, and completed close/cleanup
+at `04:24:54Z`. These observations come from root's real Sky input/state/images;
+this agent did not run UI automation. Screenshots were displayed in chat, with
+no saved PNG files claimed. No per-action time or unobserved exit code is invented.
+
+- Focused Position X was changed from0 to5 without Enter/focus loss. F5 showed
+  [PLAYING], disabled X5 and the dirty marker. Stop retained authored X5.
+- A literal nonnumeric value followed by F5 stayed in authoring with its text
+  retained and error `position needs a number in every box`. Escape restored5;
+  Ctrl+S saved the corrected scene. This checks real validation and recovery.
+- Opening bad.project.json retained keep.scene.json, the selected Keep Authored
+  Box, X5 and the visible cube. The status began `Cannot open bad.project.json:
+  missing.scene.json: cannot open...`, keeping the useful cause visible. Ctrl+Z
+  after outliner focus restored X0; Ctrl+Y restored X5, proving history survived.
+- Ctrl+N created a new scene. Renaming Ground to Fixed Save Probe with Return
+  made it dirty. Close > Yes opened the actual Save As picker; Escape/Cancel
+  retained the dirty window and named entity. Repeating Close > Yes and saving
+  root-a/fixed-close-save.scene.json succeeded and the window closed.
+
+The saved file actually contains Fixed Save Probe and has SHA256
+`73778f0a654bb147bc0c78b54ce4632ea69a52292ad01da8b9bfd73a29cc7d09`.
+Root's fresh Sky inventory and owned-process inventory were empty afterward.
+The actual process exit code was not captured, so no exit0 is asserted. The
+native Tool remains the compiled/reviewed51815b18... source, core c6b22ffa... and
+tests e04fa86f... unchanged. Only Task/QA prose is updated after the matrix.
+
+This establishes the three observed native repairs and those bounded controls.
+It does not establish every DPI/IME/controller/capture-loss path, model import,
+native project creation, Runtime-only package or stability duration. All original
+old witnesses and failed/fixed core matrix receipts remain preserved above.
 
 Coordinator owns all launches/input and must retain actual before/after
 evidence. The following creates original fixture JSON under the external

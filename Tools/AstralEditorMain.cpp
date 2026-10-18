@@ -30,6 +30,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -166,6 +167,7 @@ struct EditorApp {
     int inspectorContentHeight{};
     int inspectorScroll{};
     bool updatingInspector{};
+    std::optional<std::size_t> invalidInspectorField;
 
     // Viewport state.
     int renderScale{1};
@@ -191,6 +193,12 @@ WNDPROC g_editProc = nullptr; // the system EDIT procedure the inspector boxes s
 LRESULT CALLBACK InspectorEditProc(HWND edit, UINT message, WPARAM wParam, LPARAM lParam);
 
 Editor::SceneEditor& Scene() { return *g_app.editor; }
+bool CommitPendingInspector();
+
+bool InspectorHasFocus() {
+    const HWND focus = GetFocus();
+    return focus && g_app.inspector && IsChild(g_app.inspector, focus);
+}
 
 // ---------------------------------------------------------------- helpers
 
@@ -235,6 +243,10 @@ void RefreshTitle() {
 }
 
 void RefreshStatus() {
+    if (!g_app.lastError.empty()) {
+        SetStatus("Error: " + g_app.lastError);
+        return;
+    }
     std::string text = Scene().Status();
     if (Scene().Playing()) {
         char fps[64];
@@ -357,6 +369,7 @@ void ClearInspector() {
     g_app.addComponentId = 0;
     g_app.addBehaviourId = 0;
     g_app.materialNameEdit = nullptr;
+    g_app.invalidInspectorField.reset();
 }
 
 void UpdateInspectorScrollbar() {
@@ -614,17 +627,26 @@ Math::Vec3 ReadVec3Field(const std::string& name, Math::Vec3 fallback) {
     return fallback;
 }
 
-void CommitField(std::size_t index) {
-    if (g_app.updatingInspector || index >= g_app.fields.size() || Scene().Playing()) return;
+bool CommitField(std::size_t index) {
+    if (g_app.updatingInspector || index >= g_app.fields.size() || Scene().Playing()) return true;
+    if (g_app.invalidInspectorField && *g_app.invalidInspectorField != index) {
+        ReportError("correct or revert the invalid inspector field before continuing");
+        return false;
+    }
     const FieldBinding binding = g_app.fields[index];
     Core::JsonValue value;
     std::string error;
     if (!ReadField(binding, value, error)) {
-        if (!error.empty()) ReportError(error);
-        ShowFieldValue(binding);
-        return;
+        g_app.invalidInspectorField = index;
+        ReportError(error.empty() ? "invalid inspector value" : error);
+        return false; // retain the user's editable text; Escape explicitly reverts
     }
-    if (SameAsShown(value, binding.field.value)) return; // unchanged: no undo step
+    if (SameAsShown(value, binding.field.value)) {
+        g_app.invalidInspectorField.reset();
+        g_app.lastError.clear();
+        RefreshStatus();
+        return true; // unchanged: no undo step
+    }
     bool ok = false;
     if (binding.group == InspectorGroupKind::Transform) {
         ok = Scene().SetTransform(ReadVec3Field("position", Scene().Position()), ReadVec3Field("rotation", Scene().EulerDegrees()),
@@ -634,11 +656,30 @@ void CommitField(std::size_t index) {
     } else {
         ok = Scene().SetField(binding.group, binding.groupName, binding.index, binding.field.name, value, error);
     }
-    AfterEdit(ok, error);
+    if (!ok) {
+        g_app.invalidInspectorField = index;
+        ReportError(error.empty() ? Scene().Status() : error);
+        return false;
+    }
+    g_app.invalidInspectorField.reset();
+    AfterEdit(true, error);
+    return true;
+}
+
+bool CommitPendingInspector() {
+    if (g_app.updatingInspector || Scene().Playing()) return true;
+    if (g_app.invalidInspectorField && !CommitField(*g_app.invalidInspectorField)) return false;
+    const HWND focus = GetFocus();
+    for (std::size_t index = 0; index < g_app.fields.size(); ++index) {
+        const auto& controls = g_app.fields[index].controls;
+        if (std::find(controls.begin(), controls.end(), focus) != controls.end()) return CommitField(index);
+    }
+    return true;
 }
 
 void OnInspectorCommand(int id, int code, HWND control) {
     if (g_app.updatingInspector || Scene().Playing()) return;
+    if ((code == BN_CLICKED || code == CBN_SELCHANGE) && !CommitPendingInspector()) return;
     std::string error;
     if (id == g_app.addComponentId && code == CBN_SELCHANGE) {
         const LRESULT selected = SendMessageW(control, CB_GETCURSEL, 0, 0);
@@ -692,6 +733,9 @@ LRESULT CALLBACK InspectorEditProc(HWND edit, UINT message, WPARAM wParam, LPARA
                 CommitField(found->second);
             } else if (found->second < g_app.fields.size()) {
                 ShowFieldValue(g_app.fields[found->second]);
+                if (g_app.invalidInspectorField == found->second) g_app.invalidInspectorField.reset();
+                if (!g_app.invalidInspectorField) g_app.lastError.clear();
+                RefreshStatus();
             }
         }
         return 0;
@@ -799,11 +843,12 @@ void StopPlaying() {
     BuildInspector();
 }
 
-void StartPlaying() {
+bool StartPlaying() {
+    if (!CommitPendingInspector()) return false;
     std::string error;
     if (!Scene().Play(error)) {
         ReportError("Play failed: " + error);
-        return;
+        return false;
     }
     g_app.input = {};
     g_app.lastTick = std::chrono::steady_clock::now();
@@ -812,13 +857,15 @@ void StartPlaying() {
     SetFocus(g_app.viewport);
     RefreshAll();
     BuildInspector();
+    return true;
 }
 
-void TogglePlay() {
+bool TogglePlay() {
     if (Scene().Playing()) {
         StopPlaying();
+        return true;
     } else {
-        StartPlaying();
+        return StartPlaying();
     }
 }
 
@@ -931,6 +978,7 @@ LRESULT CALLBACK ViewportProc(HWND window, UINT message, WPARAM wParam, LPARAM l
     int height = 1;
     switch (message) {
     case WM_LBUTTONDOWN: {
+        if (!CommitPendingInspector()) return 0;
         SetFocus(window);
         RenderPoint(lParam, x, y, width, height);
         g_app.lastMouse = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
@@ -1013,12 +1061,16 @@ LRESULT CALLBACK ViewportProc(HWND window, UINT message, WPARAM wParam, LPARAM l
 
 // ---------------------------------------------------------------- commands
 
+bool SaveAs();
+
 bool ConfirmDiscard() {
+    if (!CommitPendingInspector()) return false;
     if (!Scene().Dirty()) return true;
     const int answer = MessageBoxW(g_app.window, L"The scene has unsaved changes. Save them first?", L"Astral Editor",
         MB_YESNOCANCEL | MB_ICONQUESTION);
     if (answer == IDCANCEL) return false;
     if (answer == IDNO) return true;
+    if (Scene().ScenePath().empty()) return SaveAs();
     std::string error;
     if (Scene().Save(error)) return true;
     ReportError(error);
@@ -1059,44 +1111,56 @@ std::string RelativeToContentRoot(const std::wstring& file) {
     return Utf8(relative.generic_wstring());
 }
 
-void ReplaceEditor(const std::string& contentRoot) {
-    Scene().Stop();
-    g_app.editor = std::make_unique<Editor::SceneEditor>(contentRoot);
-}
-
 void OpenFile(bool project) {
     if (!ConfirmDiscard()) return;
     std::wstring file;
     if (!BrowseFile(false, project ? L"Open project" : L"Open scene", file)) return;
     std::string relative = RelativeToContentRoot(file);
+    std::unique_ptr<Editor::SceneEditor> candidate;
     if (project || relative.empty()) {
         // A project (or a scene elsewhere) brings its own content root: the file's folder.
+        // Keep the current editor and authored context alive until the new file
+        // has loaded fully. A failed candidate must never discard that context.
         const std::filesystem::path path(file);
-        ReplaceEditor(Utf8(path.parent_path().wstring()));
+        candidate = std::make_unique<Editor::SceneEditor>(Utf8(path.parent_path().wstring()));
         relative = Utf8(path.filename().wstring());
     }
     std::string error;
-    const bool ok = project ? Scene().OpenProject(relative, error) : Scene().OpenScene(relative, error);
-    if (!ok) ReportError(error);
+    Editor::SceneEditor& destination = candidate ? *candidate : Scene();
+    const bool ok = project ? destination.OpenProject(relative, error) : destination.OpenScene(relative, error);
+    if (!ok) {
+        const std::string filename = Utf8(std::filesystem::path(file).filename().wstring());
+        ReportError("Cannot open " + filename + ": " + error + " (selected path: " + Utf8(file) + ")");
+        return; // RefreshAll would hide the error and rebuild the old inspector.
+    }
+    if (candidate) {
+        Scene().Stop();
+        g_app.editor = std::move(candidate);
+    }
+    g_app.lastError.clear();
     g_app.inspectorScroll = 0;
     RefreshAssets();
     RefreshAll();
     BuildInspector();
 }
 
-void SaveAs() {
+bool SaveAs() {
+    if (!CommitPendingInspector()) return false;
     std::wstring file = Wide(Scene().ScenePath());
-    if (!BrowseFile(true, L"Save scene as", file)) return;
+    if (!BrowseFile(true, L"Save scene as", file)) return false;
     const std::string relative = RelativeToContentRoot(file);
     std::string error;
     if (relative.empty()) {
         ReportError("save inside the content root (" + Utf8(AbsoluteContentRoot()) + ")");
-        return;
+        return false;
     }
-    AfterEdit(Scene().SaveAs(relative, error), error);
+    const bool saved = Scene().SaveAs(relative, error);
+    AfterEdit(saved, error);
+    return saved;
 }
 
 void Create(const std::string& kind) {
+    if (!CommitPendingInspector()) return;
     std::string error;
     AfterEdit(Scene().CreateEntity(kind, error), error);
     BuildInspector();
@@ -1128,6 +1192,8 @@ void ShowControls() {
 }
 
 void OnCommand(int id) {
+    if (id != kHelpControls && id != kEditFrame && id != kViewGrid && id != kViewSnap && id != kViewHalfResolution
+        && !CommitPendingInspector()) return;
     std::string error;
     switch (id) {
     case kFileNew:
@@ -1328,11 +1394,15 @@ void ApplyLayout(HWND window) {
 
     const auto status = Astral::Editor::ComputeEditorStatusContentLayout(g_app.layout.status);
     MoveControl(g_app.status, status.x, status.y, status.width, status.height);
-    if (g_app.editor) BuildInspector();
+    if (g_app.editor && CommitPendingInspector()) BuildInspector();
     InvalidateRect(window, nullptr, TRUE);
 }
 
 void OnOutlinerSelection() {
+    if (!CommitPendingInspector()) {
+        RefreshOutliner(); // restore the authored selection, retaining invalid inspector text
+        return;
+    }
     const LRESULT selected = SendMessageW(g_app.outliner, LB_GETCURSEL, 0, 0);
     if (selected < 0 || static_cast<std::size_t>(selected) >= g_app.rows.size()) return;
     const Editor::OutlinerRow& row = g_app.rows[static_cast<std::size_t>(selected)];
@@ -1423,7 +1493,7 @@ LRESULT CALLBACK EditorWindowProc(HWND window, UINT message, WPARAM wParam, LPAR
         for (int i = 0; i < 5; ++i) {
             if (id != kToolButtonIds[i]) continue;
             if (i == 4) {
-                TogglePlay();
+                if (!TogglePlay()) return 0;
             } else {
                 Scene().tool = static_cast<GizmoTool>(i);
                 RefreshToolbar();
@@ -1437,6 +1507,7 @@ LRESULT CALLBACK EditorWindowProc(HWND window, UINT message, WPARAM wParam, LPAR
     }
     case WM_TIMER:
         if (wParam == kDiskPollTimer && g_app.editor && !Scene().Playing() && !Scene().Dragging()
+            && !InspectorHasFocus() && !g_app.invalidInspectorField
             && Scene().ReloadIfChangedOnDisk()) {
             RefreshAssets();
             RefreshAll();
