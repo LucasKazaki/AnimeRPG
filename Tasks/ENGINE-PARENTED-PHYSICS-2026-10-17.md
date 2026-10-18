@@ -1,5 +1,35 @@
 # Synchronize parented physics poses in hierarchy order
 
+## Current authorized status — October18, 03:51Z onward
+
+Ownership transferred to `/root/demo_runtime`. Lucas released the desktop/GPU
+hold and set the live demonstration deadline to October18 noon Eastern (16:00Z).
+Root accepted actual local OLD receipts from assembled `afd4a21`: child-created-
+first and unbodied-bridge filters each aborted with child exit3; parent-created-
+first returned0. Configure0 (5.0s), two-job Debug Services/World build0 (34.344s),
+original Engine bytes2c698887 and original World fixture file hash15dd0d17f403d56952446daee81e55fb4bf8575580ebbc4c13419d7d6a41aed6 verified.
+Receipts/outputs are in `work/cpu-repro-evidence`. Root then authorized the
+bounded production correction: collect sorted-root subtrees parent-first,
+refresh every node (including unbodied bridges), and pull dynamic bodies using
+existing pose conversion. Kinematic bookkeeping and solver/body state stay
+unchanged. Original translation assertions remain unchanged; a new regression
+uses nonidentity rotations, public off-center impulses, stable body handles,
+unchanged velocities/world scale and body/cache/matrix checks across both
+creation orders and repeated steps. Root independently reviewed this source
+clean, and final Debug/Release World31, Framework21, Sample20 cases passed:
+72 cases across3/3 suites per configuration (83.641/1.141s). Two-job builds
+returned0 (43.390/56.812s), safety3/3 passed (5.297s), M1-3 returned0. Source
+patchSHA256 remained
+`579f631e829c9eb85808a5dd9aeacc95e4fb8f1a5530ffdf7ff2fd71a7eb7213`.
+Evidence: `work/parented-physics-final-evidence`. Final independent logs/docs/
+commit binding remains pending. The CPU slot was explicitly released after
+completion; no affected compiler/test process remained. Root schedules all slots.
+
+The original preparation/contract below is retained as historical context;
+its hold, hypothesis-only and pending OLD execution statuses are superseded.
+
+## Original preparation and agreed scope
+
 Owner: `/root/containment_implementation`, sole implementation owner in
 `work/astral-parented-physics`, branch `engine/parented-physics-20261017`.
 Deliberate base: `2c69888774c074a69ec12c5f659e3632280db420`, the coordinator's
