@@ -7,11 +7,19 @@ Branch: `engine/imported-animation-binding-20261018`. Immutable base:
 
 ## Current phase
 
-Implementation and affected Debug/Release CPU checks have passed, followed by
-actual Debug/Release native authoring and visible-animation checks under root's
-exclusive supervision. The final two documentation updates await coordinator
-and independent review before a scoped eleven-path commit. No commit, push,
-rebase or additional engine execution is authorized by this record.
+The accepted implementation passed local Debug/Release CPU and actual native
+checks and was committed as ad30857e6bc63a2c9472a88c262dd2590279b69a in PR107.
+Hosted Windows head/merge checks passed, but all five portable jobs failed at
+one test-only partial AnimState initializer under warnings-as-errors. A narrow
+source-only repair now default-initializes that state and assigns the same name
+and clip. All assertions, fixture bytes and production source remain unchanged.
+The correction passed the separately granted local MSVC Framework gate in
+Debug and Release: 31 cases, including ten imported cases and nine cleaned
+fixture roots per configuration. Independent actual acceptance is recorded in
+QA. Only the two Framework test EXEs changed; their old versions are preserved.
+Production/native binaries and PR head remain unchanged. Fresh portable GCC/
+Clang warnings-as-errors and sanitizer CI is still pending publication; no new
+commit, push, merge or engine execution is authorized by this record.
 
 The accepted concrete design is
 `work/imported-animation-binding-evidence/OWNERSHIP-AND-SCHEMA-DESIGN.md`,
@@ -238,3 +246,24 @@ reparenting is not a live controller-rebinding API. Direct C++ clip-string
 mutation also does not rebind. Unsupported imported root motion, deforming
 collision, static skinned LOD and non-joint selected channels reject. The sealed
 8056 CPU demonstration package remains untouched and separate from this packet.
+
+## Actual initializer-repair local acceptance
+
+Root reported outer execution session 84818 closed with exit 0. All 57 individual
+owned children exited0, were reaped and had no timeout. The exact reviewed
+six-command plan built only Framework Debug/Release with max 2/no node reuse,
+then ran one anchored 31-case suite per configuration, including all ten imported
+cases and nine cleaned roots. No configure, production/native rebuild, source
+change or hosted acceptance was claimed. All 621 tracked source hashes, the
+283 build inputs and eleven-file scope matched the compiled repair freeze;
+cache/owner, twelve other accepted EXEs, 711 prior evidence files and eleven
+native Content files remained exact. The final inventory had blockingCount 0
+and only its own direct conhost marked currentQueryConsole/nonblocking.
+
+Independent evidence-only acceptance:
+`work/imported-animation-binding-evidence/ci-repair-framework-independent-actual-acceptance.json`,
+SHA256 `595c494351fe7536ad225dcdf7d6a85231f0fbcb78506ab6f1401821bc5d0e1e`.
+This proves local MSVC semantics of the unchanged default-state initialization;
+portable compiler warnings and sanitizer CI still require the new exact head.
+Only Task/QA are reconciled after this local pass. Every production/test byte
+and prior proof stays frozen. The current PR remains unmerged.

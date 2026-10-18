@@ -1765,7 +1765,10 @@ ASTRAL_TEST(ImportedAnimationHelperNormalBlendHasDocumentFallback) {
         const Vec3 secondScale = mode == 0 ? Vec3{1,1,1} : mode == 1 ? Vec3{2,1,1} : Vec3{0,1,1};
         clip.AddKey(0, 0, {{}, {}, firstScale}); clip.AddKey(1, 0, {{}, {}, secondScale});
         auto machine = std::make_shared<Animation::AnimStateMachine>();
-        machine->AddState({"normal-control", &clip});
+        Animation::AnimState normalState{};
+        normalState.name = "normal-control";
+        normalState.clip = &clip;
+        machine->AddState(normalState);
         auto bind = std::make_shared<Graphics::MeshData>();
         for (Vec3 position : {Vec3{1,1,1}, Vec3{2,1,1}, Vec3{1,2,1}}) {
             Graphics::Vertex vertex; vertex.position = position; vertex.normal = {2.0f/7,3.0f/7,6.0f/7};

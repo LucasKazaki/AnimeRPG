@@ -1,9 +1,14 @@
 # Imported animation binding QA
 
-Status: affected Debug/Release CPU and actual Debug/Release native checks passed.
-Final Task/QA-only reconciliation awaits independent review before commit.
-Earlier OLD findings, partial failures and the first native visibility failure
-are retained below; none is relabeled as a pass.
+Status: local Debug/Release CPU and actual native checks passed at commit
+ad30857e6bc63a2c9472a88c262dd2590279b69a. PR107 hosted Windows head/merge
+checks passed; five portable builds failed a test-only partial AnimState
+initializer under warnings-as-errors. The minimal correction has now passed
+local MSVC Framework Debug/Release acceptance, independently verified below.
+Portable compiler/sanitizer CI for the corrected head remains pending; the PR
+head is unchanged. Production/native binaries stay exact; only the two
+Framework test EXEs were rebuilt and their old versions preserved. Earlier
+findings and failures remain retained; none is relabeled as a pass.
 Base `8056ff6a6d04589bffbac84120365c271f2e9e85`, worktree,
 branch and exact eleven-path ownership are recorded in the matching Task.
 The sealed CPU demonstration remains separate and unchanged.
@@ -413,3 +418,104 @@ the scene/editor rebuild path. Imported root motion, deforming mesh collision,
 static skinned LOD and non-joint selected channels reject. No unnamed-Play hot
 reload claim is made; resource-only editor reload and existing named Host
 atomic reload have their own passing CPU cases.
+
+## PR107 portable CI finding and source-only correction
+
+PR107 head ad30857e6bc63a2c9472a88c262dd2590279b69a has tree
+7c235a27e5e0a87ba5bb5fac1d4e6cdf6c646ff9. All ten hosted checks completed:
+package-manifest, MSVC Debug/Release head and merge, and D3D11 head and merge
+passed. GCC Debug, GCC Release, Clang Release, GCC ASan+UBSan and GCC TSan
+failed compilation at EngineFrameworkTests.cpp:1768, before their engine or
+sanitizer suites ran. GCC reports missing blendSamples and blendParameter;
+Clang reports the missing blendSamples initializer, with warnings-as-errors.
+No portable runtime or sanitizer result is claimed from these failed jobs.
+
+The actual source was `machine->AddState({"normal-control", &clip});` in the
+direct normal-blend helper regression. AnimState declares name, clip,
+blendSamples, blendParameter and speed(default1). The authorized correction
+uses `Animation::AnimState normalState{};`, assigns the same name and clip,
+then passes that state. Empty vector/string and speed1 defaults are preserved.
+No assertion, numeric expectation, fixture recipe or production path changes.
+Reversing only this exact initializer substitution recovers the prior complete
+test bytes. At that source freeze the repair had not been compiled or run.
+The separately reviewed/granted local MSVC result follows; portable hosted
+validation remains pending before merge acceptance.
+
+Actual hosted Windows and D3D11 logs identify head checkout ad30857e, parent
+8056ff6a6d04589bffbac84120365c271f2e9e85, and synthetic merge checkout
+bde672d8cdc3af8461c452602544a0d6e8e13a9e with ordered parents
+bbbed2a2b201fef675c9aa7caa5009beeb501542 then ad30857e. GitHub commit objects
+for those exact logged checkouts give head tree7c235a27 and merge tree
+4e00908ec1005e27cb12bd1293e452a8f5eda8dd. Tree SHAs are API evidence, not
+values printed by the hosted workflow. Current main/base was bbbed2a; branch
+API reported unprotected, protection GET404 "Branch not protected", and the
+repository ruleset list was empty. Root's merge gate remains closed despite
+the absence of enforced status contexts.
+
+Read-only evidence `work/imported-animation-binding-evidence/ci-first` retains
+all metadata, actual logs and bounded command receipts. Verification SHA256:
+`a2dde171e26744203a73aa09e00c18540020adac41501353f9cc26b66438670c`.
+Two gh run-log reads failed with an invalid cached ZIP; their receipts remain.
+Direct per-job log API retrieval, explicitly allowing raw escape bytes only
+into evidence pipes after the CLI refused them, succeeded without deleting
+caches. These collection issues are separate from the actual compile failure.
+No merge, source production edit or local engine execution occurred during
+the read-only verification or this narrowly authorized source repair.
+
+## Actual initializer-repair Framework Debug/Release pass
+
+Root reported outer session 84818 closed 0. Reviewed runner SHA256
+`627223197f61536a503cebe24b4f102e251730fb89f7f83ec39945e328d53dad`
+used the existing exact owned cache without configure. The six exact commands
+are in independent plan SHA256
+`4afc141ca4ede6876a76e65d51ce9f92c909ca771a06d2d12099fc329bed02f6`:
+only EngineFrameworkTests Debug/Release builds with `--parallel 2 -- /nr:false`,
+anchored `^EngineFrameworkTests$` JSON inventories, then verbose one-suite CTest
+with `-j 1 --stop-on-failure --output-on-failure --no-tests=error`.
+
+| Actual child | PID | Exit | Seconds |
+| --- | ---: | ---: | ---: |
+| Debug Framework build | 40900 | 0 | 2.921 |
+| Debug Framework suite | 30724 | 0 | 1.016 |
+| Release Framework build | 54600 | 0 | 3.532 |
+| Release Framework suite | 44648 | 0 | 0.203 |
+
+Both CTest inventories contained exactly the expected single unfiltered EXE.
+Each suite passed 31 cases, with all ten imported RUN/OK pairs exactly once and
+nine distinct owned fixture roots absent afterward. The original normal witness
+remained (-0.428571373,0.285714298,0.857142866), matching (-3,2,6)/7. Assertions,
+numeric expectations, fixture recipes and all production bytes stayed exact.
+All 57 owned children—six build/inventory/test commands, 32 Git queries,
+14 process queries, three memory queries and two diff checks—exited0, reaped
+without timeout. Fresh memory was 12.4693 GiB before archive, 12.4566 before Debug,
+and 12.4756 before Release. No local native/GPU check was repeated.
+
+| Rebuilt Framework EXE | Bytes | SHA256 |
+| --- | ---: | --- |
+| Debug | 6066688 | 5251f198bfbc4eefa28c5963fa0c5045fdfea059a57bc94efd0ca4700b33647a |
+| Release | 1669120 | 07bdfa74c2ada02b7869e30d4996daa74112e3ea24849da124bde3acaae16896 |
+
+Both old Framework EXEs were copied exclusively before compilation and rehashed
+afterward. All twelve other accepted EXEs, including both native editors, stayed
+exact. Cache 02f26/owner 696089 remained exact. All 621 tracked source files,
+283 build inputs and eleven scoped hashes matched before/config/after/final
+maps; current build-input binding SHA256 is
+`03d382f075a5583c8ca70efe2bf25be67952262d33df27a8ad1614fd312f2c65`.
+All 711 pinned prior evidence files and eleven native Content files stayed exact.
+Only these Task/QA documents change after the actual compiled repair freeze.
+
+The final process inventory at 09:38:55.5592794 UTC had blockingCount 0 and one
+row: query 46288's direct conhost 13648, currentQueryConsole=true/nonblocking.
+No other row or blocker was present. That bounded query and all 57 recorded
+children exited0 and were reaped; the runner excludes itself while querying.
+The inventory is reported at its actual scope, without a later claim that the
+exempt console was observed absent. Root reported the outer session closed 0.
+
+Independent evidence-only acceptance SHA256:
+`595c494351fe7536ad225dcdf7d6a85231f0fbcb78506ab6f1401821bc5d0e1e`,
+file `ci-repair-framework-independent-actual-acceptance.json`. The review matched
+all individual receipts/logs,57-child arithmetic, source/cache/binary/archive
+maps, numeric cases and final inventory. This is local MSVC Framework acceptance
+of the initializer-only repair. Fresh GCC/Clang warnings-as-errors and all five
+previously failed portable/sanitizer jobs for the corrected head remain pending,
+along with relevant current head/merge CI. No merge acceptance follows yet.
