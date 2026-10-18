@@ -1,8 +1,11 @@
 # Noon demonstration assembly evidence
 
 Owner `/root`; Task ENGINE-NOON-DEMO-ASSEMBLY-2026-10-18.
-Status: source assembly only; no combined configure/build/test/native/package
-acceptance yet. Every input's earlier evidence remains limited to that input.
+Status at2026-10-18 06:15UTC: combined8056 CPU3D package and fresh-project
+workflow locally verified; complete native compatibility checks pass. Final
+overall hosted/main integration remains pending. The ordered entries below
+retain earlier admission/failure history; later actual results supersede their
+then-pending status. Full development workflow gate remains NOT PASSED.
 
 The branch deliberately started at reviewed Project1804a3c. Task commit10d4e59
 preceded source integration. Creator5c9fb44 merged normally without conflicts.
@@ -141,7 +144,7 @@ treec98fb623ee88668788ae920819e97db475dd96a3, passed the complete native CPU
 matrix. All-target Debug/Release builds returned0 in30.234/70.531s. Both exact
 inventories selected33 deterministic CTest suites, all passed in106.828/7.219s.
 Seventeen self-registering engine suites totaled299 cases per configuration;
-the other16 are legacy suites. Safety3/3 passed in5.726s, milestones1–3 each0,
+the other16 are legacy suites. Safety3/3 passed in5.726s, milestones1â€“3 each0,
 and the then-current16 packaging controls passed. Fresh RAM was12.791/12.778/
 12.561GiB before configure/Debug/Release. All23 bounded recorded commands
 returned0/reaped without timeout. Full615-file/56-directory before/after source,
@@ -193,16 +196,154 @@ The independently verified editor reopen86cd91a normal-merged as034009c without
 conflicts after the8867 hardware source binding completed. Exactly its4 paths
 are adopted: two current-Error guards, six meaningful original/recovery fixtures
 and Task/QA. Four safe old failures/two controls preceded production. Component
-D/R five targets and four suites all passed (Editor30), safety3/M1–3; exact full
+D/R five targets and four suites all passed (Editor30), safety3/M1â€“3; exact full
 patch71a3b7c711ed3485d8e02241a85007b3be86a86fdcf1c427b8b37c0fb5099286.
 DraftPR104 is attached. The combined editor and real package still need the
 subsequent source-bound checks; earlier8867 acceptance does not validate new code.
 
 The separate four-path PE-format correction was independently reviewed against
 actual output. Its OLD unit reproduced the sameSECTION failure; final19 controls,
-safety3 and M1–3 passed with the parser/allowlist unchanged. The only production
+safety3 and M1â€“3 passed with the parser/allowlist unchanged. The only production
 change makes two real dumpbin calls and concatenates headers before dependents.
 Root is integrating that accepted packet before the next real package attempt.
 No mocked fixture constitutes a real package or native acceptance. Validation
 staging is C:/AI/astral-demo; accepted delivery copies may later go under session
 outputs with the exact manifest preserved. Full workflow remains NOT PASSED.
+
+## Actual combined8056 package and complete CPU workflow
+
+The PE-format input12cdbc05dd3a6513a80166a78ada6a7c24856f04 normal-merged
+without conflicts as8056ff6a6d04589bffbac84120365c271f2e9e85, tree
+7758351dfb56415ea945693db01847a74738226d. This revision includes editor-reopen86
+and all earlier reviewed inputs. No Host, native Tool, GPU or CMake code changed
+between the fully accepted8867 hardware run and8056; the changed production is
+the two editor cached-current-error guards and two actual PE commands. The
+previous failed first real package and safe old failures remain retained.
+
+Final all-target Debug/Release builds passed in4.578/4.875s. Both exact33-suite
+deterministic CTest inventories passed in72.266/6.047s (CTest72.24/6.01s):
+17engine suites305cases each, including Editor30, plus16legacy suites.
+Safety3/3, packaging19/19 with zero skips and milestones1-3 all passed. All23
+recorded children returned0/reaped/noTimeout. Available RAM before configure/
+Debug/Release was12.637/12.659/12.562GiB. Complete619physical files/56directories,
+HEAD/tree and clean status matched before/after. Canonical binding SHA256 is
+9057c0afa722aecc85dc32528aaad2b9e00fb1bfbb69bb16942e53df351ff7a1.
+Evidence: work/noon-combined-cpu-8056-first, reviewed external runner00c6b134
+(one expected16-to19 unit-count change from original66e0a72). Hardware tests
+were explicitly OFF for this separate CPU admission. The original8867 hardware
+evidence is unchanged and its GPU/Host/Tool sources match this8056 production.
+
+The corrected actual static Release package ran05:46:17.447774-
+05:46:24.744329Z, child0/reaped/noTimeout7.297s. All four static CRT/x64 tools
+have only the actual checked Windows system DLL imports.14sealed files were
+byte-verified; raw separate headers/dependents reports and source/toolchain/
+memory/EXE hashes are in work/noon-package-fixed-first and
+work/noon-package-supervision-fixed-first. The copied source notice is factual
+original-fixture provenance, not an invented redistribution license.
+
+Exact static binary hashes:
+
+- Editor da8b4e7cfeb8015538b501cbd4a206d7093d9d734cb6a5bbbf085aeeca3ca6e7.
+- Headless cc6a0b18f59d91ad96d9f6fcb5038ec80e6ce0289a088eef205cde1c4cb96760.
+- Native player4d03df3d6b7e3457af942615436566702c52409f4d4a0e6809def140bae09227.
+- Creator31ff45b9d37b72d63743c333f51ff4733acf0a9545701b4221601096c7fcad4f.
+
+Root's actual no-argument static native launch from unrelated SESSION cwd ran
+05:50:39.195360-05:51:43.721543Z/PID3864, child0/reaped/noTimeout64.531s.
+Root observed the original blue/orange marker, Box/ground, audio-device-active
+console, F5 reload, maximize4K/restore and normal close. A separate headless
+120frames/320x180 run passed with BoxY0.490; root inspected the real PNG. The
+first headless attempt returned3 because the capture directory did not exist;
+it is retained in work/noon-package-headless-first. Creating the output folder
+before the corrected run repaired setup, without altering production.
+
+The full fresh-project rehearsal used only the four packaged tools and the
+original glTF/bin, in a new owned NoonLive-01 project. The creator returned0.
+Actual editorPID24812 ran05:52:38.179992-05:54:54.937014Z,0/reaped136.750s.
+Root instantiated the Assets model, framed/selected it, changed X1.5-to2,
+observed global Undo1.5 and Redo2 after leaving the field, saved startup main,
+saved demo.scene.json via SaveAs, reopened that named file and observed X2.
+Play showed the model/Box/ground; Stop restored authoring and close returned0.
+Startup and demo JSON hashes both equal
+b1c468039c825019d48dba376a00ade32106a2a578461ba3fddf82922b46c7a9.
+The separate120frame capture passed and was visually inspected. A new real
+source packaging command returned0/reaped4.406s05:55:13-05:55:17Z, producing
+NoonLivePackage-01. Its outside-directory no-argument nativePID56580 ran
+05:55:23.700570-05:56:19.879525Z,0/reaped/noTimeout56.188s, with correct
+Astral Noon Live title/content, F5, maximize/restore and normal close. All exact
+commands/receipts are in work/noon-rehearsal-first,
+work/noon-rehearsal-package-first and noon-rehearsal-package-supervision-first.
+
+New delivery outputs/astral-noon-cpu-8056ff6 contains the12-file primary Package,
+14-file RecoveryPackage, separate verification/addendum and reviewed walkthrough.
+Both copies include unchanged release manifests and byte-identical complete
+inventories. The3,088,755-byte ZIP SHA256 is
+9b6a21790ceefce0c3a7ec938252ae8eb5166c6c1c73070b3c567a3ee4f024aa;
+each ZIP entry was read back and compared with the primary package. The actual
+relocated primary player also ran from unrelated C:/AI/astral-demo cwd:
+06:01:18.048451-06:01:41.531833Z/PID53076,0/reaped/noTimeout23.484s. Root
+observed the correct title and model/Box/ground and closed normally. Both package
+manifests were reverified afterwards. No nonexistent screenshot file is claimed;
+actual native screenshots are in the task conversation. WALKTHROUGH SHA256
+67016c98d20a35a64d9c0a3a8ad78f4e291c3c01cb45ed71f7e2dfde206470b3;
+its seven PowerShell blocks parsed without execution and sealed folders stayed
+unchanged. The walkthrough uses fresh02names, explicit capture-directory creation
+and the same factual notice argument. Its approximate seven minutes is a human
+presentation estimate, not a measured human-live timing promise.
+
+Scoped PE PR105 is draft/attached against frozen8867. Both Windows head/merge
+jobs passed. Root downloaded actual merge job117600238096/run39102081138:
+checked-out71b3d2f20f943cb0d0d1f4526574e1d818840efc has ordered8867/12cdbc
+parents and treefdfcabe474c09839168ce03d97d8cff1fd7f75c2, exactly the reviewed
+PE head tree. Do not confuse the setup action's own f3dc54 commit with the
+repository checkout. Editor PR104's seven hosted checks also passed. These
+scoped jobs do not substitute for the final overall candidate/main jobs.
+
+The sealed BuildInfo and manifest helper flags describe staging-time acceptance;
+later native/CPU proof is recorded separately, never by editing the seal. This
+is a locally verified CPU3D workflow. General GPU presentation is still a
+separate15-path implementation; no2D/rigged-authoring/full-parity, clean-machine
+or24hour-soak completion is asserted. Overall development workflow gate remains
+NOT PASSED. Remaining final integration/native checks are recorded separately.
+
+
+## Retained native compatibility on the same8056 source
+
+The separate direct-harness runner ef6e31ddfe5a191b02fddaa8092d70abe6e1a6cad5d6bfb891627e899741fc2b
+ran all six unchanged M4/M5/M7/M8/M9/M10 native executables in each configuration.
+All12 returned0/reaped/noTimeout and reported their real controls plus Clean
+Escape0. This is12 direct harness passes, not12 registered CTest executions:
+only the harness working-directory argument changed to new external empty roots
+so astral.log could not alter the frozen source. Default procedural GDI uses
+no external assets; each root contains only its generated log. Memory before
+every harness was12.358-12.695GiB. All44 recorded helper children returned0,
+reaped/noTimeout. Source619files/56directories/cleanHEAD/tree,14 native EXEs and
+cache matched before/after/final. Corrected exact-build process queries were
+empty before, after every harness and finally. Root found and fixed the runner's
+double-separator inventory prefix before execution; retained pure-string actual-
+path positive/sibling negative control proves its revised matching. Evidence:
+work/noon-runtime-smokes-8056-first; completion06:07:28.923236Z.
+
+Root additionally inspected existing application/player behavior in real windows.
+Debug AstralGame's original GDI scene ran normally and closed0. Existing Astral
+3D presentation was explicitly enabled using its existing ASTRAL_RENDER_MODE
+environment option, then visually inspected in Debug and Release and closed
+normally0/reaped/noTimeout (59.688/82.844s). Both actual logs report that opt-in.
+Two short Sky F2 inputs did not visibly switch the initial Debug app; one short
+Release F2 did not visibly return to GDI. These observations are retained; a
+subframe polling/input-tool timing hypothesis remains unproven. No F2 switching
+acceptance or new production input fix is claimed from these runs.
+
+The retained legacy AstralPlayerWin32 actually loaded its original Playground
+project in both configurations, showing35entities and the existing scene/HUD.
+Root opened the console and observed Audio output device active, pressedF5 and
+observed a second load plus the reset sample timer, then closed normally. Debug
+PID44524 ran06:12:28.373856-06:13:15.143483Z,0/reaped/noTimeout46.781s;
+ReleasePID40712 ran06:13:15.629452-06:14:12.530207Z,0/reaped56.890s.
+Exact EXE hashes/arguments/logs/receipts are in work/noon-legacy-native-first.
+Final native window and owned process inventories are empty. Root then checked
+all619physical source files/56directories against the complete8056 CPU proof,
+plus all53 EXE/LIB outputs per configuration: every hash and byte count matches.
+The two documentation paths updated after that binding do not change compiled
+production/test/workflow inputs. No audible-content or title-FPS performance
+claim is made. The frozen static CPU delivery remains unchanged.
