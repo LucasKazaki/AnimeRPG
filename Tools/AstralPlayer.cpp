@@ -24,7 +24,9 @@
 
 #include "Engine/Framework/GameHost.h"
 #include "Engine/Graphics/Image.h"
+#if defined(ASTRAL_PLAYER_PLAYGROUND)
 #include "Game/Samples/Playground/PlaygroundBehaviours.h"
+#endif
 
 #include <algorithm>
 #include <cstdint>
@@ -176,7 +178,9 @@ int main(int argc, char** argv) {
         if (frames == 0) frames = 300;
     }
 
+#if defined(ASTRAL_PLAYER_PLAYGROUND)
     Samples::RegisterPlaygroundBehaviours();
+#endif
     Framework::HostSettings settings;
     settings.contentRoot = contentRoot;
     Framework::GameHost host(settings);
