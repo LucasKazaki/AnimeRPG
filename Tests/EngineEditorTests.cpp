@@ -203,7 +203,185 @@ std::string FileText(const std::filesystem::path& path) {
     return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 }
 
+const char* const kReopenAuthorScene = R"({"format":"astral-scene","version":1,"entities":[
+  {"name":"AuthorBox","transform":{"position":[1,0,0]}},
+  {"name":"AuthorCamera","components":{"Camera":{}}}]})";
+const char* const kReopenAlternateScene = R"({"format":"astral-scene","version":1,"entities":[
+  {"name":"AlternateBox","transform":{"position":[9,0,0]}}]})";
+const char* const kReopenRecoveredScene = R"({"format":"astral-scene","version":1,"entities":[
+  {"name":"RecoveredBox","transform":{"position":[11,0,0]}}]})";
+const char* const kReopenAuthorProject = R"({"format":"astral-project","version":1,"name":"Author settings",
+  "startupScene":"author.scene.json","config":{"host.showStats":true},
+  "input":{"contexts":[{"name":"Author input","actions":[{"name":"EditorReopenProbe","bindings":[{"key":"W"}]}]}]}})";
+const char* const kReopenAlternateProject = R"({"format":"astral-project","version":1,"name":"Alternate settings",
+  "startupScene":"alternate.scene.json","config":{"host.showStats":false},
+  "input":{"contexts":[{"name":"Alternate input","actions":[{"name":"EditorReopenProbe","bindings":[{"key":"D"}]}]}]}})";
+const char* const kReopenRecoveredProject = R"({"format":"astral-project","version":1,"name":"Recovered settings",
+  "startupScene":"alternate.scene.json","config":{"host.showStats":false},
+  "input":{"contexts":[{"name":"Recovered input","actions":[{"name":"EditorReopenProbe","bindings":[{"key":"D"}]}]}]}})";
+
+struct ReopenFiles {
+    std::filesystem::path root;
+    ReopenFiles() {
+        static unsigned sequence = 0;
+        root = std::filesystem::temp_directory_path() / ("astral-editor-reopen-"
+            + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())
+            + "-" + std::to_string(++sequence));
+        ASTRAL_CHECK(std::filesystem::create_directory(root)); // exclusive owned directory
+        Write("author.scene.json", kReopenAuthorScene);
+        Write("alternate.scene.json", kReopenAlternateScene);
+        Write("author.project.json", kReopenAuthorProject);
+        Write("alternate.project.json", kReopenAlternateProject);
+        // Retain original bytes for the OLD runner if an assertion aborts before
+        // destruction. Normal completion removes only this private directory.
+        Write("author.scene.json.initial", kReopenAuthorScene);
+        Write("alternate.scene.json.initial", kReopenAlternateScene);
+        Write("author.project.json.initial", kReopenAuthorProject);
+        Write("alternate.project.json.initial", kReopenAlternateProject);
+        std::fprintf(stderr, "[ REOPEN_FIXTURE ] %s\n", root.string().c_str());
+        std::fflush(stderr);
+    }
+    ~ReopenFiles() { std::filesystem::remove_all(root); }
+    void Write(const std::string& name, const char* bytes) const {
+        std::ofstream file(root / name, std::ios::binary | std::ios::trunc);
+        ASTRAL_CHECK(file.good());
+        file << bytes;
+        file.close();
+        ASTRAL_CHECK(file.good());
+    }
+};
+
+void CacheAlternateAndOpenAuthor(SceneEditor& editor, bool project) {
+    std::string error;
+    ASTRAL_CHECK(project ? editor.OpenProject("alternate.project.json", error)
+                        : editor.OpenScene("alternate.scene.json", error));
+    ASTRAL_CHECK(editor.OpenProject("author.project.json", error));
+    ASTRAL_CHECK(editor.Select(Find(editor, "AuthorBox")));
+}
+
+void CheckReopenSettings(SceneEditor& editor, const char* name, bool author) {
+    const Core::JsonValue document = editor.Document();
+    std::string error;
+    ASTRAL_CHECK(editor.Play(error));
+    Framework::GameHost* game = editor.Game();
+    ASTRAL_CHECK(game && game->Project().name == name);
+    const Core::ConsoleVariable* stats = game->Commands().Find("host.showStats");
+    ASTRAL_CHECK(stats && stats->GetBool() == author);
+    Framework::HostInput input;
+    input.keys.keys.set('W');
+    game->Update(1.0f / 60.0f, input);
+    ASTRAL_CHECK(game->Input().Down("EditorReopenProbe") == author);
+    game->Update(1.0f / 60.0f, {});
+    input.keys.keys.reset();
+    input.keys.keys.set('D');
+    game->Update(1.0f / 60.0f, input);
+    ASTRAL_CHECK(game->Input().Down("EditorReopenProbe") == !author);
+    editor.Stop();
+    ASTRAL_CHECK(!editor.Playing() && editor.Document() == document);
+}
+
+void CheckPublishedReopen(SceneEditor& editor, bool project, bool recovered) {
+    ASTRAL_CHECK(editor.ScenePath() == "alternate.scene.json" && !editor.Dirty());
+    ASTRAL_CHECK(!editor.CanUndo() && !editor.CanRedo());
+    const char* box = recovered && !project ? "RecoveredBox" : "AlternateBox";
+    ASTRAL_CHECK(editor.Select(Find(editor, box)));
+    ASTRAL_CHECK(Near(editor.Position(), {recovered && !project ? 11.0f : 9.0f, 0, 0}));
+    ASTRAL_CHECK(editor.ProjectPath() == (project ? "alternate.project.json" : "author.project.json"));
+    CheckReopenSettings(editor, project ? (recovered ? "Recovered settings" : "Alternate settings") : "Author settings", !project);
+}
+
+void CheckRetainedReopenRejected(bool project, bool missing) {
+    const ReopenFiles files;
+    SceneEditor editor(files.root.string(), 0);
+    CacheAlternateAndOpenAuthor(editor, project);
+    const Core::JsonValue original = editor.Document();
+    const Vec3 originalPosition = editor.Position();
+    const Vec3 editedPosition = originalPosition + Vec3{2, 0, 0};
+    std::string error;
+    ASTRAL_CHECK(editor.Rename("DirtyAuthor", error));
+    ASTRAL_CHECK(editor.SetTransform(editedPosition, editor.EulerDegrees(), editor.Scale(), error));
+    ASTRAL_CHECK(editor.Undo()); // rename is undoable; the transform remains redoable
+    ASTRAL_CHECK(editor.Dirty() && editor.CanUndo() && editor.CanRedo());
+    editor.Camera().target = {4, 5, 6};
+    editor.Camera().yawDegrees = 73;
+    editor.Camera().pitchDegrees = 18;
+    editor.Camera().distance = 23;
+    const Editor::EditorCamera camera = editor.Camera();
+    const AuthorState before(editor);
+    const std::string candidate = project ? "alternate.project.json" : "alternate.scene.json";
+    const auto handle = editor.Assets().Load<Core::JsonValue>(candidate);
+    ASTRAL_CHECK(handle.Ready() && handle.Error().empty());
+    const auto version = handle.Version();
+    const auto attempt = handle.Attempt();
+    if (missing) ASTRAL_CHECK(std::filesystem::remove(files.root / candidate));
+    else files.Write(candidate, "{ invalid current replacement");
+    ASTRAL_CHECK(editor.Assets().Reload(candidate));
+    ASTRAL_CHECK(handle.Ready() && !handle.Error().empty());
+    ASTRAL_CHECK(handle.Version() == version && handle.Attempt() > attempt);
+
+    const bool opened = project ? editor.OpenProject(candidate, error) : editor.OpenScene(candidate, error);
+    ASTRAL_CHECK(!opened); // OLD witness: require rejection BEFORE any prior-state access
+
+    ASTRAL_CHECK(error.find(candidate) != std::string::npos && !error.empty());
+    before.Check(editor);
+    ASTRAL_CHECK(Near(editor.Camera().target, camera.target));
+    ASTRAL_CHECK(editor.Camera().yawDegrees == camera.yawDegrees && editor.Camera().pitchDegrees == camera.pitchDegrees
+        && editor.Camera().distance == camera.distance);
+    ASTRAL_CHECK(editor.Undo() && editor.Document() == original);
+    ASTRAL_CHECK(editor.Redo() && editor.Document() == before.document);
+    ASTRAL_CHECK(editor.Redo() && Near(editor.Position(), editedPosition));
+    ASTRAL_CHECK(editor.Undo() && editor.Document() == before.document);
+    CheckReopenSettings(editor, "Author settings", true);
+
+    files.Write(candidate, project ? kReopenRecoveredProject : kReopenRecoveredScene);
+    ASTRAL_CHECK(editor.Assets().Reload(candidate));
+    ASTRAL_CHECK(handle.Ready() && handle.Error().empty() && handle.Version() == version + 1);
+    ASTRAL_CHECK(project ? editor.OpenProject(candidate, error) : editor.OpenScene(candidate, error));
+    CheckPublishedReopen(editor, project, true);
+}
+
 } // namespace
+
+ASTRAL_TEST(EditorOpenSceneRejectsRetainedMalformedJson) { CheckRetainedReopenRejected(false, false); }
+ASTRAL_TEST(EditorOpenSceneRejectsRetainedMissingJson) { CheckRetainedReopenRejected(false, true); }
+ASTRAL_TEST(EditorOpenProjectRejectsRetainedMalformedJson) { CheckRetainedReopenRejected(true, false); }
+ASTRAL_TEST(EditorOpenProjectRejectsRetainedMissingJson) { CheckRetainedReopenRejected(true, true); }
+
+ASTRAL_TEST(EditorExplicitReopenAcceptsCurrentGoodJson) {
+    for (bool project : {false, true}) {
+        const ReopenFiles files;
+        SceneEditor editor(files.root.string(), 0);
+        CacheAlternateAndOpenAuthor(editor, project);
+        std::string error;
+        ASTRAL_CHECK(project ? editor.OpenProject("alternate.project.json", error)
+                            : editor.OpenScene("alternate.scene.json", error));
+        CheckPublishedReopen(editor, project, false);
+    }
+}
+
+ASTRAL_TEST(EditorExplicitReopenAcceptsRecoveredJson) {
+    for (bool project : {false, true}) {
+        for (bool missing : {false, true}) {
+            const ReopenFiles files;
+            SceneEditor editor(files.root.string(), 0);
+            CacheAlternateAndOpenAuthor(editor, project);
+            const std::string candidate = project ? "alternate.project.json" : "alternate.scene.json";
+            const auto handle = editor.Assets().Load<Core::JsonValue>(candidate);
+            ASTRAL_CHECK(handle.Ready() && handle.Error().empty());
+            const auto version = handle.Version();
+            if (missing) ASTRAL_CHECK(std::filesystem::remove(files.root / candidate));
+            else files.Write(candidate, "{ invalid current replacement");
+            ASTRAL_CHECK(editor.Assets().Reload(candidate));
+            ASTRAL_CHECK(handle.Ready() && !handle.Error().empty() && handle.Version() == version);
+            files.Write(candidate, project ? kReopenRecoveredProject : kReopenRecoveredScene);
+            ASTRAL_CHECK(editor.Assets().Reload(candidate));
+            ASTRAL_CHECK(handle.Ready() && handle.Error().empty() && handle.Version() == version + 1);
+            std::string error;
+            ASTRAL_CHECK(project ? editor.OpenProject(candidate, error) : editor.OpenScene(candidate, error));
+            CheckPublishedReopen(editor, project, true);
+        }
+    }
+}
 
 ASTRAL_TEST(EulerAnglesRoundTripThroughQuaternions) {
     const Vec3 cases[] = {{0, 0, 0}, {30, 0, 0}, {0, 45, 0}, {0, 0, 60}, {52, 35, 0}, {-20, 170, 15}, {80, -120, -45},

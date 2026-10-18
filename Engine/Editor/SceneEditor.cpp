@@ -279,7 +279,7 @@ bool SceneEditor::LoadDocument(JsonValue json, const std::string& path, std::str
 
 bool SceneEditor::OpenScene(const std::string& path, std::string& error) {
     const auto handle = assets_->Load<JsonValue>(path);
-    if (!handle.Ready()) {
+    if (!handle.Ready() || !handle.Error().empty()) {
         error = path + ": " + handle.Error();
         return false;
     }
@@ -290,7 +290,7 @@ bool SceneEditor::OpenScene(const std::string& path, std::string& error) {
 
 bool SceneEditor::OpenProject(const std::string& path, std::string& error) {
     const auto handle = assets_->Load<JsonValue>(path);
-    if (!handle.Ready()) {
+    if (!handle.Ready() || !handle.Error().empty()) {
         error = path + ": " + handle.Error();
         return false;
     }
