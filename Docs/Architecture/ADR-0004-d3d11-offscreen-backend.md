@@ -1,7 +1,9 @@
 # ADR 0004: first connected D3D11 offscreen pass
 
-Date: 2026-10-17. Status: bounded implementation approved; hardware validation and
-independent review pending. Scope: ENGINE-GPU-SPIKE-2026-10-17, not full GPU adoption.
+Date: 2026-10-17. Status: bounded offscreen implementation, hardware evidence and
+independent review accepted (packet QA). October18 optional native consumers now
+have bounded CPU/hardware evidence and actual application observations with
+explicit remaining gates below. This is not full GPU adoption.
 
 `GameWorld::BuildRenderScene` already emits indexed meshes/materials/transforms.
 The CPU `SceneRenderer` remains the reference. The installed VS2022/Windows SDK
@@ -16,7 +18,9 @@ superseded for this bounded spike by current Windows tooling/evidence. Reassess
 only on measured requirements; this does not select a cross-platform strategy.
 
 Keep Windows code in a separate optional static library; root options default
-OFF, portable source list unchanged. No player/editor switch or CPU replacement.
+OFF, portable source list unchanged. The original offscreen packet had no
+player/editor switch or CPU replacement; the optional native extension below
+adds explicit selection while preserving CPU default and legacy behavior.
 An isolated Windows-2022 workflow explicitly builds only the D3D11 test target
 in Debug/Release and runs only CPU shader diagnostics, with event-aware exact
 head/merge/commit provenance. It must never create a graphics device or run the
@@ -45,11 +49,11 @@ tests fail when no hardware device is available. WARP never satisfies this gate.
 Optional missing debug-layer fallback is diagnosed and never installs software.
 Do not physically remove/reset the GPU to manufacture failure evidence.
 
-Rollback is disabling the optional CMake options/removing the isolated target;
-existing CPU/editor/player paths are unchanged. Future packets must connect real
-player/editor consumers, add Toon/Lit/Water and other passes, swapchain
-resize/minimize/restore and validate native device-failure recovery. Until those
-pass, report this only as an offscreen opaque-Unlit backend increment.
+Rollback disables optional CMake options/consumer attachment; ordinary CPU and
+legacy paths remain available. Later work must add Toon/Lit/Water and other
+passes, broader hardware/package coverage and observed device-failure recovery.
+The October18 native evidence closes a bounded consumer increment, with its
+input/diagnostics/timeout limits retained rather than claiming full adoption.
 
 Primary documentation read:
 
@@ -61,3 +65,67 @@ Primary documentation read:
 - [No-wait Map](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_map_flag)
 - [Timestamp/disjoint validity](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ns-d3d11-d3d11_query_data_timestamp_disjoint)
 - [Device/context thread ownership](https://learn.microsoft.com/en-us/windows/win32/direct3d11/overviews-direct3d-11-render-multi-thread-intro)
+
+## October 18: optional native consumers and bounded evidence
+
+ENGINE-NATIVE-GPU-CONSUMERS-2026-10-18 keeps CPU default/legacy behavior and adds a
+shared Windows adapter for the Runtime-only native player and editor Play's
+actual GameHost. Portable Host frame extraction/UI-only methods carry no native
+header. The same validated indexed geometry pass renders GPU HDR/IDs/depth;
+normal presentation retains these targets and performs no scene readback.
+Only the transparent CPU UI bitmap is uploaded, explicitly disclosed as CPU UI.
+
+One GPU-only child HWND owns one two-buffer flip chain; the CPU/GDI parent is a
+different HWND. A GPU display pass implements the existing neutral tone map and
+sRGB once, then composites display-encoded straight-alpha UI. This does not add
+lighting/sky/fog/shadow/general post or other shading models. Invalid/unsupported
+selection gives a concrete reason; a later failure detaches and visibly selects
+CPU once until another user choice, without material mutation or automatic retry.
+
+Bounds cover swap buffers/UI/in-flight resources. Local failed submissions retain
+their uploads/staging through a bounded event fence even before queue publication.
+Resize retires work/unbinds views, verifies actual backbuffer dimensions and skips
+zero/minimized sizes; no hidden half-resolution enters this path. Query identities
+separate current CPU submission from actual completed GPU upload/scene/display
+times. Display overlay text explicitly labels the previous submitted frame.
+
+Before acceptance require authored original-model geometry, actual HWND captures,
+unchanged HDR/ID comparison, independent neutral-display/UI byte comparison,
+twenty cycles with real equivalent debug-layer live-object reports, actual
+player/editor controls and cleanup, and fixed 1280x720/30+120 measurement. Both
+GPU-work and presentation-inclusive full-frame p95 targets are 16.67 ms; a failed
+target remains explicit. The offscreen tolerance/coverage/timing gates stay
+unchanged. DPI/client/backbuffer/capture sizes and render adapter versus actual
+presentation monitor/output/refresh are separate metadata, with no system change.
+The actual Debug/Release hardware suite passed15/15 in each configuration on an
+RTX5080, including unchanged HDR/ID and independent display/UI comparisons,
+20 real resize/zero/restore/reload/detach cycles and matching actual debug-driver
+live-object reports. At declared1280x720,30warmup+120measured, fixed scene dt0,
+GPU/full-loop p95 was Debug0.135712/11.804800ms and Release4.334048/13.015900ms;
+both meet unchanged16.67ms targets. This is a fixed-fixture result, not a production
+FPS/4K claim. Raw clocks, separate output/DPI metadata, captures and source/binary
+bindings are retained in ENGINE-NATIVE-GPU-CONSUMERS-2026-10-18 QA.
+
+Root observed actual indexed authored geometry, normal CPU/GPU selection and
+supported controls in both player/editor configurations. Native editor Play
+keeps existing disk hot reload disabled: open/restart use cached assets; changed
+documents enter through Stop, clean edit-mode poll, then new CPU Play. This is
+initial unsupported selection/restoration evidence, not active-session disk-
+reload fallback. Player live fallback/restoration was observed separately.
+
+Keep the acceptance limits: Debug player and Release editor each had a retained
+600s timeout, followed by separately bounded fresh-process normal closes. A
+followup does not convert a timed-out attempt to a normal close. Stationary
+scaled-UI first-click acceptance remains open because the existing append-only
+console offers no visible hit/caret oracle. Debug postresize explicit diagnostics
+remain unobserved. Release explicit renderer.info was a fresh1104x655 window;
+earlier resized972x655 was automatic metadata only. Long console suffixes can
+clip; unobserved DPI/output fields must not be inferred from titles/screenshots.
+The entire native matrix, Toon/Lit/Water, GPUUI, clean-machine package, long soak
+and real device-removal recovery are not established by this packet.
+
+- [Flip-model HWND separation](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/dxgi-flip-model)
+- [Native chain creation and lifetime](https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgifactory2-createswapchainforhwnd)
+- [Resize unbinding rules](https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nf-dxgi-idxgiswapchain-resizebuffers)
+- [Present status and synchronization](https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nf-dxgi-idxgiswapchain-present)
+- [Actual debug-layer live reports](https://learn.microsoft.com/en-us/windows/win32/api/d3d11sdklayers/nf-d3d11sdklayers-id3d11debug-reportlivedeviceobjects)

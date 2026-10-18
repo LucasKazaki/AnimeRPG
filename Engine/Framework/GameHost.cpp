@@ -466,11 +466,13 @@ const Graphics::ImageRgba8& GameHost::Render(int width, int height) {
     const Clock::time_point start = Clock::now();
     width = std::max(1, width);
     height = std::max(1, height);
-    viewport_ = {static_cast<float>(width), static_cast<float>(height)};
     Graphics::RenderScene scene;
     Graphics::RenderView view;
     target_.Resize(width, height);
-    if (world_->BuildRenderScene(scene, view, width, height)) {
+    stats_.renderBackend = "CPU";
+    stats_.renderSubmission = 0;
+    if (PrepareRenderScene(width, height, scene, view)) {
+        ++stats_.cpuSceneRenders;
         renderer_.Render(scene, view, target_);
         stats_.render = renderer_.Stats();
     } else {
@@ -486,6 +488,31 @@ const Graphics::ImageRgba8& GameHost::Render(int width, int height) {
     return target_.output;
 }
 
+bool GameHost::PrepareRenderScene(int width, int height, Graphics::RenderScene& scene, Graphics::RenderView& view) {
+    width = std::max(1, width);
+    height = std::max(1, height);
+    scene = {};
+    view = {};
+    viewport_ = {static_cast<float>(width), static_cast<float>(height)};
+    return world_->BuildRenderScene(scene, view, width, height);
+}
+
+const Graphics::ImageRgba8& GameHost::RenderOverlay(int width, int height) {
+    overlay_.Resize(std::max(1, width), std::max(1, height), {0, 0, 0, 0});
+    Graphics::Canvas canvas(overlay_);
+    ui_.Draw(canvas);
+    if (showStats_) DrawStats(overlay_);
+    return overlay_;
+}
+
+void GameHost::SetExternalRenderStats(const Graphics::RenderStats& stats, double renderMs,
+    const std::string& backend, std::uint64_t submission) {
+    stats_.render = stats;
+    stats_.renderMs = renderMs;
+    stats_.renderBackend = backend;
+    stats_.renderSubmission = submission;
+}
+
 void GameHost::DrawStats(Graphics::ImageRgba8& image) const {
     const GameWorldStats& world = world_->Stats();
     char text[256];
@@ -493,6 +520,11 @@ void GameHost::DrawStats(Graphics::ImageRgba8& image) const {
         "frame %llu  update %.2f ms  render %.2f ms\nentities %zu  bodies %zu  behaviours %zu\ndraws %zu  tris %zu%s",
         static_cast<unsigned long long>(world.frame), stats_.updateMs, stats_.renderMs, world.entities, world.bodies,
         world.behaviours, stats_.render.drawsVisible, stats_.render.trianglesRasterized, paused_ ? "  PAUSED" : "");
+    if (stats_.renderBackend != "CPU") {
+        std::snprintf(text, sizeof(text), "%s | CPU UI\nprevious submission %llu  native %.2f ms\nsubmitted draws %zu  tris %zu%s",
+            stats_.renderBackend.c_str(), static_cast<unsigned long long>(stats_.renderSubmission),
+            stats_.renderMs, stats_.render.drawsSubmitted, stats_.render.trianglesSubmitted, paused_ ? "  PAUSED" : "");
+    }
     Graphics::Canvas canvas(image);
     Graphics::TextStyle style;
     style.color = {255, 230, 140, 255};

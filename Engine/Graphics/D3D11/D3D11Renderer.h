@@ -2,6 +2,7 @@
 
 // Optional Windows backend; its public boundary has no Windows/D3D headers.
 #include "Engine/Graphics/RenderScene.h"
+#include "Engine/Graphics/Image.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -35,6 +36,10 @@ struct FrameStats {
     bool gpuTimingValid{};
     bool videoMemoryAvailable{};
     std::uint64_t localVideoUsage{}, localVideoBudget{};
+    std::uint64_t frameId{}; // native presentation identity; zero for the offscreen API
+    double gpuUploadMs{}, gpuSceneMs{}, gpuDisplayMs{}, validationMs{}, overlayUploadMs{}, presentMs{};
+    std::size_t inFlightFrames{}, queryCount{};
+    bool occluded{};
 };
 
 struct Frame {
@@ -42,6 +47,12 @@ struct Frame {
     std::vector<Color> hdr; // row-major, linear HDR; background is the supplied clear color
     std::vector<std::uint32_t> objectId; // 0 = background; DrawItem ID or draw index + 1
     FrameStats stats;
+};
+
+struct PresentationCapture {
+    Frame geometry;
+    ImageRgba8 display; // actual swap-chain backbuffer, before this frame's Present
+    ImageRgba8 overlay; // exact transparent CPU UI bytes uploaded for this frame
 };
 
 enum class RenderStatus { Failed, Skipped, Rendered };
@@ -67,6 +78,26 @@ public:
     // failed upload/readback or device failure leaves output unchanged.
     RenderStatus RenderOpaqueUnlit(const RenderScene& scene, const RenderView& view,
         Frame& output, std::string& error, Color clear = {});
+
+    // CPU validation only; no device/shader/window is created. The caller owns
+    // all inputs and no borrowed pointer survives this call.
+    bool ValidateOpaqueUnlit(const RenderScene& scene, const RenderView& view, std::string& error,
+        Color clear = {0.02f, 0.025f, 0.04f});
+    // nativeWindow is an owned, dedicated GPU-only HWND, used on this thread.
+    // Caller retains the HWND until successful DetachWindow/Shutdown.
+    bool AttachWindow(void* nativeWindow, std::string& error);
+    bool DetachWindow(std::string& error);
+    bool HasWindow() const;
+    RenderStatus PresentOpaqueUnlit(const RenderScene& scene, const RenderView& view,
+        const ImageRgba8& overlay, FrameStats& stats, std::string& error,
+        PresentationCapture* capture = nullptr, Color clear = {0.02f, 0.025f, 0.04f});
+    // Returns each completed native timestamp exactly once. Normal consumers
+    // poll every frame; tests may drain, with the same bounded GPU wait.
+    bool CollectCompletedFrames(std::vector<FrameStats>& frames, std::string& error, bool drain = false);
+    std::string PresentationDiagnostics() const;
+    // Emits the actual debug-layer live-device report, not logical counters.
+    // A test may capture its debug output in an owned child process.
+    bool ReportLiveObjects(std::string& error) const;
 
 private:
     struct Impl;

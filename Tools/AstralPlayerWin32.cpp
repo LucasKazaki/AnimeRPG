@@ -21,6 +21,9 @@
 #include "Engine/Framework/GameHost.h"
 #include "Engine/Input/InputSystem.h"
 #include "Engine/Platform/Win32/Win32WaveOutput.h"
+#if defined(ASTRAL_NATIVE_D3D11)
+#include "Engine/Platform/Win32/D3D11Viewport.h"
+#endif
 #if defined(ASTRAL_PLAYER_PLAYGROUND)
 #include "Game/Samples/Playground/PlaygroundBehaviours.h"
 #endif
@@ -100,9 +103,83 @@ struct PlayerWindow {
     Input::InputRecording recorded;
     bool quit{};
     std::vector<std::uint32_t> bgra;
+#if defined(ASTRAL_NATIVE_D3D11)
+    HWND window{};
+    std::unique_ptr<Platform::D3D11Viewport> gpu;
+    std::string rendererReason;
+    bool gpuSkipped{};
+#endif
 };
 
+#if defined(ASTRAL_NATIVE_D3D11)
+constexpr UINT kRendererCpu = 5001, kRendererGpu = 5002;
+int EffectiveScale(const PlayerWindow& player);
+bool GpuActive(const PlayerWindow& player) { return player.gpu && player.gpu->Active(); }
+void SetPointer(PlayerWindow& player, POINT point) {
+    const float scale = static_cast<float>(EffectiveScale(player));
+    player.input.ui.pointer = {static_cast<float>(point.x) / scale, static_cast<float>(point.y) / scale};
+}
+void RefreshPointer(PlayerWindow& player) {
+    POINT point{};
+    if (GetCursorPos(&point) && ScreenToClient(player.window, &point)) {
+        SetPointer(player, point); player.lastMouse = point; player.haveMouse = true;
+    }
+    player.input.keys.mouseDelta = {};
+}
+std::string RendererText(const PlayerWindow& player) {
+    if (GpuActive(player)) return "D3D11 Opaque Unlit | neutral display | CPU UI";
+    return player.rendererReason.empty() ? "CPU" : "CPU | " + player.rendererReason;
+}
+void SelectCpu(PlayerWindow& player, const std::string& reason = {}) {
+    player.rendererReason = reason;
+    if (player.gpu) {
+        std::string error;
+        if (!player.gpu->Deactivate(error)) player.rendererReason += " | detach: " + error;
+        player.gpu.reset();
+    }
+    player.gpuSkipped = false;
+    Graphics::RenderScene cpuScene; Graphics::RenderView cpuView;
+    player.host->PrepareRenderScene(std::max(1, player.clientWidth / player.renderScale),
+        std::max(1, player.clientHeight / player.renderScale), cpuScene, cpuView);
+    player.host->SetExternalRenderStats({}, 0, "CPU");
+    RefreshPointer(player);
+    CheckMenuRadioItem(GetMenu(player.window), kRendererCpu, kRendererGpu, kRendererCpu, MF_BYCOMMAND);
+    player.host->Console().Print("Renderer: " + RendererText(player));
+}
+void SelectGpu(PlayerWindow& player) {
+    if (GpuActive(player)) return;
+    auto candidate = std::make_unique<Platform::D3D11Viewport>();
+    std::string error;
+    if (!candidate->Activate(player.window, *player.host, error)) { SelectCpu(player, error); return; }
+    Platform::NativeViewportStats stats;
+    if (candidate->Render(*player.host, stats, error) == Graphics::D3D11::RenderStatus::Failed) {
+        candidate.reset(); SelectCpu(player, error); return;
+    }
+    player.gpu = std::move(candidate); player.rendererReason.clear();
+    RefreshPointer(player);
+    CheckMenuRadioItem(GetMenu(player.window), kRendererCpu, kRendererGpu, kRendererGpu, MF_BYCOMMAND);
+    player.host->Console().Print("Renderer: D3D11 Opaque Unlit; neutral display and CPU UI; lighting/sky/fog/shadows/general post unsupported");
+    player.host->Console().Print(player.gpu->Diagnostics());
+}
+#endif
+
+int EffectiveScale(const PlayerWindow& player) {
+#if defined(ASTRAL_NATIVE_D3D11)
+    if (GpuActive(player)) return 1;
+#endif
+    return player.renderScale;
+}
+
 void Present(PlayerWindow& player, HDC deviceContext) {
+#if defined(ASTRAL_NATIVE_D3D11)
+    if (GpuActive(player)) {
+        std::string error; Platform::NativeViewportStats stats;
+        const auto result = player.gpu->Render(*player.host, stats, error);
+        player.gpuSkipped = result == Graphics::D3D11::RenderStatus::Skipped;
+        if (result != Graphics::D3D11::RenderStatus::Failed) return;
+        SelectCpu(player, error); // one explicit return; no automatic retry
+    }
+#endif
     const int width = std::max(1, player.clientWidth / player.renderScale);
     const int height = std::max(1, player.clientHeight / player.renderScale);
     const Graphics::ImageRgba8& image = player.host->Render(width, height);
@@ -142,7 +219,23 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
     auto* player = reinterpret_cast<PlayerWindow*>(GetWindowLongPtrW(window, GWLP_USERDATA));
     if (!player) return DefWindowProcW(window, message, wParam, lParam);
     Framework::HostInput& input = player->input;
+#if defined(ASTRAL_NATIVE_D3D11)
+    // Native menus own system keys and both halves of the F10 menu gesture.
+    if (message == WM_SYSKEYDOWN || message == WM_SYSKEYUP
+        || ((message == WM_KEYDOWN || message == WM_KEYUP) && wParam == VK_F10)) {
+        // An ordinary-held key can be released while Alt is down.
+        if (message == WM_SYSKEYUP || message == WM_KEYUP)
+            input.keys.keys.reset(static_cast<std::size_t>(wParam & 0xFF));
+        return DefWindowProcW(window, message, wParam, lParam);
+    }
+#endif
     switch (message) {
+#if defined(ASTRAL_NATIVE_D3D11)
+    case WM_COMMAND:
+        if (LOWORD(wParam) == kRendererCpu) { SelectCpu(*player); return 0; }
+        if (LOWORD(wParam) == kRendererGpu) { SelectGpu(*player); return 0; }
+        return DefWindowProcW(window, message, wParam, lParam);
+#endif
     case WM_CLOSE:
         player->quit = true;
         return 0;
@@ -163,7 +256,13 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             if (key == VK_ESCAPE && !player->host->Console().IsOpen()) player->quit = true;
             if (key == VK_F3) player->host->Commands().Execute("stat");
             if (key == VK_F5) player->host->Commands().Execute("restart");
-            if (key == VK_F6) player->renderScale = player->renderScale == 1 ? 2 : 1;
+            if (key == VK_F6) {
+#if defined(ASTRAL_NATIVE_D3D11)
+                if (GpuActive(*player)) player->host->Console().Print("D3D11 uses the full viewport; select CPU to use Half Resolution");
+                else
+#endif
+                    player->renderScale = player->renderScale == 1 ? 2 : 1;
+            }
             if (key == VK_F9) ToggleRecording(*player);
         }
         input.ui.shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
@@ -185,24 +284,36 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         player->lastMouse = point;
         player->haveMouse = true;
         // UI coordinates are render pixels.
-        input.ui.pointer = {static_cast<float>(point.x) / static_cast<float>(player->renderScale),
-            static_cast<float>(point.y) / static_cast<float>(player->renderScale)};
+        input.ui.pointer = {static_cast<float>(point.x) / static_cast<float>(EffectiveScale(*player)),
+            static_cast<float>(point.y) / static_cast<float>(EffectiveScale(*player))};
         return 0;
     }
     case WM_LBUTTONDOWN:
+#if defined(ASTRAL_NATIVE_D3D11)
+        SetPointer(*player, {static_cast<SHORT>(LOWORD(lParam)), static_cast<SHORT>(HIWORD(lParam))});
+#endif
         input.keys.keys.set(Input::Keys::MouseLeft);
         input.ui.pointerDown = true;
         SetCapture(window);
         return 0;
     case WM_LBUTTONUP:
+#if defined(ASTRAL_NATIVE_D3D11)
+        SetPointer(*player, {static_cast<SHORT>(LOWORD(lParam)), static_cast<SHORT>(HIWORD(lParam))});
+#endif
         input.keys.keys.reset(Input::Keys::MouseLeft);
         input.ui.pointerDown = false;
         ReleaseCapture();
         return 0;
     case WM_RBUTTONDOWN:
+#if defined(ASTRAL_NATIVE_D3D11)
+        SetPointer(*player, {static_cast<SHORT>(LOWORD(lParam)), static_cast<SHORT>(HIWORD(lParam))});
+#endif
         input.keys.keys.set(Input::Keys::MouseRight);
         return 0;
     case WM_RBUTTONUP:
+#if defined(ASTRAL_NATIVE_D3D11)
+        SetPointer(*player, {static_cast<SHORT>(LOWORD(lParam)), static_cast<SHORT>(HIWORD(lParam))});
+#endif
         input.keys.keys.reset(Input::Keys::MouseRight);
         return 0;
     case WM_PAINT: {
@@ -261,12 +372,32 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     windowClass.lpszClassName = L"AstralPlayerWindow";
     if (!RegisterClassW(&windowClass)) return Fail("RegisterClassW failed");
+    HMENU menu = nullptr;
+    DWORD windowStyle = WS_OVERLAPPEDWINDOW;
+#if defined(ASTRAL_NATIVE_D3D11)
+    menu = CreateMenu();
+    HMENU rendererMenu = CreatePopupMenu();
+    if (!menu || !rendererMenu) { if (menu) DestroyMenu(menu); if (rendererMenu) DestroyMenu(rendererMenu); return Fail("Cannot create renderer menu"); }
+    if (!AppendMenuW(rendererMenu, MF_STRING | MF_CHECKED, kRendererCpu, L"&CPU")
+        || !AppendMenuW(rendererMenu, MF_STRING, kRendererGpu, L"&D3D11 Opaque Unlit")
+        || !AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(rendererMenu), L"&Renderer")) {
+        DestroyMenu(rendererMenu); DestroyMenu(menu); return Fail("Cannot populate renderer menu");
+    }
+    windowStyle |= WS_CLIPCHILDREN;
+#endif
     RECT frame{0, 0, player.clientWidth, player.clientHeight};
-    AdjustWindowRectEx(&frame, WS_OVERLAPPEDWINDOW, FALSE, 0);
+    AdjustWindowRectEx(&frame, windowStyle, menu != nullptr, 0);
     const std::wstring title = L"Astral Player - " + Wide(project && !host->Project().name.empty() ? host->Project().name : startPath);
-    HWND window = CreateWindowExW(0, windowClass.lpszClassName, title.c_str(), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
-        CW_USEDEFAULT, frame.right - frame.left, frame.bottom - frame.top, nullptr, nullptr, instance, nullptr);
-    if (!window) return Fail("CreateWindowExW failed");
+    HWND window = CreateWindowExW(0, windowClass.lpszClassName, title.c_str(), windowStyle, CW_USEDEFAULT,
+        CW_USEDEFAULT, frame.right - frame.left, frame.bottom - frame.top, nullptr, menu, instance, nullptr);
+    if (!window) { if (menu) DestroyMenu(menu); return Fail("CreateWindowExW failed"); }
+#if defined(ASTRAL_NATIVE_D3D11)
+    player.window = window;
+    host->Commands().RegisterCommand("renderer.info", "renderer.info: actual renderer, HWND/DPI/output metadata", [&player](const std::vector<std::string>& arguments) {
+        if (!arguments.empty()) return std::string("usage: renderer.info");
+        return GpuActive(player) ? player.gpu->Diagnostics() : "Renderer: " + RendererText(player);
+    });
+#endif
     SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&player));
     ShowWindow(window, showCommand);
 
@@ -304,6 +435,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         HDC deviceContext = GetDC(window);
         Present(player, deviceContext);
         ReleaseDC(window, deviceContext);
+#if defined(ASTRAL_NATIVE_D3D11)
+        if (GpuActive(player) && player.gpuSkipped) MsgWaitForMultipleObjects(0, nullptr, FALSE, 16, QS_ALLINPUT);
+#endif
 
         ++framesSinceTitle;
         const float sinceTitle = std::chrono::duration<float>(now - titleTime).count();
@@ -313,11 +447,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
                 static_cast<double>(static_cast<float>(framesSinceTitle) / sinceTitle), host->World().Stats().entities,
                 player.recording ? L"  |  REC" : L"");
             SetWindowTextW(window, text);
+#if defined(ASTRAL_NATIVE_D3D11)
+            const std::wstring actualTitle = std::wstring(text) + L" | Renderer: " + Wide(RendererText(player));
+            SetWindowTextW(window, actualTitle.c_str());
+#endif
             titleTime = now;
             framesSinceTitle = 0;
         }
     }
     if (player.recording) ToggleRecording(player); // keep what was recorded
+#if defined(ASTRAL_NATIVE_D3D11)
+    if (player.gpu) SelectCpu(player);
+#endif
     audio.reset();
     DestroyWindow(window);
     host.reset();
