@@ -18,6 +18,7 @@
 
 #include <windows.h>
 #include <commdlg.h>
+#include <cderr.h>
 #include <windowsx.h>
 
 #include <algorithm>
@@ -1082,9 +1083,37 @@ std::wstring AbsoluteContentRoot() {
     return std::filesystem::absolute(std::filesystem::path(Wide(Scene().ContentRoot())), error).wstring();
 }
 
+const char* FileDialogErrorName(DWORD error) {
+    switch (error) {
+    case CDERR_DIALOGFAILURE: return "CDERR_DIALOGFAILURE";
+    case CDERR_STRUCTSIZE: return "CDERR_STRUCTSIZE";
+    case CDERR_INITIALIZATION: return "CDERR_INITIALIZATION";
+    case CDERR_NOTEMPLATE: return "CDERR_NOTEMPLATE";
+    case CDERR_NOHINSTANCE: return "CDERR_NOHINSTANCE";
+    case CDERR_LOADSTRFAILURE: return "CDERR_LOADSTRFAILURE";
+    case CDERR_FINDRESFAILURE: return "CDERR_FINDRESFAILURE";
+    case CDERR_LOADRESFAILURE: return "CDERR_LOADRESFAILURE";
+    case CDERR_LOCKRESFAILURE: return "CDERR_LOCKRESFAILURE";
+    case CDERR_MEMALLOCFAILURE: return "CDERR_MEMALLOCFAILURE";
+    case CDERR_MEMLOCKFAILURE: return "CDERR_MEMLOCKFAILURE";
+    case CDERR_NOHOOK: return "CDERR_NOHOOK";
+    case CDERR_REGISTERMSGFAIL: return "CDERR_REGISTERMSGFAIL";
+    case FNERR_SUBCLASSFAILURE: return "FNERR_SUBCLASSFAILURE";
+    case FNERR_INVALIDFILENAME: return "FNERR_INVALIDFILENAME";
+    case FNERR_BUFFERTOOSMALL: return "FNERR_BUFFERTOOSMALL";
+    default: return "unknown common-dialog error";
+    }
+}
+
 bool BrowseFile(bool save, const wchar_t* title, std::wstring& path) {
     wchar_t buffer[MAX_PATH]{};
-    if (!path.empty()) wcsncpy_s(buffer, path.c_str(), _TRUNCATE);
+    if (path.size() >= MAX_PATH) {
+        ReportError(std::string(save ? "Save As" : "Open") + " dialog initial filename exceeds "
+            + std::to_string(MAX_PATH - 1) + " characters");
+        return false;
+    }
+    if (!path.empty()) wcscpy_s(buffer, path.c_str());
+    const std::wstring initialName = buffer;
     const std::wstring directory = AbsoluteContentRoot();
     OPENFILENAMEW dialog{};
     dialog.lStructSize = sizeof(dialog);
@@ -1096,7 +1125,17 @@ bool BrowseFile(bool save, const wchar_t* title, std::wstring& path) {
     dialog.lpstrTitle = title;
     dialog.lpstrDefExt = L"json";
     dialog.Flags = OFN_NOCHANGEDIR | (save ? OFN_OVERWRITEPROMPT : OFN_FILEMUSTEXIST);
-    if (!(save ? GetSaveFileNameW(&dialog) : GetOpenFileNameW(&dialog))) return false;
+    if (!(save ? GetSaveFileNameW(&dialog) : GetOpenFileNameW(&dialog))) {
+        const DWORD failure = CommDlgExtendedError();
+        if (failure != 0) {
+            char code[16]{};
+            std::snprintf(code, sizeof(code), "0x%04lX", static_cast<unsigned long>(failure));
+            ReportError(std::string(save ? "Save As" : "Open") + " dialog failed for '"
+                + (initialName.empty() ? std::string("<empty>") : Utf8(initialName)) + "': "
+                + FileDialogErrorName(failure) + " (" + code + ")");
+        }
+        return false; // zero means ordinary cancellation, which stays quiet
+    }
     path = buffer;
     return true;
 }
@@ -1146,7 +1185,11 @@ void OpenFile(bool project) {
 
 bool SaveAs() {
     if (!CommitPendingInspector()) return false;
-    std::wstring file = Wide(Scene().ScenePath());
+    std::wstring file;
+    if (!Scene().ScenePath().empty()) {
+        std::filesystem::path initial = std::filesystem::path(AbsoluteContentRoot()) / std::filesystem::path(Wide(Scene().ScenePath()));
+        file = initial.make_preferred().wstring();
+    }
     if (!BrowseFile(true, L"Save scene as", file)) return false;
     const std::string relative = RelativeToContentRoot(file);
     std::string error;
