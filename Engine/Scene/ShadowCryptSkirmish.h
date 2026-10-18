@@ -52,6 +52,13 @@ enum class ShadowCryptThreatVariant : std::uint8_t {
     Count,
 };
 
+enum class ShadowCryptStatusKind : std::uint8_t {
+    RiftMark,
+    VeilWard,
+    BulwarkGuardLink,
+    Count,
+};
+
 struct ShadowCryptEnemyState {
     ShadowCryptEnemyRole role{ShadowCryptEnemyRole::RiftSkirmisher};
     int health{};
@@ -84,6 +91,8 @@ struct ShadowCryptDefenseReport {
     bool interruptedChannel{};
     bool staggerOpened{};
     bool breachOpened{};
+    bool pressureApplied{};
+    bool pressurePurged{};
     int postureDamageApplied{};
     int damageTaken{};
     std::size_t enemyIndex{};
@@ -95,6 +104,8 @@ struct ShadowCryptAttackReport {
     std::size_t enemyIndex{};
     int healthDamage{};
     int postureDamage{};
+    int wardAbsorbed{};
+    int postureProtected{};
     bool staggerOpened{};
     bool staggerConsumed{};
     bool defeated{};
@@ -102,6 +113,7 @@ struct ShadowCryptAttackReport {
     bool breachConsumed{};
     bool weaknessExploited{};
     bool flowBreakConsumed{};
+    bool pressurePurged{};
 };
 
 struct ShadowCryptTargetRecommendation {
@@ -124,6 +136,20 @@ struct ShadowCryptRoleIntel {
     ShadowCryptAttackStyle recommendedAttack{ShadowCryptAttackStyle::Heavy};
     bool breachOpening{};
     bool enraged{};
+};
+
+struct ShadowCryptStatusEntry {
+    bool active{};
+    ShadowCryptStatusKind kind{ShadowCryptStatusKind::RiftMark};
+    std::size_t sourceEnemyIndex{};
+    std::size_t targetEnemyIndex{};
+    int magnitude{};
+};
+
+struct ShadowCryptStatusLedger {
+    static constexpr std::size_t Capacity = 5;
+    std::array<ShadowCryptStatusEntry, Capacity> entries{};
+    std::size_t count{};
 };
 
 // Game-domain Shadow Crypt room combat. This models original enemy roles and
@@ -202,6 +228,30 @@ public:
         return intel;
     }
 
+    ShadowCryptStatusLedger StatusLedger() const {
+        ShadowCryptStatusLedger ledger{};
+        auto append = [&](ShadowCryptStatusKind kind, std::size_t source,
+                          std::size_t target, int magnitude) {
+            if (ledger.count >= ShadowCryptStatusLedger::Capacity) return;
+            ledger.entries[ledger.count++] = {true, kind, source, target, magnitude};
+        };
+        if (RiftMarkActive()) {
+            append(ShadowCryptStatusKind::RiftMark, riftMarkSource_, EnemyCapacity,
+                RiftMarkDamageBonus);
+        }
+        for (std::size_t i = 0; i < enemyCount_; ++i) {
+            if (VeilWardActive(i)) {
+                append(ShadowCryptStatusKind::VeilWard, veilWardSource_[i], i,
+                    veilWard_[i]);
+            }
+        }
+        if (GuardLinkActive()) {
+            append(ShadowCryptStatusKind::BulwarkGuardLink, guardLinkSource_,
+                guardLinkedTarget_, BulwarkGuardPostureReduction);
+        }
+        return ledger;
+    }
+
     ShadowCryptThreatTelegraph CurrentThreat() const {
         if (!active_ || complete_ || threatIndex_ >= enemyCount_
             || enemies_[threatIndex_].defeated) return {};
@@ -246,6 +296,9 @@ public:
             report.breachOpened = true;
             shadowFlow_ = std::min<std::uint8_t>(MaxShadowFlow,
                 static_cast<std::uint8_t>(shadowFlow_ + 1));
+            if (report.precision) {
+                report.pressurePurged = ClearPressureFromSource(threat.enemyIndex);
+            }
             if (threat.role == ShadowCryptEnemyRole::GraveboundBulwark
                 && response == ShadowCryptDefenseResponse::Guard) {
                 auto& enemy = enemies_[threat.enemyIndex];
@@ -256,17 +309,21 @@ public:
                     if (enemy.posture == 0) {
                         enemy.staggered = true;
                         report.staggerOpened = true;
+                        ClearGuardLinkFromSource(threat.enemyIndex);
                     }
                 }
             }
         } else {
+            const bool consumedMark = RiftMarkActive();
             const int damageBefore = damageTaken_;
             damageTaken_ = std::min(MaxTrackedDamage, damageTaken_ + threat.failureDamage);
             report.damageTaken = damageTaken_ - damageBefore;
+            if (consumedMark) ClearRiftMark();
             counterTarget_ = EnemyCapacity;
             precisionCounterTarget_ = EnemyCapacity;
             breachOpenings_[threat.enemyIndex] = false;
             shadowFlow_ = 0;
+            report.pressureApplied = ApplyPressure(threat.enemyIndex, threat.role);
         }
         report.shadowFlow = shadowFlow_;
         AdvanceThreatPattern(threat.enemyIndex);
@@ -318,6 +375,7 @@ public:
                 report.weaknessExploited = true;
                 healthDamage += WeaknessHealthBonus;
                 postureDamage += WeaknessPostureBonus;
+                report.pressurePurged = ClearPressureFromSource(index);
             }
         }
         if (style == ShadowCryptAttackStyle::Heavy && ShadowFlowReady()) {
@@ -325,6 +383,13 @@ public:
             shadowFlow_ = 0;
             healthDamage += FlowBreakHealthBonus;
             postureDamage += FlowBreakPostureBonus;
+        }
+
+        if (GuardLinkActive() && guardLinkedTarget_ == index) {
+            const int protectedPosture = std::min(BulwarkGuardPostureReduction, postureDamage);
+            postureDamage -= protectedPosture;
+            report.postureProtected = protectedPosture;
+            ClearGuardLink();
         }
 
         if (enemy.staggered) {
@@ -339,9 +404,18 @@ public:
             if (enemy.posture == 0) {
                 enemy.staggered = true;
                 report.staggerOpened = true;
+                if (enemy.role == ShadowCryptEnemyRole::GraveboundBulwark) {
+                    ClearGuardLinkFromSource(index);
+                }
             }
         }
 
+        if (VeilWardActive(index)) {
+            report.wardAbsorbed = std::min(veilWard_[index], healthDamage);
+            veilWard_[index] -= report.wardAbsorbed;
+            healthDamage -= report.wardAbsorbed;
+            if (veilWard_[index] == 0) veilWardSource_[index] = EnemyCapacity;
+        }
         const int beforeHealth = enemy.health;
         enemy.health = std::max(0, enemy.health - healthDamage);
         report.healthDamage = beforeHealth - enemy.health;
@@ -351,6 +425,10 @@ public:
             report.staggerOpened = false;
             report.defeated = true;
             breachOpenings_[index] = false;
+            veilWard_[index] = 0;
+            veilWardSource_[index] = EnemyCapacity;
+            ClearPressureFromSource(index);
+            if (guardLinkedTarget_ == index) ClearGuardLink();
             if (lockedTarget_ == index) lockedTarget_ = EnemyCapacity;
             if (counterTarget_ == index) counterTarget_ = EnemyCapacity;
             if (precisionCounterTarget_ == index) precisionCounterTarget_ = EnemyCapacity;
@@ -374,6 +452,7 @@ public:
             if (counterTarget_ == i) priority += 80;
             if (threatIndex_ == i && enemies_[i].role == ShadowCryptEnemyRole::VeilChanneler)
                 priority += 40;
+            if (SourcesActivePressure(i)) priority += 60;
             if (!best.valid || priority > best.priority
                 || (priority == best.priority && i < best.enemyIndex)) {
                 best.valid = true;
@@ -419,6 +498,9 @@ private:
     static constexpr int WeaknessPostureBonus = 8;
     static constexpr int FlowBreakHealthBonus = 12;
     static constexpr int FlowBreakPostureBonus = 10;
+    static constexpr int RiftMarkDamageBonus = 6;
+    static constexpr int VeilWardDurability = 14;
+    static constexpr int BulwarkGuardPostureReduction = 10;
     static constexpr double PrecisionResponseFraction = 0.30;
 
     static constexpr bool ValidTier(ShadowCryptSkirmishTier tier) {
@@ -527,18 +609,146 @@ private:
                 std::max(0.20, telegraph.responseWindowSeconds * 0.80);
             telegraph.failureDamage = std::min(40, telegraph.failureDamage + 6);
         }
+        if (RiftMarkActive()) {
+            telegraph.failureDamage = std::min(40,
+                telegraph.failureDamage + RiftMarkDamageBonus);
+        }
         return telegraph;
+    }
+
+    bool RiftMarkActive() const {
+        return riftMarked_ && riftMarkSource_ < enemyCount_
+            && !enemies_[riftMarkSource_].defeated;
+    }
+
+    bool VeilWardActive(std::size_t target) const {
+        return target < enemyCount_ && veilWard_[target] > 0
+            && veilWardSource_[target] < enemyCount_
+            && !enemies_[veilWardSource_[target]].defeated
+            && !enemies_[target].defeated;
+    }
+
+    bool GuardLinkActive() const {
+        return guardLinkedTarget_ < enemyCount_ && guardLinkSource_ < enemyCount_
+            && !enemies_[guardLinkedTarget_].defeated
+            && !enemies_[guardLinkSource_].defeated
+            && !enemies_[guardLinkSource_].staggered;
+    }
+
+    bool SourcesActivePressure(std::size_t source) const {
+        if (RiftMarkActive() && riftMarkSource_ == source) return true;
+        for (std::size_t i = 0; i < enemyCount_; ++i) {
+            if (VeilWardActive(i) && veilWardSource_[i] == source) return true;
+        }
+        return GuardLinkActive() && guardLinkSource_ == source;
+    }
+
+    void ClearRiftMark() {
+        riftMarked_ = false;
+        riftMarkSource_ = EnemyCapacity;
+    }
+
+    void ClearGuardLink() {
+        guardLinkedTarget_ = EnemyCapacity;
+        guardLinkSource_ = EnemyCapacity;
+    }
+
+    void ClearGuardLinkFromSource(std::size_t source) {
+        if (guardLinkSource_ == source) ClearGuardLink();
+    }
+
+    bool ClearPressureFromSource(std::size_t source) {
+        bool cleared = false;
+        if (riftMarked_ && riftMarkSource_ == source) {
+            ClearRiftMark();
+            cleared = true;
+        }
+        for (std::size_t i = 0; i < enemyCount_; ++i) {
+            if (veilWard_[i] > 0 && veilWardSource_[i] == source) {
+                veilWard_[i] = 0;
+                veilWardSource_[i] = EnemyCapacity;
+                cleared = true;
+            }
+        }
+        if (guardLinkSource_ == source && guardLinkedTarget_ < enemyCount_) {
+            ClearGuardLink();
+            cleared = true;
+        }
+        return cleared;
+    }
+
+    std::size_t LowestHealthAlly(std::size_t source) const {
+        std::size_t best = EnemyCapacity;
+        for (std::size_t i = 0; i < enemyCount_; ++i) {
+            if (i == source || enemies_[i].defeated) continue;
+            if (best == EnemyCapacity
+                || enemies_[i].health * enemies_[best].maxHealth
+                    < enemies_[best].health * enemies_[i].maxHealth
+                || (enemies_[i].health * enemies_[best].maxHealth
+                        == enemies_[best].health * enemies_[i].maxHealth && i < best)) {
+                best = i;
+            }
+        }
+        return best == EnemyCapacity ? source : best;
+    }
+
+    std::size_t HighestPriorityAlly(std::size_t source) const {
+        std::size_t best = EnemyCapacity;
+        int bestPriority = -1;
+        for (std::size_t i = 0; i < enemyCount_; ++i) {
+            if (i == source || enemies_[i].defeated) continue;
+            const int priority = BasePriority(enemies_[i].role);
+            if (best == EnemyCapacity || priority > bestPriority
+                || (priority == bestPriority && i < best)) {
+                best = i;
+                bestPriority = priority;
+            }
+        }
+        return best;
+    }
+
+    bool ApplyPressure(std::size_t source, ShadowCryptEnemyRole role) {
+        if (source >= enemyCount_ || enemies_[source].defeated) return false;
+        switch (role) {
+        case ShadowCryptEnemyRole::RiftSkirmisher:
+            riftMarked_ = true;
+            riftMarkSource_ = source;
+            return true;
+        case ShadowCryptEnemyRole::VeilChanneler: {
+            const std::size_t target = LowestHealthAlly(source);
+            if (target >= enemyCount_ || enemies_[target].defeated) return false;
+            veilWard_[target] = VeilWardDurability;
+            veilWardSource_[target] = source;
+            return true;
+        }
+        case ShadowCryptEnemyRole::GraveboundBulwark: {
+            const std::size_t target = HighestPriorityAlly(source);
+            if (target >= enemyCount_) return false;
+            guardLinkedTarget_ = target;
+            guardLinkSource_ = source;
+            return true;
+        }
+        case ShadowCryptEnemyRole::Count:
+            return false;
+        }
+        return false;
     }
 
     void Reset() {
         enemies_ = {};
         patternSteps_ = {};
         breachOpenings_ = {};
+        veilWard_ = {};
+        veilWardSource_.fill(EnemyCapacity);
         enemyCount_ = 0;
         threatIndex_ = 0;
         lockedTarget_ = EnemyCapacity;
         counterTarget_ = EnemyCapacity;
         precisionCounterTarget_ = EnemyCapacity;
+        riftMarkSource_ = EnemyCapacity;
+        guardLinkedTarget_ = EnemyCapacity;
+        guardLinkSource_ = EnemyCapacity;
+        riftMarked_ = false;
         damageTaken_ = 0;
         shadowFlow_ = 0;
         replayMode_ = false;
@@ -579,14 +789,20 @@ private:
     std::array<ShadowCryptEnemyState, EnemyCapacity> enemies_{};
     std::array<std::uint8_t, EnemyCapacity> patternSteps_{};
     std::array<bool, EnemyCapacity> breachOpenings_{};
+    std::array<int, EnemyCapacity> veilWard_{};
+    std::array<std::size_t, EnemyCapacity> veilWardSource_{};
     std::size_t enemyCount_{};
     std::size_t threatIndex_{};
     std::size_t lockedTarget_{EnemyCapacity};
     std::size_t counterTarget_{EnemyCapacity};
     std::size_t precisionCounterTarget_{EnemyCapacity};
+    std::size_t riftMarkSource_{EnemyCapacity};
+    std::size_t guardLinkedTarget_{EnemyCapacity};
+    std::size_t guardLinkSource_{EnemyCapacity};
     int damageTaken_{};
     std::uint8_t shadowFlow_{};
     ShadowCryptSkirmishTier tier_{ShadowCryptSkirmishTier::EntrySeal};
+    bool riftMarked_{};
     bool replayMode_{};
     bool active_{};
     bool complete_{};
