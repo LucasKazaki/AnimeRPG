@@ -126,11 +126,7 @@ bool ParseAction(const JsonValue& json, const std::string& path, Input::ActionDe
 std::string ConfigValue(const JsonValue& value) {
     if (value.IsBool()) return value.AsBool() ? "1" : "0";
     if (value.IsString()) return value.AsString();
-    const double number = value.AsNumber();
-    if (std::floor(number) == number && std::fabs(number) < 1.0e15) return std::to_string(static_cast<long long>(number));
-    char text[32];
-    std::snprintf(text, sizeof(text), "%.9g", number);
-    return text;
+    return Core::WriteJson(value, Core::JsonWriteOptions{false}); // preserve numeric precision and exact compact spelling
 }
 
 } // namespace
@@ -387,7 +383,7 @@ bool GameHost::ApplyProject(const ProjectDesc& project, std::string& error) {
 
 bool GameHost::LoadProject(const std::string& path, std::string& error) {
     const auto handle = assets_->Load<JsonValue>(path);
-    if (!handle.Ready()) return Report(error = path + ": " + handle.Error());
+    if (!handle.Ready() || !handle.Error().empty()) return Report(error = path + ": " + handle.Error());
     ProjectDesc project;
     std::string parseError;
     if (!ParseProject(*handle.Get(), project, parseError)) return Report(error = path + ": " + parseError);
