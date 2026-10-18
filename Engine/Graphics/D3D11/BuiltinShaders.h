@@ -53,4 +53,44 @@ Pixel PSMain(Interpolated input) {
 }
 )hlsl";
 
+inline constexpr char kNativeDisplayShader[] = R"hlsl(
+cbuffer DisplayConstants : register(b0) { float exposure; float3 unused; };
+Texture2D<float4> hdrTexture : register(t0);
+Texture2D<float4> uiTexture : register(t1);
+struct DisplayVertex { float4 position : SV_Position; };
+DisplayVertex VSMain(uint id : SV_VertexID) {
+    DisplayVertex output;
+    output.position = float4(id == 2 ? 3 : -1, id == 1 ? 3 : -1, 0, 1);
+    return output;
+}
+float3 Neutral(float3 color) {
+    const float startCompression = 0.76;
+    float x = min(color.x, min(color.y, color.z));
+    float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+    color -= offset;
+    float peak = max(color.x, max(color.y, color.z));
+    float3 result = color;
+    if (peak >= startCompression) {
+        float d = 1 - startCompression;
+        float newPeak = 1 - d * d / (peak + d - startCompression);
+        color *= newPeak / peak;
+        float g = 1 - 1 / (0.15 * (peak - newPeak) + 1);
+        result = lerp(color, newPeak.xxx, g);
+    }
+    return result;
+}
+float Encode(float value) {
+    value = saturate(value);
+    return value <= 0.0031308 ? value * 12.92 : 1.055 * pow(value, 1.0 / 2.4) - 0.055;
+}
+float4 PSMain(DisplayVertex input) : SV_Target {
+    int3 pixel = int3(int2(input.position.xy), 0);
+    float3 mappedColor = Neutral(max(hdrTexture.Load(pixel).rgb * exposure, 0));
+    float3 display = float3(Encode(mappedColor.r), Encode(mappedColor.g), Encode(mappedColor.b));
+    // Existing Canvas/UI bytes use straight alpha in display-encoded space.
+    float4 ui = uiTexture.Load(pixel);
+    return float4(lerp(display, ui.rgb, ui.a), 1);
+}
+)hlsl";
+
 } // namespace Astral::Graphics::D3D11::Detail
