@@ -124,6 +124,16 @@ bool Boundary(const std::vector<std::uint32_t>& ids, int width, int height, int 
 }
 void Compare(const RenderTarget& cpu, const GPU::Frame& gpu, bool textured) {
     ASTRAL_CHECK(cpu.Width() == gpu.width && cpu.Height() == gpu.height);
+    ASTRAL_CHECK(cpu.Width() > 0 && cpu.Height() > 0);
+    ASTRAL_CHECK(cpu.hdr.size() == cpu.PixelCount() && gpu.hdr.size() == cpu.PixelCount());
+    ASTRAL_CHECK(cpu.objectId.size() == cpu.PixelCount() && gpu.objectId.size() == cpu.PixelCount());
+    // Reject corrupt input on either side, including boundary/background pixels,
+    // before subtraction, maximum/mean accumulation or boundary exclusions.
+    for (std::size_t p = 0; p < cpu.PixelCount(); ++p) {
+        for (const Color color : {cpu.hdr[p], gpu.hdr[p]}) {
+            ASTRAL_CHECK(std::isfinite(color.x) && std::isfinite(color.y) && std::isfinite(color.z));
+        }
+    }
     std::size_t differences = 0, checked = 0, foreground = 0;
     double maximum = 0, sum = 0;
     for (int y = 0; y < gpu.height; ++y) for (int x = 0; x < gpu.width; ++x) {
@@ -150,6 +160,50 @@ void Compare(const RenderTarget& cpu, const GPU::Frame& gpu, bool textured) {
     ASTRAL_CHECK(fraction <= 0.005);
     ASTRAL_CHECK(maximum <= (textured ? 1.0 / 128.0 : 2.0e-4));
     if (textured) ASTRAL_CHECK(mean <= 1.0 / 512.0);
+}
+int CompareProbe(const std::string& side, const std::string& value, bool textured) {
+    // This private CPU-only child calls the actual comparison oracle. No
+    // renderer, device, shader compiler or desktop window is constructed.
+    RenderTarget cpu; cpu.Resize(16, 16);
+    GPU::Frame gpu; gpu.width = gpu.height = 16;
+    gpu.hdr.assign(16 * 16, Color{0.25f, 0.5f, 0.75f});
+    gpu.objectId.assign(16 * 16, 17);
+    cpu.hdr = gpu.hdr; cpu.objectId = gpu.objectId;
+    if (value != "finite") {
+        ASTRAL_CHECK(side == "cpu" || side == "gpu");
+        Color& pixel = side == "cpu" ? cpu.hdr[8 * 16 + 8] : gpu.hdr[8 * 16 + 8];
+        if (value == "nan") pixel.x = std::numeric_limits<float>::quiet_NaN();
+        else if (value == "positive-infinity") pixel.y = std::numeric_limits<float>::infinity();
+        else if (value == "negative-infinity") pixel.z = -std::numeric_limits<float>::infinity();
+        else ASTRAL_CHECK(false);
+    } else ASTRAL_CHECK(side == "none");
+    Compare(cpu, gpu, textured);
+    return 0; // Only the finite positive controls should reach this return.
+}
+DWORD RunCompareNonfiniteProbe(const wchar_t* side = L"cpu", const wchar_t* value = L"nan", bool textured = false) {
+    std::vector<wchar_t> executable(32768);
+    const DWORD count = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+    ASTRAL_CHECK(count > 0 && count < executable.size());
+    std::wstring command = L"\"" + std::wstring(executable.data(), count) + L"\" --compare-probe "
+        + side + L" " + value + (textured ? L" 1" : L" 0");
+    STARTUPINFOW startup{}; startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESHOWWINDOW; startup.wShowWindow = SW_HIDE;
+    PROCESS_INFORMATION process{};
+    ASTRAL_CHECK(CreateProcessW(executable.data(), command.data(), nullptr, nullptr, FALSE,
+        CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process));
+    const DWORD wait = WaitForSingleObject(process.hProcess, 5000);
+    if (wait != WAIT_OBJECT_0) {
+        // Only this explicitly created child is terminated on its deadline.
+        TerminateProcess(process.hProcess, 99);
+        WaitForSingleObject(process.hProcess, 2000);
+    }
+    DWORD exitCode = STILL_ACTIVE;
+    const BOOL gotExitCode = GetExitCodeProcess(process.hProcess, &exitCode);
+    CloseHandle(process.hThread); CloseHandle(process.hProcess);
+    ASTRAL_CHECK(wait == WAIT_OBJECT_0 && gotExitCode);
+    std::printf("CPU-only comparison child side=%ls value=%ls textured=%d exit=%lu\n", side, value, textured, exitCode);
+    std::fflush(stdout);
+    return exitCode;
 }
 ImageRgba8 Display(const std::vector<Color>& pixels, int width, int height) {
     ImageRgba8 image; image.Resize(width, height);
@@ -197,6 +251,22 @@ PROCESS_MEMORY_COUNTERS_EX ProcessMemory() {
     return counters;
 }
 } // namespace
+
+ASTRAL_TEST(ComparisonOracleRejectsNonfiniteCpuReference) {
+    ASTRAL_CHECK(RunCompareNonfiniteProbe() == 3);
+}
+
+ASTRAL_TEST(ComparisonOracleRejectsNonfiniteHdrOnEitherSide) {
+    for (const wchar_t* side : {L"cpu", L"gpu"})
+        for (const wchar_t* value : {L"nan", L"positive-infinity", L"negative-infinity"})
+            for (bool textured : {false, true})
+                ASTRAL_CHECK(RunCompareNonfiniteProbe(side, value, textured) == 3);
+}
+
+ASTRAL_TEST(ComparisonOracleAcceptsFiniteHdrInBothModes) {
+    for (bool textured : {false, true})
+        ASTRAL_CHECK(RunCompareNonfiniteProbe(L"none", L"finite", textured) == 0);
+}
 
 ASTRAL_TEST(ShaderCompilerReturnsRealDiagnosticsAndRecovers) {
     const auto broken = GPU::CompileShader("float4 Broken( : SV_Target {", "invalid-neutral-fixture", "Broken", "ps_5_0");
@@ -405,4 +475,15 @@ ASTRAL_TEST(Fixed720pHardwareWorkloadRecordsDeclaredBudgets) {
     ASTRAL_CHECK(memory.PrivateUsage <= 768 * kMiB && frame.stats.resourceBytes <= 256 * kMiB);
 }
 
-ASTRAL_TEST_MAIN("EngineD3D11Tests")
+int main(int argc, char** argv) {
+    if (argc == 2 && std::strcmp(argv[1], "--compare-nonfinite-probe") == 0) {
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+        return CompareProbe("cpu", "nan", false);
+    }
+    if (argc == 5 && std::strcmp(argv[1], "--compare-probe") == 0) {
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+        ASTRAL_CHECK(std::strcmp(argv[4], "0") == 0 || std::strcmp(argv[4], "1") == 0);
+        return CompareProbe(argv[2], argv[3], std::strcmp(argv[4], "1") == 0);
+    }
+    return Test::RunAll(argc, argv, "EngineD3D11Tests");
+}

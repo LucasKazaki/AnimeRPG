@@ -6,14 +6,17 @@ Base `5245a3dd079083a534b4afd16924a6a5496d1a0d`, dedicated
 
 ## Current evidence boundary
 
-No local configure, compilation, GPU device creation, rendering, native UI,
-performance result or image inspection has run for this packet. Production and
-workflow source pre-reviews are clean. The first hosted compile attempt failed
-in a test fixture; a reviewed correction passed the next hosted compile and
-diagnostic-only run. Actual production HLSL compilation coverage is being added
-without device creation; exact receipt boundaries are recorded below.
-The coordinator currently holds hardware execution pending desktop/GPU ownership
-and RAM headroom. Other applications/processes are untouched.
+Hosted C++ and actual production HLSL compilation have passed on the exact head
+and synthetic merge recorded below. After an actual CPU-only oracle failure and
+independently reviewed finite guard, local Debug/Release oracle cases and the
+registered D3D11/Graphics matrix pass. Hardware was the actual NVIDIA GeForce RTX
+5080, feature level 11_0, debug layer active. The coordinator inspected all eight
+paired/difference/object-ID captures. Fixed-workload timing/memory budgets pass.
+This is offscreen opaque Unlit validation; native presentation, a driver
+live-object baseline and the full GPU milestone remain open. The first hosted
+compile and oracle failures remain retained. Local source/receipts await final
+commit binding and coordinator review; no newer hosted head is implied by the
+earlier 91f6966 shader receipts. Other applications/processes are untouched.
 
 The task declares fixed budgets/tolerances before measurement. No old failure is
 claimed for this new feature. The planned hardware suite uses the actual
@@ -36,11 +39,12 @@ substitute WARP or skip an unavailable adapter as a pass.
 - GPU timestamp/disjoint timing is distinct from CPU upload/submission/readback.
   Report DXGI local usage as driver-managed memory, not exact resource accounting.
 
-Seven behavioral cases are authored: shader diagnostics/recovery; actual world
+Seven original behavioral cases were authored: shader diagnostics/recovery; actual world
 HDR/ID/texture parity; depth/clipping/winding; pointer-identity replacement/mips;
 invalid input/budgets/thread/zero viewport/output preservation; twenty
 resize/reload/reinitialize cycles; fixed 1280x720 hardware timings and memory.
-These are unexecuted assertions, not passing receipts.
+They were unexecuted at the initial preparation checkpoint. Actual execution,
+including the three later oracle cases, is recorded at the end of this receipt.
 
 `FrameStats::resourceCount` is a logical per-frame buffer/texture admission count,
 not a query of actual driver live objects. The twenty-cycle test's constant
@@ -149,7 +153,7 @@ They did not call Initialize or compile the actual built-in VS/PS, which was
 previously compiled only inside device initialization. Thus they establish C++
 and diagnostic-helper coverage, not production HLSL or hardware acceptance.
 
-## Production HLSL coverage extension: source prepared, execution pending
+## Production HLSL coverage extension: prepared, then hosted pass
 
 After that immutable run completed, the coordinator requested the same unique
 CPU-only filter additionally compile the exact production
@@ -160,7 +164,210 @@ and prints full diagnostics on failure. It keeps the existing invalid/valid
 diagnostic assertions, duplicates no HLSL, and creates no device. No production,
 CMake, workflow, hardware assertion, budget or tolerance changes.
 
-This extension has not run. Its bounded test/QA diff requires independent review,
-a new commit and new hosted head/merge execution. All local hardware, visual,
-performance, device-failure and live-object validation remains pending under the
-persistent user/RAM holds. Hosted compilation cannot satisfy those gates.
+At the initial preparation checkpoint this extension had not run. The
+coordinator reviewed and committed it as
+`91f6966d4880a279b1a96bb9417439bc826465c9`, then confirmed all eleven hosted PR
+checks passing. The relevant dedicated CPU-only shader workflow was
+[run 39063908626](https://github.com/LucasKazaki/AnimeRPG/actions/runs/39063908626).
+
+| Job | Actual checkout | Production shader cases Debug / Release UTC |
+| --- | --- | --- |
+| [Head 117487416987](https://github.com/LucasKazaki/AnimeRPG/actions/runs/39063908626/job/117487416987) | `91f6966d4880a279b1a96bb9417439bc826465c9` | 19:47:50 / 19:48:55 |
+| [Merge 117487417242](https://github.com/LucasKazaki/AnimeRPG/actions/runs/39063908626/job/117487417242) | `84027f627a6c120fdd847f96b12b03f7f5e236d4` | 19:47:56 / 19:49:10 |
+
+The merge's actual ordered parents were
+`2c69888774c074a69ec12c5f659e3632280db420` and
+`91f6966d4880a279b1a96bb9417439bc826465c9`. Both jobs built the complete optional
+C++ target Debug/Release and ran only the one selected CPU shader test in each
+configuration. It retained invalid/valid shader diagnostics and compiled actual
+VSMain/PSMain using both debug and optimized flags: VS/PS bytes 17324/19828 and
+1380/1800 respectively. Full logs were downloaded and read at
+`work/d3d11-evidence/hosted-production-head.log` and
+`hosted-production-merge.log`. No renderer or device was initialized. All local
+hardware, visual, performance, device-failure and live-object validation remains
+pending; hosted compilation cannot satisfy those gates.
+
+## Comparison-oracle old witness prepared; not yet executed
+
+The coordinator independently found that the untextured comparison can accept a
+NaN in the CPU HDR reference: `std::max` can retain its prior finite maximum and
+the mean is checked only for textured comparisons. A CPU-only regression now
+builds matching 16x16 foreground HDR/ID buffers and places exactly one quiet NaN
+in the interior CPU red channel, then invokes the actual unchanged `Compare`
+function with `textured=false`. A private self-child argument prevents this
+expected abort from stopping the complete suite. The parent launches only its
+own executable, with a hidden console, waits at most five seconds, closes its
+handles, and requires the child's assertion-abort exit code 3. The old oracle
+returns 0 instead, so the parent check must fail before the fix.
+
+This preparation changes only EngineD3D11Tests.cpp and this receipt. It does not
+change the oracle, production backend, shaders, workflow, CMake, performance
+budgets or comparison tolerances. No configure, build or test ran during this
+preparation. The user has now released desktop/GPU access; local execution still
+requires the coordinator's exclusive slot and fresh memory headroom. The live
+demonstration deadline is October 18 at noon America/New_York (16:00 UTC).
+The old child/parent failure must be retained before adding finite guards.
+
+### Actual CPU-only old-oracle failure
+
+The coordinator reviewed the prepared witness and granted an exclusive CPU-only
+slot. On October 18 at 03:53:38 UTC, VS2022 x64 configure with backend and hardware
+test-target options ON completed with exit 0 (3.85 seconds). Only the Debug
+EngineD3D11Tests target was built, with two jobs: exit 0 in 27.696 seconds. At
+03:54:26 UTC, only `ComparisonOracleRejectsNonfiniteCpuReference` ran. The hidden
+child returned 0 after accepting the CPU NaN, and the parent failed its genuine
+`RunCompareNonfiniteProbe() == 3` assertion with exit 3 in 0.162 seconds. This is
+the expected pre-fix failure; the shell receipt checker returned 0 after verifying
+the actual child/parent outputs and exits.
+
+The test source SHA256 before and after was identical:
+`5D3C9AE60006013E7962AA8C5FC93BF6605A82458280D3E8A6E95F45072D1D8F`.
+Receipts are `work/d3d11-evidence/oracle-old-configure.log`,
+`oracle-old-build-debug.log`, `oracle-old-test-debug.log` and
+`oracle-old-receipt.json`. No shader compilation, renderer, graphics device,
+hardware test, CTest or desktop action ran. The build session completed, both
+process handles closed, and no executable under the owned build prefix remained.
+The exclusive slot was explicitly released. The oracle is still unchanged;
+finite guards require coordinator acceptance of this receipt first.
+
+### Finite guard after accepted old receipt
+
+The coordinator accepted the actual old receipt and authorized this bounded
+correction. `Compare` first validates matching nonempty HDR/ID shapes, then
+checks every RGB channel of both CPU and GPU HDR buffers for finiteness in a
+separate pass. This includes boundary and background pixels and precedes all
+boundary exclusions, subtraction and maximum/mean arithmetic. All existing
+coverage bands, coverage fraction and RGB error tolerances remain unchanged.
+
+The same private CPU-only self-child now supports twelve invalid variants:
+CPU/GPU side, NaN/+infinity/-infinity and untextured/textured comparison mode.
+The three invalid kinds exercise red, green and blue channels respectively;
+every invalid variant must abort with code 3. The original CPU NaN witness
+remains registered separately. Two matching finite foreground controls must
+return 0, one in each comparison mode. All use actual `Compare`, matching 16x16
+arrays and the same hidden, bounded child/handle cleanup path. The earlier
+private old-witness argument remains supported. The existing production shader
+checks are unchanged. There are now ten registered cases, of which three are
+comparison-oracle cases. The coordinator independently reviewed this exact source
+at SHA256 `B93563058A618D99622295B4701C1E4DCD2B4C7CA43AE932C1FF42A6678A81C8`
+and cleared the fixed CPU-only run recorded below.
+
+Only the test and this QA file changed. Backend production, shaders, workflow,
+CMake and declared budgets are untouched. No hardware result is inferred from an
+oracle correction or CPU shader coverage.
+
+### Actual fixed CPU-only matrix
+
+The coordinator granted an exclusive CPU-only slot after the previous owner
+explicitly released it. The prepared runner independently parsed with zero
+PowerShell AST errors and checked HEAD
+`91f6966d4880a279b1a96bb9417439bc826465c9`, the reviewed test source hash, existing
+backend/test-target options ON, and at least 8 GiB available before each two-job
+target build. It did not invoke CTest or an unfiltered test process.
+
+On October 18 from 04:14:17 to 04:15:01 UTC:
+
+| Configuration | EngineD3D11Tests build | ComparisonOracle filter |
+| --- | --- | --- |
+| Debug | exit 0, 1.910 seconds | exit 0, 0.407 seconds, three cases pass |
+| Release | exit 0, 40.323 seconds | exit 0, 0.409 seconds, three cases pass |
+
+Each configuration recorded thirteen invalid-child aborts with code 3 (the
+original witness plus twelve variants) and two finite-child exits 0. Available
+host memory before the Release build was 14,159,577,088 bytes. Test source SHA256
+before/after matched the independently reviewed B9356305 hash above. No owned
+build-prefix process remained; the build session completed exit 0 and the CPU
+slot was explicitly released.
+
+Exact structured receipt and full logs:
+`work/d3d11-evidence/oracle-fixed-20261018-041417-receipt.json`,
+`oracle-fixed-20261018-041417-Debug-build.log`, `-Debug-test.log`,
+`-Release-build.log` and `-Release-test.log`; prepared runner
+`work/d3d11-evidence/run-oracle-fixed.ps1`. No renderer, graphics device, shader
+test, audio device, native UI or hardware/performance case ran in this slot.
+Hardware acceptance still requires its own explicit coordinator grant.
+
+## Actual exclusive RTX 5080 hardware matrix
+
+After inspecting the fixed CPU-only receipts, the coordinator separately granted
+the hardware/CPU slot. The external runner checked reviewed HEAD 91f6966 and
+test SHA256 B9356305, admitted at least 8 GiB before two-job affected builds and
+hardware execution, and ran only the registered anchored D3D11/Graphics pair
+with verbose output, stop-on-failure and one test at a time. Captures were scoped
+to `work/d3d11-evidence/Debug` and `Release`; prior evidence was not overwritten.
+No desktop window, player/editor, WARP, driver installation or system setting
+was used. From October 18 04:16:23 to 04:17:24 UTC:
+
+| Configuration | Affected build | Registered CTest result |
+| --- | --- | --- |
+| Debug | exit 0, 8.318 seconds | 2/2, 34.44 seconds: ten D3D11 cases and sixteen Graphics cases |
+| Release | exit 0, 10.134 seconds | 2/2, 7.70 seconds: ten D3D11 cases and sixteen Graphics cases |
+
+The ten D3D11 cases comprise three CPU oracle cases, one shader compiler case
+and six actual hardware cases. Actual adapter identity in both configurations:
+NVIDIA GeForce RTX 5080, vendor `10de`, device `2c02`, LUID `73259`, feature level
+`b000` (11_0), debug layer `1`. No missing-debug-layer fallback occurred. All
+device/compiler initialization diagnostics reported success. Expected invalid
+inputs/budget/thread rejections preserve the prior frame and recover; twenty
+resize/reload cycles and explicit shutdown/reinitialize pass.
+
+The real GameWorld fixture has two draws, 28 vertices, fourteen triangles and
+one texture at 1280x720. The World untextured interior max absolute RGB error was
+0.000000238. Repeat texture max/mean were 0.001921505/0.000048647; Clamp plus
+emissive/vertex-toggle max/mean were 0.000313818/0.000026770. Coverage differed at
+ten of 921,600 pixels, all inside the existing one-pixel band. Separate
+depth/winding/clipping, same-pointer data replacement and actual mip checks pass.
+No coverage/error tolerance was changed after measurement.
+
+Thirty hardware warmup frames preceded 120 measured frames in each configuration.
+GPU timestamps were valid. The complete logs retain min/p50/p95/p99/max for every
+phase. Recorded p95 values in milliseconds:
+
+| Phase | Debug | Release |
+| --- | ---: | ---: |
+| Actual GPU opaque Unlit pass | 0.030880 | 0.021536 |
+| CPU preparation/upload | 12.053200 | 2.633600 |
+| CPU submission | 0.377200 | 0.307100 |
+| CPU completion/readback | 66.590700 | 14.802000 |
+| Synchronous total | 78.568700 | 17.327200 |
+
+GPU-pass p95 <=16.67 ms and synchronous p95 <=100 ms both pass. This tiny fixture
+does not establish general scene performance. The separately recorded CPU full
+Render reference (two warmups, ten samples) includes CPU post and is not a
+pass-equivalent speed comparison.
+
+Fixed-workload logical resource bytes were 40,553,400 (eleven logical resources).
+Process private bytes were 226,021,376 Debug and 225,644,544 Release, below the
+declared 768 MiB limit. DXGI reported local usage 56,193,024 and budget
+15,947,792,384 bytes in both final workload receipts. Lowest sampled available
+host memory was 13,813,366,784 Debug and 13,750,874,112 Release, above the 6 GiB
+runtime guard. At the small-size resource check, logical count/bytes returned to
+eleven/636,600 after twenty cycles. This logical accounting and bounded process
+memory do not establish the actual driver live-object baseline or prove no leak.
+
+Complete command/results receipt, build/verbose CTest logs and unchanged checks
+are under `work/d3d11-evidence/hardware-20261018-041623`: `receipt.json`,
+`Debug-build.log`, `Debug-ctest.log`, `Release-build.log`, `Release-ctest.log`,
+`safety-milestones.json`, the four corresponding check logs and
+`final-cleanup.json`. The test source hash before/after remained exactly
+`B93563058A618D99622295B4701C1E4DCD2B4C7CA43AE932C1FF42A6678A81C8`.
+No first hardware failure occurred or was discarded.
+
+The coordinator viewed all four actual PNGs in each Debug/Release capture folder:
+`d3d11-cpu.png`, `d3d11-gpu.png`, `d3d11-difference-x16.png` and
+`d3d11-object-ids.png`. Root's inspection found aligned scene framing, foreground
+occlusion, textures and colors; differences were sparse/minor and IDs distinct
+and coherent, with no apparent missing geometry or visual artifacts. This
+inspection is only for the bounded offscreen fixture, not player/editor output.
+
+Unchanged test safety passed 3/3 in 5.575 seconds; M1, M2 and M3 static verifiers
+all exited 0. Final cleanup at 04:18:09 UTC found zero owned build/compiler/test
+processes, the same source hash and 13,802,909,696 available bytes. Both runner
+sessions completed; the exclusive slot was explicitly released.
+
+Final test/QA delta remains only the two reviewed paths. Backend production,
+shaders, CMake, workflows, budgets and tolerances are unchanged. Actual driver
+live-object/leak baseline, device-failure simulation/recovery, player/editor
+integration, swapchain/minimize/restore, other material/environment/post/HUD
+passes, constrained hardware, packaging and a long soak remain open. Await final
+coordinator receipt review and exact committed-source binding before publication.
