@@ -90,6 +90,9 @@ struct HostStats {
     double updateMs{};
     double renderMs{};
     Graphics::RenderStats render;
+    std::uint64_t cpuSceneRenders{}; // actual CPU scene raster calls, excludes UI-only drawing
+    std::string renderBackend{"CPU"};
+    std::uint64_t renderSubmission{};
 };
 
 // Project settings (see the header comment).
@@ -138,6 +141,18 @@ public:
     // Renders the world from its active camera, then the UI. The image stays
     // valid until the next Render.
     const Graphics::ImageRgba8& Render(int width, int height);
+    // Backend-neutral extraction of the actual world's frame. Borrowed scene
+    // resources remain valid only until the next world/asset mutation or Update.
+    // Replaces both outputs, leaving them defaulted when no camera is available.
+    // This never invokes the CPU scene renderer or changes authored settings.
+    bool PrepareRenderScene(int width, int height, Graphics::RenderScene& scene, Graphics::RenderView& view);
+    // Transparent display-encoded, straight-alpha HUD/console only; no scene
+    // rasterization, world update or asset reload. Valid until the next call.
+    const Graphics::ImageRgba8& RenderOverlay(int width, int height);
+    // External consumers report the current submitted frame, never stale CPU
+    // work. Completed GPU clocks remain separate and carry their own frame ID.
+    void SetExternalRenderStats(const Graphics::RenderStats& stats, double renderMs,
+        const std::string& backend, std::uint64_t submission = 0);
 
     bool Paused() const { return paused_; }
     void SetPaused(bool paused) { paused_ = paused; }
@@ -181,6 +196,7 @@ private:
     std::unique_ptr<UI::ConsoleOverlay> console_;
     Graphics::SceneRenderer renderer_;
     Graphics::RenderTarget target_;
+    Graphics::ImageRgba8 overlay_;
     std::unique_ptr<GameWorld> world_;
     SceneDocument document_;
     std::string scenePath_;

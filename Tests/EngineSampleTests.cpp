@@ -1229,4 +1229,105 @@ ASTRAL_TEST(ProjectOutOfRangeFloatRejectsWithoutMutation) {
     }
 }
 
+namespace {
+struct ExternalFrameFixture {
+    ProjectIngressDirectory directory;
+    std::unique_ptr<GameHost> host;
+    explicit ExternalFrameFixture(bool camera = true) {
+        WriteScene(1, camera);
+        WriteText((directory.path / "project.json").u8string(), R"({"format":"astral-project","version":1,
+            "name":"ExternalFrame","startupScene":"scene.json","config":{"host.showStats":false}})");
+        Framework::HostSettings settings;
+        settings.contentRoot = directory.path.u8string(); settings.workerThreads = 0; settings.audio = false;
+        host = std::make_unique<GameHost>(settings);
+        std::string error; ASTRAL_CHECK(host->LoadProject("project.json", error));
+        host->Update(0, {});
+    }
+    void WriteScene(int x, bool camera = true) {
+        const std::string cameraJson = camera ? R"({"name":"Camera","transform":{"position":[0,3,-8]},
+            "components":{"Camera":{"fieldOfView":60,"nearPlane":0.1,"farPlane":100}}},)" : "";
+        WriteText((directory.path / "scene.json").u8string(),
+            R"({"format":"astral-scene","version":1,"environment":{"fog":false,"shadows":false,"bloom":false,"outlines":false},
+            "materials":{"authored":{"shading":"Unlit","baseColor":[0.25,0.5,0.75]}},"entities":[)"
+            + cameraJson + R"({"name":"AuthoredCube","transform":{"position":[)" + std::to_string(x)
+            + R"(,2,3]},"components":{"MeshRenderer":{"mesh":"primitive:cube","material":"authored"}}}]})");
+    }
+};
+}
+
+ASTRAL_TEST(HostExternalFramePreparationUsesAuthoredSceneAndReload) {
+    ExternalFrameFixture fixture;
+    Graphics::RenderScene scene; Graphics::RenderView view;
+    ASTRAL_CHECK(fixture.host->PrepareRenderScene(160, 90, scene, view));
+    ASTRAL_CHECK(view.width == 160 && view.height == 90 && scene.draws.size() == 1);
+    ASTRAL_CHECK(scene.draws[0].material && scene.draws[0].material->name == "authored");
+    ASTRAL_CHECK(scene.draws[0].material->shading == Graphics::ShadingModel::Unlit);
+    ASTRAL_CHECK(scene.draws[0].mesh->TriangleCount() == 12);
+    ASTRAL_CHECK_NEAR(Math::TransformPoint(scene.draws[0].world, {}).x, 1, 1e-6);
+    ASTRAL_CHECK(fixture.host->Stats().cpuSceneRenders == 0);
+    Graphics::SceneRenderer reference;
+    reference.Settings() = fixture.host->Renderer().Settings();
+    Graphics::RenderTarget target;
+    reference.Render(scene, view, target);
+    const auto expectedHash = Graphics::HashImage(target.output);
+    ASTRAL_CHECK(Graphics::HashImage(fixture.host->Render(160, 90)) == expectedHash);
+    ASTRAL_CHECK(fixture.host->Stats().cpuSceneRenders == 1 && fixture.host->Stats().renderBackend == "CPU");
+    fixture.WriteScene(3);
+    std::string error;
+    ASTRAL_CHECK(fixture.host->Assets().Reload("scene.json"));
+    ASTRAL_CHECK(fixture.host->LoadScene("scene.json", error));
+    ASTRAL_CHECK(fixture.host->PrepareRenderScene(320, 180, scene, view));
+    ASTRAL_CHECK(scene.draws.size() == 1 && view.width == 320 && view.height == 180);
+    ASTRAL_CHECK_NEAR(Math::TransformPoint(scene.draws[0].world, {}).x, 3, 1e-6);
+    ASTRAL_CHECK(fixture.host->Stats().cpuSceneRenders == 1);
+}
+
+ASTRAL_TEST(HostUiOnlyFramesNeverRasterizeOrAdvanceTheWorld) {
+    ExternalFrameFixture fixture;
+    Graphics::RenderScene scene; Graphics::RenderView view;
+    ASTRAL_CHECK(fixture.host->PrepareRenderScene(640, 360, scene, view));
+    fixture.host->Update(0, {});
+    const auto worldFrame = fixture.host->World().Stats().frame;
+    const auto loads = fixture.host->Stats().sceneLoads;
+    const auto& empty = fixture.host->RenderOverlay(640, 360);
+    for (std::size_t p = 3; p < empty.pixels.size(); p += 4) ASTRAL_CHECK(empty.pixels[p] == 0);
+    fixture.host->Console().Open();
+    fixture.host->Console().Print("Actual console overlay");
+    fixture.host->Update(0, {});
+    const auto afterUiUpdate = fixture.host->World().Stats().frame;
+    const auto& overlay = fixture.host->RenderOverlay(640, 360);
+    std::size_t transparent = 0, fractional = 0, visible = 0;
+    for (std::size_t p = 3; p < overlay.pixels.size(); p += 4) {
+        transparent += overlay.pixels[p] == 0;
+        fractional += overlay.pixels[p] > 0 && overlay.pixels[p] < 255;
+        visible += overlay.pixels[p] != 0;
+    }
+    ASTRAL_CHECK(transparent > 0 && fractional > 0 && visible > 0);
+    ASTRAL_CHECK(fixture.host->Stats().cpuSceneRenders == 0 && fixture.host->Stats().sceneLoads == loads);
+    ASTRAL_CHECK(fixture.host->World().Stats().frame == afterUiUpdate && afterUiUpdate >= worldFrame);
+    Graphics::RenderStats external; external.drawsSubmitted = 4; external.trianglesSubmitted = 22;
+    fixture.host->SetExternalRenderStats(external, 2.5, "D3D11 Opaque Unlit", 17);
+    ASTRAL_CHECK(fixture.host->Stats().renderSubmission == 17 && fixture.host->Stats().render.drawsSubmitted == 4);
+    fixture.host->Console().Close();
+    const auto& cleared = fixture.host->RenderOverlay(640, 360);
+    for (std::size_t p = 3; p < cleared.pixels.size(); p += 4) ASTRAL_CHECK(cleared.pixels[p] == 0);
+    ASTRAL_CHECK(fixture.host->Stats().cpuSceneRenders == 0 && fixture.host->World().Stats().frame == afterUiUpdate);
+}
+
+ASTRAL_TEST(HostNoCameraKeepsCpuBehaviorWithoutClaimingRasterWork) {
+    ExternalFrameFixture fixture(false);
+    Graphics::RenderScene scene; Graphics::RenderView view;
+    scene.draws.emplace_back(); scene.pointLights.emplace_back(); scene.lines.emplace_back(); scene.billboards.emplace_back();
+    scene.time = 12;
+    view.eye = {9, 8, 7}; view.width = 13; view.height = 17;
+    ASTRAL_CHECK(!fixture.host->PrepareRenderScene(160, 90, scene, view));
+    const Graphics::RenderView defaultView;
+    ASTRAL_CHECK(scene.draws.empty() && scene.pointLights.empty() && scene.lines.empty() && scene.billboards.empty() && scene.time == 0);
+    ASTRAL_CHECK(view.eye.x == 0 && view.eye.y == 0 && view.eye.z == 0 && view.width == defaultView.width && view.height == defaultView.height);
+    const auto& image = fixture.host->Render(160, 90);
+    const auto corner = image.Get(159, 89);
+    ASTRAL_CHECK(corner.r == 18 && corner.g == 16 && corner.b == 30 && corner.a == 255);
+    ASTRAL_CHECK(fixture.host->Stats().cpuSceneRenders == 0 && fixture.host->Stats().renderBackend == "CPU");
+}
+
 ASTRAL_TEST_MAIN("EngineSampleTests")

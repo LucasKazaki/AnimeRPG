@@ -3,6 +3,7 @@
 #include "Engine/Graphics/D3D11/ShaderCompiler.h"
 
 #include <d3d11.h>
+#include <d3d11sdklayers.h>
 #include <dxgi1_4.h>
 #include <wrl/client.h>
 
@@ -11,8 +12,10 @@
 #include <climits>
 #include <cmath>
 #include <cstring>
+#include <deque>
 #include <exception>
 #include <iomanip>
+#include <iterator>
 #include <limits>
 #include <sstream>
 #include <thread>
@@ -61,6 +64,23 @@ bool Bytes(std::size_t count, std::size_t stride, std::size_t& result) {
     result = count * stride;
     return true;
 }
+const char* ShadingLabel(ShadingModel shading) {
+    switch (shading) {
+    case ShadingModel::Toon: return "Toon";
+    case ShadingModel::Lit: return "Lit";
+    case ShadingModel::Unlit: return "Unlit";
+    case ShadingModel::Water: return "Water";
+    default: return "Unknown";
+    }
+}
+const char* BlendLabel(BlendMode blend) {
+    switch (blend) {
+    case BlendMode::Opaque: return "Opaque";
+    case BlendMode::AlphaBlend: return "AlphaBlend";
+    case BlendMode::Additive: return "Additive";
+    default: return "Unknown";
+    }
+}
 
 struct alignas(16) Constants {
     Math::Mat4 clip;
@@ -91,6 +111,15 @@ struct Targets {
     ComPtr<ID3D11Texture2D> color, ids, depth, colorRead, idsRead;
     ComPtr<ID3D11RenderTargetView> colorView, idView;
     ComPtr<ID3D11DepthStencilView> depthView;
+    ComPtr<ID3D11ShaderResourceView> colorResource;
+};
+
+struct Submission {
+    std::vector<MeshUpload> meshes;
+    std::vector<TextureUpload> textures;
+    ComPtr<ID3D11Query> disjoint, begin, uploaded, sceneEnd, end, complete;
+    FrameStats stats;
+    std::size_t payloadBytes{}, payloadObjects{};
 };
 } // namespace
 
@@ -108,6 +137,20 @@ struct D3D11Renderer::Impl {
     ComPtr<ID3D11RasterizerState> cullBack, cullNone;
     ComPtr<ID3D11DepthStencilState> depthState;
     ComPtr<ID3D11SamplerState> repeatSampler, clampSampler;
+    HWND nativeWindow{};
+    int nativeWidth{}, nativeHeight{};
+    ComPtr<IDXGISwapChain1> swapChain;
+    ComPtr<ID3D11RenderTargetView> backbufferView;
+    Targets nativeTargets;
+    ComPtr<ID3D11Texture2D> uiTexture;
+    ComPtr<ID3D11ShaderResourceView> uiResource;
+    ComPtr<ID3D11VertexShader> displayVertex;
+    ComPtr<ID3D11PixelShader> displayPixel;
+    ComPtr<ID3D11Buffer> displayConstants;
+    ComPtr<ID3D11DepthStencilState> displayDepth;
+    std::deque<Submission> inFlight;
+    std::vector<FrameStats> completedFrames;
+    std::uint64_t nextFrameId{1};
 
     bool Thread(std::string& error) const {
         if (owner == std::this_thread::get_id()) return true;
@@ -126,9 +169,16 @@ struct D3D11Renderer::Impl {
     }
     void Reset() {
         if (context) { context->ClearState(); context->Flush(); }
+        ResetPresentation();
         clampSampler.Reset(); repeatSampler.Reset(); depthState.Reset();
         cullNone.Reset(); cullBack.Reset(); constants.Reset(); inputLayout.Reset();
         pixelShader.Reset(); vertexShader.Reset(); context.Reset(); device.Reset(); adapter.Reset();
+    }
+    void ResetPresentation() {
+        inFlight.clear(); completedFrames.clear(); nativeTargets = {};
+        displayDepth.Reset(); displayConstants.Reset(); displayPixel.Reset(); displayVertex.Reset();
+        uiResource.Reset(); uiTexture.Reset(); backbufferView.Reset(); swapChain.Reset();
+        nativeWindow = nullptr; nativeWidth = nativeHeight = 0;
     }
     bool Format(DXGI_FORMAT format, UINT required, std::string& error) {
         UINT support = 0;
@@ -217,7 +267,8 @@ struct D3D11Renderer::Impl {
 
     bool Prepare(const RenderScene& scene, const RenderView& view, Color clear,
         std::vector<MeshUpload>& meshes, std::vector<TextureUpload>& textures,
-        std::vector<PreparedDraw>& draws, FrameStats& stats, std::string& error) {
+        std::vector<PreparedDraw>& draws, FrameStats& stats, std::string& error,
+        std::size_t targetPixelBytes = 44, std::size_t targetObjects = 6, std::size_t extraFixedBytes = 0) {
         if (!Math::IsFinite(clear) || !Finite(view.view) || !Finite(view.projection)) {
             error = "Non-finite clear color or view/projection"; return false;
         }
@@ -230,22 +281,32 @@ struct D3D11Renderer::Impl {
         const std::size_t pixels = static_cast<std::size_t>(view.width) * static_cast<std::size_t>(view.height);
         // Two RGBA32 buffers, two R32 ID buffers, D32, and the persistent CB.
         std::size_t targetBytes{};
-        if (!Bytes(pixels, 44, targetBytes) || !AddBytes(sizeof(Constants), limits.maxResourceBytes, targetBytes)) {
+        if (!Bytes(pixels, targetPixelBytes, targetBytes)
+            || !AddBytes(sizeof(Constants), limits.maxResourceBytes, targetBytes)
+            || !AddBytes(extraFixedBytes, limits.maxResourceBytes, targetBytes)) {
             error = "Render target resource budget exceeded"; return false;
         }
-        stats.resourceBytes = targetBytes; stats.resourceCount = 6;
+        stats.resourceBytes = targetBytes; stats.resourceCount = targetObjects;
         std::size_t geometryBytes = 0, textureBytes = 0;
         std::unordered_map<const MeshData*, std::size_t> meshLookup;
         std::unordered_map<const Texture2D*, std::size_t> textureLookup;
         const Math::Mat4 vp = view.ViewProjection();
         for (std::size_t index = 0; index < scene.draws.size(); ++index) {
             const DrawItem& draw = scene.draws[index];
-            const auto reject = [&](const std::string& reason) { error = "Draw[" + std::to_string(index) + "]: " + reason; return false; };
+            const auto reject = [&](const std::string& reason) {
+                error = "Draw[" + std::to_string(index) + "]";
+                if (draw.material && !draw.material->name.empty()) error += " material '" + draw.material->name + "'";
+                error += ": " + reason; return false;
+            };
             if (!draw.mesh || !draw.material) return reject("mesh and explicit material required");
             const Material& material = *draw.material;
             if (material.shading != ShadingModel::Unlit || material.blend != BlendMode::Opaque
                 || material.cameraFade || material.opacity != 1.0f || draw.opacity != 1.0f)
-                return reject("only opaque Unlit, opacity 1, without cameraFade is supported");
+                return reject("requires opaque Unlit, opacity 1 and cameraFade false; shading="
+                    + std::string(ShadingLabel(material.shading)) + " blend="
+                    + BlendLabel(material.blend) + " materialOpacity="
+                    + std::to_string(material.opacity) + " drawOpacity=" + std::to_string(draw.opacity)
+                    + " cameraFade=" + std::to_string(material.cameraFade));
             if (!Finite(draw.world) || !Math::IsFinite(material.baseColor) || !Math::IsFinite(draw.tint)
                 || !Math::IsFinite(material.emissive) || !Math::IsFinite(draw.emissiveBoost)
                 || !std::isfinite(material.uvScale.x) || !std::isfinite(material.uvScale.y)) return reject("non-finite material/transform");
@@ -348,25 +409,160 @@ struct D3D11Renderer::Impl {
         return true;
     }
 
-    bool CreateTargets(int width, int height, Targets& target, std::string& error) {
+    bool CreateTargets(int width, int height, Targets& target, std::string& error, bool readback = true) {
         D3D11_TEXTURE2D_DESC desc{};
         desc.Width = static_cast<UINT>(width); desc.Height = static_cast<UINT>(height);
         desc.MipLevels = desc.ArraySize = desc.SampleDesc.Count = 1;
         desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT; desc.BindFlags = D3D11_BIND_RENDER_TARGET;
+        if (!readback) desc.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
         desc.Usage = D3D11_USAGE_DEFAULT;
         if (!Check(device->CreateTexture2D(&desc, nullptr, &target.color), "CreateTexture2D(color)", error)
             || !Check(device->CreateRenderTargetView(target.color.Get(), nullptr, &target.colorView), "CreateRenderTargetView(color)", error)) return false;
-        desc.Format = DXGI_FORMAT_R32_UINT;
+        if (!readback && !Check(device->CreateShaderResourceView(target.color.Get(), nullptr, &target.colorResource),
+            "CreateShaderResourceView(HDR)", error)) return false;
+        desc.Format = DXGI_FORMAT_R32_UINT; desc.BindFlags = D3D11_BIND_RENDER_TARGET;
         if (!Check(device->CreateTexture2D(&desc, nullptr, &target.ids), "CreateTexture2D(ids)", error)
             || !Check(device->CreateRenderTargetView(target.ids.Get(), nullptr, &target.idView), "CreateRenderTargetView(ids)", error)) return false;
         desc.Format = DXGI_FORMAT_D32_FLOAT; desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
         if (!Check(device->CreateTexture2D(&desc, nullptr, &target.depth), "CreateTexture2D(depth)", error)
             || !Check(device->CreateDepthStencilView(target.depth.Get(), nullptr, &target.depthView), "CreateDepthStencilView", error)) return false;
+        if (!readback) return true;
         desc.BindFlags = 0; desc.Usage = D3D11_USAGE_STAGING; desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
         desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
         if (!Check(device->CreateTexture2D(&desc, nullptr, &target.colorRead), "CreateTexture2D(color staging)", error)) return false;
         desc.Format = DXGI_FORMAT_R32_UINT;
         return Check(device->CreateTexture2D(&desc, nullptr, &target.idsRead), "CreateTexture2D(ids staging)", error);
+    }
+    void DrawScene(const RenderView& view, Color clear, Targets& target,
+        const std::vector<MeshUpload>& meshes, const std::vector<TextureUpload>& textures,
+        const std::vector<PreparedDraw>& draws) {
+        auto* immediate = context.Get();
+        ID3D11RenderTargetView* targets[] = {target.colorView.Get(), target.idView.Get()};
+        immediate->OMSetRenderTargets(2, targets, target.depthView.Get());
+        const float clearColor[] = {clear.x, clear.y, clear.z, 1};
+        const float clearIds[] = {0, 0, 0, 0};
+        immediate->ClearRenderTargetView(target.colorView.Get(), clearColor);
+        immediate->ClearRenderTargetView(target.idView.Get(), clearIds);
+        immediate->ClearDepthStencilView(target.depthView.Get(), D3D11_CLEAR_DEPTH, 1, 0);
+        const D3D11_VIEWPORT viewport{0, 0, static_cast<float>(view.width), static_cast<float>(view.height), 0, 1};
+        immediate->RSSetViewports(1, &viewport);
+        immediate->OMSetDepthStencilState(depthState.Get(), 0);
+        immediate->OMSetBlendState(nullptr, nullptr, UINT_MAX);
+        immediate->IASetInputLayout(inputLayout.Get());
+        immediate->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        immediate->VSSetShader(vertexShader.Get(), nullptr, 0); immediate->PSSetShader(pixelShader.Get(), nullptr, 0);
+        ID3D11Buffer* cb = constants.Get();
+        immediate->VSSetConstantBuffers(0, 1, &cb); immediate->PSSetConstantBuffers(0, 1, &cb);
+        for (const PreparedDraw& draw : draws) {
+            const MeshUpload& mesh = meshes[draw.mesh];
+            const UINT stride = sizeof(Vertex), offset = 0;
+            ID3D11Buffer* vb = mesh.vertices.Get();
+            immediate->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
+            immediate->IASetIndexBuffer(mesh.indices.Get(), DXGI_FORMAT_R32_UINT, 0);
+            immediate->UpdateSubresource(constants.Get(), 0, nullptr, &draw.constants, 0, 0);
+            immediate->RSSetState(draw.doubleSided ? cullNone.Get() : cullBack.Get());
+            ID3D11ShaderResourceView* texture = draw.textured ? textures[draw.texture].view.Get() : nullptr;
+            immediate->PSSetShaderResources(0, 1, &texture);
+            ID3D11SamplerState* sampler = draw.textured && textures[draw.texture].source->wrap == TextureWrap::Clamp
+                ? clampSampler.Get() : repeatSampler.Get();
+            immediate->PSSetSamplers(0, 1, &sampler);
+            immediate->DrawIndexed(static_cast<UINT>(mesh.source->indices.size()), 0, 0);
+        }
+    }
+    bool Viewport(const RenderView& view, std::string& error) const {
+        std::size_t pixels{};
+        if (view.width < 0 || view.height < 0) { error = "Negative viewport"; return false; }
+        if (view.width > D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION || view.height > D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION
+            || !Bytes(static_cast<std::size_t>(view.width), static_cast<std::size_t>(view.height), pixels)
+            || pixels > limits.maxPixels) { error = "Viewport pixel/dimension budget exceeded"; return false; }
+        return true;
+    }
+    bool CreateQuery(D3D11_QUERY kind, ComPtr<ID3D11Query>& query, std::string& error) {
+        const D3D11_QUERY_DESC desc{kind, 0};
+        return Check(device->CreateQuery(&desc, &query), "CreateQuery(native)", error);
+    }
+    bool Retire(bool drain, std::string& error) {
+        while (!inFlight.empty()) {
+            Submission& submission = inFlight.front();
+            BOOL finished = FALSE;
+            const HRESULT ready = context->GetData(submission.complete.Get(), &finished, sizeof(finished), D3D11_ASYNC_GETDATA_DONOTFLUSH);
+            if (FAILED(ready)) return Check(ready, "GetData(native complete)", error);
+            if (ready != S_OK && !drain) break;
+            const auto deadline = Clock::now() + std::chrono::seconds(5);
+            if (ready != S_OK && !Wait(submission.complete.Get(), &finished, sizeof(finished), deadline, error)) return false;
+            D3D11_QUERY_DATA_TIMESTAMP_DISJOINT frequency{};
+            UINT64 begin{}, uploaded{}, sceneEnd{}, end{};
+            if (!Wait(submission.disjoint.Get(), &frequency, sizeof(frequency), deadline, error)
+                || !Wait(submission.begin.Get(), &begin, sizeof(begin), deadline, error)
+                || !Wait(submission.uploaded.Get(), &uploaded, sizeof(uploaded), deadline, error)
+                || !Wait(submission.sceneEnd.Get(), &sceneEnd, sizeof(sceneEnd), deadline, error)
+                || !Wait(submission.end.Get(), &end, sizeof(end), deadline, error)) return false;
+            FrameStats& stats = submission.stats;
+            if (!frequency.Disjoint && frequency.Frequency && begin <= uploaded && uploaded <= sceneEnd && sceneEnd <= end) {
+                stats.gpuTimingValid = true;
+                const double scale = 1000.0 / static_cast<double>(frequency.Frequency);
+                stats.gpuUploadMs = static_cast<double>(uploaded - begin) * scale;
+                stats.gpuSceneMs = static_cast<double>(sceneEnd - uploaded) * scale;
+                stats.gpuDisplayMs = static_cast<double>(end - sceneEnd) * scale;
+                stats.gpuMs = static_cast<double>(end - begin) * scale;
+            }
+            if (completedFrames.size() >= 256) {
+                error = "Completed native timing queue exceeded 256; consumer must collect every frame";
+                return false;
+            }
+            completedFrames.push_back(stats);
+            inFlight.pop_front();
+        }
+        return true;
+    }
+    bool ResizeNative(int width, int height, std::string& error) {
+        if (width == nativeWidth && height == nativeHeight && backbufferView) return true;
+        if (!Retire(true, error)) return false;
+        context->ClearState(); context->Flush();
+        nativeTargets = {}; uiResource.Reset(); uiTexture.Reset(); backbufferView.Reset();
+        nativeWidth = nativeHeight = 0;
+        if (!Check(swapChain->ResizeBuffers(2, static_cast<UINT>(width), static_cast<UINT>(height),
+            DXGI_FORMAT_R8G8B8A8_UNORM, 0), "ResizeBuffers", error)) return false;
+        ComPtr<ID3D11Texture2D> backbuffer;
+        if (!Check(swapChain->GetBuffer(0, IID_PPV_ARGS(&backbuffer)), "GetBuffer", error)) return false;
+        D3D11_TEXTURE2D_DESC actual{}; backbuffer->GetDesc(&actual);
+        if (actual.Width != static_cast<UINT>(width) || actual.Height != static_cast<UINT>(height)) {
+            error = "Actual swapchain backbuffer differs from requested full HWND client: " + std::to_string(actual.Width)
+                + "x" + std::to_string(actual.Height); return false;
+        }
+        if (!Check(device->CreateRenderTargetView(backbuffer.Get(), nullptr, &backbufferView), "CreateRenderTargetView(backbuffer)", error)
+            || !CreateTargets(width, height, nativeTargets, error, false)) return false;
+        D3D11_TEXTURE2D_DESC desc{};
+        desc.Width = static_cast<UINT>(width); desc.Height = static_cast<UINT>(height);
+        desc.MipLevels = desc.ArraySize = desc.SampleDesc.Count = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        if (!Check(device->CreateTexture2D(&desc, nullptr, &uiTexture), "CreateTexture2D(UI)", error)
+            || !Check(device->CreateShaderResourceView(uiTexture.Get(), nullptr, &uiResource), "CreateShaderResourceView(UI)", error)) return false;
+        nativeWidth = width; nativeHeight = height;
+        return true;
+    }
+    void DrawDisplay(float exposure) {
+        auto* immediate = context.Get();
+        immediate->OMSetRenderTargets(0, nullptr, nullptr);
+        ID3D11RenderTargetView* target = backbufferView.Get();
+        immediate->OMSetRenderTargets(1, &target, nullptr);
+        immediate->OMSetDepthStencilState(displayDepth.Get(), 0);
+        immediate->RSSetState(cullNone.Get());
+        immediate->IASetInputLayout(nullptr);
+        ID3D11Buffer* noBuffer = nullptr; const UINT zero = 0;
+        immediate->IASetVertexBuffers(0, 1, &noBuffer, &zero, &zero);
+        immediate->IASetIndexBuffer(nullptr, DXGI_FORMAT_R32_UINT, 0);
+        immediate->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        immediate->VSSetShader(displayVertex.Get(), nullptr, 0);
+        immediate->PSSetShader(displayPixel.Get(), nullptr, 0);
+        const float constantsData[4] = {exposure, 0, 0, 0};
+        immediate->UpdateSubresource(displayConstants.Get(), 0, nullptr, constantsData, 0, 0);
+        ID3D11Buffer* cb = displayConstants.Get(); immediate->PSSetConstantBuffers(0, 1, &cb);
+        ID3D11ShaderResourceView* resources[] = {nativeTargets.colorResource.Get(), uiResource.Get()};
+        immediate->PSSetShaderResources(0, 2, resources);
+        immediate->Draw(3, 0);
+        immediate->ClearState();
     }
     bool Wait(ID3D11Asynchronous* query, void* data, UINT size, Clock::time_point deadline, std::string& error) {
         for (;;) {
@@ -412,7 +608,11 @@ struct D3D11Renderer::Impl {
 
 D3D11Renderer::D3D11Renderer() : impl_(std::make_unique<Impl>()) {}
 D3D11Renderer::~D3D11Renderer() { Shutdown(); }
-void D3D11Renderer::Shutdown() { impl_->Reset(); impl_->info = {}; }
+void D3D11Renderer::Shutdown() {
+    std::string ignored;
+    DetachWindow(ignored);
+    impl_->Reset(); impl_->info = {};
+}
 bool D3D11Renderer::Ready() const { return impl_->device != nullptr; }
 const DeviceInfo& D3D11Renderer::Info() const { return impl_->info; }
 
@@ -463,37 +663,7 @@ RenderStatus D3D11Renderer::RenderOpaqueUnlit(const RenderScene& scene, const Re
         frame.stats.uploadMs = Milliseconds(start, uploaded);
         auto* context = state.context.Get();
         context->Begin(disjoint.Get()); context->End(begin.Get());
-        ID3D11RenderTargetView* targets[] = {target.colorView.Get(), target.idView.Get()};
-        context->OMSetRenderTargets(2, targets, target.depthView.Get());
-        const float clearColor[] = {clear.x, clear.y, clear.z, 1};
-        const float clearIds[] = {0, 0, 0, 0};
-        context->ClearRenderTargetView(target.colorView.Get(), clearColor);
-        context->ClearRenderTargetView(target.idView.Get(), clearIds);
-        context->ClearDepthStencilView(target.depthView.Get(), D3D11_CLEAR_DEPTH, 1, 0);
-        const D3D11_VIEWPORT viewport{0, 0, static_cast<float>(view.width), static_cast<float>(view.height), 0, 1};
-        context->RSSetViewports(1, &viewport);
-        context->OMSetDepthStencilState(state.depthState.Get(), 0);
-        context->OMSetBlendState(nullptr, nullptr, UINT_MAX);
-        context->IASetInputLayout(state.inputLayout.Get());
-        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        context->VSSetShader(state.vertexShader.Get(), nullptr, 0); context->PSSetShader(state.pixelShader.Get(), nullptr, 0);
-        ID3D11Buffer* cb = state.constants.Get();
-        context->VSSetConstantBuffers(0, 1, &cb); context->PSSetConstantBuffers(0, 1, &cb);
-        for (const PreparedDraw& draw : draws) {
-            const MeshUpload& mesh = meshes[draw.mesh];
-            const UINT stride = sizeof(Vertex), offset = 0;
-            ID3D11Buffer* vb = mesh.vertices.Get();
-            context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
-            context->IASetIndexBuffer(mesh.indices.Get(), DXGI_FORMAT_R32_UINT, 0);
-            context->UpdateSubresource(state.constants.Get(), 0, nullptr, &draw.constants, 0, 0);
-            context->RSSetState(draw.doubleSided ? state.cullNone.Get() : state.cullBack.Get());
-            ID3D11ShaderResourceView* texture = draw.textured ? textures[draw.texture].view.Get() : nullptr;
-            context->PSSetShaderResources(0, 1, &texture);
-            ID3D11SamplerState* sampler = draw.textured && textures[draw.texture].source->wrap == TextureWrap::Clamp
-                ? state.clampSampler.Get() : state.repeatSampler.Get();
-            context->PSSetSamplers(0, 1, &sampler);
-            context->DrawIndexed(static_cast<UINT>(mesh.source->indices.size()), 0, 0);
-        }
+        state.DrawScene(view, clear, target, meshes, textures, draws);
         context->End(end.Get()); context->End(disjoint.Get());
         context->OMSetRenderTargets(0, nullptr, nullptr);
         context->CopyResource(target.colorRead.Get(), target.color.Get()); context->CopyResource(target.idsRead.Get(), target.ids.Get());
@@ -532,6 +702,338 @@ RenderStatus D3D11Renderer::RenderOpaqueUnlit(const RenderScene& scene, const Re
         error = std::string("D3D11 render: ") + exception.what();
         return RenderStatus::Failed;
     }
+}
+
+bool D3D11Renderer::ValidateOpaqueUnlit(const RenderScene& scene, const RenderView& view, std::string& error, Color clear) {
+    error.clear();
+    try {
+    if (!impl_->Thread(error) || !impl_->Viewport(view, error)) return false;
+    if (!view.width || !view.height) { error = "GPU selection requires a nonzero client"; return false; }
+    if (!std::isfinite(scene.post.exposure) || scene.post.exposure < 0) { error = "Non-finite or negative display exposure"; return false; }
+    if (!Math::IsFinite(clear)) { error = "Non-finite native clear color"; return false; }
+    for (float channel : {clear.x, clear.y, clear.z}) {
+        if (std::fabs(static_cast<double>(channel)) * scene.post.exposure > std::numeric_limits<float>::max()) {
+            error = "Clear color: possible HDR/display arithmetic overflow"; return false;
+        }
+    }
+    std::vector<MeshUpload> meshes; std::vector<TextureUpload> textures; std::vector<PreparedDraw> draws;
+    FrameStats stats;
+    if (!impl_->Prepare(scene, view, clear, meshes, textures, draws, stats, error, 36, 8, 16)) return false;
+    // Normal presentation has no HDR readback. Reject possible arithmetic
+    // overflow before submission instead of hiding an Inf in the display pass.
+    for (std::size_t index = 0; index < draws.size(); ++index) {
+        const PreparedDraw& draw = draws[index];
+        double vertexMaximum[3] = {1, 1, 1}, textureMaximum[3] = {1, 1, 1};
+        if (draw.constants.flags[0]) {
+            std::fill(std::begin(vertexMaximum), std::end(vertexMaximum), 0);
+            for (const Vertex& vertex : meshes[draw.mesh].source->vertices) {
+                const float values[] = {vertex.color.x, vertex.color.y, vertex.color.z};
+                for (int c = 0; c < 3; ++c) vertexMaximum[c] = std::max(vertexMaximum[c], std::fabs(static_cast<double>(values[c])));
+            }
+        }
+        if (draw.textured) {
+            std::fill(std::begin(textureMaximum), std::end(textureMaximum), 0);
+            const Texture2D& texture = *textures[draw.texture].source;
+            for (int level = 0; level < texture.LevelCount(); ++level) for (const Math::Vec4& texel : texture.GetLevel(level).texels) {
+                const float values[] = {texel.x, texel.y, texel.z};
+                for (int c = 0; c < 3; ++c) textureMaximum[c] = std::max(textureMaximum[c], std::fabs(static_cast<double>(values[c])));
+            }
+        }
+        const float base[] = {draw.constants.baseTint.x, draw.constants.baseTint.y, draw.constants.baseTint.z};
+        const float glow[] = {draw.constants.emissive.x, draw.constants.emissive.y, draw.constants.emissive.z};
+        for (int c = 0; c < 3; ++c) {
+            const double vertexProduct = std::fabs(static_cast<double>(base[c])) * vertexMaximum[c];
+            const double hdrBound = vertexProduct * textureMaximum[c] + std::fabs(static_cast<double>(glow[c]));
+            if (vertexProduct > std::numeric_limits<float>::max() || hdrBound > std::numeric_limits<float>::max()
+                || hdrBound * scene.post.exposure > std::numeric_limits<float>::max()) {
+                error = "Draw[" + std::to_string(index) + "]: possible HDR/display arithmetic overflow"; return false;
+            }
+        }
+    }
+    return true;
+    } catch (const std::exception& exception) {
+        error = std::string("Native validation: ") + exception.what(); return false;
+    }
+}
+
+bool D3D11Renderer::AttachWindow(void* nativeWindow, std::string& error) {
+    error.clear();
+    Impl& state = *impl_;
+    if (!state.Thread(error)) return false;
+    if (!Ready()) { error = "D3D11 renderer is not initialized"; return false; }
+    HWND window = static_cast<HWND>(nativeWindow);
+    if (!window || !IsWindow(window) || GetWindowThreadProcessId(window, nullptr) != GetCurrentThreadId()) {
+        error = "Native GPU HWND must be live and owned by this thread"; return false;
+    }
+    RECT client{}; RenderView attachment;
+    if (!GetClientRect(window, &client) || client.right <= 0 || client.bottom <= 0) { error = "GPU HWND requires a nonzero client"; return false; }
+    attachment.width = client.right; attachment.height = client.bottom;
+    std::size_t attachmentBytes{};
+    if (!state.Viewport(attachment, error)) return false;
+    if (!Bytes(static_cast<std::size_t>(client.right) * client.bottom, 36, attachmentBytes)
+        || !AddBytes(sizeof(Constants) + 16, state.limits.maxResourceBytes, attachmentBytes)) {
+        error = "Native attachment resource budget exceeded"; return false;
+    }
+    if (!DetachWindow(error)) return false;
+    try {
+        ComPtr<IDXGIFactory2> factory;
+        if (!state.Check(state.adapter->GetParent(IID_PPV_ARGS(&factory)), "GetParent(factory2)", error)) return false;
+        DXGI_SWAP_CHAIN_DESC1 desc{};
+        desc.Width = static_cast<UINT>(client.right); desc.Height = static_cast<UINT>(client.bottom);
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; desc.SampleDesc.Count = 1;
+        desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT; desc.BufferCount = 2;
+        desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD; desc.Scaling = DXGI_SCALING_STRETCH;
+        desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+        if (!state.Check(factory->CreateSwapChainForHwnd(state.device.Get(), window, &desc, nullptr, nullptr, &state.swapChain),
+                "CreateSwapChainForHwnd", error)
+            || !state.Check(factory->MakeWindowAssociation(window, DXGI_MWA_NO_ALT_ENTER), "MakeWindowAssociation", error)) {
+            state.ResetPresentation(); return false;
+        }
+        const auto vs = CompileShader(Detail::kNativeDisplayShader, "AstralNativeDisplay", "VSMain", "vs_5_0", state.info.debugLayer);
+        const auto ps = CompileShader(Detail::kNativeDisplayShader, "AstralNativeDisplay", "PSMain", "ps_5_0", state.info.debugLayer);
+        if (!vs.Succeeded() || !ps.Succeeded()) { error = vs.diagnostics + '\n' + ps.diagnostics; state.ResetPresentation(); return false; }
+        D3D11_BUFFER_DESC cb{}; cb.ByteWidth = 16; cb.Usage = D3D11_USAGE_DEFAULT; cb.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        D3D11_DEPTH_STENCIL_DESC depth{};
+        depth.DepthEnable = FALSE; depth.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO; depth.DepthFunc = D3D11_COMPARISON_ALWAYS;
+        if (!state.Check(state.device->CreateVertexShader(vs.bytecode.data(), vs.bytecode.size(), nullptr, &state.displayVertex), "CreateVertexShader(display)", error)
+            || !state.Check(state.device->CreatePixelShader(ps.bytecode.data(), ps.bytecode.size(), nullptr, &state.displayPixel), "CreatePixelShader(display)", error)
+            || !state.Check(state.device->CreateBuffer(&cb, nullptr, &state.displayConstants), "CreateBuffer(display constants)", error)
+            || !state.Check(state.device->CreateDepthStencilState(&depth, &state.displayDepth), "CreateDepthStencilState(display)", error)) {
+            state.ResetPresentation(); return false;
+        }
+        state.nativeWindow = window;
+        return true;
+    } catch (const std::exception& exception) {
+        error = std::string("Native attach: ") + exception.what(); state.ResetPresentation(); return false;
+    }
+}
+
+bool D3D11Renderer::DetachWindow(std::string& error) {
+    error.clear();
+    if (!impl_->Thread(error)) return false;
+    bool retired = true;
+    if (impl_->context) {
+        retired = impl_->Retire(true, error);
+        if (impl_->context) { impl_->context->ClearState(); impl_->context->Flush(); }
+    }
+    impl_->ResetPresentation();
+    if (impl_->context) impl_->context->Flush(); // retire deferred releases before HWND reuse
+    return retired;
+}
+
+bool D3D11Renderer::HasWindow() const { return impl_->swapChain != nullptr; }
+
+bool D3D11Renderer::CollectCompletedFrames(std::vector<FrameStats>& frames, std::string& error, bool drain) {
+    error.clear();
+    if (!impl_->Thread(error)) return false;
+    if (!impl_->context) { error = "D3D11 renderer is not initialized"; return false; }
+    if (!impl_->Retire(drain, error)) return false;
+    frames.swap(impl_->completedFrames);
+    impl_->completedFrames.clear();
+    return true;
+}
+
+RenderStatus D3D11Renderer::PresentOpaqueUnlit(const RenderScene& scene, const RenderView& view,
+    const ImageRgba8& overlay, FrameStats& stats, std::string& error, PresentationCapture* capture, Color clear) {
+    error.clear();
+    Impl& state = *impl_;
+    if (!state.Thread(error)) return RenderStatus::Failed;
+    if (!Ready() || !HasWindow()) { error = "Native D3D11 presentation is not attached"; return RenderStatus::Failed; }
+    if (!state.Viewport(view, error)) return RenderStatus::Failed;
+    if (!view.width || !view.height) return RenderStatus::Skipped;
+    const auto validationStarted = Clock::now();
+    if (!ValidateOpaqueUnlit(scene, view, error, clear)) return RenderStatus::Failed;
+    const double validationMs = Milliseconds(validationStarted, Clock::now());
+    const std::size_t pixels = static_cast<std::size_t>(view.width) * view.height;
+    if (overlay.width != view.width || overlay.height != view.height || overlay.pixels.size() != pixels * 4) {
+        error = "UI overlay must exactly match the full native viewport"; return RenderStatus::Failed;
+    }
+    const auto started = Clock::now();
+    try {
+        if (!state.Retire(false, error)) return RenderStatus::Failed;
+        if (state.inFlight.size() >= 2 && !state.Retire(true, error)) return RenderStatus::Failed;
+        if ((view.width != state.nativeWidth || view.height != state.nativeHeight) && !state.Retire(true, error)) return RenderStatus::Failed;
+        Submission submission;
+        ComPtr<ID3D11Texture2D> hdrRead, idsRead, displayRead;
+        PresentationCapture captured;
+        std::vector<PreparedDraw> draws;
+        if (!state.Prepare(scene, view, clear, submission.meshes, submission.textures, draws, submission.stats, error, 36, 8, 16)) return RenderStatus::Failed;
+        submission.stats.validationMs = validationMs;
+        const std::size_t baseBytes = pixels * 36 + sizeof(Constants) + 16;
+        submission.payloadBytes = submission.stats.resourceBytes - baseBytes;
+        submission.payloadObjects = submission.stats.resourceCount - 8;
+        for (const Submission& previous : state.inFlight) {
+            if (!AddBytes(previous.payloadBytes, state.limits.maxResourceBytes, submission.stats.resourceBytes)) {
+                error = "In-flight native resource budget exceeded"; return RenderStatus::Failed;
+            }
+            submission.stats.resourceCount += previous.payloadObjects;
+        }
+        if (capture && !AddBytes(pixels * 24, state.limits.maxResourceBytes, submission.stats.resourceBytes)) {
+            error = "Native capture staging resource budget exceeded"; return RenderStatus::Failed;
+        }
+        if (capture) submission.stats.resourceCount += 3;
+        if (!state.ResizeNative(view.width, view.height, error)
+            || !state.CreateQuery(D3D11_QUERY_TIMESTAMP_DISJOINT, submission.disjoint, error)
+            || !state.CreateQuery(D3D11_QUERY_TIMESTAMP, submission.begin, error)
+            || !state.CreateQuery(D3D11_QUERY_TIMESTAMP, submission.uploaded, error)
+            || !state.CreateQuery(D3D11_QUERY_TIMESTAMP, submission.sceneEnd, error)
+            || !state.CreateQuery(D3D11_QUERY_TIMESTAMP, submission.end, error)
+            || !state.CreateQuery(D3D11_QUERY_EVENT, submission.complete, error)) return RenderStatus::Failed;
+        // Declared after every local GPU resource owner so it fences failed
+        // work before those owners are destroyed. Successful work transfers to
+        // inFlight; failed Begin/upload/draw/capture/Present paths stay local.
+        struct FailedFrameGuard {
+            Impl& state;
+            Submission& submission;
+            std::string& error;
+            bool started{}, timingOpen{}, committed{};
+            ~FailedFrameGuard() noexcept {
+                if (!started || committed || !state.context) return;
+                try {
+                    state.context->ClearState();
+                    if (timingOpen) state.context->End(submission.disjoint.Get());
+                    state.context->End(submission.complete.Get()); state.context->Flush();
+                    BOOL done = FALSE; std::string cleanup;
+                    if (!state.Wait(submission.complete.Get(), &done, sizeof(done), Clock::now() + std::chrono::seconds(5), cleanup)) {
+                        state.Reset(); error += " | failed-frame cleanup: " + cleanup;
+                    }
+                } catch (...) { state.Reset(); }
+            }
+        } failedFrame{state, submission, error};
+        auto* context = state.context.Get();
+        context->Begin(submission.disjoint.Get()); context->End(submission.begin.Get());
+        failedFrame.started = failedFrame.timingOpen = true;
+        if (!state.Upload(submission.meshes, submission.textures, error)) return RenderStatus::Failed;
+        const auto overlayBegin = Clock::now();
+        context->UpdateSubresource(state.uiTexture.Get(), 0, nullptr, overlay.pixels.data(), static_cast<UINT>(view.width * 4), 0);
+        const auto uploaded = Clock::now();
+        submission.stats.overlayUploadMs = Milliseconds(overlayBegin, uploaded);
+        submission.stats.uploadMs = Milliseconds(started, uploaded);
+        context->End(submission.uploaded.Get());
+        state.DrawScene(view, clear, state.nativeTargets, submission.meshes, submission.textures, draws);
+        context->End(submission.sceneEnd.Get());
+        state.DrawDisplay(scene.post.exposure);
+        context->End(submission.end.Get()); context->End(submission.disjoint.Get());
+        failedFrame.timingOpen = false;
+
+        if (capture) {
+            captured.overlay = overlay;
+            captured.geometry.width = view.width; captured.geometry.height = view.height;
+            captured.geometry.hdr.resize(pixels); captured.geometry.objectId.resize(pixels);
+            captured.display.Resize(view.width, view.height);
+            D3D11_TEXTURE2D_DESC desc{};
+            desc.Width = view.width; desc.Height = view.height; desc.MipLevels = desc.ArraySize = desc.SampleDesc.Count = 1;
+            desc.Usage = D3D11_USAGE_STAGING; desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+            desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+            if (!state.Check(state.device->CreateTexture2D(&desc, nullptr, &hdrRead), "CreateTexture2D(capture HDR)", error)) return RenderStatus::Failed;
+            desc.Format = DXGI_FORMAT_R32_UINT;
+            if (!state.Check(state.device->CreateTexture2D(&desc, nullptr, &idsRead), "CreateTexture2D(capture IDs)", error)) return RenderStatus::Failed;
+            desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            if (!state.Check(state.device->CreateTexture2D(&desc, nullptr, &displayRead), "CreateTexture2D(capture display)", error)) return RenderStatus::Failed;
+            ComPtr<ID3D11Texture2D> backbuffer;
+            if (!state.Check(state.swapChain->GetBuffer(0, IID_PPV_ARGS(&backbuffer)), "GetBuffer(capture)", error)) return RenderStatus::Failed;
+            context->CopyResource(hdrRead.Get(), state.nativeTargets.color.Get());
+            context->CopyResource(idsRead.Get(), state.nativeTargets.ids.Get());
+            context->CopyResource(displayRead.Get(), backbuffer.Get());
+        }
+        context->End(submission.complete.Get()); context->Flush();
+        const auto submitted = Clock::now();
+        submission.stats.submissionMs = Milliseconds(uploaded, submitted);
+        submission.stats.frameId = state.nextFrameId++;
+        submission.stats.inFlightFrames = state.inFlight.size() + 1;
+        submission.stats.queryCount = submission.stats.inFlightFrames * 6;
+        const HRESULT present = state.swapChain->Present(1, 0);
+        submission.stats.presentMs = Milliseconds(submitted, Clock::now());
+        if (!state.Check(present, "Present(1)", error)) return RenderStatus::Failed;
+        submission.stats.occluded = present == DXGI_STATUS_OCCLUDED;
+        submission.stats.totalMs = Milliseconds(started, Clock::now());
+        ComPtr<IDXGIAdapter3> memory;
+        if (SUCCEEDED(state.adapter.As(&memory))) {
+            DXGI_QUERY_VIDEO_MEMORY_INFO usage{};
+            if (SUCCEEDED(memory->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &usage))) {
+                submission.stats.videoMemoryAvailable = true;
+                submission.stats.localVideoUsage = usage.CurrentUsage; submission.stats.localVideoBudget = usage.Budget;
+            }
+        }
+        // GPU resources are retained, but no borrowed world/asset pointer is.
+        for (auto& mesh : submission.meshes) mesh.source = nullptr;
+        for (auto& texture : submission.textures) texture.source = nullptr;
+        stats = submission.stats;
+        state.inFlight.push_back(std::move(submission));
+        failedFrame.committed = true;
+        if (capture) {
+            if (!state.Retire(true, error)) return RenderStatus::Failed;
+            if (!state.completedFrames.empty() && state.completedFrames.back().frameId == stats.frameId) stats = state.completedFrames.back();
+            const auto deadline = Clock::now() + std::chrono::seconds(5);
+            if (!state.Read(hdrRead.Get(), captured.geometry, true, deadline, error)
+                || !state.Read(idsRead.Get(), captured.geometry, false, deadline, error)) return RenderStatus::Failed;
+            for (Color color : captured.geometry.hdr) if (!Math::IsFinite(color)) { error = "Non-finite native GPU HDR output"; return RenderStatus::Failed; }
+            D3D11_MAPPED_SUBRESOURCE mapped{};
+            for (;;) {
+                const HRESULT hr = context->Map(displayRead.Get(), 0, D3D11_MAP_READ, D3D11_MAP_FLAG_DO_NOT_WAIT, &mapped);
+                if (hr == S_OK) break;
+                if (hr != DXGI_ERROR_WAS_STILL_DRAWING) { state.Check(hr, "Map(native display capture)", error); return RenderStatus::Failed; }
+                if (Clock::now() >= deadline) { error = "Native display readback exceeded five-second deadline"; state.Reset(); return RenderStatus::Failed; }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            const std::size_t rowBytes = static_cast<std::size_t>(view.width) * 4;
+            if (mapped.RowPitch < rowBytes) { context->Unmap(displayRead.Get(), 0); error = "Invalid display capture RowPitch"; return RenderStatus::Failed; }
+            for (int y = 0; y < view.height; ++y) std::memcpy(captured.display.pixels.data() + y * rowBytes,
+                static_cast<const std::uint8_t*>(mapped.pData) + static_cast<std::size_t>(y) * mapped.RowPitch, rowBytes);
+            context->Unmap(displayRead.Get(), 0);
+            captured.geometry.stats = stats;
+            *capture = std::move(captured);
+        }
+        return stats.occluded ? RenderStatus::Skipped : RenderStatus::Rendered;
+    } catch (const std::exception& exception) {
+        if (state.context) state.context->ClearState();
+        error = std::string("Native presentation: ") + exception.what(); return RenderStatus::Failed;
+    }
+}
+
+std::string D3D11Renderer::PresentationDiagnostics() const {
+    std::ostringstream result;
+    result << "renderAdapter=" << impl_->info.adapter << " renderLuid=" << impl_->info.adapterLuid
+        << " hardware=" << impl_->info.hardware << " debugLayer=" << impl_->info.debugLayer
+        << " backbuffer=" << impl_->nativeWidth << 'x' << impl_->nativeHeight << " syncInterval=1";
+    if (!impl_->info.diagnostics.empty()) result << " deviceDiagnostics=[" << impl_->info.diagnostics << ']';
+    if (impl_->swapChain) {
+        ComPtr<IDXGIOutput> output;
+        const HRESULT hr = impl_->swapChain->GetContainingOutput(&output);
+        result << " containingOutputHRESULT=" << Hex(hr);
+        if (SUCCEEDED(hr)) {
+            DXGI_OUTPUT_DESC desc{};
+            const HRESULT description = output->GetDesc(&desc);
+            result << " outputDescHRESULT=" << Hex(description);
+            if (SUCCEEDED(description)) result << " output=" << Utf8(desc.DeviceName)
+                << " outputDesktop=" << desc.DesktopCoordinates.left << ',' << desc.DesktopCoordinates.top
+                << ',' << desc.DesktopCoordinates.right << ',' << desc.DesktopCoordinates.bottom;
+            ComPtr<IDXGIAdapter1> owner;
+            const HRESULT parent = output->GetParent(IID_PPV_ARGS(&owner));
+            result << " outputParentHRESULT=" << Hex(parent);
+            if (SUCCEEDED(parent)) {
+                DXGI_ADAPTER_DESC1 adapter{};
+                const HRESULT adapterDescription = owner->GetDesc1(&adapter);
+                result << " outputAdapterDescHRESULT=" << Hex(adapterDescription);
+                if (SUCCEEDED(adapterDescription)) {
+                    std::uint64_t luid{}; std::memcpy(&luid, &adapter.AdapterLuid, sizeof(luid));
+                    result << " outputAdapter=" << Utf8(adapter.Description) << " outputAdapterLuid=" << luid;
+                }
+            }
+        }
+    }
+    return result.str();
+}
+
+bool D3D11Renderer::ReportLiveObjects(std::string& error) const {
+    error.clear();
+    if (!impl_->Thread(error)) return false;
+    if (!impl_->device || !impl_->info.debugLayer) { error = "Actual D3D11 debug layer is unavailable"; return false; }
+    ComPtr<ID3D11Debug> debug;
+    HRESULT hr = impl_->device.As(&debug);
+    if (SUCCEEDED(hr)) hr = debug->ReportLiveDeviceObjects(static_cast<D3D11_RLDO_FLAGS>(D3D11_RLDO_SUMMARY | D3D11_RLDO_DETAIL));
+    if (FAILED(hr)) { error = "ReportLiveDeviceObjects HRESULT=" + Hex(hr); return false; }
+    return true;
 }
 
 } // namespace Astral::Graphics::D3D11
