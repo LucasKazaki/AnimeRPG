@@ -1,116 +1,86 @@
 # Astral Engine weekend checkpoint
 
-Updated: 2026-10-17 13:41 America/New_York. Owner: Codex chat
-`01a14ae5-1646-7c80-b8a8-c76ba4ab5747`, coordinator `/root`.
-Scope/authority: `Tasks/ENGINE-WEEKEND-COORDINATION-2026-10-17.md` and Lucas's
-October 17 pasted request. Deadline: 2026-10-18 23:59 Eastern.
+Updated: 2026-10-18. Coordinator `/root`, chat
+`01a14ae5-1646-7c80-b8a8-c76ba4ab5747`. Lucas's October 17 pasted request and
+October 18 noon-demonstration instruction govern engine-only work. Deadline:
+**October 18 noon Eastern / 16:00 UTC**. This compact current record supersedes
+the old October 17 checkpoint; its full history remains in Git and Task/QA.
 
-## Current baseline and ownership
+## Current source, delivery and authority
 
-- Remote main: `c644eec79752b9dc101aeca6b03141cf26854c96`, refreshed locally.
-- Primary `C:/AI/projects/AnimeRPG`: main at `771b61ac116dfa4a70d81b53a390f672aaf3bf4e`,
-  926 commits behind; tracked tree clean; three untracked files preserved.
-- Other existing worktrees: local-test at `96c25cbb6d56094b49a3e60717d150db42a9b873`,
-  director recovery at `a13c3dae28bf1745d4c13bd48269c07fd3318fc6`, R0 recovery at
-  `f43b3d385a4e6a90e7a178fcc00be57e97b7ed01`. Do not edit them.
-- Session root: `C:/Users/lucas/Documents/Codex/2026-10-17/files-pasted-by-the-user-you`.
-- Coordinator worktree: `<session-root>/work/astral-integration`, branch
-  `engine/weekend-coordinator-20261017`, created from exact current remote main.
-- Numeric owner worktree: `<session-root>/work/astral-numeric`, branch
-  `engine/numeric-repair-20261017`, same base; implementation agent
-  `/root/numeric_implementation`. Frozen repair `ec3822df1966e50c944ab064c9c694f26639445e`;
-  clean independent review and full native checks passed; coordinator cherry-pick
-  `94d4e8a7b6437bc99a64898407361dbfa1dff285`. No remote merge yet.
-- Framework worktree: `<session-root>/work/astral-framework`, branch
-  `engine/framework-containment-20261017`, deliberately based on unmerged PR 80.
-  Owner `/root/containment_implementation`. Exact PR80 full Debug build and
-  31/31 deterministic CTest passed (56.05 s). Old importer root escape locally
-  reproduced with harmless fixtures (exit 3); scoped repair is in progress.
-  Focused post-fix Debug asset suite passes; Release and independent review pending.
-- Full builds/native/GPU tests belong to coordinator and run serially. No Astral,
-  CMake, MSBuild, or R0 process was observed before the owned baseline build.
-- Chat inventory shows other active projects on this host; leave their processes,
-  RAM/GPU workloads and schedulers untouched.
+- Candidate: `work/astral-noon-integrated-demo`, branch
+  `engine/noon-integrated-demo-20261018`. Static tools were compiled from clean
+  `4f3c6cef564e94980b333daf35d9870202be8dd5`, tree
+  `1fb67a3132684bdad419383eead84aaf7f72f71d`, physical manifest `0a009fd1`.
+- ON CPU/hardware/native binaries retain original `7f6b0e05`, tree `ba17c501`,
+  index `47f2a0d4`, physical manifest `61c83e96`. All 285 build inputs are equal
+  across the documentation commit; neither later docs nor their hashes are the
+  original compile source. Final four-doc reconciliation changes no code.
+- Last actual main observation reported by root: 11:41 UTC,
+  `bfbe3a1fa589d64a4b3f1c3ad147a843e1e735ba`. This is a pinned observation,
+  not a fresh network assertion. Main includes PR107 imported CPU animation;
+  the candidate additionally cherry-picks reviewed GPU `bf8d705` as `7f6b0e05`.
+- The separate Win32 input increment is excluded. Its optional serial-F2 oracle
+  failed; later diagnostic source was reviewed but is unexecuted. Do not claim
+  the whole optional matrix or change/adopt that branch from this checkpoint.
+- Root alone admits compiler/native/GPU execution, serially, fresh 8 GiB and
+  at most two build jobs/no node reuse. Preserve foreign desktop owners and all
+  old worktrees/evidence. Do not create another scheduler; no automation change
+  is part of this record.
 
-## Refreshed candidates (unmerged)
+## Accepted bounded results
 
-| PR | Exact head | Current state |
-|---|---|---|
-| 80 | `efac9db54e8f2781c20fbb1bb9be9a0ab85f4f5c` | Framework/assets/host/players; CI green, no submitted reviews; defects B–F require repair |
-| 76 | `fa76e04f0cf3c88471bd266677589e39e26f8b01` | Conflicts; adapt engine-only numeric repairs, reconcile IsFinite signature |
-| 52 | `1b7a80715b33080372405ff357b1dafb3979d178` | CI fails before configure, run 36026761079; R0 not admitted |
-| 13 | `daf872debbba5fb775c57ab9e2e16c82bc32c13f` | Conflicting editor smoke candidate; native evidence pending |
+- CPU: independent `025f7cd2`, completion `fa2dc7c5`; D/R ALL_BUILD, 33 selected
+  suites/configuration, 17 imported cases and 18 cleaned roots/configuration,
+  CPU filters 3/1/1, safety 3/M1-M3/package-helper 19; 47 children exit 0/reaped.
+- Hardware: independent `48ac12f3`, D/R 15 cases, original fixed 1280x720 opaque
+  Unlit 4/76/22/1 workload, 120 matching frame IDs, 20 lifetime cycles and 13
+  artifacts/configuration. Current native GPU/full-frame p95 milliseconds:
+  Debug 0.146048/12.6961; Release 4.313472/12.7855, unchanged 16.67 ms limits.
+  Retained analyzer exit 1 followed by v2 exit 0 did not rerun engine tests.
+- Current bounded Release ON player and Debug ON editor GPU/CPU menu/diagnostic/
+  Stop paths closed normally. Same Debug editor loaded original animation;
+  CPU Bend/.25 poses and restored identity authoring state were observed.
+  Broad pointer/resize/hot-reload/native matrix gates remain open.
+- Static CPU Release/MT package: independent `ffc296a5`; four actual x64 tools,
+  13 exact files at `outputs/astral-noon-integrated-20261018/Package`, BuildInfo
+  and manifest bind actual 4f3c/tree1fb. Cache `noon-int-store` hashes 663652f0,
+  owner f4ad996e. Outer 43433 exit 1 followed actual package 11280 exit 0;
+  only cache type STRING-to-UNINITIALIZED changed, value MultiThreaded exact.
+  Independent bc2/0662 accepted actual /MT/PE evidence; no engine rerun/cache edit.
+- Fresh `NoonLive-01` CPU workflow: completion `88591bed`, independent
+  `b74c007d` (122 sealed evidence files/42 children) accepted real create/import/
+  Frame/transform UndoRedo/save/SaveAs cancel/save/reopen/PlayStop, editor exit 0;
+  120 simulation frames/one PNG d45e47f7/Box Y0.490; fresh package 38900 exit 0
+  with ten steps 0, and outside noargs native 59216 exit 0/maximize/restore/close.
+  F5 has no distinct reset oracle; no audible fixture or universal FPS claim.
+- Original 8056 recovery 33 files, current primary Package 13 files and source
+  627 stayed exact. Root UI evidence is live observation, no saved UI trace.
 
-Existing local-test editor candidate requires read-only inspection before any
-new editor implementation. Do not assume PR 80 or that local branch is main.
+## Next bounded actions and unpassed gates
 
-## Machine and toolchain observed
+1. Independently review/apply only four documentation paths: current noon Task,
+   current noon QA, this checkpoint and `Docs/Research/ENGINE-CAPABILITIES.json`.
+   Rebind full 627 files, 623 unchanged others, all 285 build inputs, actual new
+   index/tree and nineteen candidate-v-main paths. No final tree is invented.
+2. Root may authorize the scoped documentation commit only after resulting
+   review. Existing binaries/packages retain their original compile identities.
+   Verify fresh actual main and exact new PR head/merge/main hosted checks;
+   current candidate CI/publication/merge remains pending.
+3. Review and seal an immutable practical guide/delivery outside the repository.
+   The proposed guide uses current Package and fresh `-02` names; outputs have
+   not been changed by documentation preparation. Separate current static CPU
+   animation proof cb9d146d/c38fb86b accepted the same player PID 22844 normal 0
+   after 36.156 seconds; 11 children/26 sealed files and original/copied Content6
+   stayed exact. Root observed two distinct same-camera Bend poses, without a
+   saved visual trace. The guide adds that separate project command; no GPU/
+   audio/full-animation breadth claim follows.
 
-Windows 11 Home 10.0.26300; AMD Ryzen 9 7950X3D (16 cores/32 threads);
-31.16 GiB visible RAM, approximately 9.24 GiB initially available. RTX 5080,
-16,303 MiB VRAM (1,633 MiB used), NVIDIA driver 617.14. C: approximately 471 GiB
-free. Visual Studio 2022 Community 17.14.22, MSVC 19.44.35222, Windows SDK
-10.0.26100.0. CMake/CTest bundled with VS, not on ordinary PATH. GitHub CLI
-authenticated as repository owner; no token material retained in repository.
-Build with two jobs initially. No optional models or competing GPU tests started.
+**Whole-engine workflow/breadth gate: NOT PASSED.** Full 2D acceptance, full GPU
+materials/skinning/parity/native controls, clean-machine compatibility and the
+required immutable soak remain unaccepted. A new 24-hour soak cannot complete
+before noon. No Unreal/Unity parity or game-content restart is authorized.
 
-## Commands, results and next action
-
-Coordinator baseline configure and full Debug/Release builds succeeded (VS2022
-x64) in `<session-root>/work/build-main-baseline`. Deterministic CTest: Debug
-25/25, 53.67 seconds; Release 25/25, 4.87 seconds. Debug native smokes: 6/6,
-19.45 seconds. Release smokes also pass 6/6 (see retained log for duration).
-Logs: `<session-root>/work/baseline-{configure,debug-build,debug-test,
-release-build,release-test,debug-smoke,release-smoke}.log`.
-`test_test_safety.py`: 3/3 pass after adding VS CMake to this process's PATH;
-milestone verifiers 1–3 pass. Initial safety invocation failed because CMake was
-not on PATH; preserve both failure and `baseline-path-fixed-*` success logs.
-Numeric reproduction harness compiled successfully and exited 1 on exact main:
-member/free length infinity, normalized vector zero, NaN projection succeeds,
-idle NaN time poisons position, hierarchy translation infinity. Harness/logs:
-`<session-root>/work/numeric-evidence/`. Repaired harness passes all six checks.
-Numeric full Debug/Release builds and deterministic CTest pass 25/25 each
-(52.23/4.90 s); native smokes pass 6/6 each (18.96/19.29 s). No surviving owned
-Astral processes observed. Fixed original 320x180 CPU fixture p95 rose from
-9.1984 to 10.0937 ms (1.09733 ratio, under the predeclared 1.25 guard); images
-visually inspected, 10 changed pixels. This is a robustness/cost check, not
-general real-time or GPU acceptance. Full evidence: `Docs/QA/ENGINE-NUMERIC-2026-10-17.md`.
-Next coordinator action: final integration documentation review, push scoped
-numeric PR, verify actual head/base/merge trees and CI, merge only passing work,
-then verify integrated main. Do not blindly merge original PR76 or PR80.
-
-One read of historical PR 52 job logs via `gh api` failed because the response
-contained terminal escape sequences; a subsequent explicitly escape-tolerant
-read succeeded and retained `work/pr52-failed-job.log`. It confirms 31 tests,
-one failure: CI exercises only PR head, not both head and merge ref. Do not
-treat old CI logs as current build evidence.
-
-App heartbeat `astral-engine-weekend-implementation` is active in this chat,
-hourly at :59 through the deadline. It resumes this checkpoint and must stop
-implementation at the deadline. Initial creation without destination was
-rejected; corrected `destination=thread` creation succeeded. No other scheduler
-was changed. The app must be running for local execution.
-
-## Prioritized queue
-
-1. Establish exact-main native baseline; numeric failure reproductions and repair A.
-2. Independently review and integrate numeric repair after applicable gates.
-3. Bound adoption of PR 80 with fixes for explicit UI/modal consumption (B),
-   transactional dependency reload (C), diagnostics/recovery (D), canonical glTF
-   dependency containment (E), finite input accumulation (F). Keep original sample
-   only as existing engine validation; create no game content.
-4. Repair actual head/merge execution coverage (G), reconcile editor smoke candidate.
-   Existing editor-only adoption candidates after repaired PR80:
-   `1c3d2ddb732b48d2129a5a0150747dbe3aa55978` then
-   `96c25cbb6d56094b49a3e60717d150db42a9b873`. Skip game commits `bffe363` and
-   `abadca8` wholesale. Preserve dirty local-test work. Confirmed source gaps:
-   failed project-open loses document, untitled save confirmation, capture-loss
-   cancellation, Unicode/surrogates, keyboard traversal/DPI, project creation,
-   Play audio and dependency reload. PR13 shell predicates are obsolete for this
-   editor; preserve its process containment but test a current neutral fixture.
-5. Connect existing editor to runtime world and save/play restoration; then GPU
-   spike/ADR/backend, asset/animation integration, external projects/packaging,
-   starter walkthrough and measured hardening, dependency ordered.
-
-Workflow gate: **not passed**. 24-hour immutable-candidate soak: **not started**.
-No performance target has been measured. Long-term roadmap remains open.
+Current detailed packet: `Tasks/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md` and
+`Docs/QA/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md`. Read actual pinned evidence
+before action; never rerun an exclusive evidence writer or weaken an oracle.

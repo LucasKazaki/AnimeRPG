@@ -1,5 +1,62 @@
 # Noon integrated candidate QA
 
+## Current delivery record after the Release rehearsal
+
+Current static Release CPU delivery and the fresh-project workflow passed their
+bounded independent reviews: static `independent-static-off-actual-review.json`
+(ffc296a5), then rehearsal completion 88591bede61a300b18b45c5c1604cbf415a9a13fbfd834abbad559cd30744e45
+and `independent-actual-rehearsal-review.json` (b74c007d, 122 sealed evidence
+files/42 children). The whole-engine gate is **NOT PASSED**. This establishes
+the recorded CPU demonstration on this machine, with the limits below.
+
+The four actual static x64 Release/MT tools and 13-file primary Package were
+built from clean commit `4f3c6cef564e94980b333daf35d9870202be8dd5`, tree
+`1fb67a3132684bdad419383eead84aaf7f72f71d`, physical manifest 0a009fd1.
+All 285 production/test build inputs are unchanged from accepted ON validation
+7f6b0e05/61c83e96; ON binaries retain that original provenance. The static cache
+663652f0 and owner f4ad996e retain value MultiThreaded: the helper's untyped
+configure changed only STRING to UNINITIALIZED. Outer session 43433 exit 1
+is preserved; actual package child 11280 exited 0. The independent variance
+proof bc2/0662 admitted this metadata-only difference without an engine rerun.
+
+Fresh Basic3D creation/file-copy original-model import, Assets instantiate,
+Frame Selection, X1.5-to-2 Undo/Redo, startup save, Save As cancel with no
+Content changes, new demo save/reopen X2, CPU Play with settled Box and Stop
+restoring authored state passed. Editor PID 2468 exited 0/reaped/no timeout in
+309.531 seconds. Headless simulated 120 frames and produced one final PNG
+(d45e47f7), with tracked Box Y0.490. Fresh package PID 38900 exited 0/reaped in
+4.562 seconds; all ten internal steps passed. Its no-argument player PID 59216
+ran from an unrelated outside cwd, showed the saved geometry, maximized and
+restored, then closed normally: exit 0/reaped/no timeout, 103.594 seconds.
+F5 was sent without a distinct reset oracle; no audio fixture was verified.
+Root UI observations have no saved trace. The original editor capture-height
+record 1430 has an explicit supplement correcting it to 1429 (width 2378);
+this is window-capture metadata, without a render-size/performance inference.
+
+Source 627, old recovery 33 and primary Package 13 files remained exact.
+Final documentation scope is this Task/QA pair plus the canonical weekend
+checkpoint and capability map (four paths; nineteen candidate-v-main paths).
+Before applying/committing this final docs-only reconciliation, independently
+bind its new 627-file/tree identity, verify the other 623 files/all 285 inputs
+unchanged, and preserve the 4f3c package BuildInfo/manifest identity. Do not
+relabel packaged binaries as compiled from a later documentation commit.
+Current candidate hosted CI, merge and immutable final guide/delivery seal
+remain pending. Full 2D, full GPU/material/skinning parity, remaining native
+controls, clean-machine compatibility and the required soak remain unaccepted.
+A separate current static CPU animation-player check passed (completion
+cb9d146d, independent c38fb86b): same packaged player PID 22844, normal exit 0/
+reaped/no timeout, 36.156 seconds, 11 children/26 sealed evidence files. Original
+and copied six-file Content stayed exact. Root observed two distinct Bend poses
+at the same camera/window; there is no saved visual trace or independent viewing
+claim. GPU animation, audio and full animation breadth remain unaccepted.
+
+## Earlier integration and validation record (chronological)
+
+The record below predates the static-package/fresh-rehearsal results above.
+Its then-pending package, rehearsal and clean-commit steps are retained history;
+the current delivery record above governs status. Initial 61c83 and subsequent
+0a009 manifest/patch/receipt history remain immutable.
+
 Status: current CPU/hardware and bounded Release player accepted. Later
 editor/delivery/rehearsal/CI gates remain pending. Root created candidate 7f6b0e05, tree
 ba17c501, from exact main bfbe3a1 and unchanged reviewed GPU bf8d705. Input is
