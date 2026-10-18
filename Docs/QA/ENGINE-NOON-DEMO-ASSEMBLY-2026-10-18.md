@@ -133,3 +133,76 @@ cache, two-job/no-node-reuse build, fresh8GiB per configuration, all targets,
 exact33 deterministic suites with RuntimeSmoke/GPU excluded, safety/M1-M3 and
 the16 packaging unit cases. Native and hardware execution require later slots.
 No complete matrix or package result is asserted by this admission record.
+
+## Actual combined CPU and offscreen hardware acceptance at8867
+
+The admitted immutable revision8867bb39ee76f209c2c87b1089d0d61a9ece5439,
+treec98fb623ee88668788ae920819e97db475dd96a3, passed the complete native CPU
+matrix. All-target Debug/Release builds returned0 in30.234/70.531s. Both exact
+inventories selected33 deterministic CTest suites, all passed in106.828/7.219s.
+Seventeen self-registering engine suites totaled299 cases per configuration;
+the other16 are legacy suites. Safety3/3 passed in5.726s, milestones1–3 each0,
+and the then-current16 packaging controls passed. Fresh RAM was12.791/12.778/
+12.561GiB before configure/Debug/Release. All23 bounded recorded commands
+returned0/reaped without timeout. Full615-file/56-directory before/after source,
+HEAD/tree and clean status matched; canonical binding SHA256
+ce6115ca75bdc574e37234c81a822652c1ea2973303c33ea0dab456fee212037.
+Exact commands, actual exits, cache and binary hashes are retained under
+work/noon-combined-cpu-first. No interactive/RuntimeSmoke/GPU action ran there.
+
+Root then independently read and executed reviewed offscreen hardware runner
+deed2bb608f1b7fbdf9d90f4cd401cff8da1ab46cfe3235b9f57701a700494a5
+in a separate exclusive slot. Same source8867 stayed clean and byte-identical.
+Both configurations passed anchored D3D11 ten +Graphics sixteen cases,2/2 CTests
+in31.640/7.672s, including13 invalid comparison children exiting3 and2 finite
+controls exiting0. Both affected target builds returned0 in3.047/3.140s.
+Actual RTX5080 vendor10de/device2c02/LUID73259/featureb000/debugLayer1 was used.
+All unchanged coverage/RGB/depth/recovery/resource/20-cycle budgets passed.
+
+For the explicitly tiny fixed720p workload (2draws,28vertices,14triangles,
+1texture,30warm/120measured), Debug/Release GPU p95 was0.020512/0.019648ms;
+synchronous total including CPU upload/readback was69.6256/17.3454ms against the
+existing100ms bound. Release prepare/upload p95=2.6243ms, completion/readback
+p95=14.8589ms. Private bytes at the fixed run were219062272/225542144; logical
+count11/40553400bytes. Release DXGI local usage56193024/budget15947792384.
+These are reported sample aggregates, not exported per-frame samples or a
+general-game/60Hz/native-presentation result. Driver live-object baseline and
+physical device-removal behavior remain unverified by this offscreen pass.
+
+Evidence work/noon-combined-hardware-first retains exact command/source/cache/
+binary/memory metadata, verbose logs and14 actual PNGs. Root visually inspected
+the7 distinct Debug images (CPU/GPU/difference/IDs and3 Graphics references);
+the matching7 Release files are byte-identical by actual SHA256 comparison.
+Geometry, texture/depth and sparse amplified difference output were coherent.
+Every recorded command returned0/reaped without timeout; final owned process
+query was empty. The reused cache deliberately now has hardware tests ON, so
+subsequent CPU admission must turn that option OFF or exclude the GPU label.
+
+## Actual first package blocker and accepted narrow follow-ups
+
+The real static Release four-tool package attempt at8867 configured0/3.359s and
+built all four tools0/57.594s. The actual dumpbin command0 emitted dependency
+names followed by SECTION HEADER #3 before Summary; the strict combined-output
+parser rejected it. Overall child1/reaped/noTimeout61.953s is retained in
+work/noon-package-supervision-first and work/noon-package-first. No destination
+was reserved. Root preserved this failure and captured8 separate actual headers/
+dependents reports, each0/reaped with unchanged EXE hashes, under
+work/noon-package-pe-format-first. A corrected real package has not run yet.
+
+The independently verified editor reopen86cd91a normal-merged as034009c without
+conflicts after the8867 hardware source binding completed. Exactly its4 paths
+are adopted: two current-Error guards, six meaningful original/recovery fixtures
+and Task/QA. Four safe old failures/two controls preceded production. Component
+D/R five targets and four suites all passed (Editor30), safety3/M1–3; exact full
+patch71a3b7c711ed3485d8e02241a85007b3be86a86fdcf1c427b8b37c0fb5099286.
+DraftPR104 is attached. The combined editor and real package still need the
+subsequent source-bound checks; earlier8867 acceptance does not validate new code.
+
+The separate four-path PE-format correction was independently reviewed against
+actual output. Its OLD unit reproduced the sameSECTION failure; final19 controls,
+safety3 and M1–3 passed with the parser/allowlist unchanged. The only production
+change makes two real dumpbin calls and concatenates headers before dependents.
+Root is integrating that accepted packet before the next real package attempt.
+No mocked fixture constitutes a real package or native acceptance. Validation
+staging is C:/AI/astral-demo; accepted delivery copies may later go under session
+outputs with the exact manifest preserved. Full workflow remains NOT PASSED.
