@@ -38,3 +38,13 @@ all-target acceptance remains pending; this focused result authorizes only the
 reviewed merge resolution.
 Native-player, Host-ingress and packaging packets remain separately owned.
 No R0, GPU presentation, clean-machine or24hour-soak result exists here.
+
+Next, normal D3D11 backend1c370c4 merge conflicted only at root Runtime
+construction. Resolution keeps Creator's shared Runtime helper, followed by the
+unchanged opt-in backend targets/options from the reviewed GPU parent; the
+duplicate old Runtime construction is removed. Backend sources, tests, workflow
+and packet records are unchanged from the GPU commit. Independent runtime-owner
+resolution review is clean: exact incoming GPU sources/options/tests and one
+shared Runtime helper invocation, with creator/editor consumers retained.
+Combined compile remains pending. Offscreen hardware acceptance still
+does not establish editor/player GPU presentation.
