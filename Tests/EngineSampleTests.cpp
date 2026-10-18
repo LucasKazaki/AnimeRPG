@@ -1040,4 +1040,193 @@ ASTRAL_TEST(ProjectSceneOnCreateSeesFinalProjectSettings) {
     ProjectCreateProbe::host = nullptr;
 }
 
+namespace {
+
+struct ProjectIngressDirectory {
+    std::filesystem::path parent, path;
+    ProjectIngressDirectory() {
+        parent = std::filesystem::canonical(std::filesystem::temp_directory_path());
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        for (int attempt = 0; attempt < 100; ++attempt) {
+            const auto candidate = parent / ("astral_project_ingress_" + std::to_string(stamp) + "_" + std::to_string(attempt));
+            std::error_code error;
+            if (std::filesystem::create_directory(candidate, error)) {
+                path = std::filesystem::canonical(candidate);
+                break;
+            }
+            ASTRAL_CHECK(!error);
+        }
+        ASTRAL_CHECK(!path.empty() && path.parent_path() == parent);
+        std::printf("fresh project ingress root: %s\n", path.u8string().c_str());
+    }
+    ~ProjectIngressDirectory() {
+        std::error_code error;
+        const auto current = std::filesystem::weakly_canonical(path, error);
+        if (!error && current == path && path.parent_path() == parent
+            && path.filename().u8string().find("astral_project_ingress_") == 0) {
+            std::filesystem::remove_all(path, error); // only this fixture's exclusively created canonical root
+        }
+    }
+};
+
+struct ProjectIngressFixture {
+    ProjectIngressDirectory directory;
+    std::unique_ptr<GameHost> host;
+    Framework::GameWorld* originalWorld{};
+    std::string bindings;
+    float held{};
+    int notifications{};
+
+    ProjectIngressFixture() {
+        WriteText(File("keep.scene.json"), R"({"entities":[{"name":"Keep","components":{"Camera":{}}}]})");
+        WriteText(File("next.scene.json"), R"({"entities":[{"name":"Replacement","components":{"Camera":{}}}]})");
+        Framework::HostSettings settings;
+        settings.contentRoot = directory.path.u8string();
+        settings.workerThreads = 0;
+        settings.audio = false;
+        host = std::make_unique<GameHost>(settings);
+        host->Commands().RegisterInt("project.observed", 1, "neutral ingress setting");
+        host->Commands().RegisterFloat("project.edge", 0.5f, "finite numeric ingress setting");
+        auto project = TransactionProject("Original", "keep.scene.json", 'W');
+        project.config = {{"r.Quality", "1"}, {"project.observed", "1"}};
+        std::string error;
+        ASTRAL_CHECK(host->ApplyProject(project, error));
+        host->Commands().Find("r.Quality")->OnChanged([this](const Core::ConsoleVariable&) { ++notifications; });
+        host->Commands().Find("project.observed")->OnChanged([this](const Core::ConsoleVariable&) { ++notifications; });
+        host->Update(kFrame, Hold({"W"}));
+        originalWorld = &host->World();
+        bindings = host->Input().SaveBindings();
+        held = host->Input().HeldSeconds("Move");
+        ASTRAL_CHECK(host->Input().Down("Move") && host->Input().Pressed("Move"));
+    }
+    ~ProjectIngressFixture() { host.reset(); }
+    std::string File(const char* relative) const { return (directory.path / relative).u8string(); }
+    Core::JsonValue Candidate() const {
+        auto json = Core::JsonValue::MakeObject();
+        json.Set("format", "astral-project");
+        json.Set("version", 1);
+        json.Set("name", "Candidate");
+        json.Set("startupScene", "next.scene.json");
+        auto config = Core::JsonValue::MakeObject();
+        config.Set("r.Quality", 0);
+        config.Set("project.observed", 9);
+        json.Set("config", config);
+        return json;
+    }
+    void WriteProject(const Core::JsonValue& json) const { WriteText(File("project.json"), Core::WriteJson(json)); }
+    void CheckPreserved() const {
+        ASTRAL_CHECK(&host->World() == originalWorld && !host->World().Find("Keep").IsNull());
+        ASTRAL_CHECK(host->Project().name == "Original" && host->Project().startupScene == "keep.scene.json"
+            && host->ScenePath() == "keep.scene.json");
+        const std::vector<std::pair<std::string, std::string>> originalConfig{{"r.Quality", "1"}, {"project.observed", "1"}};
+        ASTRAL_CHECK(host->Project().config == originalConfig && host->Project().input.size() == 1
+            && host->Project().input[0].name == "Original");
+        ASTRAL_CHECK(host->Input().SaveBindings() == bindings && host->Input().Down("Move")
+            && host->Input().Pressed("Move") && host->Input().HeldSeconds("Move") == held);
+        ASTRAL_CHECK(host->Commands().Find("r.Quality")->GetInt() == 1
+            && host->Commands().Find("project.observed")->GetInt() == 1
+            && host->Commands().Find("project.edge")->GetFloat() == 0.5f && notifications == 0);
+    }
+    void CheckCandidate() const {
+        ASTRAL_CHECK(host->Project().name == "Candidate" && host->ScenePath() == "next.scene.json"
+            && !host->World().Find("Replacement").IsNull() && host->LastError().empty());
+        ASTRAL_CHECK(host->Project().input.empty() && !host->Input().Down("Move"));
+        ASTRAL_CHECK(host->Commands().Find("r.Quality")->GetInt() == 0
+            && host->Commands().Find("project.observed")->GetInt() == 9 && notifications == 2);
+    }
+};
+
+void CheckFailedCachedProject(bool deleted) {
+    ProjectIngressFixture fixture;
+    fixture.WriteProject(fixture.Candidate());
+    const auto cached = fixture.host->Assets().Load<Core::JsonValue>("project.json");
+    ASTRAL_CHECK(cached.Ready() && cached.Error().empty());
+    const auto version = cached.Version();
+    const auto attempt = cached.Attempt();
+    if (deleted) ASTRAL_CHECK(std::filesystem::remove(fixture.File("project.json")));
+    else WriteText(fixture.File("project.json"), "{");
+    ASTRAL_CHECK(fixture.host->Assets().Reload("project.json"));
+    ASTRAL_CHECK(cached.Ready() && !cached.Error().empty() && cached.Version() == version && cached.Attempt() > attempt);
+    std::string error;
+    const bool accepted = fixture.host->LoadProject("project.json", error);
+    std::printf("cached project deleted=%d ready=%d version=%u attempt=%llu error='%s' accepted=%d project='%s'\n",
+        deleted, cached.Ready(), cached.Version(), static_cast<unsigned long long>(cached.Attempt()),
+        cached.Error().c_str(), accepted, fixture.host->Project().name.c_str());
+    std::fflush(stdout);
+    ASTRAL_CHECK(!accepted); // OLD fails safely here after applying stale valid data
+    ASTRAL_CHECK(!error.empty() && error.find("project.json") != std::string::npos && !fixture.host->LastError().empty());
+    fixture.CheckPreserved();
+    fixture.WriteProject(fixture.Candidate());
+    ASTRAL_CHECK(fixture.host->Assets().Reload("project.json") && cached.Ready() && cached.Error().empty());
+    ASTRAL_CHECK(fixture.host->LoadProject("project.json", error) && error.empty());
+    fixture.CheckCandidate();
+}
+
+void CheckProjectNumericLoad(double candidate, float expected, bool range = false) {
+    ProjectIngressFixture fixture;
+    auto* edge = fixture.host->Commands().Find("project.edge");
+    if (range) edge->SetRange(0, 10);
+    auto json = fixture.Candidate();
+    json.Find("config")->Set("project.edge", candidate);
+    fixture.WriteProject(json);
+    std::string error;
+    const bool accepted = fixture.host->LoadProject("project.json", error);
+    std::printf("numeric project %.17g range=%d accepted=%d error='%s'\n", candidate, range, accepted, error.c_str());
+    std::fflush(stdout);
+    ASTRAL_CHECK(accepted); // no Float getter until a real project load has safely succeeded
+    ASTRAL_CHECK(error.empty() && edge->GetFloat() == expected);
+    fixture.CheckCandidate();
+}
+
+} // namespace
+
+ASTRAL_TEST(ProjectLoadRejectsCachedSyntaxFailure) { CheckFailedCachedProject(false); }
+ASTRAL_TEST(ProjectLoadRejectsCachedDeletion) { CheckFailedCachedProject(true); }
+ASTRAL_TEST(ProjectPositiveFloatBoundaryLoads) {
+    CheckProjectNumericLoad(static_cast<double>(std::numeric_limits<float>::max()), std::numeric_limits<float>::max());
+}
+ASTRAL_TEST(ProjectNegativeFloatBoundaryLoads) {
+    CheckProjectNumericLoad(-static_cast<double>(std::numeric_limits<float>::max()), -std::numeric_limits<float>::max());
+}
+
+ASTRAL_TEST(ProjectCurrentCachedDataAndRecoveryLoad) {
+    ProjectIngressFixture fixture;
+    fixture.WriteProject(fixture.Candidate());
+    const auto cached = fixture.host->Assets().Load<Core::JsonValue>("project.json");
+    ASTRAL_CHECK(cached.Ready() && cached.Error().empty());
+    std::string error;
+    ASTRAL_CHECK(fixture.host->LoadProject("project.json", error));
+    fixture.CheckCandidate();
+    const auto version = cached.Version();
+    WriteText(fixture.File("project.json"), "{");
+    ASTRAL_CHECK(fixture.host->Assets().Reload("project.json") && cached.Ready() && !cached.Error().empty());
+    auto recovered = fixture.Candidate();
+    recovered.Set("name", "Recovered");
+    fixture.WriteProject(recovered);
+    ASTRAL_CHECK(fixture.host->Assets().Reload("project.json") && cached.Error().empty() && cached.Version() > version);
+    ASTRAL_CHECK(fixture.host->LoadProject("project.json", error) && error.empty() && fixture.host->Project().name == "Recovered");
+    ASTRAL_CHECK(!fixture.host->World().Find("Replacement").IsNull() && fixture.host->LastError().empty());
+}
+
+ASTRAL_TEST(ProjectOrdinaryFloatUnderflowAndClampingLoad) {
+    CheckProjectNumericLoad(0.1, 0.1f);
+    CheckProjectNumericLoad(1e-100, 0.0f);
+    CheckProjectNumericLoad(static_cast<double>(std::numeric_limits<float>::denorm_min()), std::numeric_limits<float>::denorm_min());
+    CheckProjectNumericLoad(1e100, 10.0f, true);
+    CheckProjectNumericLoad(-1e100, 0.0f, true);
+}
+
+ASTRAL_TEST(ProjectOutOfRangeFloatRejectsWithoutMutation) {
+    for (double candidate : {1e100, -1e100}) {
+        ProjectIngressFixture fixture;
+        auto json = fixture.Candidate();
+        json.Find("config")->Set("project.edge", candidate);
+        fixture.WriteProject(json);
+        std::string error;
+        ASTRAL_CHECK(!fixture.host->LoadProject("project.json", error));
+        ASTRAL_CHECK(error.find("project.edge") != std::string::npos);
+        fixture.CheckPreserved();
+    }
+}
+
 ASTRAL_TEST_MAIN("EngineSampleTests")
