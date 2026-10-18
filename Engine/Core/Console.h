@@ -49,6 +49,7 @@ public:
 
 private:
     friend class ConsoleRegistry;
+    bool NormalizeNumber(double value, double minimum, double maximum, double& normalized) const;
     void Notify();
     std::string name_, help_;
     CVarType type_{CVarType::Int};

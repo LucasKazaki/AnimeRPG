@@ -402,4 +402,219 @@ ASTRAL_TEST(SceneRejectsUnrepresentableReflectedRuntimeScalars) {
     }
 }
 
+ASTRAL_TEST(CVarFloatParsingRejectsUnrepresentableBeforeRead) {
+    for (const char* text : {"1e100", "-1e100"}) {
+        ConsoleRegistry console;
+        auto* value = console.RegisterFloat("FloatDestination", 0.5f, "original neutral value");
+        int notifications = 0;
+        value->OnChanged([&](const ConsoleVariable&) { ++notifications; }); // no candidate getter
+        std::string error;
+        const bool accepted = value->SetFromString(text, error);
+        std::printf("float parse '%s': accepted=%d callbacks=%d\n", text, accepted, notifications);
+        std::fflush(stdout);
+        ASTRAL_CHECK(!accepted); // old aborts here, before GetFloat can narrow unsafe storage
+        ASTRAL_CHECK(!error.empty() && notifications == 0);
+        ASTRAL_CHECK(value->GetFloat() == 0.5f);
+    }
+}
+
+ASTRAL_TEST(CVarDirectIntSetRejectsUnrepresentableBeforeRead) {
+    const double invalid[] = {2147483648.0, -2147483649.0, 1e100, -1e100};
+    for (double candidate : invalid) {
+        ConsoleRegistry console;
+        auto* value = console.RegisterInt("IntDestination", 2, "original neutral value");
+        int notifications = 0;
+        value->OnChanged([&](const ConsoleVariable&) { ++notifications; });
+        value->Set(candidate);
+        std::printf("direct Int %.17g: callbacks=%d\n", candidate, notifications);
+        std::fflush(stdout);
+        ASTRAL_CHECK(notifications == 0); // no GetInt/format cast of the old unsafe candidate
+        ASTRAL_CHECK(value->GetInt() == 2);
+    }
+}
+
+ASTRAL_TEST(CVarDirectFloatSetRejectsUnrepresentableBeforeRead) {
+    for (double candidate : {1e100, -1e100}) {
+        ConsoleRegistry console;
+        auto* value = console.RegisterFloat("FloatDestination", 0.5f, "original neutral value");
+        int notifications = 0;
+        value->OnChanged([&](const ConsoleVariable&) { ++notifications; });
+        value->Set(candidate);
+        std::printf("direct Float %.17g: callbacks=%d\n", candidate, notifications);
+        std::fflush(stdout);
+        ASTRAL_CHECK(notifications == 0); // old aborts before any unsafe Float conversion
+        ASTRAL_CHECK(value->GetFloat() == 0.5f);
+    }
+}
+
+ASTRAL_TEST(CVarRangeRejectsUnsafeEffectiveValuesBeforeRead) {
+    for (bool integer : {true, false}) {
+        ConsoleRegistry console;
+        auto* value = integer ? console.RegisterInt("Destination", 2, "")
+                              : console.RegisterFloat("Destination", 2.0f, "");
+        int notifications = 0;
+        value->OnChanged([&](const ConsoleVariable&) { ++notifications; });
+        value->SetRange(integer ? 3e9 : 1e100, integer ? 4e9 : 2e100);
+        std::printf("range %s: callbacks=%d\n", integer ? "Int" : "Float", notifications);
+        std::fflush(stdout);
+        ASTRAL_CHECK(notifications == 0); // first prove rejection before a typed getter
+        if (integer) ASTRAL_CHECK(value->GetInt() == 2);
+        else ASTRAL_CHECK(value->GetFloat() == 2.0f);
+        value->Set(8.0); // rejected SetRange must also preserve the original usable range
+        ASTRAL_CHECK(notifications == 1);
+        if (integer) ASTRAL_CHECK(value->GetInt() == 8);
+        else ASTRAL_CHECK(value->GetFloat() == 8.0f);
+    }
+}
+
+ASTRAL_TEST(CVarRegistrationRejectsNonfiniteFloatDefaultsBeforeRead) {
+    const float invalid[] = {std::numeric_limits<float>::quiet_NaN(),
+        std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()};
+    for (float candidate : invalid) {
+        ConsoleRegistry console;
+        const auto* value = console.RegisterFloat("RejectedDefault", candidate, "");
+        ASTRAL_CHECK(value == nullptr); // no getter of an old nonfinite default
+        ASTRAL_CHECK(console.Find("RejectedDefault") == nullptr);
+    }
+}
+
+ASTRAL_TEST(CVarIntAcceptsTheFullLowerBoundarySpelling) {
+    ConsoleRegistry console;
+    auto* value = console.RegisterInt("IntBoundary", 2, "");
+    std::string error;
+    ASTRAL_CHECK(value->SetFromString("-2147483648.0", error));
+    ASTRAL_CHECK(value->GetInt() == std::numeric_limits<int>::lowest());
+    ASTRAL_CHECK(value->SetFromString("2147483647.0", error));
+    ASTRAL_CHECK(value->GetInt() == std::numeric_limits<int>::max());
+}
+
+ASTRAL_TEST(CVarNumericIngressKeepsUsefulClampRoundingAndUnderflow) {
+    ConsoleRegistry console;
+    auto* ranged = console.RegisterFloat("RangedFloat", 0.5f, "");
+    ranged->SetRange(0, 10);
+    std::string error;
+    ASTRAL_CHECK(ranged->SetFromString("1e100", error) && ranged->GetFloat() == 10.0f);
+    ranged->Set(-1e100);
+    ASTRAL_CHECK(ranged->GetFloat() == 0.0f);
+    auto* value = console.RegisterFloat("OrdinaryFloat", 0.5f, "");
+    ASTRAL_CHECK(value->SetFromString("0.1", error) && value->GetFloat() == 0.1f);
+    ASTRAL_CHECK(value->SetFromString("1e-100", error));
+    const float underflow = value->GetFloat();
+    ASTRAL_CHECK(std::isfinite(underflow) && underflow >= 0 && underflow <= std::numeric_limits<float>::denorm_min());
+    auto* integer = console.RegisterInt("RangedInt", 2, "");
+    integer->SetRange(0, 10);
+    integer->Set(1e100);
+    ASTRAL_CHECK(integer->GetInt() == 10);
+    integer->Set(2.6);
+    ASTRAL_CHECK(integer->GetInt() == 3);
+    ASTRAL_CHECK(integer->SetFromString("1e100", error) && integer->GetInt() == 10);
+    ASTRAL_CHECK(integer->SetFromString("-9223372036854775809", error) && integer->GetInt() == 0);
+    integer->Reset();
+    ASTRAL_CHECK(integer->GetInt() == 2);
+}
+
+ASTRAL_TEST(CVarWideFiniteRangesPreserveSafeValuesAndReset) {
+    ConsoleRegistry console;
+    auto* value = console.RegisterFloat("WideFloat", 0.5f, "");
+    value->SetRange(-1e100, 1e100); // wide endpoints are valid while the effective value is safe
+    std::string error;
+    ASTRAL_CHECK(value->SetFromString("1.25", error) && value->GetFloat() == 1.25f);
+    ASTRAL_CHECK(!value->SetFromString("1e100", error) && value->GetFloat() == 1.25f);
+    value->Reset();
+    ASTRAL_CHECK(value->GetFloat() == 0.5f);
+    value->SetRange(2, 10);
+    ASTRAL_CHECK(value->GetFloat() == 2);
+    value->Set(8.0);
+    value->Reset(); // default is normalized through the current range
+    ASTRAL_CHECK(value->GetFloat() == 2);
+    auto* integer = console.RegisterInt("IntLimits", 0, "");
+    integer->SetRange(-1e100, 1e100);
+    integer->Set(static_cast<double>(std::numeric_limits<int>::lowest()));
+    ASTRAL_CHECK(integer->GetInt() == std::numeric_limits<int>::lowest());
+    integer->Set(static_cast<double>(std::numeric_limits<int>::max()));
+    ASTRAL_CHECK(integer->GetInt() == std::numeric_limits<int>::max());
+    integer->Set(2147483647.6); // rounding, followed by destination check
+    ASTRAL_CHECK(integer->GetInt() == std::numeric_limits<int>::max());
+}
+
+ASTRAL_TEST(CVarFloatArchiveRoundTripsBothFiniteDestinationBoundaries) {
+    const double candidates[] = {static_cast<double>(std::numeric_limits<float>::max()),
+        -static_cast<double>(std::numeric_limits<float>::max()), 0.1, 1e-100,
+        static_cast<double>(std::numeric_limits<float>::denorm_min())};
+    for (double candidate : candidates) {
+        const float boundary = static_cast<float>(candidate); // all candidates are valid finite Float inputs
+        ConsoleRegistry source;
+        auto* original = source.RegisterFloat("FloatBoundary", 0.0f, "", CVarArchive);
+        original->Set(candidate);
+        ASTRAL_CHECK(original->GetFloat() == boundary);
+        const std::string saved = source.SaveConfig();
+        ASTRAL_CHECK(!saved.empty());
+        if (candidate == 0.1) ASTRAL_CHECK(saved == "FloatBoundary = 0.1\n");
+        if (candidate == 1e-100) ASTRAL_CHECK(saved == "FloatBoundary = 1e-100\n");
+        ConsoleRegistry destination;
+        auto* restored = destination.RegisterFloat("FloatBoundary", 0.5f, "", CVarArchive);
+        std::string error;
+        const bool accepted = destination.LoadConfig(saved, error);
+        std::printf("Float boundary archive '%s': accepted=%d error='%s'\n", saved.c_str(), accepted, error.c_str());
+        std::fflush(stdout);
+        ASTRAL_CHECK(accepted); // no matching getter until the load has safely succeeded
+        ASTRAL_CHECK(error.empty() && restored->GetFloat() == boundary);
+    }
+}
+
+ASTRAL_TEST(CVarConfigRejectsUnrepresentableFloatBeforeRead) {
+    ConsoleRegistry console;
+    auto* first = console.RegisterFloat("First", 0.25f, "");
+    auto* second = console.RegisterFloat("Second", 0.5f, "");
+    int notifications = 0;
+    first->OnChanged([&](const ConsoleVariable&) { ++notifications; });
+    second->OnChanged([&](const ConsoleVariable&) { ++notifications; });
+    std::string error;
+    ASTRAL_CHECK(!console.LoadConfig("First = 1\nSecond = 1e100\n", error));
+    ASTRAL_CHECK(!error.empty() && notifications == 0);
+    ASTRAL_CHECK(first->GetFloat() == 0.25f && second->GetFloat() == 0.5f);
+}
+
+ASTRAL_TEST(CVarDeferredFloatConfigKeepsRepresentableDefaultBeforeRead) {
+    ConsoleRegistry console;
+    std::string error;
+    ASTRAL_CHECK(console.LoadConfig("Deferred = 1e100\n", error));
+    auto* value = console.RegisterFloat("Deferred", 0.5f, "");
+    ASTRAL_CHECK(value != nullptr);
+    // Float GetString formats its double directly; no GetFloat narrowing or
+    // Int formatter cast is used to inspect the old deferred unsafe state.
+    ASTRAL_CHECK(value->GetString() == "0.5" && value->DefaultString() == "0.5");
+    ASTRAL_CHECK(value->GetFloat() == 0.5f);
+    value->Set(0.75);
+    value->Reset();
+    ASTRAL_CHECK(value->GetFloat() == 0.5f);
+}
+
+ASTRAL_TEST(CVarExistingFloatRegistrationIgnoresAnUnusedInvalidDefault) {
+    ConsoleRegistry console;
+    auto* original = console.RegisterFloat("Existing", 0.5f, "");
+    ASTRAL_CHECK(console.RegisterFloat("Existing", std::numeric_limits<float>::quiet_NaN(), "ignored") == original);
+    ASTRAL_CHECK(original->DefaultString() == "0.5" && original->GetFloat() == 0.5f);
+    original->Set(0.75);
+    original->Reset();
+    ASTRAL_CHECK(original->GetFloat() == 0.5f);
+}
+
+ASTRAL_TEST(CVarRangesRejectNonfiniteBoundsWithoutLosingTheOldRange) {
+    const double infinity = std::numeric_limits<double>::infinity();
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    for (const auto& bounds : std::vector<std::pair<double, double>>{
+             {infinity, infinity}, {-infinity, -infinity}, {-infinity, infinity}, {nan, 10}, {0, nan}}) {
+        ConsoleRegistry console;
+        auto* value = console.RegisterFloat("FiniteRange", 2, "");
+        value->SetRange(0, 10);
+        int notifications = 0;
+        value->OnChanged([&](const ConsoleVariable&) { ++notifications; });
+        value->SetRange(bounds.first, bounds.second);
+        ASTRAL_CHECK(notifications == 0); // never read an old nonfinite forced value
+        value->Set(11.0);
+        ASTRAL_CHECK(value->GetFloat() == 10.0f && notifications == 1);
+    }
+}
+
 ASTRAL_TEST_MAIN("EngineServicesTests")

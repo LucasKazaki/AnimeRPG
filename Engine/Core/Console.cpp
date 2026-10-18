@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdio>
+#include <limits>
 #include <utility>
 
 namespace Astral::Core {
@@ -56,7 +57,19 @@ std::string FormatNumber(CVarType type, double value) {
     switch (type) {
     case CVarType::Bool: return value != 0.0 ? "true" : "false";
     case CVarType::Int: std::snprintf(buffer, sizeof(buffer), "%lld", static_cast<long long>(value)); return buffer;
-    default: std::snprintf(buffer, sizeof(buffer), "%.9g", value); return buffer;
+    default: {
+        std::snprintf(buffer, sizeof(buffer), "%.9g", value);
+        double rounded = 0.0;
+        // Nine digits normally preserve Float display. At the finite boundary
+        // they can round the decimal beyond FLT_MAX, making our own config
+        // unsafe to reload. Preserve enough of the stored double in that case.
+        if (!ParseDouble(buffer, rounded)
+            || rounded < -static_cast<double>(std::numeric_limits<float>::max())
+            || rounded > static_cast<double>(std::numeric_limits<float>::max())) {
+            std::snprintf(buffer, sizeof(buffer), "%.17g", value);
+        }
+        return buffer;
+    }
     }
 }
 
@@ -127,21 +140,23 @@ bool ConsoleVariable::SetFromString(std::string_view text, std::string& error) {
         return true;
     }
     case CVarType::Int: {
-        long long value = 0;
-        if (!ParseInt(text, value)) {
+        long long integer = 0;
+        double value = 0.0;
+        if (ParseInt(text, integer)) {
+            value = static_cast<double>(integer);
+        } else {
             // Accept an integral float spelling ("2.0").
-            double d = 0.0;
-            if (!ParseDouble(text, d) || std::floor(d) != d || std::fabs(d) > 2147483647.0) {
+            if (!ParseDouble(text, value) || std::floor(value) != value) {
                 error = name_ + " expects an integer";
                 return false;
             }
-            value = static_cast<long long>(d);
         }
-        if (value > 2147483647LL || value < -2147483648LL) {
+        double normalized = 0.0;
+        if (!NormalizeNumber(value, minimum_, maximum_, normalized)) {
             error = name_ + " is out of the int range";
             return false;
         }
-        Set(static_cast<double>(value));
+        Set(normalized);
         return true;
     }
     case CVarType::Float: {
@@ -150,18 +165,37 @@ bool ConsoleVariable::SetFromString(std::string_view text, std::string& error) {
             error = name_ + " expects a number";
             return false;
         }
-        Set(value);
+        double normalized = 0.0;
+        if (!NormalizeNumber(value, minimum_, maximum_, normalized)) {
+            error = name_ + " is out of the float range";
+            return false;
+        }
+        Set(normalized);
         return true;
     }
     }
     return false;
 }
 
-void ConsoleVariable::Set(double value) {
-    if (type_ == CVarType::String || !std::isfinite(value)) return;
-    value = std::clamp(value, minimum_, maximum_);
+bool ConsoleVariable::NormalizeNumber(double value, double minimum, double maximum, double& normalized) const {
+    if (type_ == CVarType::String || !std::isfinite(value)) return false;
+    value = std::clamp(value, minimum, maximum);
     if (type_ == CVarType::Int) value = std::round(value);
     if (type_ == CVarType::Bool) value = value != 0.0 ? 1.0 : 0.0;
+    if (type_ == CVarType::Int
+        && (value < static_cast<double>(std::numeric_limits<int>::lowest())
+            || value > static_cast<double>(std::numeric_limits<int>::max()))) return false;
+    if (type_ == CVarType::Float
+        && (value < -static_cast<double>(std::numeric_limits<float>::max())
+            || value > static_cast<double>(std::numeric_limits<float>::max()))) return false;
+    normalized = value;
+    return true;
+}
+
+void ConsoleVariable::Set(double value) {
+    double normalized = 0.0;
+    if (!NormalizeNumber(value, minimum_, maximum_, normalized)) return;
+    value = normalized;
     if (value == number_) return;
     number_ = value;
     Notify();
@@ -184,10 +218,15 @@ void ConsoleVariable::Reset() {
 }
 
 void ConsoleVariable::SetRange(double minimum, double maximum) {
-    if (!(minimum <= maximum)) return;
+    if (!std::isfinite(minimum) || !std::isfinite(maximum) || !(minimum <= maximum)) return;
+    double normalized = 0.0;
+    if (type_ != CVarType::String && !NormalizeNumber(number_, minimum, maximum, normalized)) return;
     minimum_ = minimum;
     maximum_ = maximum;
-    if (type_ != CVarType::String) Set(number_);
+    if (type_ != CVarType::String && normalized != number_) {
+        number_ = normalized;
+        Notify();
+    }
 }
 
 void ConsoleVariable::Notify() {
@@ -208,6 +247,9 @@ ConsoleRegistry& ConsoleRegistry::Global() {
 ConsoleVariable* ConsoleRegistry::Register(std::string name, CVarType type, double number, std::string text,
     std::string help, std::uint32_t flags) {
     if (ConsoleVariable* existing = Find(name)) return existing->type_ == type ? existing : nullptr;
+    if (type == CVarType::Float && (!std::isfinite(number)
+        || number < -static_cast<double>(std::numeric_limits<float>::max())
+        || number > static_cast<double>(std::numeric_limits<float>::max()))) return nullptr;
     auto variable = std::make_unique<ConsoleVariable>();
     variable->name_ = name;
     variable->help_ = std::move(help);
