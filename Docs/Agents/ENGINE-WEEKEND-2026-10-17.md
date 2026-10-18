@@ -6,7 +6,40 @@ October 18 noon-demonstration instruction govern engine-only work. Deadline:
 **October 18 noon Eastern / 16:00 UTC**. This compact current record supersedes
 the old October 17 checkpoint; its full history remains in Git and Task/QA.
 
-## Current source, delivery and authority
+## Current postmerge handoff — October 18, 12:41 UTC
+
+PR [109](https://github.com/LucasKazaki/AnimeRPG/pull/109) merged at
+12:26:12 UTC. Actual main is `c8ec735cf7b3e706a587c32f6b7800e055308a0f`,
+tree `8c19a1e972ed40b0fc927c0fa537247e3a4c3644`; its parents are bfbe3a1 and
+reviewed head `9c821820d9af8e45e5bd9eeac721f936054a8a15`. Root accepted all
+11 exact PR checks and all eight actual main-push checks. Main acceptance
+`616eb11b` (12:41:20 UTC), independent review `5b22791f`, verification `9a23ed82`
+are retained under `work/combined-main-c8ec-hosted-ready/`.
+These are actual accepted receipts, not a proposed-merge or running-CI claim.
+
+The 285 build inputs and Engine tree `7eb81174418a369c8cbad1f1b9a145a25b5e98c9`
+are unchanged. Static binaries retain 4f3c/tree1fb/physical0a; ON binaries retain
+7f6/treeba/index47f2/physical61c83. The later 9c documentation head and main c8ec
+are not new compile identities. Accepted CPU workflow b74c007d and portable CPU
+Bend/.25 playback cb9d146d/c38fb86b retain their bounded/root-attributed scopes.
+Whole-engine, full GPU/parity/native controls, genuine 2D, audio, distinct F5
+reset, clean-machine compatibility and the required soak remain unaccepted.
+
+Next: independently review and publish only this two-document canonical handoff,
+then finish the external delivery freeze. This handoff's own PR/CI remains pending.
+Guide text `18826496` is accepted; final delivery archive and seal remain
+planned, without an invented hash or acceptance.
+Preserve primary Package13, Animation Content6, old recovery33 and all evidence.
+Root retains exclusive execution authority; no feature or engine/native replay is
+admitted by this metadata packet.
+
+## Historical premerge checkpoint
+
+The sections below preserve the pre-9c reconciliation. Their old main observation,
+branch-only/CI-pending text and next actions are history; the current handoff above
+governs. Accepted bounded measurements keep their original provenance and limits.
+
+## Premerge source, delivery and authority
 
 - Candidate: `work/astral-noon-integrated-demo`, branch
   `engine/noon-integrated-demo-20261018`. Static tools were compiled from clean
@@ -57,7 +90,7 @@ the old October 17 checkpoint; its full history remains in Git and Task/QA.
 - Original 8056 recovery 33 files, current primary Package 13 files and source
   627 stayed exact. Root UI evidence is live observation, no saved UI trace.
 
-## Next bounded actions and unpassed gates
+## Premerge next actions and unpassed gates (historical)
 
 1. Independently review/apply only four documentation paths: current noon Task,
    current noon QA, this checkpoint and `Docs/Research/ENGINE-CAPABILITIES.json`.
@@ -81,6 +114,6 @@ materials/skinning/parity/native controls, clean-machine compatibility and the
 required immutable soak remain unaccepted. A new 24-hour soak cannot complete
 before noon. No Unreal/Unity parity or game-content restart is authorized.
 
-Current detailed packet: `Tasks/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md` and
+Historical detailed packet: `Tasks/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md` and
 `Docs/QA/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md`. Read actual pinned evidence
 before action; never rerun an exclusive evidence writer or weaken an oracle.

@@ -11,7 +11,7 @@
     "checkpoint": "Docs/Agents/ENGINE-WEEKEND-2026-10-17.md",
     "development_workflow_gate": "not_passed",
     "editor_workflow": "Current4f staticCPU Release fresh create/import/Frame/transform UndoRedo/startupSave/SaveAsCancel/newSave/reopen/PlayStop/repackage/outside noargs independently accepted b74c007d; bounded3D workflow only",
-    "framework_assets_players": "Currentmainbfbe PR107 source ancestry; current combinedCPU025f/hardware48ac/ONnative bounded; static4f packageffc296/rehearsalb74 accepted. Wholeengine breadth not passed; input excluded.",
+    "framework_assets_players": "Mainc8ec PR109 merged;11PR+8actualmainchecks accepted616eb11b. CPU025f/hardware48ac/ONnative bounded, static4f packageffc/rehearsalb74/CPUanimationc38 accepted.285inputs unchanged; wholeengine breadth not passed; input excluded.",
     "numeric_repair": {
       "classification": "locally_verified",
       "integration": "merged_main_PR_81",
@@ -20,15 +20,37 @@
       "scope": "member/free Vec3 length and normalization, finite camera/controller, checked translation hierarchy; independent review clean, full native Debug/Release and smokes pass before and after main integration; hosted checks including sanitizers pass; fixed CPU fixture p95 ratio 1.09733",
       "merge_sha": "126e6cfafedc47d1a2266f1adf27d6b23293f329"
     },
-    "gpu_backend": "partial_D3D11_opaqueUnlit_offscreen_and_optional_native_consumers; currentcombined_branch_only; no_fullGPU_parity",
+    "gpu_backend": "partial_D3D11_opaqueUnlit_offscreen_and_optional_native_consumers; merged_main_PR109_c8ec; no_fullGPU_parity",
     "packaged_external_project": "current4f staticReleaseMT fourtools Package13 and fresh3D external project workflow independently accepted; clean_machine_unverified",
     "immutable_24_hour_soak": "not_completed; new24h cannot finish before current noon deadline",
     "parity_claim": false,
     "updated_at": "2026-10-18",
     "deadline_at_initial_record": "2026-10-18T23:59:00-04:00",
-    "baseline_scope_note": "baseline_sha/status retain the original Oct17 baseline; current candidate and last main are separately pinned below",
+    "baseline_scope_note": "baseline_sha/status retain the original Oct17 baseline; accepted postmerge main and historical premerge candidate observations are separately pinned below",
+    "postmerge_handoff": {
+      "main_commit": "c8ec735cf7b3e706a587c32f6b7800e055308a0f",
+      "main_tree": "8c19a1e972ed40b0fc927c0fa537247e3a4c3644",
+      "engine_tree": "7eb81174418a369c8cbad1f1b9a145a25b5e98c9",
+      "pr": 109,
+      "pr_url": "https://github.com/LucasKazaki/AnimeRPG/pull/109",
+      "reviewed_head": "9c821820d9af8e45e5bd9eeac721f936054a8a15",
+      "merged_at": "2026-10-18T12:26:12Z",
+      "accepted_pr_checks": 11,
+      "accepted_actual_main_checks": 8,
+      "main_acceptance_receipt": "work/combined-main-c8ec-hosted-ready/combined-main-hosted-first/root-acceptance.receipt.json",
+      "main_acceptance_sha256": "616eb11b17eb81202979f1e592f00888f3160b889be2d739672b9746fe46314a",
+      "accepted_at": "2026-10-18T12:41:20.1811435Z",
+      "independent_main_review_sha256": "5b22791f98af5144e0a21660636aacbeeec2dece4780107aff7811f9905979fa",
+      "main_verification_sha256": "9a23ed8298c2b7b3c801c8110fbb6b6f8ae8162aaece99953742b97894d60be2",
+      "unchanged_build_inputs": 285,
+      "compile_provenance": "Static4f/tree1fb/0a andON7f6/treeba/index47f2/61c83 retained;9c andmainc8ec docs do not relabel binaries as rebuilt.",
+      "guide_sha256": "18826496d68192b9c0799f4300db356e32b33006b0c92c273d1acaa89397bd17",
+      "delivery_state": "Guide text accepted; final delivery archive and seal planned until actual external freeze. Source is published mainc8ec/Engine7eb.",
+      "current_queue": "Independent two-canonical-doc review/own PR/CI, then delivery freeze; no new feature or engine/native replay.",
+      "remaining": "Wholeengine/fullGPU/parity/fullnative/2D/audio/distinctF5reset/cleanmachine/requiredsoak unaccepted; input increment excluded."
+    },
     "integrated_noon_candidate": {
-      "classification": "locally_independently_verified_bounded_CPU_hardware_native_static_delivery_rehearsal; current_CI_merge_guide_pending",
+      "classification": "merged_main_PR109_and_mainCI_accepted_bounded_validation; canonical_docs_PR_and_final_delivery_freeze_pending",
       "worktree": "work/astral-noon-integrated-demo",
       "branch": "engine/noon-integrated-demo-20261018",
       "static_compiled_commit": "4f3c6cef564e94980b333daf35d9870202be8dd5",
@@ -37,7 +59,7 @@
       "on_compiled_head": "7f6b0e05ca661c0b9e2a9119818d60f3755c39ae",
       "on_physical_manifest": "61c83e9693c841a9eee0b02acd0a4db335c80019c7adb55a05f1451516b7bf45",
       "unchanged_build_inputs": 285,
-      "last_main_observed_by_root": {
+      "premerge_last_main_observed_by_root": {
         "sha": "bfbe3a1fa589d64a4b3f1c3ad147a843e1e735ba",
         "observed_utc": "2026-10-18T11:41:00Z",
         "fresh_query_by_this_packet": false
@@ -108,11 +130,16 @@
         "Docs/Research/ENGINE-CAPABILITIES.json"
       ],
       "candidate_vs_main_path_count": 19,
-      "pending": [
+      "scope_count_qualification": "Historical PR109 comparison against bfbe; this postmerge canonical packet changes only two documentation paths.",
+      "premerge_pending_history": [
         "fourdoc resulting review/commit",
         "immutable final guide/delivery seal",
         "fresh exact current PR head/merge/main CI",
         "root merge decision"
+      ],
+      "pending": [
+        "two canonical documents independent review and own PR/CI/publication",
+        "external final delivery archive and seal"
       ],
       "whole_engine_gate": "NOT_PASSED",
       "limits": [
@@ -129,7 +156,7 @@
       "evidence": "Docs/QA/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md"
     }
   },
-  "current_scope_note": "October18 current local verification is bounded; final documentation hashes are not original compile identities. Current records are above/below; historical catalog/uplift/proposal snapshots are explicitly labeled and do not assert current absence or completion.",
+  "current_scope_note": "October18 mainc8ec/PR109 and actualmainCI accepted; bounded results retain original compile identities. Canonical handoff PR and external delivery seal remain pending. Historical catalog/uplift/proposal/premerge snapshots do not assert current absence or completion.",
   "historical_catalog_assessment": {
     "assessed_at": "2026-09-22",
     "inspected_base": "e12e6c559bf776ffc9c715c809a517f8e02ce5d5",
@@ -158,13 +185,13 @@
   },
   "assessed_at": "2026-10-18",
   "repository": "LucasKazaki/AnimeRPG",
-  "inspected_base": "4f3c6cef564e94980b333daf35d9870202be8dd5",
+  "inspected_base": "c8ec735cf7b3e706a587c32f6b7800e055308a0f",
   "inspected_engine_tree": "7eb81174418a369c8cbad1f1b9a145a25b5e98c9",
   "source_catalog_and_acceptance_contracts": "ENGINE-CAPABILITIES-2026-09-20.md",
   "scope": "custom C++17 engine-first; no UE migration or paused content restart",
   "parity_claim": false,
   "inventory_complete": false,
-  "local_state": "locally_verified_bounded_combined_candidate; whole_catalog_and_engine_gate_not_passed",
+  "local_state": "merged_main_PR109_and_actual_mainCI_accepted_bounded_validation; whole_catalog_and_engine_gate_not_passed",
   "scheduling": {
     "requested_interval_minutes": 15,
     "chat_minimum_interval_minutes": 60,
@@ -195,7 +222,7 @@
   "current_repair": {
     "id": "ENGINE-NOON-INTEGRATED-DEMO-2026-10-18",
     "kind": "bounded_engine_integration_validation_and_documentation",
-    "status": "local_bounded_validation_passed_final_four_docs_CI_merge_guide_pending",
+    "status": "merged_main_PR109_11checks_and_main8checks_accepted; canonical_handoff_PR_and_final_delivery_pending",
     "covered_subrequirement": "Current source-bound CPU3D workflow/staticMT package and bounded opaqueUnlit/CPU animation proof; no whole-engine completion",
     "task": "Tasks/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md",
     "evidence": "Docs/QA/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md"
@@ -203,10 +230,10 @@
   "active_candidates": [
     {
       "id": "ENGINE-NOON-INTEGRATED-DEMO-2026-10-18",
-      "kind": "reviewed_branch_integration_with_final_docs_pending",
+      "kind": "merged_main_bounded_integration_with_canonical_handoff_pending",
       "compiled_static_head": "4f3c6cef564e94980b333daf35d9870202be8dd5",
       "compiled_static_tree": "1fb67a3132684bdad419383eead84aaf7f72f71d",
-      "status": "branch_only_current_PR_head_merge_main_CI_and_merge_pending",
+      "status": "merged_main_PR109_c8ec_and_actual_mainCI_accepted; own_canonical_docs_PR_and_delivery_pending",
       "task": "Tasks/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md",
       "evidence": "Docs/QA/ENGINE-NOON-INTEGRATED-DEMO-2026-10-18.md"
     }
