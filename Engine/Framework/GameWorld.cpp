@@ -527,13 +527,19 @@ void GameWorld::PushBodies(CharacterMover& mover, float dt) {
 }
 
 void GameWorld::SyncFromPhysics() {
-    for (Entity entity : SortedEntities<Collider>()) {
-        Collider& collider = *registry_.Get<Collider>(entity);
-        const Physics::Body* body = physics_.GetBody(collider.body);
+    // A simulated child must derive its local pose from this step's parent,
+    // including any non-bodied transforms between the simulated entities.
+    std::vector<Entity> hierarchy;
+    for (Entity root : Roots()) CollectSubtree(root, hierarchy);
+    for (Entity entity : hierarchy) {
+        RefreshWorld(entity);
+        Collider* collider = registry_.Get<Collider>(entity);
+        if (!collider) continue;
+        const Physics::Body* body = physics_.GetBody(collider->body);
         if (!body || body->type != Physics::BodyType::Dynamic) continue;
         WriteWorldPose(entity, body->pose.position, body->pose.rotation);
-        collider.syncedPosition = body->pose.position;
-        collider.syncedRotation = body->pose.rotation;
+        collider->syncedPosition = body->pose.position;
+        collider->syncedRotation = body->pose.rotation;
     }
     for (Entity entity : SortedEntities<Collider>()) {
         // Kinematic bodies reached their targets during the step.

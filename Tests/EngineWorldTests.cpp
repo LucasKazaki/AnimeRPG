@@ -113,6 +113,85 @@ Framework::RigidBody MovingBody(float mass, Math::Vec3 velocity = {}) {
     body.angularDamping = 0;
     return body;
 }
+
+void CheckParentedDynamicPoses(bool childCreatedFirst, bool unbodiedIntermediate) {
+    auto settings = RigidSyncSettings();
+    settings.fixedDelta = 1.0f / 64.0f; // exact binary steps, including the multi-step frame
+    Framework::GameWorld world(settings);
+    const Math::Vec3 childStart{20, 4, 0}, parentStart{-20, -4, 0};
+    const auto create = [&](const char* name, Math::Vec3 position) {
+        return world.CreateEntity(name, {position, {}, {1, 1, 1}});
+    };
+    Entity child, parent;
+    if (childCreatedFirst) {
+        child = create("simulated child", childStart);
+        parent = create("simulated parent", parentStart);
+    } else {
+        parent = create("simulated parent", parentStart);
+        child = create("simulated child", childStart);
+    }
+    ASTRAL_CHECK((child.index < parent.index) == childCreatedFirst);
+    Entity immediateParent = parent;
+    Entity bridge{};
+    if (unbodiedIntermediate) {
+        bridge = create("unbodied intermediate", {3, 7, 0});
+        ASTRAL_CHECK(world.SetParent(bridge, parent));
+        immediateParent = bridge;
+    }
+    ASTRAL_CHECK(world.SetParent(child, immediateParent));
+    ASTRAL_CHECK(Math::DistanceSquared(world.GetWorld(child).translation, childStart) < 1e-10f);
+    ASTRAL_CHECK(World::GetParent(world.Registry(), child) == immediateParent);
+    Framework::Collider tinyBox;
+    tinyBox.halfExtents = {0.05f, 0.05f, 0.05f}; // independent bodies, far apart: no contact response
+    world.Add<Framework::Collider>(child, tinyBox);
+    world.Add<Framework::RigidBody>(child, MovingBody(1, {2, 0, 0}));
+    world.Add<Framework::Collider>(parent, tinyBox);
+    world.Add<Framework::RigidBody>(parent, MovingBody(1, {1, 0, 0}));
+    const Entity follower = world.CreateEntity("unbodied child follower", {{0, 3, 0}, {}, {1, 1, 1}}, child);
+    const Math::TRS followerLocal = world.GetLocal(follower);
+    const Math::TRS bridgeLocal = bridge.IsNull() ? Math::TRS{} : world.GetLocal(bridge);
+    world.Tick(0);
+    ASTRAL_CHECK(world.Stats().fixedStepsLastFrame == 0 && world.Physics().BodyCount() == 0);
+    Physics::BodyId childBody{}, parentBody{};
+    int simulatedSteps = 0;
+    for (const int steps : {1, 1, 3}) {
+        world.Tick(settings.fixedDelta * steps);
+        ASTRAL_CHECK(world.Stats().fixedStepsLastFrame == steps);
+        simulatedSteps += steps;
+        const auto currentChild = world.Get<Framework::Collider>(child)->body;
+        const auto currentParent = world.Get<Framework::Collider>(parent)->body;
+        if (childBody.IsNull()) { childBody = currentChild; parentBody = currentParent; }
+        ASTRAL_CHECK(currentChild == childBody && currentParent == parentBody);
+        const auto* childPhysics = world.Physics().GetBody(childBody);
+        const auto* parentPhysics = world.Physics().GetBody(parentBody);
+        ASTRAL_CHECK(childPhysics && parentPhysics && world.Physics().BodyCount() == 2);
+        ASTRAL_CHECK(childPhysics->type == Physics::BodyType::Dynamic && parentPhysics->type == Physics::BodyType::Dynamic);
+        ASTRAL_CHECK_NEAR(childPhysics->linearVelocity.x, 2, 1e-6f);
+        ASTRAL_CHECK_NEAR(parentPhysics->linearVelocity.x, 1, 1e-6f);
+        ASTRAL_CHECK_NEAR(childPhysics->pose.position.x, childStart.x + 2 * settings.fixedDelta * simulatedSteps, 1e-5f);
+        ASTRAL_CHECK_NEAR(parentPhysics->pose.position.x, parentStart.x + settings.fixedDelta * simulatedSteps, 1e-5f);
+        const auto childWorld = world.GetWorld(child);
+        const auto parentWorld = world.GetWorld(parent);
+        std::printf("parented child-first=%d bridge=%d fixed=%d: cached child x=%.9f body x=%.9f\n",
+            childCreatedFirst, unbodiedIntermediate, simulatedSteps, childWorld.translation.x, childPhysics->pose.position.x);
+        ASTRAL_CHECK(Math::DistanceSquared(childWorld.translation, childPhysics->pose.position) < 1e-10f);
+        ASTRAL_CHECK(Math::DistanceSquared(parentWorld.translation, parentPhysics->pose.position) < 1e-10f);
+        for (const Math::Vec3 axis : {Math::Vec3{1, 0, 0}, Math::Vec3{0, 1, 0}, Math::Vec3{0, 0, 1}}) {
+            ASTRAL_CHECK(Math::DistanceSquared(Math::Rotate(childWorld.rotation, axis),
+                Math::Rotate(childPhysics->pose.rotation, axis)) < 1e-10f);
+        }
+        // The renderer and non-bodied descendants use the actual hierarchy cache.
+        const auto* cached = world.Get<World::WorldTransform>(child);
+        ASTRAL_CHECK(cached && Math::DistanceSquared(Math::TransformPoint(cached->matrix, {}), childPhysics->pose.position) < 1e-10f);
+        ASTRAL_CHECK(Math::DistanceSquared(world.GetWorld(follower).translation,
+            Math::Combine(childWorld, followerLocal).translation) < 1e-10f);
+        if (!bridge.IsNull()) {
+            ASTRAL_CHECK(!world.Get<Framework::Collider>(bridge) && !world.Get<Framework::RigidBody>(bridge));
+            ASTRAL_CHECK(Math::DistanceSquared(world.GetWorld(bridge).translation,
+                Math::Combine(parentWorld, bridgeLocal).translation) < 1e-10f);
+        }
+    }
+}
 } // namespace
 
 ASTRAL_TEST(EntitiesAreGenerational) {
@@ -739,6 +818,97 @@ ASTRAL_TEST(WorldAudioSourceRetainsThePlayingClipUntilRelease) {
     mixer.Mix(stereo, 16);
     world.Remove<Framework::AudioSource>(entity);
     ASTRAL_CHECK(!mixer.IsPlaying(voice) && weak.expired());
+}
+
+ASTRAL_TEST(ParentedDynamicChildCreatedBeforeParentMatchesBodyPose) {
+    CheckParentedDynamicPoses(true, false);
+}
+
+ASTRAL_TEST(ParentedDynamicChildCreatedAfterParentMatchesBodyPose) {
+    CheckParentedDynamicPoses(false, false);
+}
+
+ASTRAL_TEST(ParentedDynamicChildThroughUnbodiedAncestorMatchesBodyPose) {
+    CheckParentedDynamicPoses(false, true);
+}
+
+ASTRAL_TEST(ParentedRotatingBodiesKeepPhysicsWorldPosesAndHierarchyScale) {
+    for (bool childCreatedFirst : {true, false}) {
+        auto settings = RigidSyncSettings();
+        settings.fixedDelta = 1.0f / 64.0f;
+        Framework::GameWorld world(settings);
+        const Math::TRS parentStart{{-8, -4, 0}, Math::QuatFromAxisAngle({0, 1, 0}, 0.35f), {1.25f, 1.25f, 1.25f}};
+        const Math::TRS childStart{{8, 4, 0}, Math::QuatFromAxisAngle({1, 0, 0}, -0.55f), {0.75f, 0.75f, 0.75f}};
+        Entity parent, child;
+        if (childCreatedFirst) {
+            child = world.CreateEntity("rotating child", childStart);
+            parent = world.CreateEntity("rotating parent", parentStart);
+        } else {
+            parent = world.CreateEntity("rotating parent", parentStart);
+            child = world.CreateEntity("rotating child", childStart);
+        }
+        const Entity bridge = world.CreateEntity("rotated unbodied bridge",
+            {{2, 3, 0}, Math::QuatFromAxisAngle({0, 0, 1}, 0.2f), {1, 1, 1}});
+        ASTRAL_CHECK(world.SetParent(bridge, parent) && world.SetParent(child, bridge));
+        Framework::Collider box;
+        box.halfExtents = {0.05f, 0.05f, 0.05f};
+        world.Add<Framework::Collider>(parent, box);
+        world.Add<Framework::RigidBody>(parent, MovingBody(1, {1, 0, 0}));
+        world.Add<Framework::Collider>(child, box);
+        world.Add<Framework::RigidBody>(child, MovingBody(1, {2, 0, 0}));
+        const Entity follower = world.CreateEntity("rotating child follower", {{0, 1, 0}, {}, {1, 1, 1}}, child);
+        const Math::TRS followerLocal = world.GetLocal(follower), bridgeLocal = world.GetLocal(bridge);
+        world.Tick(settings.fixedDelta);
+        const auto parentId = world.Get<Framework::Collider>(parent)->body;
+        const auto childId = world.Get<Framework::Collider>(child)->body;
+        ASTRAL_CHECK(!parentId.IsNull() && !childId.IsNull());
+        const auto* parentBody = world.Physics().GetBody(parentId);
+        const auto* childBody = world.Physics().GetBody(childId);
+        ASTRAL_CHECK(parentBody && childBody);
+        const auto parentBefore = parentBody->pose, childBefore = childBody->pose;
+        world.Physics().ApplyImpulse(parentId, {0, 0.005f, 0}, parentBefore.position + Math::Vec3{0.04f, 0, 0});
+        world.Physics().ApplyImpulse(childId, {0.003f, 0, 0}, childBefore.position + Math::Vec3{0, 0.04f, 0});
+        const auto parentVelocity = parentBody->linearVelocity, childVelocity = childBody->linearVelocity;
+        const auto parentAngular = parentBody->angularVelocity, childAngular = childBody->angularVelocity;
+        ASTRAL_CHECK(Math::LengthSquared(parentAngular) > 0.001f && Math::LengthSquared(childAngular) > 0.001f);
+        int stepsTaken = 0;
+        for (int steps : {1, 1, 3}) {
+            world.Tick(settings.fixedDelta * steps);
+            stepsTaken += steps;
+            ASTRAL_CHECK(world.Stats().fixedStepsLastFrame == steps);
+            ASTRAL_CHECK(world.Get<Framework::Collider>(parent)->body == parentId
+                && world.Get<Framework::Collider>(child)->body == childId && world.Physics().BodyCount() == 2);
+            for (Entity entity : {parent, child}) {
+                const bool isParent = entity == parent;
+                const auto* body = world.Physics().GetBody(isParent ? parentId : childId);
+                const auto cached = world.GetWorld(entity);
+                const auto& start = isParent ? parentBefore : childBefore;
+                const auto velocity = isParent ? parentVelocity : childVelocity;
+                const auto angular = isParent ? parentAngular : childAngular;
+                ASTRAL_CHECK(body && Math::DistanceSquared(cached.translation, body->pose.position) < 1e-8f);
+                ASTRAL_CHECK(Math::DistanceSquared(body->pose.position,
+                    start.position + velocity * (settings.fixedDelta * stepsTaken)) < 1e-8f);
+                ASTRAL_CHECK(Math::DistanceSquared(body->linearVelocity, velocity) < 1e-10f
+                    && Math::DistanceSquared(body->angularVelocity, angular) < 1e-10f);
+                ASTRAL_CHECK(Math::DistanceSquared(cached.scale, isParent ? parentStart.scale : childStart.scale) < 1e-10f);
+                for (const Math::Vec3 axis : {Math::Vec3{1, 0, 0}, Math::Vec3{0, 1, 0}, Math::Vec3{0, 0, 1}}) {
+                    ASTRAL_CHECK(Math::DistanceSquared(Math::Rotate(cached.rotation, axis),
+                        Math::Rotate(body->pose.rotation, axis)) < 1e-8f);
+                }
+                const auto* transform = world.Get<World::WorldTransform>(entity);
+                ASTRAL_CHECK(transform && Math::DistanceSquared(Math::TransformPoint(transform->matrix, {}),
+                    body->pose.position) < 1e-8f);
+            }
+            ASTRAL_CHECK(Math::DistanceSquared(world.GetWorld(follower).translation,
+                Math::Combine(world.GetWorld(child), followerLocal).translation) < 1e-8f);
+            ASTRAL_CHECK(Math::DistanceSquared(world.GetWorld(bridge).translation,
+                Math::Combine(world.GetWorld(parent), bridgeLocal).translation) < 1e-8f);
+        }
+        ASTRAL_CHECK(Math::DistanceSquared(Math::Rotate(parentBody->pose.rotation, {1, 0, 0}),
+            Math::Rotate(parentBefore.rotation, {1, 0, 0})) > 1e-6f);
+        ASTRAL_CHECK(Math::DistanceSquared(Math::Rotate(childBody->pose.rotation, {1, 0, 0}),
+            Math::Rotate(childBefore.rotation, {1, 0, 0})) > 1e-6f);
+    }
 }
 
 ASTRAL_TEST_MAIN("EngineWorldTests")
