@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <exception>
 #include <filesystem>
 #include <functional>
 #include <limits>
@@ -366,6 +367,7 @@ bool SceneEditor::SaveAs(const std::string& path, std::string& error) {
         // The asset cache now matches the file, so hot reload does not see our own save.
         assets_->Reload(savedPath);
         diskVersion_ = assets_->Load<JsonValue>(savedPath).Version();
+        RefreshResourceWatches();
         status_ = "Saved " + savedPath;
         return true;
     } catch (const std::system_error& e) {
@@ -374,34 +376,66 @@ bool SceneEditor::SaveAs(const std::string& path, std::string& error) {
 }
 
 bool SceneEditor::ReloadIfChangedOnDisk() {
-    if (scenePath_.empty() || Playing()) return false;
+    if (Playing()) return false;
     assets_->PollChanges();
-    const auto handle = assets_->Load<JsonValue>(scenePath_);
-    if (!handle.Ready() || handle.Version() == diskVersion_) return false;
-    diskVersion_ = handle.Version();
-    if (*handle.Get() == json_) return false;
-    if (Dirty()) {
-        status_ = scenePath_ + " changed on disk; your unsaved edits are kept";
+    if (!std::any_of(resourceWatches_.begin(), resourceWatches_.end(), [](const auto& watch) { return watch.Changed(); })) return false;
+    JsonValue candidate = json_;
+    const auto handle = scenePath_.empty() ? Assets::AssetHandle<JsonValue>{} : assets_->Load<JsonValue>(scenePath_);
+    const bool resourceChanged = std::any_of(resourceWatches_.begin(), resourceWatches_.end(), [&](const auto& watch) {
+        return watch.Changed() && (!handle.Valid() || !(watch == handle.Dependency()));
+    });
+    const bool dirty = Dirty();
+    bool documentChanged = false;
+    bool keptEdits = false;
+    if (handle.Valid()) {
+        if (!handle.Ready() || !handle.Error().empty()) {
+            if (!dirty) {
+                status_ = "Not reloaded, " + scenePath_ + ": " + handle.Error();
+                RefreshResourceWatches();
+                return false;
+            }
+            keptEdits = true;
+        } else if (*handle.Get() != json_) {
+            if (dirty) keptEdits = true;
+            else { candidate = *handle.Get(); documentChanged = true; }
+        }
+    }
+    if (!resourceChanged && !documentChanged) {
+        RefreshResourceWatches();
+        if (keptEdits) status_ = scenePath_ + " changed on disk; your unsaved edits are kept";
         return false;
     }
     Framework::SceneDocument document;
     std::string error;
-    if (!Framework::SceneSerializer(assets_.get()).Parse(*handle.Get(), document, error)) {
-        status_ = "Not reloaded, " + scenePath_ + " has an error: " + error;
+    std::vector<Assets::AssetDependency> attempted;
+    if (!Framework::SceneSerializer(assets_.get()).Parse(candidate, document, error, &attempted, true)) {
+        status_ = "Not reloaded: " + error;
+        RefreshResourceWatches(attempted);
+        return false;
+    }
+    PreparedPreview prepared;
+    try { prepared = PreparePreview(document, candidate); }
+    catch (const std::exception& exception) {
+        status_ = std::string("Not reloaded: ") + exception.what();
+        RefreshResourceWatches(attempted);
         return false;
     }
     const SelectionKind kind = selectionKind_;
     const NodePath selection = selection_;
-    PushUndo(); // the reload itself can be undone
-    json_ = *handle.Get();
-    savedJson_ = json_;
+    if (documentChanged) {
+        PushUndo(); // a disk document change remains undoable; a resource refresh is not an edit
+        json_ = std::move(candidate);
+        savedJson_ = json_;
+    }
+    if (handle.Valid() && !dirty) diskVersion_ = handle.Version();
     parsed_ = std::move(document);
-    Rebuild();
+    InstallPreview(std::move(prepared));
+    RefreshResourceWatches();
     if (kind != SelectionKind::Entity || !Select(selection)) {
         selectionKind_ = kind == SelectionKind::Scene ? SelectionKind::Scene : SelectionKind::None;
         selection_.clear();
     }
-    status_ = "Reloaded " + scenePath_ + " (changed on disk)";
+    status_ = documentChanged ? "Reloaded " + scenePath_ + " (changed on disk)" : "Reloaded model resources; authored scene kept";
     return true;
 }
 
@@ -464,38 +498,55 @@ bool SceneEditor::Commit(JsonValue next, SelectionKind kind, NodePath selection,
 }
 
 void SceneEditor::Rebuild() {
-    preview_.reset();
-    auto world = std::make_unique<Framework::GameWorld>(Framework::GameWorldSettings{}, nullptr, assets_.get());
-    Framework::SceneDocument document = parsed_;
-    for (EntitySpec& spec : document.entities) StripBehaviours(spec);
-    const std::vector<Entity> roots = Framework::SceneSerializer(assets_.get()).Instantiate(document, *world);
-    preview_ = std::move(world);
-    nodeEntities_.clear();
-    entityNodes_.clear();
-    if (const JsonValue* entities = json_.Find("entities")) {
-        for (std::size_t i = 0; i < entities->Size() && i < roots.size(); ++i) {
-            NodePath path{i};
-            MapNodes((*entities)[i], roots[i], path);
-        }
-    }
-    editorCamera_ = preview_->CreateEntity(kEditorCameraName);
-    preview_->Add<Framework::Camera>(editorCamera_).priority = std::numeric_limits<int>::max();
-    preview_->UpdateTransforms();
+    InstallPreview(PreparePreview(parsed_, json_));
+    RefreshResourceWatches();
 }
 
-void SceneEditor::MapNodes(const JsonValue& node, Entity entity, NodePath& path) {
-    nodeEntities_[path] = entity;
-    entityNodes_[Pack(entity)] = path;
-    const JsonValue* children = node.Find("children");
-    if (!children || !children->IsArray()) return;
-    const std::vector<Entity> worldChildren = World::GetChildren(preview_->Registry(), entity);
-    const std::size_t authored = children->Size();
-    if (worldChildren.size() < authored) return;
-    for (std::size_t j = 0; j < authored; ++j) {
-        path.push_back(j);
-        MapNodes((*children)[j], worldChildren[worldChildren.size() - authored + j], path);
-        path.pop_back();
+void SceneEditor::RefreshResourceWatches(const std::vector<Assets::AssetDependency>& attempted) {
+    resourceWatches_ = parsed_.dependencies;
+    for (const auto& watch : attempted) if (std::find(resourceWatches_.begin(), resourceWatches_.end(), watch) == resourceWatches_.end())
+        resourceWatches_.push_back(watch);
+    if (!scenePath_.empty()) resourceWatches_.push_back(assets_->Load<JsonValue>(scenePath_).Dependency());
+    for (auto& watch : resourceWatches_) watch.Refresh();
+}
+
+SceneEditor::PreparedPreview SceneEditor::PreparePreview(const Framework::SceneDocument& source, const JsonValue& json) const {
+    PreparedPreview prepared;
+    auto world = std::make_unique<Framework::GameWorld>(Framework::GameWorldSettings{}, nullptr, assets_.get());
+    Framework::SceneDocument document = source;
+    for (EntitySpec& spec : document.entities) StripBehaviours(spec);
+    const std::vector<Entity> roots = Framework::SceneSerializer(assets_.get()).Instantiate(document, *world);
+    std::function<void(const JsonValue&, Entity, NodePath&)> map = [&](const JsonValue& node, Entity entity, NodePath& path) {
+        prepared.nodes[path] = entity;
+        prepared.entities[Pack(entity)] = path;
+        const auto* children = node.Find("children");
+        if (!children || !children->IsArray()) return;
+        const auto worldChildren = World::GetChildren(world->Registry(), entity);
+        if (worldChildren.size() < children->Size()) return;
+        for (std::size_t j = 0; j < children->Size(); ++j) {
+            path.push_back(j);
+            map((*children)[j], worldChildren[worldChildren.size() - children->Size() + j], path);
+            path.pop_back();
+        }
+    };
+    if (const JsonValue* entities = json.Find("entities")) {
+        for (std::size_t i = 0; i < entities->Size() && i < roots.size(); ++i) {
+            NodePath path{i};
+            map((*entities)[i], roots[i], path);
+        }
     }
+    prepared.camera = world->CreateEntity(kEditorCameraName);
+    world->Add<Framework::Camera>(prepared.camera).priority = std::numeric_limits<int>::max();
+    world->UpdateTransforms();
+    prepared.world = std::move(world);
+    return prepared;
+}
+
+void SceneEditor::InstallPreview(PreparedPreview prepared) {
+    preview_ = std::move(prepared.world);
+    nodeEntities_ = std::move(prepared.nodes);
+    entityNodes_ = std::move(prepared.entities);
+    editorCamera_ = prepared.camera;
 }
 
 // ================================================================ hierarchy
@@ -1032,6 +1083,8 @@ std::vector<InspectorGroup> SceneEditor::Inspector() const {
     for (const char* type : kComponentTypes) {
         const JsonValue* effective = spec->components.Find(type);
         if (!effective) continue;
+        if (std::string(type) == "Animator" && spec->importedAnimator
+            && spec->importedAnimator->binding.role == Framework::ImportedAnimatorRole::Primitive) continue;
         InspectorGroup group;
         group.kind = InspectorGroupKind::Component;
         group.name = type;

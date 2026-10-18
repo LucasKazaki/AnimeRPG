@@ -211,7 +211,15 @@ private:
     bool Commit(Core::JsonValue next, SelectionKind kind, NodePath selection, std::string& error);
     void PushUndo();
     void Rebuild();
-    void MapNodes(const Core::JsonValue& node, Framework::Entity entity, NodePath& path);
+    struct PreparedPreview {
+        std::unique_ptr<Framework::GameWorld> world;
+        std::map<NodePath, Framework::Entity> nodes;
+        std::map<std::uint64_t, NodePath> entities;
+        Framework::Entity camera{};
+    };
+    PreparedPreview PreparePreview(const Framework::SceneDocument& document, const Core::JsonValue& json) const;
+    void InstallPreview(PreparedPreview prepared);
+    void RefreshResourceWatches(const std::vector<Assets::AssetDependency>& attempted = {});
     Core::JsonValue* Node(Core::JsonValue& json, const NodePath& path) const;
     const Core::JsonValue* Node(const Core::JsonValue& json, const NodePath& path) const;
     const Framework::EntitySpec* Spec(const NodePath& path) const;
@@ -242,6 +250,7 @@ private:
     bool hasProject_{};
     Core::JsonValue savedJson_; // as last opened or saved
     std::uint32_t diskVersion_{};
+    std::vector<Assets::AssetDependency> resourceWatches_;
     std::vector<Snapshot> undo_;
     std::vector<Snapshot> redo_;
 

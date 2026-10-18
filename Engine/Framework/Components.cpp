@@ -1,9 +1,82 @@
 #include "Engine/Framework/Components.h"
+#include "Engine/Animation/Skinning.h"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <string>
 #include <vector>
 
 namespace Astral::Framework {
+
+namespace {
+
+bool FiniteImportedMatrix(const Math::Mat4& matrix) {
+    for (const auto& row : matrix.m) for (float value : row) if (!std::isfinite(value)) return false;
+    return true;
+}
+
+// Normalize in double after scaling, so finite Float32 matrix products cannot
+// overflow the length calculation or underflow a usable direction to zero.
+bool ImportedNormalToLocal(const Math::Mat4& meshNormal, const std::array<double, 3>& document, Math::Vec3& out) {
+    std::array<double, 3> local{};
+    double largest = 0;
+    for (std::size_t row = 0; row < 3; ++row) {
+        for (std::size_t column = 0; column < 3; ++column)
+            local[row] += static_cast<double>(meshNormal.m[row][column]) * document[column];
+        if (!std::isfinite(local[row])) return false;
+        largest = std::max(largest, std::fabs(local[row]));
+    }
+    if (!(largest > 0)) return false;
+    for (double& value : local) value /= largest;
+    const double length = std::sqrt(local[0] * local[0] + local[1] * local[1] + local[2] * local[2]);
+    if (!(length > 0) || !std::isfinite(length)) return false;
+    out = {static_cast<float>(local[0] / length), static_cast<float>(local[1] / length), static_cast<float>(local[2] / length)};
+    return true;
+}
+
+} // namespace
+
+void PublishImportedAnimationMesh(AnimatorComponent& component, MeshRenderer& renderer) {
+    if (!component.animator || !component.skeleton || !component.bindMesh) return;
+    Animation::ComputeSkinMatrices(*component.skeleton, component.animator->GetPose(), component.skinMatrices);
+    std::vector<Math::Mat4> documentNormals;
+    documentNormals.reserve(component.skinMatrices.size());
+    for (auto& matrix : component.skinMatrices) {
+        Math::Mat4 inverse;
+        const bool invertible = FiniteImportedMatrix(matrix) && Math::Inverse(matrix, inverse) && FiniteImportedMatrix(inverse);
+        // A singular animated transform has no unique surface normal. Keep its
+        // document-space bind-normal direction, then apply the same mesh basis.
+        documentNormals.push_back(invertible ? Math::Transpose(inverse) : Math::Mat4::Identity());
+        matrix = component.modelToMesh * matrix; // position skinning is unchanged
+    }
+    if (!component.skinned) component.skinned = std::make_shared<Graphics::MeshData>();
+    Animation::SkinMesh(*component.bindMesh, component.skinMatrices, *component.skinned);
+    const auto& bind = *component.bindMesh;
+    if (!documentNormals.empty() && bind.skin.size() == bind.vertices.size()) {
+        const Math::Mat4 meshNormal = Math::Transpose(component.binding.meshBind);
+        for (std::size_t vertex = 0; vertex < bind.vertices.size(); ++vertex) {
+            const auto& source = bind.vertices[vertex].normal;
+            const std::array<double, 3> bindNormal{source.x, source.y, source.z};
+            std::array<double, 3> document{};
+            const auto& influence = bind.skin[vertex];
+            for (std::size_t slot = 0; slot < 4; ++slot) {
+                const float weight = influence.weights[slot];
+                if (!(weight > 0) || !std::isfinite(weight)) continue;
+                const std::size_t joint = influence.joints[slot];
+                const auto& normal = documentNormals[joint < documentNormals.size() ? joint : 0];
+                for (std::size_t row = 0; row < 3; ++row) for (std::size_t column = 0; column < 3; ++column)
+                    document[row] += static_cast<double>(weight) * normal.m[row][column] * bindNormal[column];
+            }
+            Math::Vec3 local;
+            if (!ImportedNormalToLocal(meshNormal, document, local)
+                && !ImportedNormalToLocal(meshNormal, bindNormal, local)
+                && !ImportedNormalToLocal(meshNormal, {0, 1, 0}, local)) local = {0, 1, 0};
+            component.skinned->vertices[vertex].normal = local;
+        }
+    }
+    renderer.mesh = component.skinned;
+}
 
 VFX::EmitterSettings ParticleSystem::ToSettings() const {
     VFX::EmitterSettings s;
@@ -133,6 +206,7 @@ Core::TypeRegistry BuildFrameworkTypes() {
         .Field("playOnStart", &ParticleSystem::playOnStart)
         .Field("followEntity", &ParticleSystem::followEntity);
     r.Register<AnimatorComponent>("Animator")
+        .Field("clip", &AnimatorComponent::clip, "Empty selects the first imported clip, including an unnamed clip")
         .Field("speed", &AnimatorComponent::speed).Range(0.0, 100.0)
         .Field("applyRootMotion", &AnimatorComponent::applyRootMotion);
     r.Register<Graphics::Material>("Material")

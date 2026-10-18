@@ -603,6 +603,16 @@ bool GameWorld::Raycast(const Ray& ray, float maxDistance, EntityRaycastHit& hit
 void GameWorld::UpdateAnimation(float dt) {
     for (Entity entity : SortedEntities<AnimatorComponent>()) {
         AnimatorComponent& component = *registry_.Get<AnimatorComponent>(entity);
+        if (component.binding.role == ImportedAnimatorRole::Controller) continue;
+        if (component.binding.role == ImportedAnimatorRole::Primitive) {
+            const auto* controller = registry_.Get<AnimatorComponent>(component.importedController);
+            if (!controller || controller->binding.role != ImportedAnimatorRole::Controller
+                || controller->importedOwner != component.importedOwner || !component.animator) continue;
+            const float speed = controller->speed;
+            component.animator->Update(dt * speed);
+            if (auto* renderer = registry_.Get<MeshRenderer>(entity)) PublishImportedAnimationMesh(component, *renderer);
+            continue;
+        }
         if (!component.animator && component.skeleton && component.machine) {
             component.animator = std::make_shared<Animation::Animator>(*component.skeleton, *component.machine);
         }

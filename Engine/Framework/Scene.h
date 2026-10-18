@@ -54,12 +54,23 @@ struct BehaviourSpec {
     Core::JsonValue properties; // object
 };
 
+struct ResolvedImportedAnimator {
+    ImportedAnimatorBinding binding;
+    std::shared_ptr<const ImportedModelAnimation> owner;
+    std::shared_ptr<const ImportedAnimationRig> rig;
+    std::shared_ptr<const Graphics::MeshData> bindMesh;
+    Math::Mat4 modelToMesh{Math::Mat4::Identity()};
+};
+
 struct EntitySpec {
     std::string name;
     TransformDesc transform;
     Core::JsonValue components = Core::JsonValue::MakeObject(); // type name -> field object
     std::vector<BehaviourSpec> behaviours;
     std::vector<EntitySpec> children;
+    std::string modelSource; // authored model wrapper, not flattened output
+    ImportedAnimatorBinding modelPrimitive; // source identity, inactive until opt-in
+    std::shared_ptr<const ResolvedImportedAnimator> importedAnimator;
 };
 
 struct SceneDocument {
@@ -134,6 +145,8 @@ private:
     bool ResolveClip(const std::string& ref, const std::string& path, ParseState& state) const;
     bool ExpandModel(const std::string& model, bool colliders, const std::string& path, ParseState& state,
         EntitySpec& out, std::size_t depth, bool cached, SpecExtent& extent) const;
+    bool ResolveImportedAnimations(EntitySpec& spec, const std::string& path, ParseState& state,
+        std::shared_ptr<ImportedModelAnimation> controller = {}, const Core::JsonValue* controls = nullptr) const;
     Entity Spawn(const EntitySpec& spec, const SceneDocument& document, GameWorld& world, Entity parent) const;
     void AddComponents(const EntitySpec& spec, const SceneDocument& document, GameWorld& world, Entity entity) const;
 

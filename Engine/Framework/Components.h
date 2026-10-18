@@ -21,9 +21,12 @@
 #include "Engine/World/Registry.h"
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
+
+namespace Astral::Assets { struct GltfDocument; }
 
 namespace Astral::Framework {
 
@@ -182,9 +185,35 @@ struct ParticleSystem {
     VFX::EmitterSettings ToSettings() const;
 };
 
-// Runs an animation state machine and, with a bind-pose mesh, CPU-skins it into
-// the entity's MeshRenderer every frame. Set up from code (skeleton and
-// machine are shared assets); only playback settings are serialised.
+enum class ImportedAnimatorRole { None, Controller, Primitive };
+
+struct ImportedAnimatorBinding {
+    ImportedAnimatorRole role{ImportedAnimatorRole::None};
+    std::string model;
+    int node{-1}, skin{-1}, mesh{-1}, primitive{-1};
+    Math::Mat4 meshBind{Math::Mat4::Identity()}; // engine row-major, excludes controller transform
+};
+
+// Allocate once before wiring machine states to clip. Never move a published rig.
+struct ImportedAnimationRig {
+    Animation::Skeleton skeleton;
+    Animation::AnimationClip clip;
+    Animation::AnimStateMachine machine;
+    std::vector<int> nodeToJoint;
+};
+
+struct ImportedModelAnimation {
+    std::string model;
+    std::uint32_t version{};
+    int animation{-1};
+    std::string selector; // resolved unique name, or empty automatic-first
+    std::shared_ptr<const Assets::GltfDocument> source;
+    std::map<int, std::shared_ptr<const ImportedAnimationRig>> rigs;
+};
+
+// Runs an animation state machine and CPU-skins its bind mesh into the entity's
+// MeshRenderer. Code may install shared assets directly; scenes can resolve an
+// imported model controller and its generated primitive bindings.
 struct AnimatorComponent {
     float speed{1.0f};
     bool applyRootMotion{};
@@ -195,7 +224,17 @@ struct AnimatorComponent {
     std::shared_ptr<Animation::Animator> animator;
     std::shared_ptr<Graphics::MeshData> skinned;
     std::vector<Math::Mat4> skinMatrices;
+    // Imported mode is resolved transactionally by SceneSerializer. Existing
+    // code-installed fields above keep their original behavior and ownership.
+    std::string clip;
+    ImportedAnimatorBinding binding;
+    std::shared_ptr<const ImportedModelAnimation> importedOwner;
+    Entity importedController{}; // generation-checked ancestor, never serialized
+    Math::Mat4 modelToMesh{Math::Mat4::Identity()};
 };
+
+// Publishes only the current pose; does not tick the world or advance animation.
+void PublishImportedAnimationMesh(AnimatorComponent& component, MeshRenderer& renderer);
 
 class Behaviour;
 // Native script instances attached to an entity (see Behaviour.h).
