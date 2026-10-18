@@ -12,9 +12,9 @@ include(cmake/AstralEngineSources.cmake)
 include(cmake/AstralRuntime.cmake)
 astral_add_runtime()
 
-# Isolated hardware spike. Neither the portable source list nor existing
-# player/editor consumers depend on Windows graphics or shader compilation.
-option(ASTRAL_BUILD_D3D11 "Build the Windows D3D11 offscreen opaque-Unlit backend" OFF)
+# Optional Windows backend and native consumers; the portable Runtime source
+# list and default-OFF CPU/legacy targets retain their dependency boundaries.
+option(ASTRAL_BUILD_D3D11 "Build the Windows D3D11 opaque-Unlit backend and native consumers" OFF)
 option(ASTRAL_ENABLE_HARDWARE_GPU_TESTS "Run exclusive hardware D3D11 tests (no software fallback)" OFF)
 if(ASTRAL_ENABLE_HARDWARE_GPU_TESTS AND NOT ASTRAL_BUILD_D3D11)
     message(FATAL_ERROR "Hardware GPU tests require ASTRAL_BUILD_D3D11=ON")
@@ -104,13 +104,23 @@ add_executable(AstralEnginePlayerWin32 WIN32 Tools/AstralPlayerWin32.cpp)
 target_compile_definitions(AstralEnginePlayerWin32 PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(AstralEnginePlayerWin32 PRIVATE Astral::Runtime AstralWin32Audio user32 gdi32)
 
+if(ASTRAL_BUILD_D3D11)
+    add_library(AstralD3D11Viewport STATIC Engine/Platform/Win32/D3D11Viewport.cpp)
+    target_compile_definitions(AstralD3D11Viewport PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(AstralD3D11Viewport PUBLIC AstralD3D11 Astral::Runtime PRIVATE user32)
+    foreach(native_consumer AstralEnginePlayerWin32 AstralEditor)
+        target_compile_definitions(${native_consumer} PRIVATE ASTRAL_NATIVE_D3D11)
+        target_link_libraries(${native_consumer} PRIVATE AstralD3D11Viewport)
+    endforeach()
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
     include(cmake/AstralTestSafety.cmake)
 
     if(ASTRAL_ENABLE_HARDWARE_GPU_TESTS)
         add_executable(EngineD3D11Tests Tests/EngineD3D11Tests.cpp)
-        target_link_libraries(EngineD3D11Tests PRIVATE AstralD3D11 psapi)
+        target_link_libraries(EngineD3D11Tests PRIVATE AstralD3D11Viewport psapi)
         target_compile_definitions(EngineD3D11Tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
         astral_add_test(EngineD3D11Tests)
         set_tests_properties(EngineD3D11Tests PROPERTIES LABELS GPU RUN_SERIAL TRUE TIMEOUT 180)

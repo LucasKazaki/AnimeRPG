@@ -14,6 +14,9 @@
 
 #include "Engine/Editor/EditorLayout.h"
 #include "Engine/Editor/SceneEditor.h"
+#if defined(ASTRAL_NATIVE_D3D11)
+#include "Engine/Platform/Win32/D3D11Viewport.h"
+#endif
 #include "Game/Samples/Playground/PlaygroundBehaviours.h"
 
 #include <windows.h>
@@ -59,6 +62,9 @@ enum Command : int {
     kCreatePointLight, kCreateDirectionalLight, kCreateCamera,
     kViewGrid = 3301, kViewSnap, kViewHalfResolution,
     kPlayToggle = 3401,
+#if defined(ASTRAL_NATIVE_D3D11)
+    kPlayRendererCpu, kPlayRendererGpu,
+#endif
     kHelpControls = 3501,
 };
 
@@ -186,6 +192,11 @@ struct EditorApp {
     int framesSinceFps{};
     double fps{};
     std::string lastError;
+#if defined(ASTRAL_NATIVE_D3D11)
+    std::unique_ptr<Platform::D3D11Viewport> gpu;
+    std::string rendererReason;
+    bool gpuSkipped{};
+#endif
 };
 
 EditorApp g_app;
@@ -195,6 +206,64 @@ LRESULT CALLBACK InspectorEditProc(HWND edit, UINT message, WPARAM wParam, LPARA
 
 Editor::SceneEditor& Scene() { return *g_app.editor; }
 bool CommitPendingInspector();
+
+#if defined(ASTRAL_NATIVE_D3D11)
+void RefreshStatus();
+void RefreshToolbar();
+int RenderScale();
+bool GpuPlaying() { return g_app.gpu && g_app.gpu->Active(); }
+void SetPlayPointer(POINT point) {
+    const float scale = static_cast<float>(RenderScale());
+    g_app.input.ui.pointer = {static_cast<float>(point.x) / scale, static_cast<float>(point.y) / scale};
+}
+void RefreshPlayPointer() {
+    POINT point{};
+    if (GetCursorPos(&point) && ScreenToClient(g_app.viewport, &point)) {
+        SetPlayPointer(point); g_app.lastMouse = point;
+    }
+    g_app.input.keys.mouseDelta = {};
+}
+std::string PlayRendererText() {
+    if (GpuPlaying()) return "D3D11 Opaque Unlit | neutral display | CPU UI";
+    return g_app.rendererReason.empty() ? "CPU" : "CPU | " + g_app.rendererReason;
+}
+void SelectPlayCpu(const std::string& reason = {}) {
+    g_app.rendererReason = reason;
+    if (g_app.gpu) {
+        std::string error;
+        if (!g_app.gpu->Deactivate(error)) g_app.rendererReason += " | detach: " + error;
+        g_app.gpu.reset();
+    }
+    g_app.gpuSkipped = false;
+    RefreshPlayPointer();
+    if (Scene().Game()) {
+        RECT client{}; GetClientRect(g_app.viewport, &client);
+        const int scale = RenderScale();
+        Graphics::RenderScene cpuScene; Graphics::RenderView cpuView;
+        Scene().Game()->PrepareRenderScene(std::max(1, static_cast<int>(client.right) / scale),
+            std::max(1, static_cast<int>(client.bottom) / scale), cpuScene, cpuView);
+        Scene().Game()->SetExternalRenderStats({}, 0, "CPU");
+        Scene().Game()->Console().Print("Renderer: " + PlayRendererText());
+    }
+    RefreshStatus(); RefreshToolbar();
+}
+void SelectPlayGpu() {
+    Framework::GameHost* game = Scene().Game();
+    if (!game || GpuPlaying()) return;
+    auto candidate = std::make_unique<Platform::D3D11Viewport>();
+    std::string error;
+    if (!candidate->Activate(g_app.viewport, *game, error)) { SelectPlayCpu(error); return; }
+    Platform::NativeViewportStats stats;
+    if (candidate->Render(*game, stats, error) == Graphics::D3D11::RenderStatus::Failed) {
+        candidate.reset(); SelectPlayCpu(error); return;
+    }
+    g_app.gpu = std::move(candidate); g_app.rendererReason.clear();
+    RefreshPlayPointer();
+    game->Console().Print("Renderer: D3D11 Opaque Unlit; neutral display and CPU UI; lighting/sky/fog/shadows/general post unsupported");
+    game->Console().Print(g_app.gpu->Diagnostics());
+    RefreshStatus(); RefreshToolbar();
+}
+#endif
 
 bool InspectorHasFocus() {
     const HWND focus = GetFocus();
@@ -245,7 +314,11 @@ void RefreshTitle() {
 
 void RefreshStatus() {
     if (!g_app.lastError.empty()) {
-        SetStatus("Error: " + g_app.lastError);
+        std::string message = "Error: " + g_app.lastError;
+#if defined(ASTRAL_NATIVE_D3D11)
+        if (Scene().Playing()) message += " | Renderer: " + PlayRendererText();
+#endif
+        SetStatus(message);
         return;
     }
     std::string text = Scene().Status();
@@ -253,6 +326,9 @@ void RefreshStatus() {
         char fps[64];
         std::snprintf(fps, sizeof(fps), "Playing | %.0f fps | Esc or F5 stops", g_app.fps);
         text = fps;
+#if defined(ASTRAL_NATIVE_D3D11)
+        text += " | Renderer: " + PlayRendererText();
+#endif
     } else if (g_app.reparenting) {
         text = "Set parent: click the new parent in the Outliner (the Scene row moves it to the top level; Esc cancels)";
     } else if (text.empty()) {
@@ -262,6 +338,13 @@ void RefreshStatus() {
 }
 
 void RefreshToolbar() {
+#if defined(ASTRAL_NATIVE_D3D11)
+    HMENU menu = GetMenu(g_app.window);
+    EnableMenuItem(menu, kPlayRendererGpu, MF_BYCOMMAND | (Scene().Playing() ? MF_ENABLED : MF_GRAYED));
+    CheckMenuRadioItem(menu, kPlayRendererCpu, kPlayRendererGpu,
+        GpuPlaying() ? kPlayRendererGpu : kPlayRendererCpu, MF_BYCOMMAND);
+    EnableMenuItem(menu, kViewHalfResolution, MF_BYCOMMAND | (GpuPlaying() ? MF_GRAYED : MF_ENABLED));
+#endif
     const int active = static_cast<int>(Scene().tool);
     for (int i = 0; i < 4; ++i) SendMessageW(g_app.toolButtons[i], BM_SETCHECK, i == active ? BST_CHECKED : BST_UNCHECKED, 0);
     SetWindowTextW(g_app.toolButtons[4], Scene().Playing() ? L"Stop (F5)" : L"Play (F5)");
@@ -793,6 +876,9 @@ LRESULT CALLBACK InspectorProc(HWND window, UINT message, WPARAM wParam, LPARAM 
 // ---------------------------------------------------------------- viewport
 
 int RenderScale() {
+#if defined(ASTRAL_NATIVE_D3D11)
+    if (GpuPlaying()) return 1;
+#endif
     RECT client{};
     GetClientRect(g_app.viewport, &client);
     const int area = static_cast<int>(client.right) * static_cast<int>(client.bottom);
@@ -801,6 +887,18 @@ int RenderScale() {
 }
 
 void PresentViewport(HDC dc) {
+#if defined(ASTRAL_NATIVE_D3D11)
+    if (GpuPlaying()) {
+        if (!Scene().Playing() || !Scene().Game()) SelectPlayCpu("Play ended");
+        else {
+            std::string error; Platform::NativeViewportStats stats;
+            const auto result = g_app.gpu->Render(*Scene().Game(), stats, error);
+            g_app.gpuSkipped = result == Graphics::D3D11::RenderStatus::Skipped;
+            if (result != Graphics::D3D11::RenderStatus::Failed) return;
+            SelectPlayCpu(error); // latch CPU once, never retry per frame
+        }
+    }
+#endif
     RECT client{};
     GetClientRect(g_app.viewport, &client);
     const int scale = RenderScale();
@@ -838,6 +936,10 @@ void RenderPoint(LPARAM lParam, float& x, float& y, int& width, int& height) {
 
 void StopPlaying() {
     if (!Scene().Playing()) return;
+#if defined(ASTRAL_NATIVE_D3D11)
+    if (g_app.gpu) SelectPlayCpu(); // release GPU before destroying the Play host
+    g_app.rendererReason.clear();
+#endif
     Scene().Stop();
     g_app.input = {};
     RefreshAll();
@@ -851,6 +953,12 @@ bool StartPlaying() {
         ReportError("Play failed: " + error);
         return false;
     }
+#if defined(ASTRAL_NATIVE_D3D11)
+    Scene().Game()->Commands().RegisterCommand("renderer.info", "renderer.info: actual renderer, HWND/DPI/output metadata", [](const std::vector<std::string>& arguments) {
+        if (!arguments.empty()) return std::string("usage: renderer.info");
+        return GpuPlaying() ? g_app.gpu->Diagnostics() : "Renderer: " + PlayRendererText();
+    });
+#endif
     g_app.input = {};
     g_app.lastTick = std::chrono::steady_clock::now();
     g_app.fpsStart = g_app.lastTick;
@@ -887,6 +995,9 @@ void TickPlay() {
     HDC dc = GetDC(g_app.viewport);
     PresentViewport(dc);
     ReleaseDC(g_app.viewport, dc);
+#if defined(ASTRAL_NATIVE_D3D11)
+    if (GpuPlaying() && g_app.gpuSkipped) MsgWaitForMultipleObjects(0, nullptr, FALSE, 16, QS_ALLINPUT);
+#endif
     ++g_app.framesSinceFps;
     const double elapsed = std::chrono::duration<double>(now - g_app.fpsStart).count();
     if (elapsed >= 0.5) {
@@ -905,6 +1016,16 @@ void AppendUtf8(std::string& out, wchar_t c) {
 // Keyboard and mouse while playing go to the game, like AstralPlayerWin32.
 bool PlayInput(UINT message, WPARAM wParam, LPARAM lParam) {
     Framework::HostInput& input = g_app.input;
+#if defined(ASTRAL_NATIVE_D3D11)
+    // Let ViewportProc preserve native menus before recording game/UI input.
+    if (message == WM_SYSKEYDOWN || message == WM_SYSKEYUP
+        || ((message == WM_KEYDOWN || message == WM_KEYUP) && wParam == VK_F10)) {
+        // An ordinary-held key can be released while Alt is down.
+        if (message == WM_SYSKEYUP || message == WM_KEYUP)
+            input.keys.keys.reset(static_cast<std::size_t>(wParam & 0xFF));
+        return false;
+    }
+#endif
     switch (message) {
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN: {
@@ -917,6 +1038,9 @@ bool PlayInput(UINT message, WPARAM wParam, LPARAM lParam) {
         input.keys.keys.set(key);
         if (!repeat) input.ui.keysPressed.push_back(key);
         if (!repeat && key == VK_F3) Scene().Game()->Commands().Execute("stat");
+#if defined(ASTRAL_NATIVE_D3D11)
+        if (!repeat && key == VK_F6 && GpuPlaying()) Scene().Game()->Console().Print("D3D11 uses the full viewport; select CPU to use Half Resolution");
+#endif
         input.ui.shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
         return true;
     }
@@ -935,17 +1059,31 @@ bool PlayInput(UINT message, WPARAM wParam, LPARAM lParam) {
         return true;
     }
     case WM_LBUTTONDOWN:
+#if defined(ASTRAL_NATIVE_D3D11)
+        SetPlayPointer({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
+#endif
         input.keys.keys.set(Input::Keys::MouseLeft);
         input.ui.pointerDown = true;
         SetCapture(g_app.viewport);
         return true;
     case WM_LBUTTONUP:
+#if defined(ASTRAL_NATIVE_D3D11)
+        SetPlayPointer({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
+#endif
         input.keys.keys.reset(Input::Keys::MouseLeft);
         input.ui.pointerDown = false;
         ReleaseCapture();
         return true;
-    case WM_RBUTTONDOWN: input.keys.keys.set(Input::Keys::MouseRight); return true;
-    case WM_RBUTTONUP: input.keys.keys.reset(Input::Keys::MouseRight); return true;
+    case WM_RBUTTONDOWN:
+#if defined(ASTRAL_NATIVE_D3D11)
+        SetPlayPointer({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
+#endif
+        input.keys.keys.set(Input::Keys::MouseRight); return true;
+    case WM_RBUTTONUP:
+#if defined(ASTRAL_NATIVE_D3D11)
+        SetPlayPointer({GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
+#endif
+        input.keys.keys.reset(Input::Keys::MouseRight); return true;
     default: return false;
     }
 }
@@ -1166,6 +1304,9 @@ void OpenFile(bool project) {
     }
     std::string error;
     Editor::SceneEditor& destination = candidate ? *candidate : Scene();
+#if defined(ASTRAL_NATIVE_D3D11)
+    if (g_app.gpu) SelectPlayCpu("Opening another project or scene");
+#endif
     const bool ok = project ? destination.OpenProject(relative, error) : destination.OpenScene(relative, error);
     if (!ok) {
         const std::string filename = Utf8(std::filesystem::path(file).filename().wstring());
@@ -1241,6 +1382,9 @@ void OnCommand(int id) {
     switch (id) {
     case kFileNew:
         if (!ConfirmDiscard()) return;
+#if defined(ASTRAL_NATIVE_D3D11)
+        if (g_app.gpu) SelectPlayCpu("Creating another scene");
+#endif
         Scene().NewScene();
         RefreshAssets();
         RefreshAll();
@@ -1289,11 +1433,18 @@ void OnCommand(int id) {
     case kViewGrid: Scene().showGrid = !Scene().showGrid; InvalidateViewport(); return;
     case kViewSnap: Scene().snap = !Scene().snap; InvalidateViewport(); return;
     case kViewHalfResolution:
+#if defined(ASTRAL_NATIVE_D3D11)
+        if (GpuPlaying()) { Scene().Game()->Console().Print("D3D11 uses the full viewport; select CPU to use Half Resolution"); return; }
+#endif
         g_app.renderScale = RenderScale() == 2 ? 1 : 2;
         g_app.autoHalfResolution = false;
         InvalidateViewport();
         return;
     case kPlayToggle: TogglePlay(); return;
+#if defined(ASTRAL_NATIVE_D3D11)
+    case kPlayRendererCpu: SelectPlayCpu(); InvalidateViewport(); return;
+    case kPlayRendererGpu: SelectPlayGpu(); InvalidateViewport(); return;
+#endif
     case kHelpControls: ShowControls(); return;
     default: return;
     }
@@ -1398,6 +1549,12 @@ HMENU BuildMenu() {
     AppendMenuW(view, MF_STRING, kViewHalfResolution, L"&Half Resolution\tF6");
     HMENU play = CreatePopupMenu();
     AppendMenuW(play, MF_STRING, kPlayToggle, L"&Play / Stop\tF5");
+#if defined(ASTRAL_NATIVE_D3D11)
+    HMENU renderer = CreatePopupMenu();
+    AppendMenuW(renderer, MF_STRING | MF_CHECKED, kPlayRendererCpu, L"&CPU");
+    AppendMenuW(renderer, MF_STRING | MF_GRAYED, kPlayRendererGpu, L"&D3D11 Opaque Unlit");
+    AppendMenuW(play, MF_POPUP, reinterpret_cast<UINT_PTR>(renderer), L"&Renderer (During Play)");
+#endif
     HMENU help = CreatePopupMenu();
     AppendMenuW(help, MF_STRING, kHelpControls, L"&Controls");
     AppendMenuW(bar, MF_POPUP, reinterpret_cast<UINT_PTR>(file), L"&File");
@@ -1485,7 +1642,11 @@ LRESULT CALLBACK EditorWindowProc(HWND window, UINT message, WPARAM wParam, LPAR
         g_app.assetsLabel = MakeControl(window, L"STATIC", L"ASSETS (double-click to create)", SS_LEFT);
         g_app.assets = MakeControl(window, L"LISTBOX", L"", LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_BORDER | WS_VSCROLL, kAssetListId);
         g_app.status = MakeControl(window, L"STATIC", L"", SS_LEFT | SS_ENDELLIPSIS);
-        g_app.viewport = CreateWindowExW(0, kViewportClass, L"", WS_CHILD | WS_VISIBLE, 0, 0, 10, 10, window, nullptr,
+        DWORD viewportStyle = WS_CHILD | WS_VISIBLE;
+#if defined(ASTRAL_NATIVE_D3D11)
+        viewportStyle |= WS_CLIPCHILDREN;
+#endif
+        g_app.viewport = CreateWindowExW(0, kViewportClass, L"", viewportStyle, 0, 0, 10, 10, window, nullptr,
             GetModuleHandleW(nullptr), nullptr);
 
         const Astral::Editor::EditorControlCreationState createdControls{{
