@@ -54,3 +54,23 @@ merge another worker's unreviewed PRs, change architecture, invoke unsafe R0,
 start local execution, deploy, or release under this authorization.
 Company Runtime remains the sole workstation scheduler/executor. These
 operating records themselves are documentation, not playable-game acceptance.
+
+## September 22, 2026 operator update: parallel hourly ART worker
+
+Lucas explicitly requested a separate hourly AnimeRPG art-direction worker to
+perform bounded art direction, creative-tool planning, original source/default
+asset production, and creative verification toward leading engine/game quality.
+That instruction is newer than the blanket production-art pause above. For this
+art worker only, dependency-ready art direction, original source assets, generic
+starter/default content, creative QA, and tool/workflow qualification may advance
+in parallel with engine and game work.
+
+The art worker does not own renderer/editor/gameplay implementation, engine
+acceptance, local Company Runtime execution, architecture changes, dependency or
+software installation, paid-service spending, deployment, release, or another
+worker's branch. Unsupported assets must remain source-only and must not be
+presented as runtime-integrated. Existing native, performance, provenance,
+independent-review, and repository-protection gates still apply to dependent work.
+The game worker's separate automatic-merge authorization does not transfer to the
+art worker. Art changes use scoped task packets and the durable records under
+`Docs/Agents/art-hourly/`.

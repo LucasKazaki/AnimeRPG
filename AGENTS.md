@@ -52,3 +52,19 @@ Lucas explicitly requested an hourly AnimeRPG game worker, separate from the hou
 For that worker only, [the operating contract](Docs/Agents/ANIMERPG-HOURLY.md) records standing push/merge approval and dependency-ready parallel game work. This supersedes older blanket game-content-pause and per-merge-human-approval wording within that scope. It does not waive independent implementation review, applicable tests, native acceptance, dependency/architecture approvals, or repository protections. An unresolved gate blocks dependent work, not unrelated independently verifiable game work. Documentation-only operating records are not product implementation and require content/structural validation and applicable checks, not fabricated gameplay acceptance.
 
 Do not broaden this authorization to the engine worker, its unreviewed PR stack, unrelated repositories, local execution, deployment, or release. Keep the original rules above for all other work. Use the [game backlog](Docs/Agents/animerpg-hourly/BACKLOG.json) and a scoped task packet; verify live ownership before changing gameplay files that happen to reside under `Engine/Scene`.
+
+## September 22, 2026: separate hourly ART worker authorization
+
+Lucas explicitly requested an hourly AnimeRPG art worker, separate from both the
+GAME and Astral Engine workers, for bounded art direction, creative-tool planning,
+original source/default asset production, and creative verification. For that
+worker only, this supersedes the older blanket art/assets pause for work that is
+independent of missing engine capabilities.
+
+Use `GAME_DEVELOPMENT_CONTROL.md`, a scoped art task, and the durable records under
+`Docs/Agents/art-hourly/`. The art worker may create and verify original source
+assets and starter/default content, but must keep unsupported outputs explicitly
+source-only. It does not gain renderer/editor/gameplay ownership, automatic merge
+authority, architecture approval, dependency-install authority, spending authority,
+local Company Runtime control, deployment, release, or permission to clear native,
+performance, provenance, independent-review, or engine-acceptance gates.

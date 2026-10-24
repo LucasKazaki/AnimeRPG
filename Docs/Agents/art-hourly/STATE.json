@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "loop_id": "astral-art-hourly-20260922",
+  "original_baseline": "755faabfb5f04d5bc07324d91cbceb261cdc1060",
+  "latest_observed_main": "e782f595696c046c2c394b636622f700a18d0425",
+  "run_date": "2026-09-22",
+  "focus": "repair independent-review findings in starter materials v2 and record explicit art-worker authorization",
+  "delivered": [
+    "proposed art bible v0.1 retained",
+    "four generated 512x512 material families moved to unique [0,1) periodic sampling",
+    "bounded PNG inflation and full-texel material semantic validation",
+    "explicit scoped art-worker authorization recorded in repository control files",
+    "three new regressions for review findings"
+  ],
+  "verification": {
+    "initial_hosted_windows_head_e1c4d0f": "passed: workflow run 35759820363",
+    "initial_independent_review": "completed with 1 authorization and 3 tooling findings",
+    "repair_generator": "passed: astral-materials-v2-2",
+    "repair_exact_regeneration_check": "passed",
+    "repair_validator": "passed: 4 materials, 16 PNGs",
+    "repair_regression_tests": "passed: 7/7 with documented task invocation",
+    "repair_python_compile": "passed",
+    "repair_expected_manifest_match": "passed",
+    "repair_hosted_ci": "not_run_until_pushed",
+    "repair_independent_review": "not_run_until_pushed",
+    "runtime_render": "not_run_engine_unsupported",
+    "native_windows_runtime": "not_run",
+    "independent_art_review": "not_run"
+  },
+  "next_action": "push this review repair, obtain exact-head hosted CI and independent re-review, then hand the asymmetric triangle/UV/tangent/texture calibration requirements to the engine worker"
+}
