@@ -329,7 +329,10 @@ def analyze(receipt_path: Path, telemetry_path: Path, *,
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # Exclusive creation also protects input aliases, hard links and prior reports.
+    # A preflight exists() check would leave a race before a truncating write.
+    with path.open("x", encoding="utf-8") as output:
+        output.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -338,7 +341,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("telemetry", type=Path)
     p.add_argument("--expected-commit")
     p.add_argument("--expected-executable-sha256")
-    p.add_argument("--json", type=Path)
+    p.add_argument("--json", type=Path,
+                   help="Create a new report file; existing paths are never overwritten")
     return p.parse_args(argv)
 
 

@@ -191,6 +191,79 @@ class SoakTelemetryAnalysisTests(unittest.TestCase):
             self.assertFalse(data["acceptance"]["required_24h_soak_verified"])
             self.assertFalse(data["acceptance"]["independent_acceptance"])
 
+    def test_cli_preserves_inputs_when_output_reuses_an_input_path(self) -> None:
+        for invalid in (False, True):
+            for target in ("receipt", "telemetry"):
+                with self.subTest(invalid=invalid, target=target), tempfile.TemporaryDirectory() as td:
+                    receipt, telemetry = write_fixture(Path(td))
+                    if invalid:
+                        telemetry.write_bytes(telemetry.read_bytes() + b" ")
+                    before = {path: path.read_bytes() for path in (receipt, telemetry)}
+                    output = receipt if target == "receipt" else telemetry
+                    proc = subprocess.run(
+                        [sys.executable, "-B", str(Path(mod.__file__)), str(receipt),
+                         str(telemetry), "--json", str(output)],
+                        capture_output=True, text=True, timeout=10,
+                    )
+                    self.assertNotEqual(proc.returncode, 0)
+                    self.assertIn("cannot write analysis receipt", proc.stderr)
+                    for path, original in before.items():
+                        self.assertEqual(path.read_bytes(), original)
+
+    def test_cli_preserves_previous_report_on_success_and_failure(self) -> None:
+        for invalid in (False, True):
+            with self.subTest(invalid=invalid), tempfile.TemporaryDirectory() as td:
+                receipt, telemetry = write_fixture(Path(td))
+                if invalid:
+                    telemetry.write_bytes(telemetry.read_bytes() + b" ")
+                output = Path(td) / "analysis.json"
+                original = b'{"previous_evidence": "retain exactly"}\r\n'
+                output.write_bytes(original)
+                proc = subprocess.run(
+                    [sys.executable, "-B", str(Path(mod.__file__)), str(receipt),
+                     str(telemetry), "--json", str(output)],
+                    capture_output=True, text=True, timeout=10,
+                )
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertIn("cannot write analysis receipt", proc.stderr)
+                self.assertEqual(output.read_bytes(), original)
+
+    def test_cli_preserves_input_when_output_is_a_hard_link(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            receipt, telemetry = write_fixture(Path(td))
+            original = receipt.read_bytes()
+            output = Path(td) / "receipt-alias.json"
+            output.hardlink_to(receipt)
+            proc = subprocess.run(
+                [sys.executable, "-B", str(Path(mod.__file__)), str(receipt),
+                 str(telemetry), "--json", str(output)],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn("cannot write analysis receipt", proc.stderr)
+            self.assertEqual(receipt.read_bytes(), original)
+            self.assertEqual(output.read_bytes(), original)
+
+    def test_cli_writes_fresh_failure_report_without_upgrading_claims(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            receipt, telemetry = write_fixture(Path(td))
+            telemetry.write_bytes(telemetry.read_bytes() + b" ")
+            before = {path: path.read_bytes() for path in (receipt, telemetry)}
+            output = Path(td) / "new" / "analysis.json"
+            proc = subprocess.run(
+                [sys.executable, "-B", str(Path(mod.__file__)), str(receipt),
+                 str(telemetry), "--json", str(output)],
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(proc.returncode, 1)
+            self.assertEqual(proc.stderr, "")
+            data = json.loads(output.read_text(encoding="utf-8"))
+            self.assertFalse(data["passed"])
+            self.assertIn("SHA-256", data["error"])
+            self.assertTrue(all(value is False for value in data["acceptance"].values()))
+            for path, original in before.items():
+                self.assertEqual(path.read_bytes(), original)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
