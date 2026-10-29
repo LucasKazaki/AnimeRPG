@@ -34,9 +34,8 @@ switching away cancels a partially typed command. Release held keys before resum
 - **Open Astral Editor.cmd** opens that project for editing. Select an object in
   the Outliner, use W/E/R for move/rotate/scale, F to frame selection, and F5 to
   play/stop. Save changes only if you want to edit the packaged sample.
-- **Open Engine Player.cmd** exercises the generic engine host. It does not
-  register the Playground-specific gameplay behaviours; use Play Engine Sample
-  for the complete sample game.
+- **Open Engine Player.cmd** exercises the generic engine host with a neutral
+  scene. Use Play Engine Sample for the Playground game and its gameplay behaviours.
 - **Open GPU Sample.cmd** opens the neutral graphics fixture. Choose **Renderer >
   D3D11 Opaque Unlit** to exercise the hardware renderer. The Playground uses
   materials outside that renderer's current scope and remains on CPU rendering.

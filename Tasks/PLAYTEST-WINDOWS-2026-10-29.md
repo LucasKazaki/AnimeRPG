@@ -17,7 +17,8 @@ C++17/CMake/Win32 architecture and existing content. New unrelated features,
 third-party dependencies and architecture migrations are excluded.
 
 Build output: sibling astral-playtest-build. Evidence: sibling playtest-evidence.
-Package: C:/Users/lucas/Games/AstralPlaytest-2026-10-29.
+Initial QA package: C:/Users/lucas/Games/AstralPlaytest-2026-10-29.
+Final corrected package: C:/Users/lucas/Games/AstralPlaytest.
 
 Validation: configure root CMake using VS2022 x64 with D3D11 and hardware test
 targets enabled; build Debug and Release with at most four compiler workers;

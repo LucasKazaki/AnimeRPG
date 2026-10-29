@@ -25,3 +25,10 @@ to connect the packaged binaries to the reviewed source.
 git diff --check, Python syntax inspection and fixture JSON parsing passed.
 The guide accurately limits the delivered game to its training-target prototype.
 No source was edited and no native test was run by the reviewer.
+
+Follow-up evidence audit: all 28 initial package file hashes, 8 executable
+identities and 12 EXE/DLL import inventories match the retained Release build.
+Both configurations' 33 domain and 7 native test results are supported by logs.
+The final launcher correction to neutral GpuContent and inclusion of QA/review
+reports were accepted. The QA command block is a reproduction recipe; desktop
+observations are the coordinator's direct attestation, not reviewer execution.

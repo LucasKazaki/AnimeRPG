@@ -59,11 +59,15 @@ def main() -> None:
     shutil.copytree(ROOT / "Content" / "Samples" / "Playground", output / "Content")
     shutil.copytree(ROOT / "Tests" / "Fixtures" / "NativeGpu", output / "GpuContent")
     shutil.copy2(ROOT / "Docs" / "PLAYTEST.md", output / "START-HERE.md")
+    for category in ("QA", "Reviews"):
+        report_path = Path("Docs") / category / "PLAYTEST-WINDOWS-2026-10-29.md"
+        (output / report_path.parent).mkdir(parents=True)
+        shutil.copy2(ROOT / report_path, output / report_path)
     launchers = {
         "Play AnimeRPG.cmd": ('set "ASTRAL_RENDER_MODE=astral"\n', 'AstralGame.exe'),
         "Play Engine Sample.cmd": ("", 'AstralPlayerWin32.exe "Content" "project.json"'),
         "Open Astral Editor.cmd": ("", 'AstralEditor.exe "Content" "project.json"'),
-        "Open Engine Player.cmd": ("", 'AstralEnginePlayerWin32.exe "Content" "project.json"'),
+        "Open Engine Player.cmd": ("", 'AstralEnginePlayerWin32.exe "GpuContent" "project.json"'),
         "Open GPU Sample.cmd": ("", 'AstralEnginePlayerWin32.exe "GpuContent" "project.json"'),
     }
     for name, (environment, command) in launchers.items():
