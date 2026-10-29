@@ -2,6 +2,7 @@
 #include "Engine/AI/Navigation.h"
 #include "Engine/Audio/AudioMixer.h"
 #include "Engine/Input/InputSystem.h"
+#include "Engine/Input/KeyCaptureLatch.h"
 #include "Engine/Physics/PhysicsWorld.h"
 #include "Engine/VFX/Particles.h"
 #include "Tests/EngineTestSupport.h"
@@ -651,6 +652,66 @@ ASTRAL_TEST(PerceptionUsesConeRangeAndOcclusion) {
     ASTRAL_CHECK(AI::CanSee(world, eye, {0, 0, 1}, {3, 1.6f, 10}, 90, 20));  // visible past it
     ASTRAL_CHECK(!AI::CanSee(world, eye, {0, 0, 1}, {0, 1.6f, -10}, 90, 20)); // behind the viewer
     ASTRAL_CHECK(!AI::CanSee(world, eye, {0, 0, 1}, {3, 1.6f, 30}, 90, 20));  // out of range
+}
+
+ASTRAL_TEST(CaptureCloseRequiresReleaseForEveryPolledGameplayBinding) {
+    // Actions, numeric thoughts, movement, physical guard, Escape and F2-F4.
+    const int keys[]{'J', 'K', 'Q', 'L', 'E', '0', '1', '2', '3', '4', '5',
+                     'W', 'S', 'A', 'D', 0xA0, 0x1B, 0x71, 0x72, 0x73};
+    for (int key : keys) {
+        Input::KeyCaptureLatch latch;
+        ASTRAL_CHECK(!latch.Suppress(key, true, false));
+        ASTRAL_CHECK(latch.Suppress(key, true, true));
+        latch.QuarantineAllUntilRelease();
+        ASTRAL_CHECK(latch.Suppress(key, true, false));
+        ASTRAL_CHECK(latch.Suppress(key, true, false));
+        ASTRAL_CHECK(!latch.Suppress(key, false, false));
+        ASTRAL_CHECK(!latch.Suppress(key, true, false)); // fresh gameplay press
+    }
+}
+
+ASTRAL_TEST(CaptureCloseBetweenPollsStillQuarantinesPhysicalHolds) {
+    Input::KeyCaptureLatch latch;
+    // Prompt opens and closes in the message drain without a captured poll.
+    latch.QuarantineAllUntilRelease();
+    ASTRAL_CHECK(latch.Suppress('J', true, false));
+    ASTRAL_CHECK(latch.Suppress('E', true, false));
+    ASTRAL_CHECK(latch.Suppress('W', true, false));
+    ASTRAL_CHECK(!latch.Suppress('J', false, false));
+    ASTRAL_CHECK(!latch.Suppress('J', true, false));
+    ASTRAL_CHECK(latch.Suppress('E', true, false)); // independent release
+}
+
+ASTRAL_TEST(CaptureClosureNeedsAPostBoundaryReleaseObservation) {
+    Input::KeyCaptureLatch latch;
+    ASTRAL_CHECK(latch.Suppress('J', false, true));
+    latch.QuarantineAllUntilRelease();
+    // An up observation before close cannot authorize an unobserved new hold.
+    ASTRAL_CHECK(latch.Suppress('J', true, false));
+    ASTRAL_CHECK(!latch.Suppress('J', false, false));
+    ASTRAL_CHECK(!latch.Suppress('J', true, false));
+}
+
+ASTRAL_TEST(CaptureQuarantineSurvivesCaptureAndRendererExit) {
+    Input::KeyCaptureLatch latch;
+    latch.QuarantineAllUntilRelease(); // presenter closes on disable too
+    ASTRAL_CHECK(latch.Suppress(0x1B, true, false)); // cancellation cannot quit
+    ASTRAL_CHECK(latch.Suppress('Q', true, false));
+    ASTRAL_CHECK(!latch.Suppress(0x1B, false, false));
+    ASTRAL_CHECK(!latch.Suppress(0x1B, true, false)); // new Escape may quit
+    ASTRAL_CHECK(latch.Suppress('Q', true, false));
+}
+
+ASTRAL_TEST(CaptureLatchBoundsAndOrdinaryKeysRemainIndependent) {
+    Input::KeyCaptureLatch latch;
+    ASTRAL_CHECK(latch.Suppress(-1, true, false));
+    ASTRAL_CHECK(latch.Suppress(256, false, false));
+    ASTRAL_CHECK(latch.Suppress(std::numeric_limits<int>::max(), true, false));
+    ASTRAL_CHECK(latch.Suppress('J', true, true));
+    ASTRAL_CHECK(!latch.Suppress('K', true, false));
+    ASTRAL_CHECK(latch.Suppress('J', true, false));
+    ASTRAL_CHECK(!latch.Suppress(255, true, false));
+    ASTRAL_CHECK(!latch.Suppress(0, true, false));
 }
 
 ASTRAL_TEST_MAIN("EngineSystemsTests")

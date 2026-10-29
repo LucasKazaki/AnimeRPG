@@ -155,6 +155,27 @@ bool CombatSandbox::ConsumeStaggerOpening() {
     return true;
 }
 
+bool CombatSandbox::RestoreDefeatedEncounterTarget() {
+    if (targetMode_ != TrainingTargetMode::Standard || !dummy_.IsDefeated()) {
+        return false;
+    }
+
+    dummy_.health = dummy_.maximumHealth;
+    dummy_.posture = 0;
+    targetDefeatElapsedSeconds_ = -1.0;
+    staggerEndMicros_ = 0;
+    lastPostureHitMicros_ = CurrentMicros();
+    postureAtRecoveryStart_ = 0;
+    comboCount_ = 0;
+    lastComboHitMicros_ = -1000000000;
+    targetAffinity_ = ManaAffinity::None;
+    eclipseOpening_ = false;
+    ResetTechniqueChain();
+    ClearEnemyAttackState();
+    lastAttack_ = {AttackType::Light, AttackResult::Ready, 0, 0, false, false, false, false};
+    return true;
+}
+
 void CombatSandbox::ResetTrainingSession() {
     const TrainingEnemyDefinition enemy = CurrentEnemyDefinition();
     dummy_ = TrainingDummy{};

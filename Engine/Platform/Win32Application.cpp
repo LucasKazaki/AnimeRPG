@@ -299,9 +299,13 @@ int Win32Application::Run() {
         return std::chrono::duration<double, std::milli>(duration).count();
     };
     const auto keyDown = [&benchmarkRunControl, this](int virtualKey) {
-        return !benchmarkRunControl.SuppressLiveInput()
-            && !astral_.SuppressKey(virtualKey)
-            && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+        if (benchmarkRunControl.SuppressLiveInput()) return false;
+        const bool physicallyDown = (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+        // Feed up observations too: short-circuiting on physicallyDown would
+        // prevent a quarantined key from ever rearming after prompt closure.
+        const bool suppressed = astral_.SuppressKey(virtualKey, physicallyDown,
+            GetForegroundWindow() != window_);
+        return physicallyDown && !suppressed;
     };
 
     while (message.message != WM_QUIT) {
@@ -365,6 +369,7 @@ int Win32Application::Run() {
         const bool dashDown = keyDown('Q');
         const bool fatalStrikeDown = keyDown('L');
         const bool interactDown = keyDown('E');
+        const bool retryDown = keyDown(VK_F5);
         bool commandDown[6]{};
         for (int index = 0; index < 6; ++index) {
             commandDown[index] = keyDown('0' + index);
@@ -445,12 +450,14 @@ int Win32Application::Run() {
             const Scene::LandmarkInteractionReport report = landmarkInteraction_.TryInteract(
                 playerController_.TransformState().WorldPosition(),
                 world_, shadowbladeActions_);
-            if (report.result == Scene::LandmarkInteractionResult::Discovered) {
-                encounterChanged = landmarkEncounter_.TryActivate(report, combatSandbox_).result
-                    == Scene::LandmarkEncounterResult::Activated;
-            }
+            encounterChanged = landmarkEncounter_.TryActivate(report, combatSandbox_).result
+                == Scene::LandmarkEncounterResult::Activated;
             astral_.OnInteract(report);
             interacted = true;
+        }
+        if (retryDown && !retryPressed_) {
+            encounterChanged = landmarkEncounter_.Retry(combatSandbox_, shadowbladeActions_).result
+                == Scene::LandmarkEncounterResult::Retried || encounterChanged;
         }
         encounterChanged = landmarkEncounter_.Update(combatSandbox_, shadowbladeActions_)
             || encounterChanged;
@@ -460,6 +467,7 @@ int Win32Application::Run() {
         dashPressed_ = dashDown;
         fatalStrikePressed_ = fatalStrikeDown;
         interactPressed_ = interactDown;
+        retryPressed_ = retryDown;
         for (int index = 0; index < 6; ++index) commandPressed_[index] = commandDown[index];
         if (attacked || shadowAction || thoughtCommand || interacted || selectionChanged
             || encounterChanged || guardChanged || input.forward || input.backward
@@ -570,7 +578,14 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND window, UINT message, WPARAM 
     case WM_CHAR: {
         // Typed Thought prompt (Astral mode only); everything else keeps default handling.
         auto* application = reinterpret_cast<Win32Application*>(GetWindowLongPtrW(window, GWLP_USERDATA));
-        if (application && application->astral_.HandleChar(static_cast<wchar_t>(wParam))) return 0;
+        if (application && GetForegroundWindow() == window
+            && application->astral_.HandleChar(static_cast<wchar_t>(wParam),
+                (lParam & (1LL << 30)) != 0)) return 0;
+        return DefWindowProcW(window, message, wParam, lParam);
+    }
+    case WM_KILLFOCUS: {
+        auto* application = reinterpret_cast<Win32Application*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+        if (application) application->astral_.OnFocusLost();
         return DefWindowProcW(window, message, wParam, lParam);
     }
     case WM_DESTROY:

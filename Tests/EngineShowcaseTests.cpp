@@ -130,6 +130,62 @@ ASTRAL_TEST(AstralModeKeepsGameplayRulesOnTheM10Route) {
     ASTRAL_CHECK_NEAR(Position(astral).y, Position(gdi).y, 0.05f);
 }
 
+ASTRAL_TEST(EarlyDefeatThenLincolnInteractionStartsOneFreshAttempt) {
+    for (bool astralMovement : {false, true}) {
+        ShowcaseSession session(nullptr, TestSettings(), astralMovement);
+        Tap(session, [](SessionInput& in) { in.fatal = true; });
+        Tap(session, [](SessionInput& in) { in.light = true; });
+        ASTRAL_CHECK(session.Combat().Dummy().IsDefeated());
+        ASTRAL_CHECK(session.Encounter().State() == Scene::LandmarkEncounterState::Locked);
+        const auto damageBefore = session.Combat().Stats().totalDamage;
+        session.Place({0.0f, 18.0f, 0.0f}); // in Lincoln interaction range, outside its solid proxy
+        SessionInput held;
+        held.interact = true;
+        const auto entered = session.Step(held, kDt);
+        ASTRAL_CHECK(entered.interacted && entered.encounterChanged);
+        ASTRAL_CHECK(session.Encounter().State() == Scene::LandmarkEncounterState::Active);
+        ASTRAL_CHECK(session.Combat().Dummy().health == session.Combat().Dummy().maximumHealth);
+        ASTRAL_CHECK(session.Combat().Stats().totalDamage == damageBefore);
+        ASTRAL_CHECK(!session.Encounter().CompletionRewardGranted());
+        const auto continued = session.Step(held, kDt);
+        ASTRAL_CHECK(!continued.interacted && !continued.encounterChanged);
+        ASTRAL_CHECK(session.Interaction().VisitedCount() == 1);
+        Run(session, 30);
+        session.Place({0.0f, 0.0f, 0.0f});
+        Tap(session, [](SessionInput& in) { in.light = true; });
+        const int remaining = session.Combat().Dummy().health;
+        ASTRAL_CHECK(remaining > 0 && remaining < session.Combat().Dummy().maximumHealth);
+        session.Place({0.0f, 18.0f, 0.0f});
+        const auto repeated = Tap(session, [](SessionInput& in) { in.interact = true; });
+        ASTRAL_CHECK(repeated.interacted && !repeated.encounterChanged);
+        ASTRAL_CHECK(session.Combat().Dummy().health == remaining);
+    }
+}
+
+ASTRAL_TEST(CompletedEncounterCanBeReplayedWithoutRepeatedKeyReset) {
+    for (bool astralMovement : {false, true}) {
+        ShowcaseSession session(nullptr, TestSettings(), astralMovement);
+        PlayM10Route(session, false, nullptr, nullptr);
+        const auto visited = session.Interaction().VisitedCount();
+        SessionInput retry;
+        retry.retry = true;
+        ASTRAL_CHECK(session.Step(retry, kDt).encounterChanged);
+        ASTRAL_CHECK(session.Encounter().State() == Scene::LandmarkEncounterState::Active);
+        ASTRAL_CHECK(!session.Combat().Dummy().IsDefeated());
+        ASTRAL_CHECK(session.Encounter().CompletionRewardGranted());
+        ASTRAL_CHECK(session.Interaction().VisitedCount() == visited);
+        retry.light = true;
+        session.Step(retry, kDt);
+        const auto health = session.Combat().Dummy().health;
+        ASTRAL_CHECK(health < session.Combat().Dummy().maximumHealth);
+        ASTRAL_CHECK(!session.Step(retry, kDt).encounterChanged);
+        ASTRAL_CHECK(session.Combat().Dummy().health == health);
+        session.Step({}, kDt);
+        ASTRAL_CHECK(!session.Step(retry, kDt).encounterChanged);
+        ASTRAL_CHECK(session.Combat().Dummy().health == health);
+    }
+}
+
 ASTRAL_TEST(ThoughtFocusDrivesPresentationTimeAtGameplayMultiplier) {
     ShowcaseSession session(nullptr, TestSettings());
     Thought(session, "focus");

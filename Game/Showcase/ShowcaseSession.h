@@ -22,6 +22,7 @@ struct SessionInput {
     bool light{}, heavy{}, dash{}, fatal{}, interact{}; // J K Q L E
     std::array<bool, 6> command{};               // number keys 0..5
     std::string typedThought;                    // non-empty: submit once
+    bool retry{};                               // F5: replay completed encounter
 };
 
 class ShowcaseSession {

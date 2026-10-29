@@ -36,6 +36,7 @@ private:
     bool dashPressed_{};
     bool fatalStrikePressed_{};
     bool interactPressed_{};
+    bool retryPressed_{};
     bool commandPressed_[6]{};
     // Opt-in Astral renderer (F2 or ASTRAL_RENDER_MODE=astral); GDI stays the default.
     Showcase::Win32AstralPresenter astral_;

@@ -25,6 +25,7 @@ bool Win32AstralPresenter::RequestedByEnvironment() {
 
 bool Win32AstralPresenter::SetEnabled(bool enabled, const Scene::WorldBlockout& world) {
     if (!enabled) {
+        if (promptOpen_) capturedKeys_.QuarantineAllUntilRelease();
         enabled_ = false;
         promptOpen_ = false;
         promptText_.clear();
@@ -66,20 +67,22 @@ void Win32AstralPresenter::HandleFunctionKeys(bool f2, bool f3, bool f4, const S
     f4Held_ = f4;
 }
 
-bool Win32AstralPresenter::HandleChar(wchar_t character) {
+bool Win32AstralPresenter::HandleChar(wchar_t character, bool repeated) {
     if (!Enabled()) return false;
+    if (character == L'\r' && repeated) return true;
     if (!promptOpen_) {
         if (character != L'\r') return false;
         promptOpen_ = true;
         promptText_.clear();
     } else if (character == L'\r') {
         submitted_ = promptText_;
+        capturedKeys_.QuarantineAllUntilRelease();
         promptOpen_ = false;
         promptText_.clear();
     } else if (character == 0x1B) {
+        capturedKeys_.QuarantineAllUntilRelease();
         promptOpen_ = false;
         promptText_.clear();
-        escapeLatched_ = true;
     } else if (character == L'\b') {
         if (!promptText_.empty()) promptText_.pop_back();
     } else if (character >= 0x20 && character < 0x7F && promptText_.size() < 40) {
@@ -89,13 +92,16 @@ bool Win32AstralPresenter::HandleChar(wchar_t character) {
     return true;
 }
 
-bool Win32AstralPresenter::SuppressKey(int virtualKey) {
-    if (PromptOpen()) return true;
-    if (escapeLatched_ && virtualKey == VK_ESCAPE) {
-        if ((GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0) return true;
-        escapeLatched_ = false;
-    }
-    return false;
+void Win32AstralPresenter::OnFocusLost() {
+    capturedKeys_.QuarantineAllUntilRelease();
+    promptOpen_ = false;
+    promptText_.clear();
+    submitted_.clear();
+    if (showcase_) showcase_->SetPrompt(false, {});
+}
+
+bool Win32AstralPresenter::SuppressKey(int virtualKey, bool physicallyDown, bool background) {
+    return capturedKeys_.Suppress(virtualKey, physicallyDown, PromptOpen() || background);
 }
 
 std::string Win32AstralPresenter::TakeSubmittedThought() {

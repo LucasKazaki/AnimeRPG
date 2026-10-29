@@ -1,0 +1,9 @@
+{
+  "format": "astral-project",
+  "version": 1,
+  "name": "GPU Original Unlit Fixture",
+  "startupScene": "scenes/main.scene.json",
+  "config": {
+    "host.showStats": false
+  }
+}

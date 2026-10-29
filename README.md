@@ -6,6 +6,15 @@
 Custom C++17, Win32, and GDI engine/action-RPG prototype. Unreal Engine and Unity
 are not production dependencies. The separate AnimeRPG-UE5 repository is an experiment.
 
+## October 29 Windows playtest
+
+The current playtest task is authorized to build and run the retained prototype
+and engine tools. See [Playtest guide](Docs/PLAYTEST.md) for launchers, controls,
+packaging and current limitations. This task supersedes historical playtest-pause
+wording for this bounded delivery; it does not declare full engine acceptance.
+Encounter entry recovery, F5 replay, foreground input protection and Thought
+prompt key-release handling are integrated on the playtest branch.
+
 ## Direction first
 
 Read [Game Development Control](GAME_DEVELOPMENT_CONTROL.md) and

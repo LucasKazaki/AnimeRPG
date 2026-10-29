@@ -1020,5 +1020,19 @@ int main(int argc, char** argv) {
         ASTRAL_CHECK(std::strcmp(argv[4], "0") == 0 || std::strcmp(argv[4], "1") == 0);
         return CompareProbe(argv[2], argv[3], std::strcmp(argv[4], "1") == 0);
     }
+    // A fresh checkout can run the hardware suite without external evidence folders.
+    // Preserve explicit caller paths; children inherit the same scoped capture root.
+    if (!std::getenv("ASTRAL_NATIVE_GPU_FIXTURE")) {
+        if (_putenv_s("ASTRAL_NATIVE_GPU_FIXTURE", ASTRAL_TEST_NATIVE_GPU_FIXTURE) != 0) return 2;
+    }
+    if (!std::getenv("ASTRAL_CAPTURE_DIR")) {
+        const auto stamp = NativeClock::now().time_since_epoch().count();
+        const auto root = std::filesystem::current_path() / "native-gpu-captures"
+            / (std::to_string(GetCurrentProcessId()) + "-" + std::to_string(stamp));
+        std::filesystem::create_directories(root.parent_path());
+        if (!std::filesystem::create_directory(root)) return 2;
+        if (_putenv_s("ASTRAL_CAPTURE_DIR", root.u8string().c_str()) != 0) return 2;
+        std::printf("Native GPU capture directory: %s\n", root.u8string().c_str());
+    }
     return Test::RunAll(argc, argv, "EngineD3D11Tests");
 }

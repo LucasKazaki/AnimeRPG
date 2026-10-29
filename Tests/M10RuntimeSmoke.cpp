@@ -103,6 +103,7 @@ int wmain(int argc, wchar_t** argv) {
     std::wstring activeTitle;
     std::wstring completedTitle;
     std::wstring repeatedTitle;
+    std::wstring retriedTitle;
     int activePixels = 0;
     int completedPixels = 0;
     if (window && WaitForTitle(window, L"M10 Landmark Encounter | Encounter: Locked",
@@ -131,7 +132,14 @@ int wmain(int argc, wchar_t** argv) {
             && WaitForTitle(window, L"Encounter: Completed | Encounter Reward: 30",
                 repeatedTitle)
             && repeatedTitle.find(L"Dummy: Defeated HP: 0/100") != std::wstring::npos;
-        if (repeatSafe && SendKey(VK_ESCAPE)) {
+        const bool retryReady = repeatSafe && SendKey(VK_F5)
+            && WaitForTitle(window, L"Encounter: Active", retriedTitle)
+            && retriedTitle.find(L"HP: 100/100") != std::wstring::npos;
+        const bool retryPlayable = retryReady && SendKey('J')
+            && WaitForTitle(window, L"HP: 75/100", retriedTitle)
+            && HoldKey(VK_F5, 600)
+            && WindowTitle(window).find(L"HP: 75/100") != std::wstring::npos;
+        if (retryPlayable && SendKey(VK_ESCAPE)) {
             passed = WaitForSingleObject(process.hProcess, 5000) == WAIT_OBJECT_0;
         }
     }
@@ -151,13 +159,13 @@ int wmain(int argc, wchar_t** argv) {
     if (!passed || exitCode != 0) {
         std::wcerr << L"M10 AUTOMATED NATIVE RUNTIME SMOKE: FAIL\nInitial: " << initialTitle
             << L"\nActive: " << activeTitle << L"\nCompleted: " << completedTitle
-            << L"\nRepeated: " << repeatedTitle << L"\nActive/completed pixels: "
+            << L"\nRepeated: " << repeatedTitle << L"\nRetried: " << retriedTitle << L"\nActive/completed pixels: "
             << activePixels << L"/" << completedPixels << L"\nExit: " << exitCode << L"\n";
         return 1;
     }
 
     std::wcout << L"M10 AUTOMATED NATIVE RUNTIME SMOKE: PASS\nActive: " << activeTitle
-        << L"\nCompleted: " << completedTitle << L"\nRepeated: " << repeatedTitle
+        << L"\nCompleted: " << completedTitle << L"\nRepeated: " << repeatedTitle << L"\nRetried: " << retriedTitle
         << L"\nVisible active/completed pixels: " << activePixels << L"/"
         << completedPixels << L"\nClean Escape exit code: " << exitCode << L"\n";
     return 0;

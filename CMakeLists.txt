@@ -122,6 +122,8 @@ if(BUILD_TESTING)
         add_executable(EngineD3D11Tests Tests/EngineD3D11Tests.cpp)
         target_link_libraries(EngineD3D11Tests PRIVATE AstralD3D11Viewport psapi)
         target_compile_definitions(EngineD3D11Tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+        target_compile_definitions(EngineD3D11Tests PRIVATE
+            ASTRAL_TEST_NATIVE_GPU_FIXTURE="${CMAKE_SOURCE_DIR}/Tests/Fixtures/NativeGpu")
         astral_add_test(EngineD3D11Tests)
         set_tests_properties(EngineD3D11Tests PROPERTIES LABELS GPU RUN_SERIAL TRUE TIMEOUT 180)
     endif()

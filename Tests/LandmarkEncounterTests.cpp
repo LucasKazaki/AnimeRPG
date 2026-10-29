@@ -48,6 +48,160 @@ void TestActivationRequiresDesignatedDiscoveryAndLiveTarget() {
         "a pre-defeated target cannot create an instant encounter completion");
 }
 
+void TestOwnedEarlyDefeatRecoveryPreservesSession() {
+    using namespace Astral::Scene;
+    WorldBlockout world;
+    CharacterProgression progression;
+    LandmarkInteraction interaction;
+    interaction.SetCharacterProgression(&progression);
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    LandmarkEncounter encounter;
+    combat.SetTrainingEnemyProfile(TrainingEnemyProfile::Bulwark);
+    combat.SetCombatAssistPreset(CombatAssistPreset::Accessible);
+    combat.SetEnemyAggressionPreset(EnemyAggressionPreset::Aggressive);
+    combat.AdvanceTime(7.0f);
+    combat.TryAttack(AttackType::Light, {});
+    combat.ApplyDamage(combat.Dummy().health);
+    actions.TryDash({});
+    actions.SetGuarding(true);
+    interaction.TryDialogueChoice(DialogueTopic::CivilianSafety, DialogueChoice::Reassure);
+    interaction.TryInteract({4.0f, 39.0f, 0.0f}, world, actions);
+    const auto report = interaction.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions);
+    const auto readiness = actions.CurrentActionReadiness();
+    const auto stats = combat.Stats();
+    const auto dialogue = interaction.DialogueSummary();
+    const auto loadout = actions.Loadout().Profile();
+    const float cooldown = combat.CooldownRemaining();
+    const int level = progression.Level();
+    const int experience = progression.ExperienceIntoLevel();
+
+    Expect(report.result == LandmarkInteractionResult::Discovered
+            && report.actionOwner == &actions && combat.Dummy().IsDefeated(),
+        "counterexample setup has a real first Lincoln discovery after early defeat");
+    Expect(encounter.TryActivate(report, combat).result == LandmarkEncounterResult::Activated
+            && encounter.State() == LandmarkEncounterState::Active
+            && combat.Dummy().health == combat.Dummy().maximumHealth,
+        "owned discovery revives a finite target and starts a new attempt");
+    Expect(!encounter.Update(combat, actions) && !encounter.CompletionRewardGranted(),
+        "recovery never turns the earlier defeat into instant completion or reward");
+    Expect(combat.ElapsedSecondsPrecise() == 7.0
+            && Near(combat.CooldownRemaining(), cooldown)
+            && combat.Stats().totalDamage == stats.totalDamage
+            && combat.Stats().hitCount == stats.hitCount
+            && combat.Stats().peakHit == stats.peakHit
+            && combat.Stats().techniqueScore == stats.techniqueScore,
+        "entry recovery preserves cumulative combat metrics, clock and attack cooldown");
+    Expect(combat.EnemyProfile() == TrainingEnemyProfile::Bulwark
+            && combat.AssistPreset() == CombatAssistPreset::Accessible
+            && combat.AggressionPreset() == EnemyAggressionPreset::Aggressive
+            && combat.Dummy().position.x == 3.0f
+            && combat.Dummy().position.y == 0.0f && combat.Dummy().position.z == 0.0f
+            && combat.ComboCount() == 0 && combat.TechniqueChain() == 0,
+        "recovery preserves target configuration/position while clearing target-local openings");
+    Expect(Near(actions.Resource(), readiness.resource)
+            && Near(actions.DashCooldownRemaining(), readiness.dashCooldownRemaining)
+            && Near(actions.FatalStrikeCooldownRemaining(), readiness.fatalStrikeCooldownRemaining)
+            && actions.IsGuarding() && actions.Loadout().Profile().attackBonus == loadout.attackBonus
+            && actions.Loadout().Profile().guardBonus == loadout.guardBonus,
+        "entry recovery does not refund resources/cooldowns or reset guard/loadout state");
+    Expect(interaction.VisitedCount() == 2
+            && interaction.DialogueSummary().topicsDiscussed == dialogue.topicsDiscussed
+            && interaction.DialogueSummary().trust == dialogue.trust
+            && progression.Level() == level && progression.ExperienceIntoLevel() == experience,
+        "entry recovery preserves other discoveries, dialogue and progression");
+}
+
+void TestEntryRecoveryRejectsInvalidReports() {
+    using namespace Astral::Scene;
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    LandmarkEncounter encounter;
+    combat.ApplyDamage(combat.Dummy().maximumHealth);
+    LandmarkInteractionReport report{LandmarkInteractionResult::AlreadyVisited,
+        LandmarkKind::LincolnMemorial, 0.0f, {}, &actions};
+    report.landmark = LandmarkKind::ReflectingPool;
+    Expect(encounter.TryActivate(report, combat).result == LandmarkEncounterResult::DiscoveryRequired
+            && combat.Dummy().IsDefeated(), "other landmarks cannot revive the encounter target");
+    report.landmark = LandmarkKind::LincolnMemorial;
+    report.result = LandmarkInteractionResult::OutOfRange;
+    Expect(encounter.TryActivate(report, combat).result == LandmarkEncounterResult::DiscoveryRequired
+            && combat.Dummy().IsDefeated(), "out-of-range reports cannot revive a target");
+    report.result = LandmarkInteractionResult::AlreadyVisited;
+    report.actionOwner = nullptr;
+    Expect(encounter.TryActivate(report, combat).result == LandmarkEncounterResult::DiscoveryRequired
+            && combat.Dummy().IsDefeated(), "unowned revisits cannot authorize recovery");
+    report.result = LandmarkInteractionResult::Discovered;
+    Expect(encounter.TryActivate(report, combat).result == LandmarkEncounterResult::TargetUnavailable
+            && combat.Dummy().IsDefeated() && encounter.State() == LandmarkEncounterState::Locked,
+        "legacy unowned discovery retains defeated-target rejection");
+    CombatSandbox live;
+    live.ApplyDamage(25);
+    Expect(!live.RestoreDefeatedEncounterTarget() && live.Dummy().health == 75,
+        "target restoration cannot heal an ordinary live target");
+    live.SetTrainingTargetMode(TrainingTargetMode::Endless);
+    Expect(!live.RestoreDefeatedEncounterTarget(), "entry recovery is limited to finite targets");
+}
+
+void TestOwnedNormalEntryAndRepeatedRetry() {
+    using namespace Astral::Scene;
+    WorldBlockout world;
+    LandmarkInteraction interaction;
+    CombatSandbox combat;
+    ShadowbladeActions actions;
+    LandmarkEncounter encounter;
+    actions.TryDash({});
+    combat.ApplyDamage(25);
+    const auto first = interaction.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions);
+    Expect(encounter.TryActivate(first, combat).result == LandmarkEncounterResult::Activated
+            && combat.Dummy().health == 75, "normal entry does not heal a partially damaged target");
+    const auto repeat = interaction.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions);
+    Expect(repeat.result == LandmarkInteractionResult::AlreadyVisited
+            && Near(repeat.rewardApplied, 0.0f)
+            && encounter.TryActivate(repeat, combat).result == LandmarkEncounterResult::AlreadyStarted
+            && combat.Dummy().health == 75, "repeated E neither heals nor repeats discovery reward");
+    Expect(encounter.Retry(combat, actions).result == LandmarkEncounterResult::RetryUnavailable
+            && combat.Dummy().health == 75, "explicit retry cannot reset an active attempt");
+    combat.ApplyDamage(combat.Dummy().health);
+    Expect(encounter.Update(combat, actions) && encounter.CompletionRewardGranted(),
+        "a post-entry defeat completes normally");
+    const float resource = actions.Resource();
+    Expect(encounter.TryActivate(repeat, combat).result == LandmarkEncounterResult::AlreadyStarted
+            && combat.Dummy().IsDefeated() && !encounter.Update(combat, actions)
+            && Near(actions.Resource(), resource), "completed E remains idempotent and cannot farm reward");
+    Expect(encounter.Retry(combat, actions).result == LandmarkEncounterResult::Retried,
+        "existing deliberate completed retry remains available to its owner pair");
+    combat.ApplyDamage(combat.Dummy().health);
+    Expect(encounter.Update(combat, actions) && Near(encounter.LastReport().rewardApplied, 0.0f),
+        "explicit retry preserves the original one-clear reward ledger");
+}
+
+void TestManualObjectiveRevisitCanRecoverEntry() {
+    using namespace Astral::Scene;
+    WorldBlockout world;
+    LandmarkInteraction interaction;
+    interaction.SetObjectiveActivationMode(LandmarkObjectiveActivationMode::ManualStart);
+    ShadowbladeActions actions;
+    CombatSandbox combat;
+    LandmarkEncounter encounter;
+    interaction.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions);
+    combat.ApplyDamage(combat.Dummy().health);
+    interaction.StartObjective();
+    const auto advanced = interaction.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions);
+    Expect(advanced.result == LandmarkInteractionResult::ObjectiveAdvanced
+            && encounter.TryActivate(advanced, combat).result == LandmarkEncounterResult::Activated
+            && !combat.Dummy().IsDefeated() && interaction.VisitedCount() == 1,
+        "owned manual-objective advancement recovers entry without rediscovery/reset");
+    CombatSandbox revisitCombat;
+    LandmarkEncounter revisitEncounter;
+    revisitCombat.ApplyDamage(revisitCombat.Dummy().health);
+    const auto revisit = interaction.TryInteract({-8.0f, 18.0f, 0.0f}, world, actions);
+    Expect(revisit.result == LandmarkInteractionResult::AlreadyVisited
+            && revisitEncounter.TryActivate(revisit, revisitCombat).result
+                == LandmarkEncounterResult::Activated,
+        "an owned already-visited Lincoln report also recovers a still-locked encounter");
+}
+
 void TestCompletionRewardsOnceThroughExistingCap() {
     using namespace Astral::Scene;
     CombatSandbox combat;
@@ -764,6 +918,10 @@ void TestOrderedLandmarkResonanceBonus() {
 
 int main() {
     TestActivationRequiresDesignatedDiscoveryAndLiveTarget();
+    TestOwnedEarlyDefeatRecoveryPreservesSession();
+    TestEntryRecoveryRejectsInvalidReports();
+    TestOwnedNormalEntryAndRepeatedRetry();
+    TestManualObjectiveRevisitCanRecoverEntry();
     TestCompletionRewardsOnceThroughExistingCap();
     TestConfiguredChallengeRewardsPersistAcrossRetryAndRespectCap();
     TestSpecialOffensiveScorecardAndCoach();
