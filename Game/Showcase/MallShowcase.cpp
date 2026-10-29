@@ -695,7 +695,7 @@ void MallShowcase::DrawHud(Graphics::ImageRgba8& image, const Graphics::RenderVi
         canvas.Text(px(30), px(149), text, {color, font, true});
     }
     // Controls and optional engine statistics.
-    canvas.Text(px(18), image.height - px(30), "F2 GDI  F3 STATS  F4 QUALITY  ENTER THOUGHT  WASD J K Q L E SHIFT", {dim, font, true});
+    canvas.Text(px(18), image.height - px(30), "WASD MOVE  J/K ATTACK  Q DASH  L FATAL  E INTERACT  F5 RETRY  ENTER THOUGHT", {dim, font, true});
     if (showStats_) {
         char lines[512];
         std::snprintf(lines, sizeof(lines),

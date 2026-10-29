@@ -88,12 +88,14 @@ const FrameEvents& ShowcaseSession::Step(const SessionInput& input, float deltaS
     if (input.interact && !previous_.interact) {
         const Scene::LandmarkInteractionReport report =
             interaction_.TryInteract(player_.TransformState().WorldPosition(), world_, shadowblade_);
-        if (report.result == Scene::LandmarkInteractionResult::Discovered) {
-            events.encounterChanged =
-                encounter_.TryActivate(report, combat_).result == Scene::LandmarkEncounterResult::Activated;
-        }
+        events.encounterChanged =
+            encounter_.TryActivate(report, combat_).result == Scene::LandmarkEncounterResult::Activated;
         events.interacted = true;
         events.interaction = report;
+    }
+    if (input.retry && !previous_.retry) {
+        events.encounterChanged = encounter_.Retry(combat_, shadowblade_).result
+            == Scene::LandmarkEncounterResult::Retried || events.encounterChanged;
     }
     events.encounterChanged = encounter_.Update(combat_, shadowblade_) || events.encounterChanged;
     previous_ = input;

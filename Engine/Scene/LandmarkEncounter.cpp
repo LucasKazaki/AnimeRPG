@@ -48,12 +48,19 @@ LandmarkEncounterReport LandmarkEncounter::TryActivate(
     if (state_ != LandmarkEncounterState::Locked) {
         return {LandmarkEncounterResult::AlreadyStarted, 0.0f};
     }
-    if (interaction.result != LandmarkInteractionResult::Discovered
-        || interaction.landmark != EncounterLandmark) {
+    const bool discovered = interaction.result == LandmarkInteractionResult::Discovered;
+    const bool ownedRevisit = interaction.actionOwner
+        && (interaction.result == LandmarkInteractionResult::AlreadyVisited
+            || interaction.result == LandmarkInteractionResult::ObjectiveAdvanced);
+    if ((!discovered && !ownedRevisit) || interaction.landmark != EncounterLandmark) {
         lastReport_ = {LandmarkEncounterResult::DiscoveryRequired, 0.0f};
         return lastReport_;
     }
-    if (combatSandbox.Dummy().IsDefeated()) {
+    // A real E interaction can begin a new finite target attempt after early
+    // free-combat defeat. Synthetic legacy discovery keeps its rejection rule.
+    // Never reset the player, discovery ledger, session clock or scoring totals.
+    if (combatSandbox.Dummy().IsDefeated()
+        && (!interaction.actionOwner || !combatSandbox.RestoreDefeatedEncounterTarget())) {
         lastReport_ = {LandmarkEncounterResult::TargetUnavailable, 0.0f};
         return lastReport_;
     }

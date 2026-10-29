@@ -202,6 +202,9 @@ public:
     void RegisterSuccessfulAttackHit();
     bool ConsumeStaggerOpening();
     void ResetTrainingSession();
+    // Start a finite encounter target after free-combat defeat without resetting
+    // the session clock, cumulative metrics or the player's attack cooldown.
+    bool RestoreDefeatedEncounterTarget();
     void ResetTechniqueChain() {
         techniqueChain_ = 0;
         lastTechniqueMicros_ = -1000000000;

@@ -1,0 +1,121 @@
+{
+  "format": "astral-scene",
+  "version": 1,
+  "environment": {
+    "fog": false,
+    "shadows": false,
+    "bloom": false,
+    "outlines": false,
+    "exposure": 1.0
+  },
+  "materials": {
+    "groundUnlit": {
+      "shading": "Unlit",
+      "blend": "Opaque",
+      "baseColor": [
+        0.8,
+        0.8,
+        0.8
+      ],
+      "texture": "textures/GroundChecker.png",
+      "uvScale": [
+        4,
+        4
+      ]
+    },
+    "boxUnlit": {
+      "shading": "Unlit",
+      "blend": "Opaque",
+      "baseColor": [
+        0.6,
+        0.75,
+        0.45
+      ]
+    }
+  },
+  "entities": [
+    {
+      "name": "Main Camera",
+      "transform": {
+        "position": [
+          0,
+          3,
+          -8
+        ],
+        "rotation": {
+          "euler": [
+            14,
+            0,
+            0
+          ]
+        }
+      },
+      "components": {
+        "Camera": {
+          "fieldOfView": 60,
+          "nearPlane": 0.1,
+          "farPlane": 100
+        },
+        "AudioListener": {}
+      }
+    },
+    {
+      "name": "Ground",
+      "transform": {
+        "scale": [
+          10,
+          1,
+          10
+        ]
+      },
+      "components": {
+        "MeshRenderer": {
+          "mesh": "primitive:plane",
+          "material": "groundUnlit"
+        },
+        "Collider": {
+          "shape": "Mesh"
+        }
+      }
+    },
+    {
+      "name": "Box",
+      "transform": {
+        "position": [
+          0,
+          2,
+          0
+        ]
+      },
+      "components": {
+        "MeshRenderer": {
+          "mesh": "primitive:cube",
+          "material": "boxUnlit"
+        },
+        "Collider": {
+          "shape": "Box",
+          "halfExtents": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "RigidBody": {
+          "type": "Dynamic",
+          "mass": 1
+        }
+      }
+    },
+    {
+      "model": "models/FacetedMarker.gltf",
+      "name": "FacetedMarker",
+      "transform": {
+        "position": [
+          2,
+          0,
+          1
+        ]
+      }
+    }
+  ]
+}

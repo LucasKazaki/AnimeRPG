@@ -10,6 +10,7 @@
 // Thought prompt (Enter submits, Escape closes it instead of quitting).
 
 #include "Engine/Core/JobSystem.h"
+#include "Engine/Input/KeyCaptureLatch.h"
 #include "Engine/Platform/Win32/Win32WaveOutput.h"
 #include "Game/Showcase/GameplayBridge.h"
 #include "Game/Showcase/MallShowcase.h"
@@ -41,11 +42,12 @@ public:
     void HandleFunctionKeys(bool f2, bool f3, bool f4, const Scene::WorldBlockout& world);
 
     // Typed Thought prompt (WM_CHAR). Returns true when the character was consumed.
-    bool HandleChar(wchar_t character);
+    bool HandleChar(wchar_t character, bool repeated = false);
+    void OnFocusLost();
     bool PromptOpen() const { return Enabled() && promptOpen_; }
-    // Gameplay keys are ignored while typing, and the Escape that closed the
-    // prompt is held back until released so it never also quits the game.
-    bool SuppressKey(int virtualKey);
+    // Observe physical up as well as down, even while the renderer is disabled.
+    // Closing a prompt quarantines held keys until release, including Escape.
+    bool SuppressKey(int virtualKey, bool physicallyDown, bool background = false);
     // Returns (and clears) a thought submitted with Enter this frame.
     std::string TakeSubmittedThought();
 
@@ -72,7 +74,7 @@ private:
     std::string submitted_;
     bool enabled_{};
     bool promptOpen_{};
-    bool escapeLatched_{};
+    Input::KeyCaptureLatch capturedKeys_;
     bool f2Held_{}, f3Held_{}, f4Held_{};
 };
 

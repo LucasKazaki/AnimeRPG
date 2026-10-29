@@ -9,28 +9,34 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "cmake/AstralEngineSources.cmake"
+      - "cmake/**"
       - "Engine/**"
       - "Game/Showcase/**"
       - "Tests/Engine*.cpp"
       - "Tests/EngineRuntime/**"
       - "Tests/EngineTestSupport.h"
+      - "Tests/AssertionsEnabled.cpp"
       - "Tools/AstralCapture.cpp"
       - "Tools/AstralPlayer.cpp"
+      - "Tools/AstralProject.cpp"
+      - "Scripts/test_portable_build_contract.py"
       - "Game/Samples/**"
       - "Content/Samples/**"
       - ".github/workflows/engine-runtime.yml"
   push:
     branches: [main]
     paths:
-      - "cmake/AstralEngineSources.cmake"
+      - "cmake/**"
       - "Engine/**"
       - "Game/Showcase/**"
       - "Tests/Engine*.cpp"
       - "Tests/EngineRuntime/**"
       - "Tests/EngineTestSupport.h"
+      - "Tests/AssertionsEnabled.cpp"
       - "Tools/AstralCapture.cpp"
       - "Tools/AstralPlayer.cpp"
+      - "Tools/AstralProject.cpp"
+      - "Scripts/test_portable_build_contract.py"
       - "Game/Samples/**"
       - "Content/Samples/**"
       - ".github/workflows/engine-runtime.yml"
@@ -58,6 +64,9 @@ jobs:
           - { name: "GCC TSan", cxx: g++, type: RelWithDebInfo, flags: "-DASTRAL_TSAN=ON" }
     steps:
       - uses: actions/checkout@v6
+
+      - name: Verify portable build and trigger contracts (offline)
+        run: python3 Scripts/test_portable_build_contract.py
 
       - name: Configure
         shell: bash
